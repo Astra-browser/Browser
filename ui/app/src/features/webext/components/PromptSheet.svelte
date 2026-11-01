@@ -24,10 +24,35 @@
   const restore = beside ? () => {} : expandBriefly();
   onDestroy(restore);
 
+  let sheet = $state<HTMLDivElement>();
+
+  // The sheet is modal (the chrome behind it is inert): Tab loops over its
+  // own buttons instead of leaving for the window behind it. Same shape as
+  // the permission sheet's loop, so every browser-owned modal answers keys
+  // the same way. Heard on the window, as the permission sheet does, so the
+  // sheet itself stays a plain labelled dialog.
+  function onkeydown(event: KeyboardEvent) {
+    if (event.key !== "Tab" || !sheet?.contains(document.activeElement)) return;
+    const buttons = Array.from(sheet.querySelectorAll("button"));
+    const first = buttons.at(0);
+    const last = buttons.at(-1);
+    if (first === undefined || last === undefined) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   let left = $derived(beside ? COMPACT_WIDTH + INSET : INSET);
 </script>
 
+<svelte:window {onkeydown} />
+
 <div
+  bind:this={sheet}
   role="alertdialog"
   aria-modal="true"
   aria-labelledby={labelledby}

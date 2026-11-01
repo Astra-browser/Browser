@@ -262,14 +262,15 @@
       <div class="astra-tabs-mount" bind:this={tabsMount}></div>
     </div>
     <div class="astra-main">
-      <div class="astra-bar-mount" bind:this={barMount}></div>
+      <div class="astra-bar-mount" role="banner" bind:this={barMount}></div>
       <div class="astra-split-mount" bind:this={splitMount}></div>
-      <div class="astra-content" data-astra-content="" bind:this={slot}>
+      <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
         {#if slotError}
-          <p class="slot-error">{slotError}</p>
+          <p class="slot-error" role="alert">{slotError}</p>
         {/if}
       </div>
     </div>
+  </div>
   </div>
   <details class="astra-about">
     <summary>Shell status</summary>
