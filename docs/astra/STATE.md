@@ -51,8 +51,8 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | done | orchestrator | agent/P2-T06-hostapi | Merged 2026-11-02; stub 262/262 + live 30/30 reproduced, no-regress 33/33+py+5/5, jar.mn wired; chrome repack deferred to next engine build (faster attempt hit fresh-objdir link fail, binary untouched, obj-x86_64* 93MB stray noted for cleanup) |
 | P2-T07 | History mirror into Places (`:visited`) | doing | worker-t07h | agent/P2-T07-history | Locked 2026-11-02; owns overlay History module + mirror doc only |
 | P2-T08 | `@astra/bridge` (Tauri-compat + mock mode) | done | orchestrator | agent/P2-T08-bridge | Merged 2026-11-02; ui 1069/1069 + bridge 19/19 reproduced, build + svelte-check clean, brand-lint clean; vitest.config tsc errors pre-existing |
-| P2-T09 | Session snapshot/restore round-trip | todo | — | — | — |
-| P2-T10 | Settings, keymap, logging, diagnostics | todo | — | — | — |
+| P2-T09 | Session snapshot/restore round-trip | doing | worker-t09b | agent/P2-T09-session | Locked 2026-11-02; owns core session + overlay Session module only |
+| P2-T10 | Settings, keymap, logging, diagnostics | doing | worker-t10b | agent/P2-T10-settings | Locked 2026-11-02; owns core settings/keymap/log/diagnostics only |
 
 ## Later phases
 
