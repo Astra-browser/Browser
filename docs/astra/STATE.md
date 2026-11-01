@@ -17,8 +17,8 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T06 | License/provenance | done | worker-1 | agent/P0-T06-license | Merged 2026-11-01; MPL LICENSE + NOTICE + 25/25 permissive |
 | P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
 | P0-T08 | CI skeleton | done | worker-1 | agent/P0-T08-ci | Merged 2026-11-01; ci-fast (brand-lint/state-check/plan-check) green locally |
-| P0-T09 | Spike briefs for U-01…U-13 | doing | orchestrator | main | Index in `docs/astra/spikes/README.md` |
-| P0-T10 | Repo hygiene docs | doing | orchestrator | main | STATE (lock registry) + DECISIONS + OWNER_QUESTIONS created; orchestration rules added to plan |
+| P0-T09 | Spike briefs for U-01…U-13 | done | orchestrator | main | Index in `docs/astra/spikes/README.md`; spikes execute in Phase 1 |
+| P0-T10 | Repo hygiene docs | doing | worker-1 | agent/P0-T10-hygiene | Locked 2026-11-01; SECURITY/CONTRIBUTING/CODEOWNERS missing |
 
 ## Phase 1 — Forge and skeleton (Linux)
 
