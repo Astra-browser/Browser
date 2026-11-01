@@ -1,6 +1,6 @@
-// astra-forge (P1-T01): assemble Astra = pinned upstream + patch series + overlay.
-// Zero-dependency CLI (std only; shells out to curl/tar/gpg). Commands:
-// fetch, doctor. import/overlay/config/build/test/package/export/bump arrive
+// astra-forge (P1-T01, P1-T02): assemble Astra = pinned upstream + patch series + overlay.
+// Zero-dependency CLI (std only; shells out to curl/tar/gpg/grep). Commands:
+// fetch, doctor, config. import/overlay/build/test/package/export/bump arrive
 // with their phase tasks.
 use std::env;
 use std::fs;
@@ -148,6 +148,10 @@ fn cmd_doctor(root: &Path) -> Result<(), String> {
             }
         }
     }
+    if let Err(e) = cmd_doctor_mozconfig(root) {
+        println!("doctor: mozconfig: {e}");
+        ok = false;
+    }
     if !ok {
         return Err("doctor: problems found (see above)".into());
     }
@@ -155,8 +159,169 @@ fn cmd_doctor(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// Configure files that may declare build options (P1-T02 evidence set).
+fn configure_files(engine: &Path) -> Vec<String> {
+    [
+        "build/moz.configure/init.configure",
+        "build/moz.configure/util.configure",
+        "build/moz.configure/update-programs.configure",
+        "moz.configure",
+        "toolkit/moz.configure",
+        "browser/moz.configure",
+    ]
+    .iter()
+    .map(|p| engine.join(p).to_string_lossy().into_owned())
+    .collect()
+}
+
+fn configure_has(engine: &Path, needle: &str) -> bool {
+    let files = configure_files(engine);
+    let mut cmd = Command::new("grep");
+    cmd.args(["-rq", "--", needle]);
+    for f in &files {
+        cmd.arg(f);
+    }
+    match cmd.output() {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    }
+}
+
+// Validate config/mozconfig.linux flags against the pinned source (P1-T02).
+fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
+    let template = root.join("config/mozconfig.linux");
+    if !template.exists() {
+        return Err("config/mozconfig.linux missing".into());
+    }
+    let engine = root.join("engine");
+    if !engine.join("toolkit/moz.configure").exists() {
+        return Err("engine/ source absent (run `forge fetch` first)".into());
+    }
+    // The template carries one placeholder in --with-branding; only the
+    // option *name* is validated, so substitute a dummy value first.
+    let text = fs::read_to_string(&template).map_err(|e| e.to_string())?;
+    let text = text.replace("@ASTRA_BRANDING_DIR@", "astra/branding");
+    let mut checked = 0;
+    let mut bad: Vec<String> = Vec::new();
+    for raw in text.lines() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(flags) = line.strip_prefix("ac_add_options") {
+            let flag = flags.trim();
+            // Split off any =value; the option name is what must exist.
+            let name = flag.split('=').next().unwrap_or(flag);
+            // Candidates that prove the option exists in the pinned source.
+            let cands: Vec<String> = if let Some(stem) = name
+                .strip_prefix("--enable-")
+                .or_else(|| name.strip_prefix("--disable-"))
+            {
+                vec![format!("\"--enable-{stem}\""), format!("\"--disable-{stem}\"")]
+            } else if let Some(stem) = name
+                .strip_prefix("--with-")
+                .or_else(|| name.strip_prefix("--without-"))
+            {
+                vec![format!("\"--with-{stem}\"")]
+            } else {
+                vec![format!("\"{name}\"")]
+            };
+            checked += 1;
+            if !cands.iter().any(|c| configure_has(&engine, c)) {
+                bad.push(flag.to_string());
+                println!("doctor: mozconfig flag NOT FOUND in pinned source: {flag}");
+            } else {
+                println!("doctor: mozconfig flag OK: {flag}");
+            }
+        } else if let Some(rest) = line.strip_prefix("export") {
+            let rest = rest.trim();
+            if let Some((var, val)) = rest.split_once('=') {
+                checked += 1;
+                let needle = format!("env=\"{var}\"");
+                if configure_has(&engine, &needle) {
+                    println!("doctor: mozconfig export OK: {var} (empty disables per options.py:454-456)");
+                } else {
+                    bad.push(rest.to_string());
+                    println!("doctor: mozconfig export NOT FOUND in pinned source: {rest}");
+                }
+                let _ = val;
+            }
+        } else if line.starts_with("mk_add_options") {
+            checked += 1;
+            println!("doctor: mozconfig passthrough (not a configure flag): {line}");
+        } else {
+            bad.push(line.to_string());
+            println!("doctor: mozconfig UNRECOGNISED line: {line}");
+        }
+    }
+    if checked == 0 {
+        return Err("no mozconfig lines checked".into());
+    }
+    if !bad.is_empty() {
+        return Err(format!("{} unknown mozconfig entr{}", bad.len(), if bad.len() == 1 { "y" } else { "ies" }));
+    }
+    println!("doctor: mozconfig clean ({checked} lines, see docs/astra/BUILD_FLAGS.md)");
+    Ok(())
+}
+
+// Render config/mozconfig.<os> into out/mozconfig.<os> (P1-T02).
+// Substitutes @ASTRA_*@ placeholders from branding/astra.toml.
+fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
+    if os != "linux" {
+        return Err(format!("os {os}: only linux yet (windows P9, macos P10)"));
+    }
+    let template_path = root.join(format!("config/mozconfig.{os}"));
+    if !template_path.exists() {
+        return Err(format!("{} missing", template_path.display()));
+    }
+    let branding_toml = root.join("branding/astra.toml");
+    let brands = fs::read_to_string(&branding_toml).map_err(|e| e.to_string())?;
+    let mut display = String::from("Astra");
+    let mut binary = String::from("astra");
+    for line in brands.lines() {
+        let line = line.split('#').next().unwrap_or("").trim().to_string();
+        if let Some((k, v)) = line.split_once('=') {
+            let v = v.trim().trim_matches('"').trim().to_string();
+            match k.trim() {
+                "display_name" => display = v,
+                "binary_name" => binary = v,
+                _ => {}
+            }
+        }
+    }
+    // Non-fatal: OWNER_DECISION placeholders block release builds only (D-19).
+    for line in brands.lines() {
+        if line.contains("OWNER_DECISION") {
+            println!("config: WARNING branding placeholder pending owner decision: {}", line.trim());
+        }
+    }
+    let branding_dir = match branding {
+        "astra" => "astra/branding",
+        "unofficial" => "browser/branding/unofficial",
+        other => return Err(format!("unknown --branding {other} (want astra|unofficial)")),
+    };
+    let template = fs::read_to_string(&template_path).map_err(|e| e.to_string())?;
+    let rendered = template
+        .replace("@ASTRA_BRANDING_DIR@", branding_dir)
+        .replace("@ASTRA_DISPLAY_NAME@", &display)
+        .replace("@ASTRA_BINARY_NAME@", &binary);
+    if rendered.contains("@ASTRA_") {
+        return Err("config: unsubstituted @ASTRA_*@ placeholder left".into());
+    }
+    let out_dir = root.join("out");
+    fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+    let dest = out_dir.join(format!("mozconfig.{os}"));
+    fs::write(&dest, &rendered).map_err(|e| e.to_string())?;
+    println!("config: rendered {} (branding={branding} -> {branding_dir})", dest.display());
+    if branding == "astra" && !root.join("engine/astra/branding").exists() {
+        println!("config: WARNING engine/astra/branding absent (lands P1-T03); configure needs `forge config --branding unofficial` until then");
+    }
+    println!("config: next: export MOZCONFIG={}", dest.display());
+    Ok(())
+}
+
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor>");
+    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]>");
     std::process::exit(2);
 }
 
@@ -166,6 +331,22 @@ fn main() {
     let res = match args.first().map(|s| s.as_str()) {
         Some("fetch") => cmd_fetch(&root),
         Some("doctor") => cmd_doctor(&root),
+        Some("config") => {
+            let mut os = "linux";
+            let mut branding = "astra";
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
+                    "--branding" => branding = it.next().map(|s| s.as_str()).unwrap_or(branding),
+                    other => {
+                        eprintln!("astra-forge: error: unknown config flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_config(&root, os, branding)
+        }
         _ => usage(),
     };
     if let Err(e) = res {
