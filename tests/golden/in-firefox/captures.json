@@ -1,0 +1,148 @@
+{
+ "firefox": "/home/rem/Projects/Astra/engine/obj-astra-linux/dist/bin/firefox",
+ "geckodriver": "/home/rem/Projects/Astra/engine/obj-astra-linux/dist/host/bin/geckodriver",
+ "pinnedClock": "2026-09-28T14:32:00.000Z",
+ "timezone": "UTC",
+ "locale": "en-US",
+ "settle_s": 1.2,
+ "captures": [
+  {
+   "name": "shell-light",
+   "bytes": 1037245,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "shell-dark",
+   "bytes": 1161273,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "spaces-light",
+   "bytes": 32969,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "spaces-dark",
+   "bytes": 32825,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "newtab-light",
+   "bytes": 961535,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "newtab-dark",
+   "bytes": 1109548,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "launcher-light",
+   "bytes": 23638,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "launcher-dark",
+   "bytes": 23708,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "tasks-light",
+   "bytes": 44469,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "tasks-dark",
+   "bytes": 45886,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "notes-light",
+   "bytes": 58357,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "notes-dark",
+   "bytes": 60146,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "time-light",
+   "bytes": 111799,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "time-dark",
+   "bytes": 113037,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "settings-light",
+   "bytes": 134169,
+   "slot": [
+    1440,
+    900
+   ]
+  },
+  {
+   "name": "settings-dark",
+   "bytes": 133863,
+   "slot": [
+    1440,
+    900
+   ]
+  }
+ ],
+ "skipped": [
+  {
+   "name": "shell-light-narrow",
+   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+  },
+  {
+   "name": "shell-dark-narrow",
+   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+  }
+ ]
+}

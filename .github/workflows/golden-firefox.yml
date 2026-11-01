@@ -1,0 +1,46 @@
+# golden-firefox (P3-T11 sketch): in-Firefox goldens vs standalone baseline.
+#
+# Compares the P0-T07 standalone (Chromium) baselines against captures
+# rendered by the REAL Astra build (Gecko) and gates per-screen pixel diff
+# at <= 1.5% (tolerance 16/channel for text antialiasing; see
+# tools/golden-capture/MASKS.md).
+#
+# Requirements (not available on ubuntu-latest runners):
+#   - a full Astra engine build (engine/obj-astra-linux/dist/bin/firefox +
+#     in-tree geckodriver) — ~70 min build; provide via a self-hosted runner
+#     with a warm objdir, or run on the nightly build job and copy dist/ in.
+#   - bun (golden UI bundle build), python3 (stdlib only — no pip needed),
+#     DejaVu/system fonts pinned per tests/golden/MANIFEST.md.
+#
+# Until the self-hosted runner exists this workflow is manual
+# (workflow_dispatch) + nightly; ci-fast keeps the no-browser self-tests.
+#
+# Current status (2026-11-02, worker run): 13/16 desktop PASS at ≤1.5%,
+# 3 marginal text-raster FAILs + 2 narrow SKIP documented in
+# tests/golden/in-firefox/DEVIATIONS.md — compare.py exits 1 until the gate
+# is tuned or text down-weighting lands, so this job is expected-red for now
+# (report, don't gate).
+name: golden-firefox
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+jobs:
+  in-firefox-goldens:
+    runs-on: [self-hosted, astra-build]
+    env:
+      TZ: UTC
+      LANG: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd tools/golden-capture && bun install
+      - run: python3 tools/golden-capture/capture_firefox.py
+      - run: python3 tools/golden-capture/compare.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: in-firefox-goldens
+          path: |
+            tests/golden/in-firefox/
+      - run: ./tools/brand-lint.sh
