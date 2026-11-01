@@ -165,6 +165,7 @@ fn configure_files(engine: &Path) -> Vec<String> {
         "build/moz.configure/init.configure",
         "build/moz.configure/util.configure",
         "build/moz.configure/update-programs.configure",
+        "build/moz.configure/toolchain.configure",
         "moz.configure",
         "toolkit/moz.configure",
         "browser/moz.configure",
@@ -444,8 +445,46 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// Run the build: `mach build` (full) or `mach build faster` (frontend-only, U-02).
+// Defaults MOZCONFIG to out/mozconfig.linux and SCCACHE_DIR to out/sccache
+// when the caller did not set them (the P1-T04 proven setup).
+fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String> {
+    let engine = root.join("engine");
+    if !engine.join("mach").exists() {
+        return Err("engine/ source absent (run `forge fetch` first)".into());
+    }
+    let mut cmd = Command::new("./mach");
+    cmd.arg("build").current_dir(&engine);
+    if faster {
+        cmd.arg("faster");
+    }
+    if let Some(n) = jobs {
+        cmd.arg(format!("-j{n}"));
+    }
+    if std::env::var("MOZCONFIG").is_err() {
+        let rendered = root.join("out/mozconfig.linux");
+        if rendered.exists() {
+            cmd.env("MOZCONFIG", &rendered);
+            println!("build: MOZCONFIG defaulted to {}", rendered.display());
+        } else {
+            println!("build: WARNING no MOZCONFIG set and out/mozconfig.linux absent (run `forge config`)");
+        }
+    }
+    if std::env::var("SCCACHE_DIR").is_err() {
+        let dir = root.join("out/sccache");
+        cmd.env("SCCACHE_DIR", &dir);
+        println!("build: SCCACHE_DIR defaulted to {}", dir.display());
+    }
+    let st = cmd.status().map_err(|e| format!("spawn mach: {e}"))?;
+    if !st.success() {
+        return Err("mach build failed (see output above)".into());
+    }
+    println!("build: done");
+    Ok(())
+}
+
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint>");
+    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|build [--faster] [--jobs N]>");
     std::process::exit(2);
 }
 
@@ -472,6 +511,22 @@ fn main() {
                 }
             }
             cmd_config(&root, os, branding)
+        }
+        Some("build") => {
+            let mut faster = false;
+            let mut jobs: Option<&str> = None;
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--faster" => faster = true,
+                    "--jobs" => jobs = Some(it.next().map(|s| s.as_str()).unwrap_or("")),
+                    other => {
+                        eprintln!("astra-forge: error: unknown build flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_build(&root, faster, jobs)
         }
         _ => usage(),
     };
