@@ -7,3 +7,15 @@
 # This file only declares packaging; chrome/resource registration lives in jar.mn.
 
 JAR_MANIFESTS += ["jar.mn"]
+
+# Autoconfig (P1-T06): local-settings.js selects dist/bin/mozilla.cfg, which
+# runs after every defaults file and lockPrefs the privacy posture.
+# (Plain defaults/pref files lose to browser/defaults/preferences/firefox.js,
+# e.g. app.normandy.enabled=true at $SRCDIR/browser/app/profile/firefox.js:2871.)
+# mozilla.cfg must sit beside the binary: FINAL_TARGET_FILES root = dist/bin.
+JS_PREFERENCE_FILES += ["prefs/local-settings.js"]
+FINAL_TARGET_FILES += ["mozilla.cfg"]
+
+# Enterprise policies (P1-T06): dist/bin/distribution/policies.json.
+# Packaged builds pick it up via package-manifest.in @RESPATH@/distribution/*.
+FINAL_TARGET_FILES.distribution += ["policies/policies.json"]
