@@ -9,7 +9,9 @@ lock it: no other agent may touch that task, its files, or its branch.
 |---|---|---|---|---|---|
 | P0-T01 | Machine/toolchain check (Linux) | doing | orchestrator | main | Initial facts in `docs/astra/DEV_SETUP.md`; `mach` absent, Firefox build reqs unverified |
 | P0-T02 | Clean repo + record base snapshot | doing | orchestrator | main | Repo initialised; base = `folder_context` snapshot (no VCS metadata), see `PROVENANCE.md` |
-| P0-T03 | Full inventory (crates, IPC, UI, storage, skills) | doing | orchestrator | main | First cut in `docs/astra/INVENTORY.md`; `ipc-surface.md` + `PARITY.md` pending — **next up** |
+| P0-T03 | Full inventory (crates, IPC, UI, storage, skills) | doing | orchestrator | main | First cut in `docs/astra/INVENTORY.md`; sub-rows below |
+| P0-T03a | IPC surface: every command/event + payloads | doing | worker-1 | agent/P0-T03a-ipc-surface | Locked 2026-11-01; feeds P0-T04 + P2-T02 |
+| P0-T03b | PARITY.md (README claims vs code) | todo | — | — | Blocked on T03a for command coverage |
 | P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | todo | — | — | Draft in `docs/astra/PORTING_MAP.md` |
 | P0-T05 | Rebrand tooling + `brand-lint` | doing | orchestrator | main | `plan.md` cleaned of previous product name; `tools/rebrand` spec pending |
 | P0-T06 | License/provenance | doing | orchestrator | main | `PROVENANCE.md` drafted; `cargo-about`/Bun license scan pending |
