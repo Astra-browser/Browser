@@ -60,7 +60,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 |---|---|---|---|---|---|
 | P3-T01 | UI into `ui/` Bun workspace (standalone track) | done | worker-2 | agent/P3-T01-ui | Merged 2026-11-01; typecheck 0 errs, tests 1062 pass, vite build exit 0 |
 | P3-T02 | Spike S-01 content slots (+ split/Work panes impl) | done | orchestrator | agent/P3-T02-slots | Merged 2026-11-02; CSS-grid slots (U-05 resolved), stub 39/39 + live 16/16, no-regress green; FIXED load-bearing P2-T06 regression (XUL_NS xhtml→xul, live-guarded) |
-| P3-T03 | Window frame per OS (Linux first) | doing | worker-frame | agent/P3-T03-frame | Locked 2026-11-02; owns overlay chrome frame + shell frame files only |
+| P3-T03 | Window frame per OS (Linux first) | done | orchestrator | agent/P3-T03-frame | Merged 2026-11-02; model 27/27 + live 17/17, no-regress green; jar.mn wired; Shell mounting deferred to P3-T13 |
 | P3-T04 | Tabs (vertical, pinned, folders, DnD, context menus) | done | orchestrator | agent/P3-T04-tabs | Merged 2026-11-02; ui 1084/1084 + shell model 13/13 reproduced, build + svelte-check clean; SpaceBar failure not reproduced (worker env) |
 | P3-T05 | Spaces/profiles (S-02 + containers impl) | done | orchestrator | agent/P3-T05-spaces | Merged 2026-11-02; S-02 (spaces→containers, profiles→dirs), isolation 117/117, core 69/69, no-regress 262+73+27 green; jar.mn wired |
 | P3-T06 | Split view + layout persistence | doing | worker-split | agent/P3-T06-split | Locked 2026-11-02; owns split UI + layout persist only |
@@ -70,6 +70,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T10 | Welcome/onboarding flow | todo | — | — | — |
 | P3-T11 | Golden suite (in-Firefox vs baseline) | done | orchestrator | agent/P3-T11-goldff | Merged 2026-11-02; 13/16 PASS reproduced, 3 text-raster FAILs + 2 narrow SKIP documented; CI job report-only until gate tuning |
 | P3-T12 | Accessibility pass | todo | — | — | — |
+| P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | todo | — | — | New: deferred from T03/T04 (mounting touches live shell layout; needs guard updates) |
 
 ## Later phases
 

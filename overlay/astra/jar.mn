@@ -21,6 +21,8 @@ astra.jar:
   content/astra/res/shell-chrome.css     (chrome/shell-chrome.css)
   content/astra/res/shell/shell.mjs      (chrome/shell/shell.mjs)
   content/astra/res/shell/shell.css      (chrome/shell/shell.css)
+  content/astra/res/frame/frame.css     (chrome/frame/frame.css)
+  content/astra/res/frame/Frame.sys.mjs (chrome/frame/Frame.sys.mjs)
   content/astra/res/host/HostAPI.sys.mjs (host/HostAPI.sys.mjs)
   content/astra/res/host/Boot.sys.mjs (host/Boot.sys.mjs)
   content/astra/res/host/Windows.sys.mjs (host/Windows.sys.mjs)
