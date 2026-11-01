@@ -46,7 +46,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P2-T01 | Bring over crates per PORTING_MAP (`BrowserHost`) | done | orchestrator | agent/P2-T01-crates | Merged 2026-11-02; workspace check+clippy clean, tests 44/44, zero tauri/wry, MPL headers, brand-lint clean |
 | P2-T02 | `astra-proto` schemas + generated Rust/TS types | done | orchestrator | agent/P2-T02-proto | Merged 2026-11-02; 267/35 registries, cargo 6/6 + bun 7/7 + validate PASS, drift gate verified, brand-lint clean; fixed stale "8 channels" comment (10 renames); Specta full-typing deferred |
 | P2-T03 | IPC transport (framing, backpressure, crash recovery) | doing | worker-t03 | agent/P2-T03-transport | Locked 2026-11-02; owns crates/astra-ipc (new) |
-| P2-T04 | `astra-store` (rusqlite + migrations, WAL) | doing | worker-t04 | agent/P2-T04-store | Locked 2026-11-02; owns crates/astra-store migrations/schemas |
+| P2-T04 | `astra-store` (rusqlite + migrations, WAL) | done | orchestrator | agent/P2-T04-store | Merged 2026-11-02; schema v4 (29 tables), store 19/19 + workspace 59/59, clippy+fmt clean; rusqlite 0.40 (migration-compat) |
 | P2-T05 | `GeckoHost` + `MockHost` | todo | — | — | After T01; next wave |
 | P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | todo | — | — | Builds on P1-T10 stub; next wave |
 | P2-T07 | History mirror into Places (`:visited`) | todo | — | — | Next wave |
