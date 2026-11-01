@@ -82,7 +82,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T03 | Element hiding (cosmetic + click-to-hide) | done | orchestrator | agent/P4-T03-hiding | Merged 2026-11-02; protocol+logic 36+44 green; live injection deferred to P4-T11 |
 | P4-T04 | Extension manager + curated gallery | todo | — | — | Next wave (needs mapping research) |
 | P4-T05 | Importers (Chromium/Firefox/Zen/...) | done | orchestrator | agent/P4-T05-import | Merged 2026-11-02; 9 sources + store round-trip, 45/45, zero net deps; FIXED latent T03 tokio macros gap (workspace build now green) |
-| P4-T06 | Tab sleeping policy | doing | worker-sleep | agent/P4-T06-sleeping | Locked 2026-11-02; owns sleeping policy + tests only |
+| P4-T06 | Tab sleeping policy | done | orchestrator | agent/P4-T06-sleeping | Merged 2026-11-02; policy 9/9, core 94/94, workspace 232/232, clippy/fmt/brand clean |
 | P4-T07 | Private windows (nothing persisted) | done | orchestrator | agent/P4-T07-private | Merged 2026-11-02; guard + forensic tests green; host-excluded today, store wiring = caller contract (see PRIVATE.md status) |
 | P4-T08 | Downloads manager + PDF viewer | doing | worker-dl | agent/P4-T08-downloads | Locked 2026-11-02; owns downloads UI + tests only |
 | P4-T09 | Password/autofill decision | todo | — | — | Needs owner confirm; propose + defer |

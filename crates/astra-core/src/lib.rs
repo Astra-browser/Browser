@@ -20,6 +20,7 @@ pub mod search;
 pub mod session;
 pub mod settings;
 pub mod settings_ext;
+pub mod sleeping;
 pub mod spaces;
 pub mod tabs;
 

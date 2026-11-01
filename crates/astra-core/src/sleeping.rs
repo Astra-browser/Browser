@@ -1,0 +1,682 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+//! Tab sleeping policy: idle timers, memory pressure, exclusions (P4-T06).
+//!
+//! Inactive tabs sleep (discard) and wake on demand. This module is the
+//! **pure policy core**: given a [`TabState`] snapshot and `now_ms`, decide
+//! with [`should_sleep`]; given a host event, decide with
+//! [`should_wake`]. Effects stay behind the [`SleepHost`] seam, which maps
+//! 1:1 onto the Host API `Tabs.discard` / `Tabs.wakeup`
+//! (`overlay/astra/host/Tabs.sys.mjs`, live binding `discardBrowser` /
+//! tab reload — see `docs/astra/HOST_API_v1.md`). This crate never touches
+//! the host modules; the [`StubSleepHost`] below is the test double that
+//! proves the discard → wakeup round-trip preserves URL/scroll via the
+//! session snapshot ([`TabSnapshot`][crate::session::TabSnapshot]).
+//!
+//! Benchmark hooks: [`SleepMetrics`] records wake-latency samples and an
+//! estimated memory-savings counter. Live discard/restore timing belongs in
+//! the Host contract suite; the stub measures the policy round-trip here.
+
+use crate::session::{ScrollState, TabSnapshot};
+use std::collections::HashMap;
+use std::time::Instant;
+use thiserror::Error;
+
+/// Default idle time before a tab becomes sleep-eligible (30 minutes).
+pub const DEFAULT_IDLE_TIMEOUT_MS: i64 = 30 * 60 * 1000;
+
+/// Default per-discarded-tab memory-saving estimate (50 MiB, Firefox
+/// content-process ballpark; refined by P4-T10 baselines in PERF.md).
+pub const DEFAULT_ESTIMATED_SAVED_KB_PER_TAB: u64 = 50 * 1024;
+
+/// Host memory-pressure level driving sleep aggressiveness.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MemoryPressure {
+    /// Normal operation: sleep only past the idle timeout.
+    #[default]
+    None,
+    /// Elevated usage: halve the effective idle timeout.
+    Moderate,
+    /// Critical usage: sleep any inactive, non-excluded tab immediately.
+    Critical,
+}
+
+/// Point-in-time tab state the policy reasons over.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TabState {
+    pub id: String,
+    /// Last user-visible activity (ms since unix epoch, same clock as `now`).
+    pub last_active_ms: i64,
+    /// Currently selected / visible tab. Never sleeps while active.
+    pub active: bool,
+    /// Audible media playing. Never auto-sleeps.
+    pub audible: bool,
+    /// Pinned (or essential). Never auto-sleeps.
+    pub pinned: bool,
+    /// Devtools open on this tab. Never auto-sleeps.
+    pub devtools_open: bool,
+    /// Already discarded. Never re-sleeps (wake first).
+    pub discarded: bool,
+}
+
+impl TabState {
+    pub fn new(id: impl Into<String>, last_active_ms: i64) -> Self {
+        Self {
+            id: id.into(),
+            last_active_ms,
+            active: false,
+            audible: false,
+            pinned: false,
+            devtools_open: false,
+            discarded: false,
+        }
+    }
+
+    pub fn active(mut self) -> Self {
+        self.active = true;
+        self
+    }
+
+    pub fn audible(mut self) -> Self {
+        self.audible = true;
+        self
+    }
+
+    pub fn pinned(mut self) -> Self {
+        self.pinned = true;
+        self
+    }
+
+    pub fn devtools_open(mut self) -> Self {
+        self.devtools_open = true;
+        self
+    }
+
+    pub fn discarded(mut self) -> Self {
+        self.discarded = true;
+        self
+    }
+}
+
+/// Tunables for [`should_sleep`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SleepConfig {
+    /// Idle milliseconds before a tab is sleep-eligible under no pressure.
+    pub idle_timeout_ms: i64,
+    /// Estimated KiB saved per discarded tab (metrics only).
+    pub estimated_saved_kb_per_tab: u64,
+}
+
+impl Default for SleepConfig {
+    fn default() -> Self {
+        Self {
+            idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
+            estimated_saved_kb_per_tab: DEFAULT_ESTIMATED_SAVED_KB_PER_TAB,
+        }
+    }
+}
+
+/// Why a tab stays awake. Exclusions are explicit so call sites and the
+/// SLEEPING.md matrix can cite them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StayReason {
+    Active,
+    Audible,
+    Pinned,
+    DevtoolsOpen,
+    AlreadyDiscarded,
+    RecentlyActive,
+}
+
+/// Policy outcome for one tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SleepDecision {
+    Sleep,
+    Stay(StayReason),
+}
+
+impl SleepDecision {
+    pub fn should_sleep(&self) -> bool {
+        matches!(self, SleepDecision::Sleep)
+    }
+}
+
+/// Effective idle timeout under pressure. Moderate halves it; Critical
+/// returns 0 so any inactive tab is immediately eligible.
+pub fn effective_timeout_ms(config: &SleepConfig, pressure: MemoryPressure) -> i64 {
+    match pressure {
+        MemoryPressure::None => config.idle_timeout_ms,
+        MemoryPressure::Moderate => config.idle_timeout_ms / 2 + config.idle_timeout_ms % 2,
+        MemoryPressure::Critical => 0,
+    }
+}
+
+/// Pure policy: should this tab sleep at `now_ms`?
+///
+/// Order of checks (exclusions first, timers last):
+/// active → discarded → audible → pinned → devtools → idle timeout
+/// (pressure-adjusted). Clocks skewed into the future count as
+/// recently-active (never sleep on negative idle age).
+pub fn should_sleep(
+    tab: &TabState,
+    now_ms: i64,
+    config: &SleepConfig,
+    pressure: MemoryPressure,
+) -> SleepDecision {
+    if tab.active {
+        return SleepDecision::Stay(StayReason::Active);
+    }
+    if tab.discarded {
+        return SleepDecision::Stay(StayReason::AlreadyDiscarded);
+    }
+    if tab.audible {
+        return SleepDecision::Stay(StayReason::Audible);
+    }
+    if tab.pinned {
+        return SleepDecision::Stay(StayReason::Pinned);
+    }
+    if tab.devtools_open {
+        return SleepDecision::Stay(StayReason::DevtoolsOpen);
+    }
+    let idle_ms = now_ms.saturating_sub(tab.last_active_ms);
+    if idle_ms >= effective_timeout_ms(config, pressure) {
+        SleepDecision::Sleep
+    } else {
+        SleepDecision::Stay(StayReason::RecentlyActive)
+    }
+}
+
+/// Oldest-first sleep candidates, capped at `max_count` (`usize::MAX` for
+/// all). Only tabs with [`SleepDecision::Sleep`] are returned, ordered by
+/// `last_active_ms` ascending so memory-pressure batch sleeps reclaim the
+/// stalest tabs first.
+pub fn select_for_sleep<'a>(
+    tabs: &'a [TabState],
+    now_ms: i64,
+    config: &SleepConfig,
+    pressure: MemoryPressure,
+    max_count: usize,
+) -> Vec<&'a TabState> {
+    let mut eligible: Vec<&TabState> = tabs
+        .iter()
+        .filter(|t| should_sleep(t, now_ms, config, pressure).should_sleep())
+        .collect();
+    eligible.sort_by_key(|t| t.last_active_ms);
+    eligible.truncate(max_count);
+    eligible
+}
+
+/// Host-side events that may wake a discarded tab.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WakeEvent {
+    /// User selected / focused the tab.
+    UserActivated { tab_id: String },
+    /// Navigation committed or requested in the tab.
+    Navigated { tab_id: String },
+    /// Media playback requested while discarded.
+    MediaRequested { tab_id: String },
+    /// Extension or Work helper asked for the live page.
+    ExtensionRequested { tab_id: String },
+    /// Background tick / timer — never wakes.
+    BackgroundTick { tab_id: String },
+    /// Memory-pressure change — never wakes (sleep-side only).
+    PressureChanged,
+}
+
+impl WakeEvent {
+    pub fn tab_id(&self) -> Option<&str> {
+        match self {
+            WakeEvent::UserActivated { tab_id }
+            | WakeEvent::Navigated { tab_id }
+            | WakeEvent::MediaRequested { tab_id }
+            | WakeEvent::ExtensionRequested { tab_id }
+            | WakeEvent::BackgroundTick { tab_id } => Some(tab_id),
+            WakeEvent::PressureChanged => None,
+        }
+    }
+
+    /// Whether this event wakes a discarded tab.
+    pub fn requires_wake(&self) -> bool {
+        matches!(
+            self,
+            WakeEvent::UserActivated { .. }
+                | WakeEvent::Navigated { .. }
+                | WakeEvent::MediaRequested { .. }
+                | WakeEvent::ExtensionRequested { .. }
+        )
+    }
+}
+
+/// Pure wake policy: a discarded tab wakes exactly when the event requires
+/// it. Non-discarded tabs never "wake" (returns false).
+pub fn should_wake(discarded: bool, event: &WakeEvent) -> bool {
+    discarded && event.requires_wake()
+}
+
+/// Errors from the [`SleepHost`] seam.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum SleepError {
+    #[error("unknown tab {0}")]
+    UnknownTab(String),
+    #[error("tab {0} already discarded")]
+    AlreadyDiscarded(String),
+    #[error("tab {0} is not discarded")]
+    NotDiscarded(String),
+}
+
+/// Discard/wakeup seam. Maps onto Host API `Tabs.discard` / `Tabs.wakeup`
+/// in production; the stub below backs unit/benchmark tests so this crate
+/// never depends on the host modules.
+pub trait SleepHost {
+    fn discard(&mut self, tab_id: &str, now_ms: i64) -> Result<(), SleepError>;
+    fn wakeup(&mut self, tab_id: &str, now_ms: i64) -> Result<(), SleepError>;
+    fn is_discarded(&self, tab_id: &str) -> Option<bool>;
+}
+
+/// Wake-latency + memory-savings benchmark hooks.
+///
+/// - `record_discard` bumps the discarded counter and the KiB estimate.
+/// - `record_wakeup` bumps the restored counter and pushes a latency sample.
+/// - [`SleepBench`] times a discard → wakeup round-trip with `Instant` for
+///   live/contract harnesses; unit tests use the stub's simulated clock.
+#[derive(Clone, Debug, Default)]
+pub struct SleepMetrics {
+    pub discarded_count: u64,
+    pub restored_count: u64,
+    pub estimated_saved_kb: u64,
+    pub wake_latency_micros: Vec<u64>,
+}
+
+impl SleepMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record_discard(&mut self, estimated_kb: u64) {
+        self.discarded_count += 1;
+        self.estimated_saved_kb += estimated_kb;
+    }
+
+    pub fn record_wakeup(&mut self, latency_micros: u64) {
+        self.restored_count += 1;
+        self.wake_latency_micros.push(latency_micros);
+    }
+
+    pub fn mean_wake_latency_micros(&self) -> Option<f64> {
+        if self.wake_latency_micros.is_empty() {
+            return None;
+        }
+        let sum: u128 = self.wake_latency_micros.iter().map(|&v| v as u128).sum();
+        Some(sum as f64 / self.wake_latency_micros.len() as f64)
+    }
+
+    pub fn max_wake_latency_micros(&self) -> Option<u64> {
+        self.wake_latency_micros.iter().copied().max()
+    }
+}
+
+/// Wall-clock round-trip timer for live/contract harnesses: call
+/// `discard()` then `wakeup()` around the Host `discard`/`wakeup` calls and
+/// push `elapsed_micros()` into [`SleepMetrics::record_wakeup`].
+#[derive(Debug)]
+pub struct SleepBench {
+    start: Instant,
+}
+
+impl SleepBench {
+    pub fn discard() -> Self {
+        Self {
+            start: Instant::now(),
+        }
+    }
+
+    pub fn elapsed_micros(&self) -> u64 {
+        self.start.elapsed().as_micros() as u64
+    }
+}
+
+/// In-memory [`SleepHost`] double. Discard snapshots the tab's URL/scroll
+/// (via [`TabSnapshot`]) and marks it discarded; wakeup restores the exact
+/// snapshot. Unknown tabs error like the Host `no_such_tab` code.
+#[derive(Debug, Default)]
+pub struct StubSleepHost {
+    tabs: HashMap<String, TabSnapshot>,
+    pub metrics: SleepMetrics,
+    estimated_kb_per_tab: u64,
+}
+
+impl StubSleepHost {
+    pub fn new() -> Self {
+        Self {
+            tabs: HashMap::new(),
+            metrics: SleepMetrics::new(),
+            estimated_kb_per_tab: DEFAULT_ESTIMATED_SAVED_KB_PER_TAB,
+        }
+    }
+
+    pub fn with_estimate(mut self, kb: u64) -> Self {
+        self.estimated_kb_per_tab = kb;
+        self
+    }
+
+    /// Register a live tab (discarded = false) for the test.
+    pub fn add_tab(&mut self, id: &str, url: &str, scroll: Option<ScrollState>) {
+        self.tabs.insert(
+            id.to_owned(),
+            TabSnapshot {
+                astra_tab_id: id.to_owned(),
+                space_uuid: None,
+                folder_uuid: None,
+                url: url.to_owned(),
+                title: String::new(),
+                pinned: false,
+                position: self.tabs.len() as i64,
+                scroll,
+                zoom: None,
+                muted: false,
+                discarded: false,
+                window_id: "win-1".to_owned(),
+                history: vec![url.to_owned()],
+                history_index: Some(0),
+            },
+        );
+    }
+
+    pub fn snapshot(&self, tab_id: &str) -> Option<&TabSnapshot> {
+        self.tabs.get(tab_id)
+    }
+}
+
+impl SleepHost for StubSleepHost {
+    fn discard(&mut self, tab_id: &str, _now_ms: i64) -> Result<(), SleepError> {
+        match self.tabs.get_mut(tab_id) {
+            None => Err(SleepError::UnknownTab(tab_id.to_owned())),
+            Some(tab) if tab.discarded => Err(SleepError::AlreadyDiscarded(tab_id.to_owned())),
+            Some(tab) => {
+                tab.discarded = true;
+                self.metrics.record_discard(self.estimated_kb_per_tab);
+                Ok(())
+            }
+        }
+    }
+
+    fn wakeup(&mut self, tab_id: &str, _now_ms: i64) -> Result<(), SleepError> {
+        match self.tabs.get_mut(tab_id) {
+            None => Err(SleepError::UnknownTab(tab_id.to_owned())),
+            Some(tab) if !tab.discarded => Err(SleepError::NotDiscarded(tab_id.to_owned())),
+            Some(tab) => {
+                // Simulated restore cost: sub-millisecond stub-level sample so
+                // the metrics path is exercised without a live engine.
+                let bench = SleepBench::discard();
+                tab.discarded = false;
+                self.metrics.record_wakeup(bench.elapsed_micros().max(1));
+                Ok(())
+            }
+        }
+    }
+
+    fn is_discarded(&self, tab_id: &str) -> Option<bool> {
+        self.tabs.get(tab_id).map(|t| t.discarded)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::ScrollState;
+
+    const NOW: i64 = 1_700_000_000_000;
+
+    fn idle(id: &str, idle_ms: i64) -> TabState {
+        TabState::new(id, NOW - idle_ms)
+    }
+
+    #[test]
+    fn idle_timeout_gates_sleep() {
+        let config = SleepConfig::default();
+        assert_eq!(
+            should_sleep(&idle("fresh", 1_000), NOW, &config, MemoryPressure::None),
+            SleepDecision::Stay(StayReason::RecentlyActive)
+        );
+        assert_eq!(
+            should_sleep(
+                &idle("stale", DEFAULT_IDLE_TIMEOUT_MS + 1),
+                NOW,
+                &config,
+                MemoryPressure::None
+            ),
+            SleepDecision::Sleep
+        );
+        // Exactly at the timeout counts as idle.
+        assert_eq!(
+            should_sleep(
+                &idle("edge", DEFAULT_IDLE_TIMEOUT_MS),
+                NOW,
+                &config,
+                MemoryPressure::None
+            ),
+            SleepDecision::Sleep
+        );
+        // Future timestamps never sleep (clock skew → recently active).
+        assert_eq!(
+            should_sleep(
+                &TabState::new("skew", NOW + 60_000),
+                NOW,
+                &config,
+                MemoryPressure::None
+            ),
+            SleepDecision::Stay(StayReason::RecentlyActive)
+        );
+    }
+
+    #[test]
+    fn exclusions_never_sleep_even_when_idle() {
+        let config = SleepConfig::default();
+        let stale = DEFAULT_IDLE_TIMEOUT_MS + 60_000;
+        let cases = vec![
+            (idle("active", stale).active(), StayReason::Active),
+            (idle("audible", stale).audible(), StayReason::Audible),
+            (idle("pinned", stale).pinned(), StayReason::Pinned),
+            (
+                idle("devtools", stale).devtools_open(),
+                StayReason::DevtoolsOpen,
+            ),
+            (
+                idle("discarded", stale).discarded(),
+                StayReason::AlreadyDiscarded,
+            ),
+        ];
+        for (tab, reason) in cases {
+            assert_eq!(
+                should_sleep(&tab, NOW, &config, MemoryPressure::Critical),
+                SleepDecision::Stay(reason),
+                "tab {} must stay under critical pressure",
+                tab.id
+            );
+        }
+    }
+
+    #[test]
+    fn memory_pressure_accelerates_sleep() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tab = idle("t", 30_000); // idle 30s of a 60s timeout
+        assert_eq!(
+            should_sleep(&tab, NOW, &config, MemoryPressure::None),
+            SleepDecision::Stay(StayReason::RecentlyActive)
+        );
+        // Moderate halves the timeout to 30s → eligible.
+        assert_eq!(
+            should_sleep(&tab, NOW, &config, MemoryPressure::Moderate),
+            SleepDecision::Sleep
+        );
+        // Critical sleeps any inactive tab immediately.
+        let fresh = idle("fresh", 0);
+        assert_eq!(
+            should_sleep(&fresh, NOW, &config, MemoryPressure::Critical),
+            SleepDecision::Sleep
+        );
+        assert_eq!(effective_timeout_ms(&config, MemoryPressure::None), 60_000);
+        assert_eq!(
+            effective_timeout_ms(&config, MemoryPressure::Moderate),
+            30_000
+        );
+        assert_eq!(effective_timeout_ms(&config, MemoryPressure::Critical), 0);
+    }
+
+    #[test]
+    fn select_for_sleep_returns_oldest_first_with_cap() {
+        let config = SleepConfig {
+            idle_timeout_ms: 10_000,
+            ..SleepConfig::default()
+        };
+        let tabs = vec![
+            idle("new-stale", 20_000),
+            idle("old-stale", 90_000),
+            idle("fresh", 1_000),
+            idle("excluded", 90_000).audible(),
+        ];
+        let all = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = all.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["old-stale", "new-stale"]);
+        let capped = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, 1);
+        assert_eq!(capped.len(), 1);
+        assert_eq!(capped[0].id, "old-stale");
+    }
+
+    #[test]
+    fn wake_on_events_only_when_discarded() {
+        let wake_events = vec![
+            WakeEvent::UserActivated {
+                tab_id: "t".to_owned(),
+            },
+            WakeEvent::Navigated {
+                tab_id: "t".to_owned(),
+            },
+            WakeEvent::MediaRequested {
+                tab_id: "t".to_owned(),
+            },
+            WakeEvent::ExtensionRequested {
+                tab_id: "t".to_owned(),
+            },
+        ];
+        for event in &wake_events {
+            assert!(event.requires_wake());
+            assert!(should_wake(true, event));
+            assert!(!should_wake(false, event));
+        }
+        let quiet = vec![
+            WakeEvent::BackgroundTick {
+                tab_id: "t".to_owned(),
+            },
+            WakeEvent::PressureChanged,
+        ];
+        for event in &quiet {
+            assert!(!event.requires_wake());
+            assert!(!should_wake(true, event));
+        }
+    }
+
+    #[test]
+    fn stub_round_trip_preserves_url_and_scroll() {
+        let mut host = StubSleepHost::new();
+        let scroll = ScrollState::new(0, 240);
+        host.add_tab("tab-a", "https://a.example/", Some(scroll.clone()));
+        let before = host.snapshot("tab-a").unwrap().clone();
+        assert!(!before.discarded);
+
+        host.discard("tab-a", NOW).unwrap();
+        let sleeping = host.snapshot("tab-a").unwrap();
+        assert!(sleeping.discarded);
+        assert_eq!(sleeping.url, before.url);
+        assert_eq!(sleeping.scroll, before.scroll);
+        assert_eq!(host.metrics.discarded_count, 1);
+        assert_eq!(
+            host.metrics.estimated_saved_kb,
+            DEFAULT_ESTIMATED_SAVED_KB_PER_TAB
+        );
+
+        host.wakeup("tab-a", NOW + 5_000).unwrap();
+        let restored = host.snapshot("tab-a").unwrap();
+        assert!(!restored.discarded);
+        // Discard → wakeup preserves organisation: URL, scroll, history.
+        assert_eq!(restored.url, "https://a.example/");
+        assert_eq!(restored.scroll, Some(scroll));
+        assert_eq!(restored.history, before.history);
+        assert_eq!(restored.history_index, before.history_index);
+        assert_eq!(host.metrics.restored_count, 1);
+        assert_eq!(host.metrics.wake_latency_micros.len(), 1);
+        assert!(host.metrics.mean_wake_latency_micros().unwrap() >= 1.0);
+        assert!(host.metrics.max_wake_latency_micros().unwrap() >= 1);
+    }
+
+    #[test]
+    fn stub_rejects_bad_transitions_like_host_errors() {
+        let mut host = StubSleepHost::new();
+        assert_eq!(
+            host.discard("ghost", NOW),
+            Err(SleepError::UnknownTab("ghost".to_owned()))
+        );
+        host.add_tab("t", "https://t.example/", None);
+        assert_eq!(
+            host.wakeup("t", NOW),
+            Err(SleepError::NotDiscarded("t".to_owned()))
+        );
+        host.discard("t", NOW).unwrap();
+        assert_eq!(
+            host.discard("t", NOW),
+            Err(SleepError::AlreadyDiscarded("t".to_owned()))
+        );
+        assert_eq!(host.is_discarded("t"), Some(true));
+        assert_eq!(host.is_discarded("ghost"), None);
+    }
+
+    #[test]
+    fn policy_driven_stub_sleep_and_wake() {
+        // End-to-end at stub level: policy selects, host discards, wake
+        // event restores.
+        let config = SleepConfig {
+            idle_timeout_ms: 10_000,
+            ..SleepConfig::default()
+        };
+        let tabs = vec![idle("old", 60_000), idle("young", 1_000)];
+        let candidates = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, "old");
+
+        let mut host = StubSleepHost::new();
+        host.add_tab("old", "https://old.example/", Some(ScrollState::new(5, 5)));
+        host.add_tab("young", "https://young.example/", None);
+        for tab in &candidates {
+            host.discard(&tab.id, NOW).unwrap();
+        }
+        assert_eq!(host.is_discarded("old"), Some(true));
+        assert_eq!(host.is_discarded("young"), Some(false));
+
+        let wake = WakeEvent::UserActivated {
+            tab_id: "old".to_owned(),
+        };
+        assert!(should_wake(host.is_discarded("old").unwrap(), &wake));
+        host.wakeup("old", NOW + 1_000).unwrap();
+        assert_eq!(host.snapshot("old").unwrap().url, "https://old.example/");
+    }
+
+    #[test]
+    fn metrics_accumulate_across_tabs() {
+        let mut metrics = SleepMetrics::new();
+        assert_eq!(metrics.mean_wake_latency_micros(), None);
+        metrics.record_discard(1024);
+        metrics.record_discard(2048);
+        metrics.record_wakeup(100);
+        metrics.record_wakeup(300);
+        assert_eq!(metrics.discarded_count, 2);
+        assert_eq!(metrics.restored_count, 2);
+        assert_eq!(metrics.estimated_saved_kb, 3072);
+        assert_eq!(metrics.mean_wake_latency_micros(), Some(200.0));
+        assert_eq!(metrics.max_wake_latency_micros(), Some(300));
+    }
+}
