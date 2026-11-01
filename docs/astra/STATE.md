@@ -88,13 +88,12 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T09 | Password/autofill decision | done | orchestrator | agent/P4-T09-password | Research merged; recommends extension-only; owner decision pending (OWNER_QUESTIONS #6 expanded) |
 | P4-T10 | Performance baselines | done | orchestrator | agent/P4-T10-perf | Merged 2026-11-02; baselines recorded (startup/RAM/switch/scroll/blocker), scripts validated; confirm re-run after engine rebuild |
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
-| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 
 ## Phase 5 — Tasks, Notes, Time
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P5-T01 | Tasks domain (lists, priorities, NL parser) | doing | worker-task | agent/P5-T01-tasks | Locked 2026-11-02; owns tasks domain + tests only |
+| P5-T01 | Tasks domain (lists, priorities, NL parser) | done | orchestrator | agent/P5-T01-tasks | Merged 2026-11-02; tasks 31/31, workspace 284/284, clippy/fmt/brand clean |
 | P5-T02 | Tasks UI + "make task" palette | todo | — | — | After T01 |
 | P5-T03 | Notes (Markdown files + index + watcher) | done | orchestrator | agent/P5-T03-notes | Merged 2026-11-02; notes 12/12, workspace 253/253, clippy/fmt/brand clean |
 | P5-T04 | Time tracking (per-site, focus mode) | doing | worker-time | agent/P5-T04-time | Locked 2026-11-02; owns time domain + tests only |
