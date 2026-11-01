@@ -1,0 +1,19 @@
+[package]
+name = "astra-import"
+version = "0.1.0"
+edition = "2021"
+description = "Astra browser importers: bookmarks and history readers for Chromium-family browsers, Firefox-family browsers, Zen, Arc and Safari (P4-T05)"
+license = "MPL-2.0"
+
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde_json = "1"
+tempfile = "3"
+url = "2"
+plist = { version = "1.10", default-features = false }
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+astra-store = { path = "../astra-store" }
+tempfile = "3"
