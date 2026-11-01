@@ -175,6 +175,54 @@ export function validateSnapshot(snapshot) {
       return `active tab ${snapshot.active_tab_id} not in snapshot`;
     }
   }
+  // Split-view layout (P3-T06): optional; mirrors `SplitLayout::validate`
+  // in `astra-core` (version, 1–4 slots, unique ids, ratios in (0,1]
+  // summing to 1.0, active slot present). Absent layout stays valid
+  // (pre-P3-T06 rows have no key; core uses `#[serde(default)]`).
+  if (snapshot.layout !== undefined && snapshot.layout !== null) {
+    const reason = validLayout(snapshot.layout);
+    if (reason) {
+      return reason;
+    }
+  }
+  return null;
+}
+
+// Structural validation for the P3-T06 split layout payload.
+function validLayout(layout) {
+  if (!isRecord(layout)) {
+    return "layout must be an object";
+  }
+  if (layout.version !== 1) {
+    return `unsupported layout version ${layout.version} (expected 1)`;
+  }
+  const slots = layout.slots;
+  if (!Array.isArray(slots) || slots.length < 1 || slots.length > 4) {
+    return "layout slots must be an array of 1..=4 entries";
+  }
+  const seen = new Set();
+  let sum = 0;
+  for (const s of slots) {
+    if (!isRecord(s) || typeof s.slot_id !== "string" || s.slot_id === "") {
+      return "layout slot_id must be a non-empty string";
+    }
+    if (seen.has(s.slot_id)) {
+      return `duplicate layout slot ${s.slot_id}`;
+    }
+    seen.add(s.slot_id);
+    if (typeof s.ratio !== "number" || !Number.isFinite(s.ratio) || s.ratio <= 0 || s.ratio > 1) {
+      return `layout slot ${s.slot_id} ratio out of range`;
+    }
+    sum += s.ratio;
+  }
+  if (Math.abs(sum - 1) > 1e-6) {
+    return `layout slot ratios must sum to 1.0 (got ${sum})`;
+  }
+  if (layout.active_slot_id !== undefined && layout.active_slot_id !== null) {
+    if (typeof layout.active_slot_id !== "string" || !seen.has(layout.active_slot_id)) {
+      return `layout active slot ${layout.active_slot_id} not in layout`;
+    }
+  }
   return null;
 }
 
@@ -226,6 +274,10 @@ export const Session = {
         active_tab_id: ordered.some((t) => t.astra_tab_id === selected_tab_id)
           ? selected_tab_id
           : null,
+        // The host model owns no layout state (P3-T06: core owns the
+        // SplitLayout); explicit null so core knows there is no host
+        // contribution to merge.
+        layout: null,
       },
     });
   },
@@ -372,6 +424,9 @@ export const Session = {
       order: finalOrder,
       active_tab_id: activeTabId,
       scroll_intents: scrollIntents,
+      // Split layout rides through untouched (P3-T06): the host applies
+      // tabs/windows; the shell applies the layout from this echo.
+      layout: snapshot.layout ?? null,
     });
   },
 };

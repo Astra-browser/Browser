@@ -1,144 +1,377 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "resource://astra/host/schemas/session.json",
-  "title": "Host API v1 — Session",
-  "description": "Startup session snapshot/restore (P2-T09, plan §5.4). Core owns organisation (spaces, folders, pins, order, scroll); the host applies snapshots through Tabs/Windows. On conflict live-existence wins for tabs, core wins for organisation. Private windows are never snapshotted.",
-  "type": "object",
-  "properties": {
-    "snapshot_version": { "const": 1 },
-    "session_name_last": { "const": "last" },
-    "ScrollState": {
-      "type": "object",
-      "properties": {
-        "x": { "type": "integer" },
-        "y": { "type": "integer" }
-      },
-      "required": ["x", "y"],
-      "additionalProperties": false
-    },
-    "Space": {
-      "type": "object",
-      "properties": {
-        "uuid": { "type": "string" },
-        "name": { "type": "string" },
-        "position": { "type": "integer" },
-        "container_ref": { "type": "string" }
-      },
-      "required": ["uuid", "name", "position"],
-      "additionalProperties": false
-    },
-    "Folder": {
-      "type": "object",
-      "properties": {
-        "uuid": { "type": "string" },
-        "space_uuid": { "type": "string" },
-        "parent_uuid": { "type": "string" },
-        "name": { "type": "string" },
-        "position": { "type": "integer" }
-      },
-      "required": ["uuid", "space_uuid", "name", "position"],
-      "additionalProperties": false
-    },
-    "Window": {
-      "type": "object",
-      "properties": {
-        "window_id": { "type": "string" },
-        "focused": { "type": "boolean" },
-        "title": { "type": "string" },
-        "private": { "type": "boolean" }
-      },
-      "required": ["window_id", "focused"],
-      "additionalProperties": false
-    },
-    "Tab": {
-      "type": "object",
-      "properties": {
-        "astra_tab_id": { "type": "string" },
-        "space_uuid": { "type": "string" },
-        "folder_uuid": { "type": "string" },
-        "url": { "type": "string" },
-        "title": { "type": "string" },
-        "pinned": { "type": "boolean" },
-        "position": { "type": "integer", "minimum": 0 },
-        "scroll": {
-          "type": ["object", "null"],
-          "properties": {
-            "x": { "type": "integer" },
-            "y": { "type": "integer" }
-          },
-          "required": ["x", "y"],
-          "additionalProperties": false
-        },
-        "zoom": { "type": ["number", "null"], "minimum": 0.3, "maximum": 3.0 },
-        "muted": { "type": "boolean" },
-        "discarded": { "type": "boolean" },
-        "window_id": { "type": "string" },
-        "history": { "type": "array", "items": { "type": "string" } },
-        "history_index": { "type": ["integer", "null"], "minimum": 0 }
-      },
-      "required": ["astra_tab_id", "url", "position"],
-      "additionalProperties": false
-    },
-    "Snapshot": {
-      "type": "object",
-      "properties": {
-        "version": { "const": 1 },
-        "name": { "type": "string" },
-        "created_at": { "type": "integer" },
-        "spaces": { "type": "array", "items": { "$ref": "#/properties/Space" } },
-        "folders": { "type": "array", "items": { "$ref": "#/properties/Folder" } },
-        "windows": { "type": "array", "items": { "$ref": "#/properties/Window" } },
-        "tabs": { "type": "array", "items": { "$ref": "#/properties/Tab" } },
-        "active_tab_id": { "type": ["string", "null"] }
-      },
-      "required": ["version", "name", "created_at", "tabs"],
-      "additionalProperties": false
-    },
-    "describe": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
-    "validate": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" },
-        "snapshot": { "$ref": "#/properties/Snapshot" }
-      },
-      "required": ["snapshot"],
-      "additionalProperties": false
-    },
-    "setScroll": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" },
-        "astra_tab_id": { "type": "string" },
-        "x": { "type": "integer" },
-        "y": { "type": "integer" }
-      },
-      "required": ["astra_tab_id", "x", "y"],
-      "additionalProperties": false
-    },
-    "getScroll": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" },
-        "astra_tab_id": { "type": "string" }
-      },
-      "required": ["astra_tab_id"],
-      "additionalProperties": false
-    },
-    "restore": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" },
-        "snapshot": { "$ref": "#/properties/Snapshot" }
-      },
-      "required": ["snapshot"],
-      "additionalProperties": false
-    }
+ "$schema": "http://json-schema.org/draft-07/schema#",
+ "$id": "resource://astra/host/schemas/session.json",
+ "title": "Host API v1 \u2014 Session",
+ "description": "Startup session snapshot/restore (P2-T09, plan \u00a75.4). Core owns organisation (spaces, folders, pins, order, scroll); the host applies snapshots through Tabs/Windows. On conflict live-existence wins for tabs, core wins for organisation. Private windows are never snapshotted.",
+ "type": "object",
+ "properties": {
+  "snapshot_version": {
+   "const": 1
   },
-  "additionalProperties": false
+  "session_name_last": {
+   "const": "last"
+  },
+  "ScrollState": {
+   "type": "object",
+   "properties": {
+    "x": {
+     "type": "integer"
+    },
+    "y": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "x",
+    "y"
+   ],
+   "additionalProperties": false
+  },
+  "Space": {
+   "type": "object",
+   "properties": {
+    "uuid": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "position": {
+     "type": "integer"
+    },
+    "container_ref": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "uuid",
+    "name",
+    "position"
+   ],
+   "additionalProperties": false
+  },
+  "Folder": {
+   "type": "object",
+   "properties": {
+    "uuid": {
+     "type": "string"
+    },
+    "space_uuid": {
+     "type": "string"
+    },
+    "parent_uuid": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "position": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "uuid",
+    "space_uuid",
+    "name",
+    "position"
+   ],
+   "additionalProperties": false
+  },
+  "Window": {
+   "type": "object",
+   "properties": {
+    "window_id": {
+     "type": "string"
+    },
+    "focused": {
+     "type": "boolean"
+    },
+    "title": {
+     "type": "string"
+    },
+    "private": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "window_id",
+    "focused"
+   ],
+   "additionalProperties": false
+  },
+  "Tab": {
+   "type": "object",
+   "properties": {
+    "astra_tab_id": {
+     "type": "string"
+    },
+    "space_uuid": {
+     "type": "string"
+    },
+    "folder_uuid": {
+     "type": "string"
+    },
+    "url": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "pinned": {
+     "type": "boolean"
+    },
+    "position": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "scroll": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "properties": {
+      "x": {
+       "type": "integer"
+      },
+      "y": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "x",
+      "y"
+     ],
+     "additionalProperties": false
+    },
+    "zoom": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "minimum": 0.3,
+     "maximum": 3.0
+    },
+    "muted": {
+     "type": "boolean"
+    },
+    "discarded": {
+     "type": "boolean"
+    },
+    "window_id": {
+     "type": "string"
+    },
+    "history": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "history_index": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 0
+    }
+   },
+   "required": [
+    "astra_tab_id",
+    "url",
+    "position"
+   ],
+   "additionalProperties": false
+  },
+  "SlotLayout": {
+   "type": "object",
+   "properties": {
+    "slot_id": {
+     "type": "string"
+    },
+    "astra_tab_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "ratio": {
+     "type": "number"
+    },
+    "position": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "slot_id",
+    "ratio",
+    "position"
+   ],
+   "additionalProperties": false
+  },
+  "Layout": {
+   "type": "object",
+   "properties": {
+    "version": {
+     "const": 1
+    },
+    "slots": {
+     "type": "array",
+     "items": {
+      "$ref": "#/properties/SlotLayout"
+     },
+     "minItems": 1,
+     "maxItems": 4
+    },
+    "active_slot_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   },
+   "required": [
+    "version",
+    "slots"
+   ],
+   "additionalProperties": false
+  },
+  "Snapshot": {
+   "type": "object",
+   "properties": {
+    "version": {
+     "const": 1
+    },
+    "name": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "integer"
+    },
+    "spaces": {
+     "type": "array",
+     "items": {
+      "$ref": "#/properties/Space"
+     }
+    },
+    "folders": {
+     "type": "array",
+     "items": {
+      "$ref": "#/properties/Folder"
+     }
+    },
+    "windows": {
+     "type": "array",
+     "items": {
+      "$ref": "#/properties/Window"
+     }
+    },
+    "tabs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/properties/Tab"
+     }
+    },
+    "active_tab_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "layout": {
+     "anyOf": [
+      {
+       "$ref": "#/properties/Layout"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "version",
+    "name",
+    "created_at",
+    "tabs"
+   ],
+   "additionalProperties": false
+  },
+  "describe": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "validate": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string"
+    },
+    "snapshot": {
+     "$ref": "#/properties/Snapshot"
+    }
+   },
+   "required": [
+    "snapshot"
+   ],
+   "additionalProperties": false
+  },
+  "setScroll": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string"
+    },
+    "astra_tab_id": {
+     "type": "string"
+    },
+    "x": {
+     "type": "integer"
+    },
+    "y": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "astra_tab_id",
+    "x",
+    "y"
+   ],
+   "additionalProperties": false
+  },
+  "getScroll": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string"
+    },
+    "astra_tab_id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "astra_tab_id"
+   ],
+   "additionalProperties": false
+  },
+  "restore": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string"
+    },
+    "snapshot": {
+     "$ref": "#/properties/Snapshot"
+    }
+   },
+   "required": [
+    "snapshot"
+   ],
+   "additionalProperties": false
+  }
+ },
+ "additionalProperties": false
 }

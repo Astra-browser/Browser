@@ -63,7 +63,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T03 | Window frame per OS (Linux first) | done | orchestrator | agent/P3-T03-frame | Merged 2026-11-02; model 27/27 + live 17/17, no-regress green; jar.mn wired; Shell mounting deferred to P3-T13 |
 | P3-T04 | Tabs (vertical, pinned, folders, DnD, context menus) | done | orchestrator | agent/P3-T04-tabs | Merged 2026-11-02; ui 1084/1084 + shell model 13/13 reproduced, build + svelte-check clean; SpaceBar failure not reproduced (worker env) |
 | P3-T05 | Spaces/profiles (S-02 + containers impl) | done | orchestrator | agent/P3-T05-spaces | Merged 2026-11-02; S-02 (spaces→containers, profiles→dirs), isolation 117/117, core 69/69, no-regress 262+73+27 green; jar.mn wired |
-| P3-T06 | Split view + layout persistence | doing | worker-split | agent/P3-T06-split | Locked 2026-11-02; owns split UI + layout persist only |
+| P3-T06 | Split view + layout persistence | done | orchestrator | agent/P3-T06-split | Merged 2026-11-02; core 80 + shell 20/20 + ui 1096 green, layout rides Session host module (validated+echoed, schema updated, 99 checks) |
 | P3-T07 | Omnibox + search | todo | — | — | — |
 | P3-T08 | Settings UI, shortcuts, theming | todo | — | — | — |
 | P3-T09 | Browser dialogs via Host API events | todo | — | — | — |

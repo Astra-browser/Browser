@@ -12,6 +12,7 @@ pub mod diagnostics;
 pub mod history;
 pub mod keymap;
 pub mod keymap_ext;
+pub mod layout;
 pub mod logging;
 pub mod policy;
 pub mod search;
@@ -28,6 +29,10 @@ pub use keymap::{Keymap, KeymapEntry, KeymapError, KeymapOutcome};
 pub use keymap_ext::{
     conflicts_in, export_keymap, find_conflicts, import_keymap, ConflictReport, KeyConflict,
     KeymapImport, KeymapStoreError,
+};
+pub use layout::{
+    layout_for, LayoutError, SlotLayout, SplitLayout, LAYOUT_SNAPSHOT_VERSION, MAX_SLOT_RATIO,
+    MAX_SPLIT_SLOTS, MIN_SLOT_RATIO,
 };
 pub use logging::{
     init_logging, is_secret_key, log_path_for_today, redact_pair, redact_text, today_log_path,

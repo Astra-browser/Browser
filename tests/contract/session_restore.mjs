@@ -89,6 +89,51 @@ reset();
   checkErr("validate empty url", noUrl, "s-3", "invalid_snapshot");
 }
 
+// === Split layout carry-through (P3-T06) ===
+{
+  const layout = {
+    version: 1,
+    slots: [
+      { slot_id: "a", astra_tab_id: null, ratio: 0.6, position: 0 },
+      { slot_id: "b", astra_tab_id: null, ratio: 0.4, position: 1 },
+    ],
+    active_slot_id: "a",
+  };
+  const base = { version: 1, name: "last", created_at: 0, tabs: [] };
+  const good = await Session.validate({ request_id: "s-4", snapshot: { ...base, layout } });
+  check("validate accepts layout", good.valid === true);
+  check(
+    "validateSnapshot accepts layout",
+    validateSnapshot({ ...base, layout }) === null,
+  );
+  for (const [name, bad] of [
+    ["layout wrong version", { ...layout, version: 2 }, "version"],
+    ["layout ratio sum", { ...layout, slots: layout.slots.map((s) => ({ ...s, ratio: 0.9 })) }, "sum to 1.0"],
+    ["layout duplicate slot", { ...layout, slots: [layout.slots[0], layout.slots[0]] }, "duplicate"],
+    ["layout unknown active", { ...layout, active_slot_id: "zzz" }, "not in layout"],
+    ["layout not object", "wide", "object"],
+  ]) {
+    const v = await Session.validate({ request_id: "s-5", snapshot: { ...base, layout: bad } });
+    checkErr(`validate ${name}`, v, "s-5", "invalid_snapshot");
+    check(
+      `validateSnapshot reports ${name}`,
+      (validateSnapshot({ ...base, layout: bad }) ?? "").length > 0,
+    );
+  }
+  check(
+    "validateSnapshot reports reason text",
+    (validateSnapshot({ ...base, layout: { ...layout, version: 2 } }) ?? "").includes("version"),
+  );
+
+  // describe contributes no layout (core owns it); restore echoes it back.
+  const d = await Session.describe({ request_id: "s-6" });
+  check("describe layout null", d.snapshot && d.snapshot.layout === null);
+  const r = await Session.restore({ request_id: "s-7", snapshot: { ...base, layout } });
+  check("restore echoes layout", JSON.stringify(r.layout) === JSON.stringify(layout));
+  const r2 = await Session.restore({ request_id: "s-8", snapshot: base });
+  check("restore layout null when absent", r2.layout === null);
+}
+
 // === describe on empty + scroll sidecar ===
 {
   const d = await Session.describe({ request_id: "s-10" });
