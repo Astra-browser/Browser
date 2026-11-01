@@ -54,6 +54,23 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P2-T09 | Session snapshot/restore round-trip | done | orchestrator | agent/P2-T09-session | Merged 2026-11-02; workspace 129/129, session 73/73 + hostapi 262/262 no-regress, clippy/fmt/brand clean; jar.mn wired |
 | P2-T10 | Settings, keymap, logging, diagnostics | done | orchestrator | agent/P2-T10-settings | Merged 2026-11-02; core 50/50, workspace 120/120, clippy/fmt/brand clean |
 
+## Phase 3 — UI port, 1:1 (daily-driver browsing)
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P3-T01 | UI into `ui/` Bun workspace (standalone track) | done | worker-2 | agent/P3-T01-ui | Merged 2026-11-01; typecheck 0 errs, tests 1062 pass, vite build exit 0 |
+| P3-T02 | Spike S-01 content slots (+ split/Work panes impl) | doing | worker-s01 | agent/P3-T02-slots | Locked 2026-11-02; owns overlay content-slot CSS + spikes/S-01 only |
+| P3-T03 | Window frame per OS (Linux first) | todo | — | — | — |
+| P3-T04 | Tabs (vertical, pinned, folders, DnD, context menus) | doing | worker-tabs | agent/P3-T04-tabs | Locked 2026-11-02; owns ui shell tabs components only |
+| P3-T05 | Spaces/profiles (S-02 + containers impl) | todo | — | — | — |
+| P3-T06 | Split view + layout persistence | todo | — | — | After T02 |
+| P3-T07 | Omnibox + search | todo | — | — | — |
+| P3-T08 | Settings UI, shortcuts, theming | todo | — | — | — |
+| P3-T09 | Browser dialogs via Host API events | todo | — | — | — |
+| P3-T10 | Welcome/onboarding flow | todo | — | — | — |
+| P3-T11 | Golden suite (in-Firefox vs baseline) | doing | worker-gold2 | agent/P3-T11-goldff | Locked 2026-11-02; owns tests/golden/in-firefox + capture ext only |
+| P3-T12 | Accessibility pass | todo | — | — | — |
+
 ## Later phases
 
 All `todo` — see `plan.md` §§8–11.
