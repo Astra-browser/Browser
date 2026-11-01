@@ -9,35 +9,10 @@ Verified-On: 153.6.0
 Removal-Plan: drop both lines if the blocker moves out of tree (fallback proxy); keep if ESR rebase preserves the gkrust layout
 ---
 diff --git a/Cargo.lock b/Cargo.lock
-index 7286a0abdf..bfd3ad4c4c 100644
+index 7286a0abdf..d2f4a90576 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -32,6 +32,7 @@ version = "0.12.1"
- source = "registry+https://github.com/rust-lang/crates.io-index"
- checksum = "698c1e831aaee3d583efe775790acc7d59fd99d8060e7385b99d2d369a5cdca8"
- dependencies = [
-+ "addr",
-  "arrayvec",
-  "base64 0.22.1",
-  "bitflags 2.10.0",
-@@ -51,6 +52,16 @@ dependencies = [
-  "url",
- ]
- 
-+[[package]]
-+name = "addr"
-+version = "0.15.6"
-+source = "registry+https://github.com/rust-lang/crates.io-index"
-+checksum = "a93b8a41dbe230ad5087cc721f8d41611de654542180586b315d9f4cf6b72bef"
-+dependencies = [
-+ "psl",
-+ "psl-types",
-+]
-+
- [[package]]
- name = "adler2"
- version = "2.0.1"
-@@ -304,6 +315,14 @@ dependencies = [
+@@ -304,6 +304,17 @@ dependencies = [
   "serde_json",
  ]
  
@@ -46,13 +21,16 @@ index 7286a0abdf..bfd3ad4c4c 100644
 +version = "0.1.0"
 +dependencies = [
 + "adblock",
++ "cstr",
 + "nserror",
++ "nsstring",
++ "xpcom",
 +]
 +
  [[package]]
  name = "async-task"
  version = "4.3.0"
-@@ -2899,6 +2918,7 @@ dependencies = [
+@@ -2899,6 +2910,7 @@ dependencies = [
   "abridged_certs",
   "adblock",
   "app_collator_glue",
@@ -60,28 +38,6 @@ index 7286a0abdf..bfd3ad4c4c 100644
   "audio_thread_priority",
   "audioipc2-client",
   "audioipc2-server",
-@@ -6477,6 +6497,21 @@ dependencies = [
-  "syn",
- ]
- 
-+[[package]]
-+name = "psl"
-+version = "2.1.245"
-+source = "registry+https://github.com/rust-lang/crates.io-index"
-+checksum = "46cce9bc841c0eeb395275a775d11e3cc91b904e6ab370a9a42369e111b3038e"
-+dependencies = [
-+ "psl-types",
-+]
-+
-+[[package]]
-+name = "psl-types"
-+version = "2.0.11"
-+source = "registry+https://github.com/rust-lang/crates.io-index"
-+checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
-+
- [[package]]
- name = "pulse"
- version = "0.3.0"
 diff --git a/toolkit/library/rust/shared/Cargo.toml b/toolkit/library/rust/shared/Cargo.toml
 index cc4e5a6683..0899b3c93e 100644
 --- a/toolkit/library/rust/shared/Cargo.toml

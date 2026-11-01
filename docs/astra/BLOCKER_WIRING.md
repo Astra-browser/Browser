@@ -79,10 +79,12 @@ Semantics (match `astra-blocker` P4-T01 exactly):
 ## 4. Supply chain: zero new vendor surface
 
 - The new crate pins `adblock = "=0.12.1"` with
-  `default-features = false` + `["embedded-domain-resolver",
-  "full-regex-handling"]` — the exact revision already vendored in
-  `third_party/rust/adblock` and audited `safe-to-deploy` in
-  `supply-chain/audits.toml:664` (bvandersloot). Consequences, all verified:
+  `default-features = false` + `["full-regex-handling", "single-thread"]`
+  — the exact revision already vendored in `third_party/rust/adblock` and
+  audited `safe-to-deploy` in `supply-chain/audits.toml:664` (bvandersloot).
+  The feature set deliberately equals the content classifier's: the unified
+  gkrust build compiles a single adblock instance, so any divergence would
+  leak into upstream code (see ownership note below). Consequences, verified:
   - `cargo vet` needs **no new entries for our crates** (repo has no `tools/vet-config`
     of its own; the engine audit already covers adblock 0.12.1; our added closure
     is only `addr` + `psl`/`psl-types`);
@@ -97,11 +99,21 @@ Semantics (match `astra-blocker` P4-T01 exactly):
     `vendor rust --ignore-modified --force`; do NOT "fix" by touching
     supply-chain/audits.toml without understanding the drift. Flag for
     upstream-watch: ESR point bumps may need the same treatment;
-  - `default-features = false` **without** `"single-thread"` is load-bearing:
-    the default feature set disables `Send`+`Sync` on `Engine`, which would
-    break the `static Mutex<Option<Engine>>` (the verdict runs on the
-    classifier worker thread). `Request::new` (3-arg in 0.12.1, vs 4-arg in
-    0.13.5) uses the embedded domain resolver, so no eTLD/XPCOM dependency.
+  - Ownership model mirrors the classifier exactly: engines are
+    Box-leaked instances owned by the C++ hook (`AstraBlockerEngine*` +
+    `Mutex`, `from_rules`/`destroy`/`should_block` FFI), never in a Rust
+    static. Rationale, verified the hard way (P4-T02 rework): the unified
+    gkrust build compiles one adblock instance with the UNION of both
+    crates' features. Our original `static Mutex<Option<Engine>>` +
+    `embedded-domain-resolver` design broke both sides at once — the
+    embedded resolver removes `set_domain_resolver` (which the classifier
+    calls), and the classifier's `single-thread` makes `Engine` non-`Sync`
+    (which our static required). Requesting exactly the classifier's set
+    (`full-regex-handling` + `single-thread`, no `embedded-domain-resolver`)
+    keeps the unified build identical to stock; domain resolution goes
+    through the eTLD service via `set_domain_resolver` (same call as the
+    classifier's init). Per-site toggles stay in a static
+    `Mutex<HashSet<String>>` (always `Sync`, feature-independent).
 - Version split (documented, not hidden): sidecar `astra-blocker` uses
   adblock **0.13.5**; in-tree uses **0.12.1**. Verdict parity is pinned by
   running the same fixture corpus against both (§5): block/allow/exception/
