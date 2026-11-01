@@ -29,7 +29,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T01 | `upstream.toml` + `forge fetch` (ESR 153.6.0, U-10 resolved) | done | worker-1 | agent/P1-T01-fetch | Merged 2026-11-01; sig OK via release key, engine extracted, baseline ee0912e |
 | P1-T02 | `forge config` + `config/mozconfig.linux` (F-05 flags verified) | done | orchestrator | agent/P1-T02-forge-config | BUILD_FLAGS.md (3 F-05 corrections); `forge doctor` mozconfig check green; `./mach configure` complete, config.status proof |
 | P1-T03 | Branding overlay | todo | — | — | Needs OWNER_DECISION values from `branding/astra.toml` |
-| P1-T04 | First full Linux build + sccache + dev loop | doing | orchestrator | agent/P1-T04-build | sccache 0.19.0 installed (pacman); `./mach build` running bg since 2026-11-01T15:55Z, release-like, unofficial branding; log out/build-p1t04.log |
+| P1-T04 | First full Linux build + sccache + dev loop | doing | orchestrator | agent/P1-T04-build | sccache 0.19.0 (pacman); `./mach build` detached (setsid/nohup) since ~16:05Z after wrapper killed first attempt at ~6min; log out/build-p1t04.log; release-like, unofficial branding |
 | P1-T05 | Overlay wiring (`chrome://astra/`, ASTRA-0001) | done | orchestrator | agent/P1-T05-overlay | overlay/astra (moz.build/jar.mn/HostAPI stub/hello) staged by `forge overlay`; ASTRA-0001 applied; `forge lint` clean; configure complete with /astra in DIRS |
 | P1-T06 | `policies.json` + pref overrides (incl. Normandy/HR path from BUILD_FLAGS.md) | todo | — | — | — |
 | P1-T07 | Endpoint audit tool | todo | — | — | — |
