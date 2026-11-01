@@ -68,7 +68,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T08 | Settings UI, shortcuts, theming | todo | — | — | — |
 | P3-T09 | Browser dialogs via Host API events | todo | — | — | — |
 | P3-T10 | Welcome/onboarding flow | todo | — | — | — |
-| P3-T11 | Golden suite (in-Firefox vs baseline) | doing | worker-gold2 | agent/P3-T11-goldff | Locked 2026-11-02; owns tests/golden/in-firefox + capture ext only |
+| P3-T11 | Golden suite (in-Firefox vs baseline) | done | orchestrator | agent/P3-T11-goldff | Merged 2026-11-02; 13/16 PASS reproduced, 3 text-raster FAILs + 2 narrow SKIP documented; CI job report-only until gate tuning |
 | P3-T12 | Accessibility pass | todo | — | — | — |
 
 ## Later phases
