@@ -1,1 +1,9 @@
 folder_context
+engine/
+out/
+target/
+ui/node_modules/
+ui/dist/
+crates/*/target/
+*.log
+.DS_Store

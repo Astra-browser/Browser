@@ -2,9 +2,9 @@
 channel = "esr"
 version = "153.6.0"          # verified 2026-11-01 via endoflife.date (released 2026-10-27); see docs/astra/UPSTREAM.md
 source = "tarball"         # or "git"
-url = "UNVERIFIED"         # verify against Mozilla release layout at implementation (P1-T01)
-sha256 = "UNVERIFIED"
-signature_url = "UNVERIFIED"
+url = "https://archive.mozilla.org/pub/firefox/releases/153.6.0esr/source/firefox-153.6.0esr.source.tar.xz"   # verified HTTP 200, 2026-11-01 (U-10 resolved)
+sha256 = "GPG-ONLY"          # Mozilla ships .asc signature, no SHA256SUMS for source tarballs
+signature_url = "https://archive.mozilla.org/pub/firefox/releases/153.6.0esr/source/firefox-153.6.0esr.source.tar.xz.asc"
 git_ref = "FIREFOX_ESR_153_0"   # fallback if source = git; verify tag name
 release_notes_url = "https://www.mozilla.org/firefox/notes/"
-last_verified = "never"
+last_verified = "2026-11-01"
