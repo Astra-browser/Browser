@@ -3,7 +3,8 @@
 - Every row has ID, status in {todo,doing,blocked,done}.
 - `doing` rows must name an Agent and a Branch (the lock).
 - `done` rows must have a Notes entry (evidence of completion).
-- No two `doing` rows share the same Branch.
+- No two `doing` rows share the same worker Branch (`main` is the
+  orchestrator's shared branch and may appear on many rows).
 """
 import re, sys
 
@@ -24,10 +25,10 @@ for tid, task, status, agent, branch, notes in rows:
             errors.append(f"{tid}: doing without Agent lock")
         if branch.strip() in ("", "—", "-"):
             errors.append(f"{tid}: doing without Branch lock")
-        elif branch in branches:
+        elif branch != "main" and branch in branches:
             errors.append(f"{tid}: branch {branch} already locked by {branches[branch]}")
         else:
-            branches[branch] = tid
+            branches.setdefault(branch, tid)
     if status == "done" and not notes.strip():
         errors.append(f"{tid}: done without Notes evidence")
 
