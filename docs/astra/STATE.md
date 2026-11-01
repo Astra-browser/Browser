@@ -66,11 +66,11 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T06 | Split view + layout persistence | done | orchestrator | agent/P3-T06-split | Merged 2026-11-02; core 80 + shell 20/20 + ui 1096 green, layout rides Session host module (validated+echoed, schema updated, 99 checks) |
 | P3-T07 | Omnibox + search | done | orchestrator | agent/P3-T07-omnibox | Merged 2026-11-02; ranking port + local engines + model, ui 1133/1133 + svelte-check clean; worker's 43 fails were stale-base env, not main |
 | P3-T08 | Settings UI, shortcuts, theming | done | orchestrator | agent/P3-T08-settings | Merged 2026-11-02; surface pre-exists bridge-driven, platform-gated conflict test fixed; ui 1096 + svelte-check clean |
-| P3-T09 | Browser dialogs via Host API events | todo | — | — | Next wave |
+| P3-T09 | Browser dialogs via Host API events | doing | worker-dlg | agent/P3-T09-dialogs | Locked 2026-11-02; owns new Dialogs module + tests only |
 | P3-T10 | Welcome/onboarding flow | done | orchestrator | agent/P3-T10-welcome | Merged 2026-11-02; ui 1144/1144, registry-known keys verified in core, svelte-check + brand clean |
 | P3-T11 | Golden suite (in-Firefox vs baseline) | done | orchestrator | agent/P3-T11-goldff | Merged 2026-11-02; 13/16 PASS reproduced, 3 text-raster FAILs + 2 narrow SKIP documented; CI job report-only until gate tuning |
-| P3-T12 | Accessibility pass | todo | — | — | — |
-| P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | todo | — | — | New: deferred from T03/T04 (mounting touches live shell layout; needs guard updates) |
+| P3-T12 | Accessibility pass | doing | worker-a11y | agent/P3-T12-a11y | Locked 2026-11-02; owns A11Y.md + a11y fixes only |
+| P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | doing | worker-asm | agent/P3-T13-assembly | Locked 2026-11-02; owns Shell.svelte + shell loader only |
 
 ## Later phases
 
