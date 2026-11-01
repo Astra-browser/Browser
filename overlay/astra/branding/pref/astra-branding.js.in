@@ -1,0 +1,14 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+// Astra branding-specific prefs (P1-T03). RENDERED by `forge overlay` from
+// branding/astra.toml. Update URLs are OWNER_DECISION (release blockers);
+// dev builds point at a localhost fixture that serves nothing.
+pref("startup.homepage_override_url", "");
+pref("startup.homepage_welcome_url", "about:welcome");
+pref("startup.homepage_welcome_url.additional", "");
+// Updater is off at build time (P1-T02); these cover the manual-update links.
+pref("app.update.url.manual", "@ASTRA_UPDATE_HOST@/manual?reason=manual-update");
+pref("app.update.url.details", "@ASTRA_UPDATE_HOST@/notes");
+// UA keeps the Firefox-compatible token for site compat (D-14): untouched.

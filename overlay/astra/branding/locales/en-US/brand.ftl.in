@@ -1,0 +1,16 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+## Astra brand (P1-T03). RENDERED by `forge overlay` from branding/astra.toml.
+## Dev channel carries the Nightly suffix; vendor is a dev default until the
+## owner sets `vendor` in branding/astra.toml (blocks release only).
+
+-brand-shorter-name = @ASTRA_DISPLAY_NAME@ Nightly
+-brand-short-name = @ASTRA_DISPLAY_NAME@ Nightly
+-brand-shortcut-name = @ASTRA_DISPLAY_NAME@ Nightly
+-brand-full-name = @ASTRA_DISPLAY_NAME@ Nightly
+# Product name stays version-independent across channels.
+-brand-product-name = @ASTRA_DISPLAY_NAME@
+-vendor-short-name = @ASTRA_VENDOR@
+trademarkInfo = { " " }
