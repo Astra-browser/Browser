@@ -78,15 +78,16 @@ lock it: no other agent may touch that task, its files, or its branch.
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P4-T01 | `astra-blocker` crate (adblock-rust + seed lists) | done | orchestrator | agent/P4-T01-blocker | Merged 2026-11-02; blocker 23/23, workspace 223/223, seed byte-identical + attribution clean; NOTICE rebrand stands (own file) |
-| P4-T02 | In-tree Rust network-hook component | todo | — | — | After T01; needs engine vendor |
+| P4-T02 | In-tree Rust network-hook component | doing | worker-vendor | agent/P4-T02-network | Locked 2026-11-02; owns in-tree crate wiring + vendor config only |
 | P4-T03 | Element hiding (cosmetic + click-to-hide) | done | orchestrator | agent/P4-T03-hiding | Merged 2026-11-02; protocol+logic 36+44 green; live injection deferred to P4-T11 |
-| P4-T04 | Extension manager + curated gallery | todo | — | — | Next wave (needs mapping research) |
+| P4-T04 | Extension manager + curated gallery | doing | worker-ext | agent/P4-T04-extensions | Locked 2026-11-02; owns extension manager + gallery only |
 | P4-T05 | Importers (Chromium/Firefox/Zen/...) | done | orchestrator | agent/P4-T05-import | Merged 2026-11-02; 9 sources + store round-trip, 45/45, zero net deps; FIXED latent T03 tokio macros gap (workspace build now green) |
 | P4-T06 | Tab sleeping policy | done | orchestrator | agent/P4-T06-sleeping | Merged 2026-11-02; policy 9/9, core 94/94, workspace 232/232, clippy/fmt/brand clean |
 | P4-T07 | Private windows (nothing persisted) | done | orchestrator | agent/P4-T07-private | Merged 2026-11-02; guard + forensic tests green; host-excluded today, store wiring = caller contract (see PRIVATE.md status) |
 | P4-T08 | Downloads manager + PDF viewer | done | orchestrator | agent/P4-T08-downloads | Merged 2026-11-02; ui 1176/1176 + svelte-check clean; bridge download routes stubbed (follow-up noted) |
-| P4-T09 | Password/autofill decision | todo | — | — | Needs owner confirm; propose + defer |
-| P4-T10 | Performance baselines | todo | — | — | After rebuild; measure vs stock ESR |
+| P4-T09 | Password/autofill decision | doing | worker-pw | agent/P4-T09-password | Locked 2026-11-02; research + proposal only, no UI; decision deferred to owner |
+| P4-T10 | Performance baselines | doing | worker-perf | agent/P4-T10-perf | Locked 2026-11-02; owns perf scripts + docs only |
+| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 
 ## Later phases
