@@ -12,8 +12,8 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T03 | Full inventory (crates, IPC, UI, storage, skills) | doing | orchestrator | main | First cut in `docs/astra/INVENTORY.md`; sub-rows below |
 | P0-T03a | IPC surface: every command/event + payloads | done | worker-1 | agent/P0-T03a-ipc-surface | Merged 2026-11-01; 267 cmds + 35 events, zero mismatches |
 | P0-T03b | PARITY.md (README claims vs code) | done | worker-1 | agent/P0-T03b-parity | Merged 2026-11-01; no new deviations beyond X-01…X-06 |
-| P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | doing | worker-1 | agent/P0-T04-porting | Locked 2026-11-01; grounding trait in T03a groups |
-| P0-T05 | Rebrand tooling + `brand-lint` | doing | orchestrator | main | `plan.md` cleaned of previous product name; `tools/rebrand` spec pending |
+| P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | done | worker-1 | agent/P0-T04-porting | Merged 2026-11-01; groups mapped to Host API modules |
+| P0-T05 | Rebrand tooling + `brand-lint` | doing | worker-1 | agent/P0-T05-rebrand | Locked 2026-11-01; writing executable lint first |
 | P0-T06 | License/provenance | doing | orchestrator | main | `PROVENANCE.md` drafted; `cargo-about`/Bun license scan pending |
 | P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
 | P0-T08 | CI skeleton | todo | — | — | — |
