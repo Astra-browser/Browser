@@ -23,6 +23,7 @@ import { Windows, __resetWindowsForTests } from "./Windows.sys.mjs";
 import { Session, __resetSessionForTests } from "./Session.sys.mjs";
 import { History, __resetHistoryForTests } from "./History.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
+import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -34,6 +35,7 @@ export {
   Tabs,
   Navigation,
   Panes,
+  Containers,
   addEventListener,
   emit,
   eventSeq,
@@ -50,5 +52,6 @@ export function __resetForTests() {
   __resetSessionForTests();
   __resetHistoryForTests();
   __resetPanesForTests();
+  __resetContainersForTests();
   __resetEventsForTests();
 }
