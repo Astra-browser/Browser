@@ -94,43 +94,18 @@ const [overlayAstraDir, cssPath] = arguments;
     sss.loadAndRegisterSheet(cssURI, sss.AGENT_SHEET);
     out.sheetRegistered = sss.sheetRegistered(cssURI, sss.AGENT_SHEET);
 
-    // Inject the frame DOM the Svelte shell builds (frame.js builders).
-    const NS = "http://www.w3.org/1999/xhtml";
-    const mk = (tag, cls) => {
-      const n = d.createElementNS(NS, tag);
-      if (cls) { n.setAttribute("class", cls); }
-      return n;
-    };
-    const frame = mk("div", "astra-frame");
-    frame.setAttribute("data-astra-frame", "");
-    const bar = mk("div", "astra-titlebar");
-    bar.setAttribute("data-astra-titlebar", "");
-    bar.setAttribute("data-astra-drag", "true");
-    const label = mk("div", "astra-titlebar-title");
-    label.textContent = "Astra";
-    bar.append(label);
-    const controls = mk("div", "astra-window-controls");
-    controls.setAttribute("data-astra-window-controls", "");
-    for (const a of ["minimize", "maximize", "close"]) {
-      const b = mk("button", "");
-      b.type = "button";
-      b.setAttribute("data-action", a);
-      b.textContent = a;
-      controls.append(b);
+    // Probe the frame DOM the assembled Svelte shell mounts (P3-T13;
+    // frame.js builders). The pre-assembly shell had no frame, so this
+    // test used to inject a synthetic copy — now the live shell is the
+    // fixture, which is strictly stronger (tests the shipped layout).
+    const bar = d.querySelector("[data-astra-titlebar]");
+    const controls = d.querySelector("[data-astra-window-controls]");
+    const side = d.querySelector("[data-astra-sidebar]");
+    const tool = d.querySelector("[data-astra-toolbar]");
+    out.shellFrameMounted = !!(bar && controls && side && tool);
+    if (!out.shellFrameMounted) {
+      throw new Error("assembled shell frame not mounted (P3-T13)");
     }
-    bar.append(controls);
-    const bodyEl = mk("div", "astra-frame-body");
-    const side = mk("div", "astra-sidebar");
-    side.setAttribute("data-astra-sidebar", "");
-    const tool = mk("div", "astra-toolbar");
-    tool.setAttribute("data-astra-toolbar", "");
-    const main = mk("div", "astra-main");
-    bodyEl.append(side);
-    bodyEl.append(main);
-    frame.append(bar);
-    frame.append(tool);
-    frame.append(bodyEl);
-    root.append(frame);
 
     // Co-located regular properties from the same rule blocks compute,
     // proving the drag rules match these live elements.
@@ -179,13 +154,16 @@ const [overlayAstraDir, cssPath] = arguments;
     out.minNoAdapter = minBare?.error?.code ?? "";
 
     // Fullscreen attribute hides the chrome rows (agent-sheet rule).
-    frame.setAttribute("data-astra-fullscreen", "true");
+    // Operate on the live assembled shell frame (P3-T13), not a copy.
+    const liveFrame = d.querySelector("[data-astra-frame]");
+    liveFrame.setAttribute("data-astra-fullscreen", "true");
     out.hiddenBar = cs(bar).getPropertyValue("display");
     out.hiddenSide = cs(side).getPropertyValue("display");
     out.hiddenTool = cs(tool).getPropertyValue("display");
-    frame.setAttribute("data-astra-fullscreen", "false");
+    liveFrame.setAttribute("data-astra-fullscreen", "false");
 
-    frame.remove();
+    // NOTE: no frame.remove() — this is the live assembled shell, not a
+    // synthetic copy (pre-P3-T13 cleanup removed). Attribute restored above.
     sss.unregisterSheet(cssURI, sss.AGENT_SHEET);
   } catch (e) {
     out.errors.push(String(e && e.message ? e.message : e));
@@ -264,6 +242,8 @@ def main():
                 return 1
             checks = [
                 ("P1-T08 mount intact (Hello Tab)", "Hello Tab" in res.get("rootText", "")),
+                ("assembled shell frame mounted (P3-T13)",
+                 res.get("shellFrameMounted") is True),
                 ("frame.css: titlebar declares drag",
                  src_checks["titlebar drags"] is True),
                 ("frame.css: controls/buttons declare no-drag",

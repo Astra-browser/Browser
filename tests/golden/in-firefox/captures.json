@@ -8,7 +8,7 @@
  "captures": [
   {
    "name": "shell-light",
-   "bytes": 1037245,
+   "bytes": 1037775,
    "slot": [
     1440,
     900
@@ -16,7 +16,7 @@
   },
   {
    "name": "shell-dark",
-   "bytes": 1161273,
+   "bytes": 1159643,
    "slot": [
     1440,
     900
@@ -24,7 +24,7 @@
   },
   {
    "name": "spaces-light",
-   "bytes": 32969,
+   "bytes": 33711,
    "slot": [
     1440,
     900
@@ -32,7 +32,7 @@
   },
   {
    "name": "spaces-dark",
-   "bytes": 32825,
+   "bytes": 33456,
    "slot": [
     1440,
     900
@@ -72,7 +72,7 @@
   },
   {
    "name": "tasks-light",
-   "bytes": 44469,
+   "bytes": 45282,
    "slot": [
     1440,
     900
@@ -80,7 +80,7 @@
   },
   {
    "name": "tasks-dark",
-   "bytes": 45886,
+   "bytes": 46495,
    "slot": [
     1440,
     900
@@ -88,7 +88,7 @@
   },
   {
    "name": "notes-light",
-   "bytes": 58357,
+   "bytes": 59209,
    "slot": [
     1440,
     900
@@ -96,7 +96,7 @@
   },
   {
    "name": "notes-dark",
-   "bytes": 60146,
+   "bytes": 60746,
    "slot": [
     1440,
     900
@@ -104,7 +104,7 @@
   },
   {
    "name": "time-light",
-   "bytes": 111799,
+   "bytes": 112661,
    "slot": [
     1440,
     900
@@ -112,7 +112,7 @@
   },
   {
    "name": "time-dark",
-   "bytes": 113037,
+   "bytes": 113688,
    "slot": [
     1440,
     900
@@ -120,7 +120,7 @@
   },
   {
    "name": "settings-light",
-   "bytes": 134169,
+   "bytes": 134995,
    "slot": [
     1440,
     900
@@ -128,21 +128,28 @@
   },
   {
    "name": "settings-dark",
-   "bytes": 133863,
+   "bytes": 134511,
    "slot": [
     1440,
     900
    ]
-  }
- ],
- "skipped": [
+  },
   {
    "name": "shell-light-narrow",
-   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+   "bytes": 192029,
+   "slot": [
+    390,
+    844
+   ]
   },
   {
    "name": "shell-dark-narrow",
-   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+   "bytes": 201971,
+   "slot": [
+    390,
+    844
+   ]
   }
- ]
+ ],
+ "skipped": []
 }

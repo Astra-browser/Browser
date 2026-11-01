@@ -45,7 +45,16 @@ function sectionTitle(doc, text) {
 
 export function mountTabStrip(container, host, options = {}) {
   const doc = container.ownerDocument;
-  const storage = options.storage ?? (typeof localStorage !== "undefined" ? localStorage : null);
+  // NOTE: even `typeof localStorage` can throw NS_ERROR_NOT_AVAILABLE in a
+  // chrome window without DOM storage (headless). Never touch it unguarded.
+  let storage = options.storage ?? null;
+  if (storage === null || storage === undefined) {
+    try {
+      storage = typeof localStorage !== "undefined" ? localStorage : null;
+    } catch {
+      storage = null;
+    }
+  }
   const makeId =
     options.makeId ??
     (() => `folder-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`);

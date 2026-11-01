@@ -93,6 +93,10 @@ def main():
                       rootHeight: r ? r.height : 0,
                       rootChildren: root ? root.childElementCount : 0,
                       rootText: root ? root.textContent.slice(0, 120) : "",
+                      // Assembled shell (P3-T13) mounts frame/tabstrip/urlbar
+                      // before the about block, so "Hello Tab" sits past the
+                      // 120-char probe: full text keeps the same assertion.
+                      rootTextFull: root ? root.textContent.slice(0, 4000) : "",
                       toolboxDisplay: cs("navigator-toolbox"),
                       tabboxDisplay: cs("tabbrowser-tabbox"),
                     };""",
@@ -105,7 +109,7 @@ def main():
                  res.get("rootWidth", 0) > 100 and res.get("rootHeight", 0) > 100),
                 ("Svelte hello rendered in #astra-root",
                  res.get("rootChildren", 0) > 0
-                 and "Hello Tab" in res.get("rootText", "")),
+                 and "Hello Tab" in res.get("rootTextFull", res.get("rootText", ""))),
                 ("#navigator-toolbox hidden",
                  res.get("toolboxDisplay") == "none"),
                 ("#tabbrowser-tabbox hidden",

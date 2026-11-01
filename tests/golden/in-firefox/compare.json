@@ -42,7 +42,7 @@
    "name": "notes-dark",
    "status": "PASS",
    "diff_pct": 0.362,
-   "strict_pct": 1.188,
+   "strict_pct": 1.622,
    "half_pct": 0.406,
    "max_channel_delta": 218,
    "pixels": 1296000
@@ -51,7 +51,7 @@
    "name": "notes-light",
    "status": "PASS",
    "diff_pct": 0.344,
-   "strict_pct": 1.046,
+   "strict_pct": 1.303,
    "half_pct": 0.389,
    "max_channel_delta": 221,
    "pixels": 1296000
@@ -59,8 +59,8 @@
   {
    "name": "settings-dark",
    "status": "FAIL",
-   "diff_pct": 3.229,
-   "strict_pct": 4.985,
+   "diff_pct": 3.228,
+   "strict_pct": 5.389,
    "half_pct": 3.549,
    "max_channel_delta": 230,
    "pixels": 1296000
@@ -68,8 +68,8 @@
   {
    "name": "settings-light",
    "status": "FAIL",
-   "diff_pct": 2.484,
-   "strict_pct": 5.937,
+   "diff_pct": 2.485,
+   "strict_pct": 6.202,
    "half_pct": 2.783,
    "max_channel_delta": 227,
    "pixels": 1296000
@@ -77,36 +77,44 @@
   {
    "name": "shell-dark",
    "status": "FAIL",
-   "diff_pct": 1.872,
-   "strict_pct": 68.698,
+   "diff_pct": 1.873,
+   "strict_pct": 68.981,
    "half_pct": 0.957,
    "max_channel_delta": 229,
    "pixels": 1296000
   },
   {
    "name": "shell-dark-narrow",
-   "status": "SKIP",
-   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+   "status": "PASS",
+   "diff_pct": 1.385,
+   "strict_pct": 80.125,
+   "half_pct": 1.551,
+   "max_channel_delta": 229,
+   "pixels": 329160
   },
   {
    "name": "shell-light",
    "status": "PASS",
    "diff_pct": 0.42,
-   "strict_pct": 62.75,
+   "strict_pct": 62.942,
    "half_pct": 0.396,
    "max_channel_delta": 196,
    "pixels": 1296000
   },
   {
    "name": "shell-light-narrow",
-   "status": "SKIP",
-   "reason": "window floor 500px > entry 390px (slot would not converge to 390x844 (got 500x844))"
+   "status": "PASS",
+   "diff_pct": 1.2,
+   "strict_pct": 64.504,
+   "half_pct": 1.416,
+   "max_channel_delta": 196,
+   "pixels": 329160
   },
   {
    "name": "spaces-dark",
    "status": "PASS",
    "diff_pct": 0.136,
-   "strict_pct": 0.887,
+   "strict_pct": 1.348,
    "half_pct": 0.126,
    "max_channel_delta": 210,
    "pixels": 1296000
@@ -115,7 +123,7 @@
    "name": "spaces-light",
    "status": "PASS",
    "diff_pct": 0.138,
-   "strict_pct": 1.031,
+   "strict_pct": 1.313,
    "half_pct": 0.128,
    "max_channel_delta": 197,
    "pixels": 1296000
@@ -123,17 +131,17 @@
   {
    "name": "tasks-dark",
    "status": "PASS",
-   "diff_pct": 0.234,
-   "strict_pct": 0.791,
+   "diff_pct": 0.233,
+   "strict_pct": 1.21,
    "half_pct": 0.25,
-   "max_channel_delta": 218,
+   "max_channel_delta": 219,
    "pixels": 1296000
   },
   {
    "name": "tasks-light",
    "status": "PASS",
    "diff_pct": 0.218,
-   "strict_pct": 0.689,
+   "strict_pct": 0.946,
    "half_pct": 0.226,
    "max_channel_delta": 213,
    "pixels": 1296000
@@ -142,7 +150,7 @@
    "name": "time-dark",
    "status": "PASS",
    "diff_pct": 0.89,
-   "strict_pct": 2.784,
+   "strict_pct": 3.245,
    "half_pct": 1.037,
    "max_channel_delta": 218,
    "pixels": 1296000
@@ -151,7 +159,7 @@
    "name": "time-light",
    "status": "PASS",
    "diff_pct": 0.861,
-   "strict_pct": 2.306,
+   "strict_pct": 2.587,
    "half_pct": 1.002,
    "max_channel_delta": 226,
    "pixels": 1296000

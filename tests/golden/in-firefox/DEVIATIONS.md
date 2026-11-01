@@ -1,8 +1,10 @@
-# In-Firefox golden deviations (P3-T11, 2026-11-02)
+# In-Firefox golden deviations (P3-T11, re-verified P3-T14 on rebuilt binary)
 
-`capture_firefox.py` + `compare.py` run green-or-documented: 13/16 desktop
-screens PASS the ≤1.5% gate, 3 screens FAIL marginally, 2 narrow screens
-SKIP (environment floor). Raw table from `compare.json`:
+`capture_firefox.py` + `compare.py` run green-or-documented: 15/18 PASS
+the ≤1.5% gate, 3 screens FAIL marginally (all text-rasterization class,
+§D-01/D-02). Recaptured 2026-11-02 against the P3-T14 rebuilt binary
+(assembled shell): narrow viewports now PASS (was SKIP, §D-03). Raw table
+from `compare.json`:
 
 | screen | status | diff% (tol 16) | half% | strict% | max Δ |
 | --- | --- | --- | --- | --- | --- |
@@ -15,9 +17,9 @@ SKIP (environment floor). Raw table from `compare.json`:
 | settings-dark | FAIL | 3.229 | 3.549 | 4.985 | 230 |
 | settings-light | FAIL | 2.484 | 2.783 | 5.937 | 227 |
 | shell-dark | FAIL | 1.872 | 0.957 | 68.698 | 229 |
-| shell-dark-narrow | SKIP | — | — | — | 500px window floor |
+| shell-dark-narrow | PASS | 1.385 | 1.551 | 80.125 | 229 |
 | shell-light | PASS | 0.42 | 0.396 | 62.75 | 196 |
-| shell-light-narrow | SKIP | — | — | — | 500px window floor |
+| shell-light-narrow | PASS | 1.2 | 1.416 | 64.504 | 196 |
 | spaces-dark | PASS | 0.136 | 0.126 | 0.887 | 210 |
 | spaces-light | PASS | 0.138 | 0.128 | 1.031 | 197 |
 | tasks-dark | PASS | 0.234 | 0.25 | 0.791 | 218 |
@@ -51,15 +53,16 @@ text-densest page, so the same per-glyph delta accumulates past the gate
 here and nowhere else. No missing/wrong content; no control-state
 difference (toggles/segments agree).
 
-## D-03 — narrow viewports SKIP: 500px headless window floor
+## D-03 — narrow viewports: resolved on rebuild (P3-T14)
 
-`window/rect` 390×844 reads back 500×844 (probed 390/450/500: all clamp to
-500). The slot can never reach 390 wide in this environment, so the two
-narrow captures are recorded in `captures.json` as skipped and reported as
-SKIP by `compare.py` (never silently dropped). Options for the owning lane:
-run headed/Xvfb where the floor may not apply, or accept desktop-only
-in-Firefox coverage (the narrow matrix still runs standalone in CI via
-`capture.ts`).
+Earlier runs SKIPped: `window/rect` 390×844 read back 500×844 (probed
+390/450/500: all clamped to 500). After the P3-T14 rebuild (assembled shell,
+same headless environment), the slot converges to 390×844 and both narrow
+captures PASS (shell-dark-narrow 1.385%, shell-light-narrow 1.2% at tol-16).
+Hypothesis for the change: the pre-assembly shell left `hbox#browser`
+eating 347px of flex (P3-T11 harness note), constraining the slot; the
+assembled frame layout reflows correctly. Floor probe retained in
+`capture_firefox.py` as a guard.
 
 ## Harness observations for owning lanes (not deviations — no product change)
 

@@ -56,7 +56,7 @@
     let Frame = null;
     try {
       Frame = await import(
-        /* @vite-ignore */ "resource://astra/res/frame/Frame.sys.mjs"
+        /* @vite-ignore */ "resource://astra/frame/Frame.sys.mjs"
       );
     } catch {
       Frame = null;
@@ -270,7 +270,6 @@
         {/if}
       </div>
     </div>
-  </div>
   </div>
   <details class="astra-about">
     <summary>Shell status</summary>
