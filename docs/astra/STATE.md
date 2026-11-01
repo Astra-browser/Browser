@@ -47,9 +47,9 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P2-T02 | `astra-proto` schemas + generated Rust/TS types | done | orchestrator | agent/P2-T02-proto | Merged 2026-11-02; 267/35 registries, cargo 6/6 + bun 7/7 + validate PASS, drift gate verified, brand-lint clean; fixed stale "8 channels" comment (10 renames); Specta full-typing deferred |
 | P2-T03 | IPC transport (framing, backpressure, crash recovery) | done | orchestrator | agent/P2-T03-transport | Merged 2026-11-02; ipc 17+5 chaos + workspace 81/81, clippy 0, fmt clean; fixed proto from_str lint + T01 fmt leftovers |
 | P2-T04 | `astra-store` (rusqlite + migrations, WAL) | done | orchestrator | agent/P2-T04-store | Merged 2026-11-02; schema v4 (29 tables), store 19/19 + workspace 59/59, clippy+fmt clean; rusqlite 0.40 (migration-compat) |
-| P2-T05 | `GeckoHost` + `MockHost` | todo | — | — | After T01; next wave |
-| P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | todo | — | — | Builds on P1-T10 stub; next wave |
-| P2-T07 | History mirror into Places (`:visited`) | todo | — | — | Next wave |
+| P2-T05 | `GeckoHost` + `MockHost` | doing | worker-t05 | agent/P2-T05-geckohost | Locked 2026-11-02; owns host-trait gecko.rs + integration tests only |
+| P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | doing | worker-t06 | agent/P2-T06-hostapi | Locked 2026-11-02; owns overlay host modules except History |
+| P2-T07 | History mirror into Places (`:visited`) | doing | worker-t07h | agent/P2-T07-history | Locked 2026-11-02; owns overlay History module + mirror doc only |
 | P2-T08 | `@astra/bridge` (Tauri-compat + mock mode) | done | orchestrator | agent/P2-T08-bridge | Merged 2026-11-02; ui 1069/1069 + bridge 19/19 reproduced, build + svelte-check clean, brand-lint clean; vitest.config tsc errors pre-existing |
 | P2-T09 | Session snapshot/restore round-trip | todo | — | — | — |
 | P2-T10 | Settings, keymap, logging, diagnostics | todo | — | — | — |
