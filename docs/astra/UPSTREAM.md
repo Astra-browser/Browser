@@ -15,6 +15,12 @@
 | ASTRA-0001 `patches/ASTRA-0001-astra-dir-hook.patch` | P2 (3 added lines) | `browser/app.mozbuild` | `clean` — applied by `forge overlay`; `forge lint` green; configure passes with `/astra` in `DIRS` |
 
 - Footprint budget: 3 upstream lines touched (budget ≤ 1,500), 1 patch (≤ 60), 0 P3. Headroom intact.
+- **Full-build proof (P1-T04, 2026-11-01):** `obj-astra-linux/dist/bin/firefox`
+  → `Mozilla Firefox 153.6.0esr`; `chrome/astra.manifest` registers
+  `content`+`resource astra`; `hello.html` + `HostAPI.sys.mjs` packaged
+  (GUI-verified); overlay chrome files land as symlinks, so
+  `mach build faster` after an overlay edit is ~2 s (U-02 closed, see
+  `docs/astra/BUILD_TIMES.md`).
 - `engine/` workspace state (git-ignored in this repo): baseline `ee0912e` +
   `forge overlay` output (`astra/`, `browser/app.mozbuild` hook). Reproduce
   with `forge fetch && forge overlay`.
