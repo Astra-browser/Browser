@@ -15,7 +15,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | done | worker-1 | agent/P0-T04-porting | Merged 2026-11-01; groups mapped to Host API modules |
 | P0-T05 | Rebrand tooling + `brand-lint` | done | worker-1 | agent/P0-T05-rebrand | Merged 2026-11-01; lint exits 0 clean / 1 dirty |
 | P0-T06 | License/provenance | done | worker-1 | agent/P0-T06-license | Merged 2026-11-01; MPL LICENSE + NOTICE + 25/25 permissive |
-| P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
+| P0-T07 | Golden capture harness | doing | worker-gold | agent/P0-T07-golden | Locked 2026-11-02; unblocked (UI ported); standalone mock screenshots |
 | P1-T01 | `upstream.toml` + `forge fetch` (ESR 153.6.0, U-10 resolved) | done | worker-1 | agent/P1-T01-fetch | Merged 2026-11-01; sig OK via release key, engine extracted, baseline ee0912e |
 | P3-T01 | UI into `ui/` Bun workspace (standalone track) | done | worker-2 | agent/P3-T01-ui | Merged 2026-11-01; typecheck 0 errs, tests 1062 pass, vite build exit 0 |
 | P0-T08 | CI skeleton | done | worker-1 | agent/P0-T08-ci | Merged 2026-11-01; ci-fast (brand-lint/state-check/plan-check) green locally |
@@ -38,6 +38,21 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T10 | Content slot + URL bar via Host API stub | done | orchestrator | agent/P1-T10-content | Merged 2026-11-02; stub 33/33 + live 12/12 PASS reproduced, P1-T08 5/5 no-regress, brand-lint/state-check green |
 | P1-T11 | Contract-test harness (geckodriver) | done | orchestrator | agent/P1-T11-contract | Merged 2026-11-02; forge test 8/8 PASS reproduced (fixture-only + full), lint/footprint still green, brand-lint/state-check green |
 | P1-T12 | `forge export`/`import` round-trip + patch lint + footprint budget | done | orchestrator | agent/P1-T12-forge-rt | Merged 2026-11-02; build+lint+footprint green (14 lines/2 patches/0 P3), roundtrip PASS vs live engine, brand-lint/state-check green |
+
+## Phase 2 — Core, storage and bridge
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P2-T01 | Bring over crates per PORTING_MAP (`BrowserHost`) | doing | worker-p2core | agent/P2-T01-crates | Locked 2026-11-02; owns crates/* except astra-proto |
+| P2-T02 | `astra-proto` schemas + generated Rust/TS types | doing | worker-p2proto | agent/P2-T02-proto | Locked 2026-11-02; builds on P1-T09 sketch; owns crates/astra-proto + schemas |
+| P2-T03 | IPC transport (framing, backpressure, crash recovery) | todo | — | — | After T02 |
+| P2-T04 | `astra-store` (rusqlite + migrations, WAL) | todo | — | — | — |
+| P2-T05 | `GeckoHost` + `MockHost` | todo | — | — | After T01 |
+| P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | todo | — | — | Builds on P1-T10 stub |
+| P2-T07 | History mirror into Places (`:visited`) | todo | — | — | — |
+| P2-T08 | `@astra/bridge` (Tauri-compat + mock mode) | todo | — | — | — |
+| P2-T09 | Session snapshot/restore round-trip | todo | — | — | — |
+| P2-T10 | Settings, keymap, logging, diagnostics | todo | — | — | — |
 
 ## Later phases
 
