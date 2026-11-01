@@ -1,0 +1,189 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Astra window frame (P3-T03, Linux first): custom titlebar, drag regions,
+ * window controls, sidebar and toolbar layout.
+ *
+ * Drag mechanism (verified against pinned ESR 153, read-only):
+ *   - `-moz-window-dragging: drag` on the titlebar strip makes empty areas
+ *     move the window; `no-drag` on every interactive descendant keeps
+ *     buttons/inputs clickable. Same property Firefox itself uses
+ *     (toolkit/themes/linux/global/global.css, browser menubar rule).
+ *   - CSD availability is gated by the `(-moz-gtk-csd-available)` media
+ *     query (browser/base/content/browser-customtitlebar.js). When the WM
+ *     provides no CSD (server-side decorations), the native titlebar owns
+ *     dragging and our strip is a plain toolbar row (see docs/astra/FRAME.md).
+ * All selectors are scoped under #astra-root so Firefox chrome is untouched.
+ */
+
+#astra-root .astra-frame {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1c1b22;
+  color: #fbfbfe;
+}
+
+/* ---- Titlebar / drag region ---- */
+#astra-root .astra-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 36px;
+  padding: 0 0 0 0.75rem;
+  background: #2b2a33;
+  border-bottom: 1px solid #52525e;
+  user-select: none;
+  -moz-window-dragging: drag;
+}
+
+#astra-root .astra-titlebar-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: #cfcfd8;
+  pointer-events: none;
+}
+
+/* Window controls sit at the trailing edge; never draggable. */
+#astra-root .astra-window-controls {
+  display: flex;
+  align-items: stretch;
+  -moz-window-dragging: no-drag;
+}
+
+#astra-root .astra-window-controls button {
+  font: inherit;
+  color: #fbfbfe;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  min-width: 44px;
+  min-height: 36px;
+  cursor: pointer;
+  -moz-window-dragging: no-drag;
+}
+
+#astra-root .astra-window-controls button:hover {
+  background: #52525e;
+}
+
+#astra-root .astra-window-controls button[data-action="close"]:hover {
+  background: #e8102e;
+  color: #fff;
+}
+
+#astra-root .astra-window-controls button:focus-visible {
+  outline: 2px solid #00ddff;
+  outline-offset: -2px;
+}
+
+/* Every interactive element inside the drag strip opts out of dragging. */
+#astra-root .astra-titlebar button,
+#astra-root .astra-titlebar input,
+#astra-root .astra-titlebar [data-astra-no-drag] {
+  -moz-window-dragging: no-drag;
+}
+
+/* ---- Frame body: sidebar + main column ---- */
+#astra-root .astra-frame-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+}
+
+#astra-root .astra-sidebar {
+  flex: 0 0 auto;
+  width: 200px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.5rem;
+  background: #23222b;
+  border-inline-end: 1px solid #52525e;
+}
+
+#astra-root .astra-sidebar[data-collapsed="true"] {
+  width: 48px;
+}
+
+#astra-root .astra-sidebar button {
+  font: inherit;
+  font-size: 0.8rem;
+  color: #fbfbfe;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  text-align: start;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#astra-root .astra-sidebar button:hover {
+  background: #2b2a33;
+}
+
+#astra-root .astra-sidebar button[aria-current="page"] {
+  background: #2b2a33;
+  border-color: #52525e;
+}
+
+#astra-root .astra-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Toolbar row (sits under the titlebar, above the content slot) ---- */
+#astra-root .astra-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #2b2a33;
+  border-bottom: 1px solid #52525e;
+}
+
+#astra-root .astra-toolbar button {
+  font: inherit;
+  font-size: 0.8rem;
+  color: #fbfbfe;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+#astra-root .astra-toolbar button:hover {
+  background: #52525e;
+}
+
+#astra-root .astra-toolbar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Fullscreen: titlebar/sidebar/toolbar yield to content. The shell toggles
+ * data-astra-fullscreen on the frame root when host Windows reports
+ * fullscreen (window.fullscreen-changed event). */
+#astra-root .astra-frame[data-astra-fullscreen="true"] .astra-titlebar,
+#astra-root .astra-frame[data-astra-fullscreen="true"] .astra-sidebar,
+#astra-root .astra-frame[data-astra-fullscreen="true"] .astra-toolbar {
+  display: none;
+}
