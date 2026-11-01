@@ -77,7 +77,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P4-T01 | `astra-blocker` crate (adblock-rust + seed lists) | doing | worker-blk | agent/P4-T01-blocker | Locked 2026-11-02; owns crates/astra-blocker only |
+| P4-T01 | `astra-blocker` crate (adblock-rust + seed lists) | done | orchestrator | agent/P4-T01-blocker | Merged 2026-11-02; blocker 23/23, workspace 223/223, seed byte-identical + attribution clean; NOTICE rebrand stands (own file) |
 | P4-T02 | In-tree Rust network-hook component | todo | — | — | After T01; needs engine vendor |
 | P4-T03 | Element hiding (cosmetic + click-to-hide) | todo | — | — | After Content actor review |
 | P4-T04 | Extension manager + curated gallery | todo | — | — | Needs mapping research |
