@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/history.json",
+  "title": "Host API v1 — History mirror into Places (P2-T07, U-06)",
+  "description": "Core owns history; the host mirrors visits into Places so :visited link styling works. The module touches Places history only (D-15: no prefs, no telemetry). Only http(s) URLs are mirrored (M-1); other schemes are acknowledged with mirrored:false.",
+  "type": "object",
+  "properties": {
+    "visit": {
+      "type": "object",
+      "description": "Mirror one core-owned visit into Places (History.insert with a default TRANSITION_LINK visit).",
+      "properties": {
+        "request_id": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "visit_time": {
+          "type": "number",
+          "description": "ms since epoch (astra-store history.visit_time); omitted means now"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "clear": {
+      "type": "object",
+      "description": "Mirror a core history wipe into Places (History.clear removes all visits).",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "isVisited": {
+      "type": "object",
+      "description": "Read helper for tests/UI: visited state per the mirror (History.fetch). Emits no events.",
+      "properties": {
+        "request_id": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
