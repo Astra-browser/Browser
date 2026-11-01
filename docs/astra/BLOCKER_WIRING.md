@@ -83,9 +83,20 @@ Semantics (match `astra-blocker` P4-T01 exactly):
   "full-regex-handling"]` — the exact revision already vendored in
   `third_party/rust/adblock` and audited `safe-to-deploy` in
   `supply-chain/audits.toml:664` (bvandersloot). Consequences, all verified:
-  - `mach vendor rust` is a **no-op** (nothing new to vendor);
-  - `cargo vet` needs **no new entries** (repo has no `tools/vet-config`
-    of its own; the engine audit already covers the crate);
+  - `cargo vet` needs **no new entries for our crates** (repo has no `tools/vet-config`
+    of its own; the engine audit already covers adblock 0.12.1; our added closure
+    is only `addr` + `psl`/`psl-types`);
+  - `mach vendor rust` is **NOT** a no-op (correction 2026-11-02, orchestrator):
+    `addr`/`psl`/`psl-types` were missing from `third_party/rust` (cbindgen
+    metadata failed with "no matching package named `addr`"), so vendoring
+    runs and lands them;
+  - `mach vendor rust` currently **also** reports `cargo vet` failures on
+    Mozilla's own crates (`cssparser*` audit-as-crates-io policy,
+    `nss-rs` git-vs-published) — pre-existing registry drift in the ESR 153
+    tree, unrelated to this task (our crates are not named). Workaround:
+    `vendor rust --ignore-modified --force`; do NOT "fix" by touching
+    supply-chain/audits.toml without understanding the drift. Flag for
+    upstream-watch: ESR point bumps may need the same treatment;
   - `default-features = false` **without** `"single-thread"` is load-bearing:
     the default feature set disables `Send`+`Sync` on `Engine`, which would
     break the `static Mutex<Option<Engine>>` (the verdict runs on the
