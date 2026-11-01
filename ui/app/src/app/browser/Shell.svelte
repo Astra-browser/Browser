@@ -343,6 +343,7 @@
   data-astra-surface={browserPage.currentPage() ?? "browse"}
   data-private={incognito || undefined}
 >
+  <a href="#astra-stage" class="skip-link">{m.ui_skip_to_content()}</a>
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
   <Sidebar
     >{#snippet browserBody(compact)}
@@ -494,7 +495,7 @@
     {#if focus.cover() !== null && browserPage.currentPage() === null}
       <!-- Focus shuts the site this tab shows; native has taken the page off
          the stage, so this stands where it was. -->
-      <main class="internal-stage">
+      <main class="internal-stage" id="astra-stage" tabindex="-1">
         <div class="stage-page">
           <LazyView
             loader={loadFocusCover}
@@ -507,7 +508,7 @@
       </main>
     {:else if (tabs.activeTab()?.availability?.state === "waiting_for_capacity" || tabs.activeTab()?.availability?.state === "blocked_by_capacity") && browserPage.currentPage() === null}
       {@const capacityTab = tabs.activeTab()}
-      <main class="internal-stage">
+      <main class="internal-stage" id="astra-stage" tabindex="-1">
         {#if capacityTab}<LazyView
             loader={loadTabCapacityState}
             loadingLabel={m.surface_loading()}
@@ -520,7 +521,7 @@
       {@const failedTab = tabs.activeTab()}
       {@const failure = failedTab?.failure}
       <!-- A page that could not be shown: the pane says why instead of staying blank. -->
-      <main class="min-w-0 flex-1 ps-2">
+      <main class="min-w-0 flex-1 ps-2" id="astra-stage" tabindex="-1">
         <div class="content-pane h-full w-full overflow-hidden">
           {#if failedTab && failure}<LazyView
               loader={loadNavigationError}
@@ -539,7 +540,7 @@
       page and the new tab never changes the window's shape. The inline start
       inset matches the core layout gap between chrome and content.
     -->
-      <main class="min-w-0 flex-1 ps-2" data-astra-new-tab>
+      <main class="min-w-0 flex-1 ps-2" data-astra-new-tab id="astra-stage" tabindex="-1">
         <!-- New Tab paints its own ground, so its dock can open onto the frame. -->
         <div class="content-pane h-full w-full overflow-hidden" data-ground="own">
           <LazyView
@@ -567,7 +568,7 @@
       </main>
     {/if}
     {#if browserPage.currentPage() !== null}
-      <main class="internal-stage">
+      <main class="internal-stage" id="astra-stage" tabindex="-1">
         <!-- Each destination arrives as its own page: the ground settles in
            while its content rises onto it. -->
         {#key browserPage.currentPage()}<div
@@ -661,6 +662,42 @@
 {#if ClearSiteData}<ClearSiteData />{/if}
 
 <style>
+  /* Keyboard-only way past the chrome: hidden until it takes focus, then a
+     chip over the column. Fixed so it never disturbs the shell's layout. */
+  .skip-link {
+    position: fixed;
+    inset-inline-start: 12px;
+    top: -48px;
+    z-index: 100;
+    padding: 8px 12px;
+    border-radius: var(--radius-row);
+    background: var(--color-raised);
+    color: var(--color-text);
+    font-size: var(--text-label);
+    text-decoration: none;
+    box-shadow: var(--shadow-overlay);
+    transition: top var(--motion-fast) var(--ease-out);
+  }
+
+  .skip-link:focus-visible {
+    top: 12px;
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skip-link {
+      transition: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .skip-link:focus-visible {
+      outline-color: Highlight;
+      border: 1px solid Highlight;
+    }
+  }
+
   .stage-column {
     display: flex;
     flex: 1;

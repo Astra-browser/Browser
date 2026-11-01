@@ -24,6 +24,8 @@ export function mountUrlBar(container, host) {
   const doc = container.ownerDocument;
   const bar = el(doc, "div", "astra-urlbar");
   bar.setAttribute("data-astra-urlbar", "");
+  bar.setAttribute("role", "toolbar");
+  bar.setAttribute("aria-label", "Browser toolbar");
 
   const back = el(doc, "button", "nav", "←");
   back.setAttribute("data-action", "back");
@@ -42,6 +44,7 @@ export function mountUrlBar(container, host) {
   rel.type = "button";
 
   const form = el(doc, "form", "urlform");
+  form.setAttribute("role", "search");
   const input = el(doc, "input");
   input.type = "text";
   input.spellcheck = false;
@@ -51,6 +54,8 @@ export function mountUrlBar(container, host) {
   form.append(input);
 
   const count = el(doc, "span", "tabcount", "0 tabs");
+  count.setAttribute("role", "status");
+  count.setAttribute("aria-live", "polite");
 
   bar.append(back, fwd, rel, form, count);
   container.append(bar);

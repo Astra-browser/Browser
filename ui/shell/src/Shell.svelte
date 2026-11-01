@@ -56,10 +56,10 @@
 </script>
 
 <div class="astra-shell">
-  <div class="astra-bar-mount" bind:this={barMount}></div>
-  <div class="astra-content" data-astra-content="" bind:this={slot}>
+  <div class="astra-bar-mount" role="banner" bind:this={barMount}></div>
+  <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
     {#if slotError}
-      <p class="slot-error">{slotError}</p>
+      <p class="slot-error" role="alert">{slotError}</p>
     {/if}
   </div>
   <details class="astra-about">
