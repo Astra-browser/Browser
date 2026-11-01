@@ -1,0 +1,45 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra mozconfig — Linux (P1-T02). TEMPLATE: rendered by `forge config`
+# into out/mozconfig.linux (placeholders @VAR@ filled from branding/astra.toml).
+# Every flag verified against ESR 153.6.0 source; see docs/astra/BUILD_FLAGS.md.
+# Branding: @ASTRA_BRANDING_DIR@ (display: @ASTRA_DISPLAY_NAME@).
+# NOTE: the astra/branding/ directory itself lands in P1-T03. Until then,
+# render with `forge config --branding unofficial` for local configure tests.
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-astra-linux
+
+ac_add_options --enable-project=browser
+ac_add_options --with-branding=@ASTRA_BRANDING_DIR@
+
+# Telemetry / data reporting off (BUILD_FLAGS.md F-05a). Empty value disables
+# (engine/python/mozbuild/mozbuild/configure/options.py, get_value).
+export MOZ_TELEMETRY_REPORTING=
+
+# Crash reporting off (option verified: engine/toolkit/moz.configure).
+ac_add_options --disable-crashreporter
+
+# Built-in updater off for dev builds; release updates use Astra's own host
+# (D-16, P1-T03/P8). Option verified: engine/build/moz.configure/update-programs.configure.
+ac_add_options --disable-updater
+
+# Parental controls off (verified literal: engine/toolkit/moz.configure).
+ac_add_options --disable-parental-controls
+
+# Background tasks agent off on Linux (verified literal: engine/toolkit/moz.configure).
+ac_add_options --disable-backgroundtasks
+
+# No legacy profile creation (verified literal: engine/toolkit/moz.configure).
+ac_add_options --disable-legacy-profile-creation
+
+# WebDriver for contract/E2E tests (P1-T11). Explicitly overridable per source comment.
+ac_add_options --enable-geckodriver
+
+# Normandy + Health Report are NOT settable from mozconfig (project_flag with
+# possible_origins=("implied",); browser/moz.configure implies True). They are
+# neutralised via policies/prefs in P1-T06 — see BUILD_FLAGS.md F-05b/F-05c.
+
+# sccache (P1-T04 installs it; documented option: configuring_build_options.rst).
+# ac_add_options --with-ccache=sccache
