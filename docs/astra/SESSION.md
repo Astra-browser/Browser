@@ -32,15 +32,29 @@ verified), `LICENSE` (MPL), `NOTICE`, `LICENSES.md` (25/25 permissive),
 
 ## Active work (Phase 1 → UI port)
 
-1. **P1-T01 engine fetch (U-10 resolved)**: tarball URL layout confirmed live —
-   `https://archive.mozilla.org/pub/firefox/releases/153.6.0esr/source/firefox-153.6.0esr.source.tar.xz`
-   (HTTP 200) + `.asc` GPG signature (no SHA256SUMS file; verify via GPG).
-   Next: `forge fetch` downloads + verifies + extracts to `engine/`.
-2. **`forge/` skeleton**: Rust CLI (`fetch`, `import`, `overlay`, `config`,
-   `build`, `test`, `package`, `export`, `bump`, `doctor`); `fetch` first.
-3. **UI port (P3-T01 track)**: copy `folder_context/frame` → `ui/` (minus
-   `node_modules`), Bun workspace, rebrand text, standalone mock-mode build.
-   Depends on nothing from the engine for the standalone pass.
+1. **P1-T01 engine fetch (worker-1, `agent/P1-T01-fetch`)**: tarball URL
+   verified HTTP 200 + `.asc` sig; `forge/astra-forge` written (zero-dep Rust:
+   `fetch`, `doctor`), `doctor` all green (incl. bun 1.4.4). Fetch round 1
+   downloaded the tarball but GPG verify failed (no key). Round 2: imported
+   `release@mozilla.com` master `14F2 6682 D091 6CDD 81E3 7B6D 61B7 B526
+   D98F 0353` (created 2015-07-17, matches long-published release key; UID
+   email verified by keys.openpgp.org), signing subkey `827E … 7AA3`
+   (2026-08-06, expires 2028-08-05). Old ESRs (115/140) signed by previous
+   subkey `5ECB…20256` — rotation, same master lineage. Rerun in background:
+   verify + extract to `engine/` + git baseline.
+2. **P3-T01 UI port (worker-2, `agent/P3-T01-ui`)**: `folder_context/frame`
+   → `ui/app`, Bun workspace (`ui/package.json`, `bun.lock`), 214 files
+   rebranded (~2900 replacements, report in `docs/astra/REBRAND-ui.md`),
+   generated `bindings.ts` excluded (regenerated P2-T02). `bun install` clean
+   (456 pkgs; `@hugeicons/svelte` postinstall trusted). `bun run typecheck`
+   clean (0 errors). Unit tests: 1061 passed / 2 failed, both diagnosed as
+   porting debt: (a) 3 wire literals in generated bindings fixed with recorded
+   deviation; (b) paraglide-js floated 2.25.0→2.29.3, new compiler shape broke
+   the `i18nLocales()` transform — transform updated for both shapes;
+   (c) skills/native cross-boundary tests skip-if-missing until
+   `crates/astra-*` land (P2/P4/P6). Full suite re-running; then `vite build`.
+3. **Context-length duty (owner direction)**: if this session passes ~35–40%
+   context, compact and announce; SESSION.md is the carry-over.
 
 ## Open doubts / deferred
 

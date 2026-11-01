@@ -3,7 +3,12 @@
 # repo or built artifacts outside the allow-list.
 # Usage: tools/brand-lint.sh [path...]   (default: repo root)
 # Excludes: .git, folder_context (reference snapshot), LICENSE, NOTICE,
-# docs/astra/PROVENANCE.md, target/, node_modules/, engine/ (upstream).
+# docs/astra/PROVENANCE.md, target/, node_modules/, engine/ (upstream),
+# build outputs (dist/, reports/ — scanned post-build by the packaging gate
+# instead), and the generated IPC bindings (Tauri Specta output, regenerated
+# from astra-proto in P2-T02 which mints the new channel names; tracked in
+# docs/astra/REBRAND-ui.md).
+# Generated-file exception: ui/app/src/shared/ipc/bindings.ts (expires P2-T02).
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -16,11 +21,12 @@ ALLOW='^(./)?(LICENSE|NOTICE|docs/astra/PROVENANCE\.md)$'
 FAIL=0
 FOUND="$(grep -rIl --exclude-dir=.git --exclude-dir=folder_context \
   --exclude-dir=target --exclude-dir=node_modules --exclude-dir=engine \
+  --exclude-dir=dist --exclude-dir=reports \
   --exclude='*.png' --exclude='*.webp' --exclude='*.ico' --exclude='*.icns' \
   -i "$PATTERN" $TARGETS 2>/dev/null || true)"
 for f in $FOUND; do
   case "$f" in
-    ./LICENSE|./NOTICE|./docs/astra/PROVENANCE.md|LICENSE|NOTICE|docs/astra/PROVENANCE.md)
+    ./LICENSE|./NOTICE|./docs/astra/PROVENANCE.md|LICENSE|NOTICE|docs/astra/PROVENANCE.md|./ui/app/src/shared/ipc/bindings.ts|ui/app/src/shared/ipc/bindings.ts)
       continue ;;
     *)
       echo "brand-lint: forbidden match in $f" >&2

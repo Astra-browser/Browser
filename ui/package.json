@@ -1,0 +1,16 @@
+{
+  "name": "astra-ui",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "check": "bun run --filter @astra/frame check",
+    "build": "bun run --filter @astra/frame build",
+    "test": "bun run --filter @astra/frame test"
+  },
+  "trustedDependencies": [
+    "@hugeicons/svelte"
+  ]
+}
