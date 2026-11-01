@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "resource://astra/host/schemas/events.json",
-  "title": "Host API v1 — events (P1-T10; envelope per plan §5.4 / Appendix C)",
-  "description": "Every event is { event_seq, type, data }. event_seq is monotonic per session so the core can detect gaps and resync.",
+  "title": "Host API v1 — events (envelope per plan §5.4 / Appendix C)",
+  "description": "Every event is { event_seq, type, data }. event_seq is monotonic per session so the core can detect gaps and resync via eventsSince (ring buffer, cap 500) or a full snapshot.",
   "type": "object",
   "properties": {
     "event_seq": { "type": "integer", "minimum": 1 },
@@ -10,12 +10,33 @@
       "type": "string",
       "enum": [
         "boot.ready",
+        "boot.shutdown",
+        "window.created",
+        "window.focused",
+        "window.closed",
+        "window.fullscreen-changed",
         "tab.created",
         "tab.updated",
+        "tab.moved",
         "tab.closed",
+        "tab.pinned",
+        "tab.unpinned",
+        "tab.discarded",
+        "tab.restored",
+        "nav.started",
         "nav.committed",
+        "nav.stopped",
+        "nav.zoom-changed",
+        "nav.find-result",
+        "nav.print-requested",
+        "nav.reader-changed",
         "pane.shown",
-        "pane.hidden"
+        "pane.hidden",
+        "pane.attached",
+        "pane.detached",
+        "pane.rect-changed",
+        "content.title-changed",
+        "content.location-changed"
       ]
     },
     "data": { "type": "object" }

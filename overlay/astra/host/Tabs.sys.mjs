@@ -1,18 +1,26 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * License, v. 2.0. If a copy of the MPL was obtained with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Host API Tabs module (P1-T10). Firefox owns live tab objects (D-05);
-// this stub owns the *model*: stable `astra_tab_id`s, selection, and a
-// per-tab history stack driving back/forward. The P2-T06 host binding keeps
-// this protocol and swaps the model for real `gBrowser` tabs. Pure logic,
-// no Firefox internals.
+// Host API Tabs module (v1). Firefox owns live tab objects (D-05); this
+// module owns the *model*: stable `astra_tab_id`s, window association,
+// ordering, pin/discard state, selection, and a per-tab history stack
+// driving back/forward. The live `gBrowser` binding lives in
+// Content.sys.mjs, which calls these model ops and mirrors them into real
+// `<browser>` elements (verified ESR 153 APIs: `gBrowser.addTab(uri,
+// {triggeringPrincipal, inBackground})`, `removeTab`, `selectedTab`,
+// `moveTabTo(tab, {tabIndex})`, `pinTab`/`unpinTab`,
+// `discardBrowser(tab)`, `reloadTab(tab)`, `duplicateTab(tab)`).
+// Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
 
 export const HOST_API_VERSION = 1;
 
-const _tabs = new Map(); // astra_tab_id -> { astra_tab_id, url, title, selected }
+export const DEFAULT_WINDOW_ID = "win-1";
+
+const _tabs = new Map(); // astra_tab_id -> tab record
+const _order = []; // astra_tab_id in display order
 const _history = new Map(); // astra_tab_id -> { entries: [url], index: n }
 let _nextId = 1;
 let _selectedId = "";
@@ -33,6 +41,7 @@ function snapshot(id) {
   const h = _history.get(id) ?? { entries: [], index: -1 };
   return {
     ...tab,
+    index: _order.indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
   };
@@ -52,6 +61,49 @@ export function __tabsState() {
   return { tabs: _tabs, history: _history, get selectedId() { return _selectedId; } };
 }
 
+// Test-only + Windows.close: close every tab in a window.
+export function __closeTabsInWindow(window_id) {
+  const ids = [..._order].filter((id) => _tabs.get(id)?.window_id === window_id);
+  for (const id of ids) {
+    _tabs.delete(id);
+    _history.delete(id);
+    const i = _order.indexOf(id);
+    if (i >= 0) {
+      _order.splice(i, 1);
+    }
+    emit("tab.closed", { astra_tab_id: id, window_id });
+  }
+  if (_selectedId && !_tabs.has(_selectedId)) {
+    _selectedId = "";
+    const first = _order[0];
+    if (first !== undefined) {
+      selectInternal(first);
+    }
+  }
+  return ids;
+}
+
+// Live-binding ingress (Content.sys.mjs progress listeners): patch a tab's
+// externally-observed fields and announce it. Never throws.
+export function __applyExternalUpdate(id, patch = {}) {
+  const tab = _tabs.get(id);
+  if (!tab) {
+    return null;
+  }
+  if (typeof patch.title === "string") {
+    tab.title = patch.title;
+  }
+  if (typeof patch.url === "string" && patch.url !== "") {
+    tab.url = patch.url;
+  }
+  if (typeof patch.discarded === "boolean") {
+    tab.discarded = patch.discarded;
+  }
+  const snap = snapshot(id);
+  emit("tab.updated", { ...snap });
+  return snap;
+}
+
 // Test-only: Navigation drives history through these without events of its own.
 export function __pushHistory(id, url) {
   let h = _history.get(id);
@@ -69,15 +121,32 @@ export function __historyFor(id) {
 }
 
 export const Tabs = {
-  async create({ request_id = "", url = "about:blank", background = false } = {}) {
+  async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1 } = {}) {
+    if (typeof url !== "string" || url === "") {
+      return err(request_id, "invalid_url", "url must be a non-empty string");
+    }
     const astra_tab_id = `tab-${_nextId++}`;
-    _tabs.set(astra_tab_id, { astra_tab_id, url, title: "", selected: false });
+    _tabs.set(astra_tab_id, {
+      astra_tab_id,
+      url,
+      title: "",
+      selected: false,
+      window_id,
+      pinned: false,
+      discarded: false,
+      muted: false,
+    });
+    if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
+      _order.splice(index, 0, astra_tab_id);
+    } else {
+      _order.push(astra_tab_id);
+    }
     __pushHistory(astra_tab_id, url);
-    emit("tab.created", { astra_tab_id, url });
+    emit("tab.created", { astra_tab_id, url, window_id });
     if (!background || _selectedId === "") {
       selectInternal(astra_tab_id);
     }
-    return ok(request_id, { astra_tab_id, url });
+    return ok(request_id, { astra_tab_id, url, window_id });
   },
 
   async select({ request_id = "", astra_tab_id = "" } = {}) {
@@ -85,36 +154,169 @@ export const Tabs = {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
     }
     const snap = selectInternal(astra_tab_id);
-    return ok(request_id, { astra_tab_id, url: snap.url });
+    return ok(request_id, { astra_tab_id, url: snap.url, window_id: snap.window_id });
   },
 
   async close({ request_id = "", astra_tab_id = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
     const existed = _tabs.delete(astra_tab_id);
     _history.delete(astra_tab_id);
+    const i = _order.indexOf(astra_tab_id);
+    if (i >= 0) {
+      _order.splice(i, 1);
+    }
     if (existed) {
-      emit("tab.closed", { astra_tab_id });
+      emit("tab.closed", { astra_tab_id, window_id: tab.window_id });
       if (_selectedId === astra_tab_id) {
         _selectedId = "";
-        const first = _tabs.keys().next();
-        if (!first.done) {
-          selectInternal(first.value);
+        const first = _order[0];
+        if (first !== undefined) {
+          selectInternal(first);
         }
       }
     }
     return ok(request_id, { closed: existed });
   },
 
-  async list({ request_id = "" } = {}) {
+  async list({ request_id = "", window_id = "" } = {}) {
+    const ids = window_id
+      ? _order.filter((id) => _tabs.get(id)?.window_id === window_id)
+      : [..._order];
     return ok(request_id, {
-      tabs: [..._tabs.keys()].map((id) => snapshot(id)),
+      tabs: ids.map((id) => snapshot(id)),
       selected_tab_id: _selectedId,
     });
+  },
+
+  async get({ request_id = "", astra_tab_id = "" } = {}) {
+    const snap = snapshot(astra_tab_id);
+    if (!snap) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    return ok(request_id, { tab: snap });
+  },
+
+  // Reorder a tab within its window's display order.
+  async move({ request_id = "", astra_tab_id = "", index = 0 } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    if (!Number.isInteger(index) || index < 0) {
+      return err(request_id, "invalid_index", "index must be a non-negative integer");
+    }
+    const from = _order.indexOf(astra_tab_id);
+    _order.splice(from, 1);
+    const clamped = Math.min(index, _order.length);
+    _order.splice(clamped, 0, astra_tab_id);
+    emit("tab.moved", { astra_tab_id, from_index: from, to_index: clamped });
+    return ok(request_id, { astra_tab_id, index: clamped });
+  },
+
+  // Fork a tab: same URL/history, new id, placed next to the source.
+  async duplicate({ request_id = "", astra_tab_id = "", background = false } = {}) {
+    const src = _tabs.get(astra_tab_id);
+    if (!src) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    const created = await Tabs.create({
+      request_id,
+      url: src.url,
+      background: true,
+      window_id: src.window_id,
+      index: _order.indexOf(astra_tab_id) + 1,
+    });
+    if (created.error) {
+      return created;
+    }
+    const dupId = created.astra_tab_id;
+    const srcHist = _history.get(astra_tab_id);
+    if (srcHist) {
+      _history.set(dupId, { entries: [...srcHist.entries], index: srcHist.index });
+    }
+    const dup = _tabs.get(dupId);
+    dup.title = src.title;
+    dup.pinned = src.pinned;
+    if (!background) {
+      selectInternal(dupId);
+    }
+    return ok(request_id, { astra_tab_id: dupId, url: src.url, source_tab_id: astra_tab_id });
+  },
+
+  async pin({ request_id = "", astra_tab_id = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    tab.pinned = true;
+    emit("tab.pinned", { astra_tab_id });
+    return ok(request_id, { astra_tab_id, pinned: true });
+  },
+
+  async unpin({ request_id = "", astra_tab_id = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    tab.pinned = false;
+    emit("tab.unpinned", { astra_tab_id });
+    return ok(request_id, { astra_tab_id, pinned: false });
+  },
+
+  // Sleep a tab (live: `gBrowser.discardBrowser`). Keeps history +
+  // selection model intact; the content process may be dropped.
+  async discard({ request_id = "", astra_tab_id = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    tab.discarded = true;
+    emit("tab.discarded", { astra_tab_id });
+    return ok(request_id, { astra_tab_id, discarded: true });
+  },
+
+  async wakeup({ request_id = "", astra_tab_id = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    tab.discarded = false;
+    emit("tab.restored", { astra_tab_id, url: tab.url });
+    return ok(request_id, { astra_tab_id, discarded: false, url: tab.url });
+  },
+
+  // Title updates from live progress listeners (Content binding) or the
+  // core (session restore) flow through here so `tab.updated` fires.
+  async setTitle({ request_id = "", astra_tab_id = "", title = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    if (typeof title !== "string") {
+      return err(request_id, "invalid_title", "title must be a string");
+    }
+    tab.title = title;
+    const snap = snapshot(astra_tab_id);
+    emit("tab.updated", { ...snap });
+    return ok(request_id, { astra_tab_id, title });
+  },
+
+  async setMuted({ request_id = "", astra_tab_id = "", muted = false } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    tab.muted = muted === true;
+    const snap = snapshot(astra_tab_id);
+    emit("tab.updated", { ...snap });
+    return ok(request_id, { astra_tab_id, muted: tab.muted });
   },
 };
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.
 export function __resetTabsForTests() {
   _tabs.clear();
+  _order.length = 0;
   _history.clear();
   _nextId = 1;
   _selectedId = "";
