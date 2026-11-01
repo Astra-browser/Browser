@@ -50,7 +50,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P2-T05 | `GeckoHost` + `MockHost` | todo | — | — | After T01; next wave |
 | P2-T06 | Host API v1 (Boot/Windows/Tabs/Navigation) | todo | — | — | Builds on P1-T10 stub; next wave |
 | P2-T07 | History mirror into Places (`:visited`) | todo | — | — | Next wave |
-| P2-T08 | `@astra/bridge` (Tauri-compat + mock mode) | doing | worker-t08 | agent/P2-T08-bridge | Locked 2026-11-02; owns ui/packages/* bridge; reads overlay stub read-only |
+| P2-T08 | `@astra/bridge` (Tauri-compat + mock mode) | done | orchestrator | agent/P2-T08-bridge | Merged 2026-11-02; ui 1069/1069 + bridge 19/19 reproduced, build + svelte-check clean, brand-lint clean; vitest.config tsc errors pre-existing |
 | P2-T09 | Session snapshot/restore round-trip | todo | — | — | — |
 | P2-T10 | Settings, keymap, logging, diagnostics | todo | — | — | — |
 

@@ -1,0 +1,13 @@
+{
+  "name": "@astra/bridge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tauri invoke/listen/window-event API surface over the Astra Host API + Appendix C stdio frames, with standalone MOCK mode (P2-T08)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test ./src"
+  }
+}

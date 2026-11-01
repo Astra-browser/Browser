@@ -25,6 +25,10 @@ export const architecture = {
       { category: "test", pattern: "**/*.test.ts" },
       { category: "entry", pattern: "src/entries/*.ts" },
     ],
+    // P2-T08: `@astra/bridge` lives in `ui/packages/*` (outside root-path),
+    // as will any later workspace package. Treat out-of-root resolves as
+    // external so `no-unknown-dependencies` stays meaningful for real code.
+    "boundaries/flag-as-external": { outsideRootPath: true },
     "import/resolver": {
       typescript: {
         project: fileURLToPath(new URL("./tsconfig.json", import.meta.url)),
