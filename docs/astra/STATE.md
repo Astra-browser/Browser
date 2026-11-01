@@ -60,10 +60,10 @@ lock it: no other agent may touch that task, its files, or its branch.
 |---|---|---|---|---|---|
 | P3-T01 | UI into `ui/` Bun workspace (standalone track) | done | worker-2 | agent/P3-T01-ui | Merged 2026-11-01; typecheck 0 errs, tests 1062 pass, vite build exit 0 |
 | P3-T02 | Spike S-01 content slots (+ split/Work panes impl) | done | orchestrator | agent/P3-T02-slots | Merged 2026-11-02; CSS-grid slots (U-05 resolved), stub 39/39 + live 16/16, no-regress green; FIXED load-bearing P2-T06 regression (XUL_NS xhtml→xul, live-guarded) |
-| P3-T03 | Window frame per OS (Linux first) | todo | — | — | — |
+| P3-T03 | Window frame per OS (Linux first) | doing | worker-frame | agent/P3-T03-frame | Locked 2026-11-02; owns overlay chrome frame + shell frame files only |
 | P3-T04 | Tabs (vertical, pinned, folders, DnD, context menus) | done | orchestrator | agent/P3-T04-tabs | Merged 2026-11-02; ui 1084/1084 + shell model 13/13 reproduced, build + svelte-check clean; SpaceBar failure not reproduced (worker env) |
-| P3-T05 | Spaces/profiles (S-02 + containers impl) | todo | — | — | — |
-| P3-T06 | Split view + layout persistence | todo | — | — | After T02 |
+| P3-T05 | Spaces/profiles (S-02 + containers impl) | doing | worker-spaces | agent/P3-T05-spaces | Locked 2026-11-02; owns spaces model + S-02 doc only |
+| P3-T06 | Split view + layout persistence | doing | worker-split | agent/P3-T06-split | Locked 2026-11-02; owns split UI + layout persist only |
 | P3-T07 | Omnibox + search | todo | — | — | — |
 | P3-T08 | Settings UI, shortcuts, theming | todo | — | — | — |
 | P3-T09 | Browser dialogs via Host API events | todo | — | — | — |
