@@ -455,56 +455,205 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// Patch header lint: §6.3 mandatory fields + `git apply --check` (P1-T05/P1-T12).
-fn cmd_lint(root: &Path) -> Result<(), String> {
+// ---- P1-T12: patch series model (§6.3) ----
+// Patch files are `Patch-Id: ASTRA-NNNN` headers (lines up to the first
+// line that is exactly `---`), then a `git diff` body. std-only: no serde.
+
+const REQUIRED_FIELDS: [&str; 9] = [
+    "Patch-Id", "Title", "Tier", "Upstream-Files", "Intent", "Risk", "Test", "Verified-On", "Removal-Plan",
+];
+
+fn list_patches(root: &Path) -> Result<Vec<PathBuf>, String> {
     let dir = root.join("patches");
     if !dir.exists() {
-        println!("lint: no patches/ dir yet, nothing to check");
-        return Ok(());
+        return Ok(Vec::new());
     }
-    let mut entries: Vec<_> = fs::read_dir(&dir)
+    let mut entries: Vec<PathBuf> = fs::read_dir(&dir)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().map(|x| x == "patch").unwrap_or(false))
         .collect();
     entries.sort();
+    Ok(entries)
+}
+
+// Split patch text into (header lines, body). Errors when the `---`
+// separator is missing. Body lines that happen to be `---` (a filename
+// starting with `--`) are not our series' convention; the first
+// column-0 `---` ends the header.
+fn split_header(text: &str) -> Result<(Vec<String>, String), String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let sep = lines.iter().position(|l| l.trim_end() == "---");
+    match sep {
+        Some(i) => Ok((
+            lines[..i].iter().map(|s| s.to_string()).collect(),
+            lines[i + 1..].join("\n"),
+        )),
+        None => Err("missing header/body `---` separator".into()),
+    }
+}
+
+fn header_map(header: &[String]) -> std::collections::HashMap<String, String> {
+    let mut m = std::collections::HashMap::new();
+    for l in header {
+        if let Some((k, v)) = l.split_once(':') {
+            m.entry(k.trim().to_string()).or_insert(v.trim().to_string());
+        }
+    }
+    m
+}
+
+fn upstream_files_of(map: &std::collections::HashMap<String, String>) -> Vec<String> {
+    map.get("Upstream-Files")
+        .map(|v| {
+            v.split(|c| c == ',' || c == ' ')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// Root (baseline) commit of the engine/ git repo — the `forge fetch`
+// `baseline: firefox <version>` commit. Falls back to the root commit.
+fn find_baseline(engine: &Path) -> Result<String, String> {
+    if let Ok(h) = run("git", &["log", "--format=%H", "--grep=^baseline:", "--reverse"], engine) {
+        if let Some(first) = h.lines().next().filter(|s| !s.is_empty()) {
+            return Ok(first.to_string());
+        }
+    }
+    let roots = run("git", &["rev-list", "--max-parents=0", "HEAD"], engine)?;
+    roots
+        .lines()
+        .next()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "engine/: no commits found".into())
+}
+
+fn git_check(engine: &Path, args: &[&str]) -> bool {
+    Command::new("git")
+        .args(args)
+        .current_dir(engine)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn json_escape(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            '\t' => o.push_str("\\t"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o
+}
+
+// Patch header lint: §6.3 mandatory fields + Tier rules + `git apply --check` (P1-T05/P1-T12).
+// Tier rules: Tier ∈ {P0,P1,P2,P3}; every patch lists ≥1 upstream file;
+// P3 (experimental) must carry a real removal plan (not "none...").
+// Upstream-Files must exist at the engine baseline; Verified-On must equal
+// the pinned upstream.toml version; Patch-Id must match the filename and
+// the series must be numbered in order.
+fn cmd_lint(root: &Path) -> Result<(), String> {
+    let entries = list_patches(root)?;
     if entries.is_empty() {
         println!("lint: no patches to check");
         return Ok(());
     }
-    let required = ["Patch-Id:", "Title:", "Tier:", "Upstream-Files:", "Intent:", "Risk:", "Test:", "Verified-On:", "Removal-Plan:"];
+    let up = read_upstream(root);
+    let pinned = up.get("version").cloned().unwrap_or_default();
+    let engine = root.join("engine");
+    let have_engine_git = engine.join(".git").exists();
+    let baseline = if have_engine_git { find_baseline(&engine).ok() } else { None };
     let mut ok = true;
+    let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut ids: Vec<String> = Vec::new();
     for p in &entries {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
         let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
-        for field in required {
-            if !text.lines().any(|l| l.trim_start().starts_with(field)) {
-                println!("lint: {name}: missing header field {field}");
+        let (header, _body) = match split_header(&text) {
+            Ok(v) => v,
+            Err(e) => {
+                println!("lint: {name}: {e}");
+                ok = false;
+                continue;
+            }
+        };
+        let map = header_map(&header);
+        for field in REQUIRED_FIELDS {
+            match map.get(field) {
+                Some(v) if !v.trim().is_empty() => {}
+                _ => {
+                    println!("lint: {name}: missing header field {field}");
+                    ok = false;
+                }
+            }
+        }
+        let id = map.get("Patch-Id").cloned().unwrap_or_default();
+        if !id.is_empty() {
+            if !(name == format!("{id}.patch") || name.starts_with(&format!("{id}-"))) {
+                println!("lint: {name}: filename does not start with Patch-Id {id}");
+                ok = false;
+            }
+            if let Some(prev) = seen.get(&id) {
+                println!("lint: {name}: duplicate Patch-Id {id} (also in {prev})");
+                ok = false;
+            } else {
+                seen.insert(id.clone(), name.clone());
+            }
+            ids.push(id);
+        }
+        let tier = map.get("Tier").map(|s| s.trim().to_string()).unwrap_or_default();
+        if !["P0", "P1", "P2", "P3"].contains(&tier.as_str()) {
+            println!("lint: {name}: bad Tier {tier}");
+            ok = false;
+        } else if tier == "P3" {
+            let rp = map.get("Removal-Plan").map(|s| s.to_lowercase()).unwrap_or_default();
+            if rp.is_empty() || rp.starts_with("none") || rp == "tbd" || rp == "n/a" {
+                println!("lint: {name}: Tier P3 (experimental) needs a real Removal-Plan, not {rp:?}");
                 ok = false;
             }
         }
-        if let Some(tier) = text.lines().find_map(|l| l.trim_start().strip_prefix("Tier:")) {
-            let tier = tier.trim();
-            if !["P0", "P1", "P2", "P3"].contains(&tier) {
-                println!("lint: {name}: bad Tier {tier}");
+        let files = upstream_files_of(&map);
+        if map.contains_key("Upstream-Files") && files.is_empty() {
+            println!("lint: {name}: Upstream-Files lists no files");
+            ok = false;
+        }
+        for f in &files {
+            let exists = match &baseline {
+                Some(b) => git_check(&engine, &["cat-file", "-e", &format!("{b}:{f}")]),
+                None => engine.join(f).exists(),
+            };
+            if have_engine_git && baseline.is_some() && !exists {
+                println!("lint: {name}: Upstream-Files entry missing at baseline: {f}");
                 ok = false;
+            } else if !have_engine_git && !engine.join(f).exists() {
+                println!("lint: {name}: (no engine checkout) cannot verify Upstream-Files entry: {f}");
+            }
+        }
+        if !pinned.is_empty() && pinned != "UNVERIFIED" {
+            match map.get("Verified-On") {
+                Some(v) if v.trim() == pinned => {}
+                Some(v) => {
+                    println!("lint: {name}: Verified-On {v} != pinned upstream {pinned}");
+                    ok = false;
+                }
+                None => {}
             }
         }
         // Must apply cleanly OR already be applied (reverse-checks clean).
-        let engine = root.join("engine");
         if engine.join("mach").exists() {
-            let clean = Command::new("git")
-                .args(["apply", "--check", &p.to_string_lossy()])
-                .current_dir(&engine)
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
-            let applied = Command::new("git")
-                .args(["apply", "--reverse", "--check", &p.to_string_lossy()])
-                .current_dir(&engine)
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
+            let pstr = p.to_string_lossy().into_owned();
+            let clean = git_check(&engine, &["apply", "--check", &pstr]);
+            let applied = git_check(&engine, &["apply", "--reverse", "--check", &pstr]);
             if clean || applied {
                 println!("lint: {name}: applies {}", if applied { "(already applied)" } else { "cleanly" });
             } else {
@@ -513,10 +662,482 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
             }
         }
     }
+    let mut ordered = ids.clone();
+    ordered.sort();
+    if ids != ordered {
+        println!("lint: patch series out of Patch-Id order");
+        ok = false;
+    }
     if !ok {
         return Err("lint: patch header/apply failures (see above)".into());
     }
     println!("lint: all {} patch(es) clean", entries.len());
+    Ok(())
+}
+
+// `forge export`: regenerate patches/*.patch bodies from the live engine/
+// tree (diff of each patch's Upstream-Files vs the fetch baseline commit),
+// preserving the §6.3 headers. Fails (before writing anything) when the
+// engine tree holds changes no patch covers, so the series never silently
+// drops upstream drift.
+fn cmd_export(root: &Path) -> Result<(), String> {
+    let engine = root.join("engine");
+    if !engine.join("mach").exists() {
+        return Err("engine/ source absent (run `forge fetch` first)".into());
+    }
+    let entries = list_patches(root)?;
+    if entries.is_empty() {
+        return Err("no patches/*.patch yet: create the first ASTRA-0001 header, then export".into());
+    }
+    let baseline = find_baseline(&engine)?;
+    struct Item {
+        path: PathBuf,
+        name: String,
+        header: Vec<String>,
+        files: Vec<String>,
+    }
+    let mut items: Vec<Item> = Vec::new();
+    let mut covered: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for p in &entries {
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+        let (header, _) = split_header(&text)
+            .map_err(|e| format!("export: {name}: {e} (fix the header first)"))?;
+        let files = upstream_files_of(&header_map(&header));
+        if files.is_empty() {
+            return Err(format!("export: {name}: Upstream-Files lists no files"));
+        }
+        for f in &files {
+            covered.entry(f.clone()).or_insert_with(|| name.clone());
+        }
+        items.push(Item { path: p.clone(), name, header, files });
+    }
+    // Fail fast on uncovered drift (before rewriting anything).
+    let short = baseline.chars().take(12).collect::<String>();
+    let touched = run("git", &["diff", "--name-only", &baseline, "--", "."], &engine)?;
+    let uncovered: Vec<&str> = touched
+        .lines()
+        .map(str::trim)
+        .filter(|f| !f.is_empty() && !covered.contains_key(*f))
+        .collect();
+    if !uncovered.is_empty() {
+        let mut msg = format!(
+            "export: engine/ has changes no patch covers (diff vs baseline {short}):\n"
+        );
+        for f in uncovered {
+            msg.push_str(&format!("  {f}\n"));
+        }
+        msg.push_str("create patches/ASTRA-00NN-<slug>.patch with a §6.3 header, then re-run export");
+        return Err(msg);
+    }
+    let mut refreshed = 0;
+    for it in &items {
+        let mut args: Vec<&str> = vec!["diff", &baseline, "--"];
+        let owned: Vec<String> = it.files.clone();
+        let refs: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
+        args.extend(refs);
+        let body = run("git", &args, &engine)?;
+        if body.trim().is_empty() {
+            println!("export: {}: no live diff vs baseline, keeping existing body", it.name);
+            continue;
+        }
+        let mut out = it.header.join("\n");
+        out.push_str("\n---\n");
+        out.push_str(body.trim_end());
+        out.push('\n');
+        fs::write(&it.path, &out).map_err(|e| e.to_string())?;
+        println!("export: {}: body refreshed ({} file(s))", it.name, it.files.len());
+        refreshed += 1;
+    }
+    println!("export: done ({refreshed}/{} patch bodies from engine@{short})", items.len());
+    Ok(())
+}
+
+struct PatchStatus {
+    id: String,
+    file: String,
+    tier: String,
+    status: String,
+    detail: String,
+    added: usize,
+}
+
+// `patch -p1 --dry-run` detail for a patch that does not apply cleanly:
+// surfaces offset/fuzz hunks (git apply --check is binary). Best-effort:
+// returns "patch(1) unavailable" when the tool is missing.
+fn patch_dryrun_detail(engine: &Path, patch_abs: &str) -> String {
+    let out = Command::new("patch")
+        .args(["-p1", "--dry-run", "-f"])
+        .current_dir(engine)
+        .arg("-i")
+        .arg(patch_abs)
+        .output();
+    let out = match out {
+        Ok(o) => o,
+        Err(_) => return "patch(1) unavailable".into(),
+    };
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mut hits: Vec<&str> = text
+        .lines()
+        .filter(|l| {
+            let l = l.to_lowercase();
+            l.contains("offset") || l.contains("fuzz") || l.contains("succeed") || l.contains("fail")
+        })
+        .take(3)
+        .collect();
+    if hits.is_empty() {
+        hits = text.lines().take(2).collect();
+    }
+    let d: Vec<String> = hits.into_iter().map(|s| s.trim().to_string()).collect();
+    let mut s = d.join(" / ");
+    if s.is_empty() {
+        s = if out.status.success() { "dry-run ok".into() } else { "dry-run failed".into() };
+    }
+    if s.len() > 300 {
+        s.truncate(300);
+    }
+    s
+}
+
+fn count_added(body: &str) -> (usize, usize) {
+    let mut added = 0;
+    let mut removed = 0;
+    for l in body.lines() {
+        if l.starts_with("+++") || l.starts_with("---") {
+            continue;
+        } else if l.starts_with('+') {
+            added += 1;
+        } else if l.starts_with('-') {
+            removed += 1;
+        }
+    }
+    (added, removed)
+}
+
+// `forge import [--check]`: apply patches/*.patch in series order with
+// 3-way fallback. Per-patch clean/offset/fuzz/conflict report goes to
+// out/patch-health.json; on success the docs hook refreshes
+// docs/astra/UPSTREAM.md. --check only classifies, never writes engine/.
+fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
+    let engine = root.join("engine");
+    if !engine.join("mach").exists() {
+        return Err("engine/ source absent (run `forge fetch` first)".into());
+    }
+    let entries = list_patches(root)?;
+    if entries.is_empty() {
+        println!("import: no patches to apply");
+        return Ok(());
+    }
+    let baseline = find_baseline(&engine)?;
+    let mut report: Vec<PatchStatus> = Vec::new();
+    let mut conflicts = 0;
+    for p in &entries {
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let pabs = fs::canonicalize(p).map_err(|e| e.to_string())?.to_string_lossy().into_owned();
+        let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+        let (header, body) = match split_header(&text) {
+            Ok(v) => v,
+            Err(e) => {
+                report.push(PatchStatus {
+                    id: name.clone(), file: name.clone(), tier: "?".into(),
+                    status: "bad-header".into(), detail: e, added: 0,
+                });
+                conflicts += 1;
+                continue;
+            }
+        };
+        let map = header_map(&header);
+        let id = map.get("Patch-Id").cloned().unwrap_or_else(|| name.clone());
+        let tier = map.get("Tier").cloned().unwrap_or_else(|| "?".into());
+        let (added, _) = count_added(&body);
+        let mut push = |status: &str, detail: String| {
+            report.push(PatchStatus {
+                id: id.clone(), file: name.clone(), tier: tier.clone(),
+                status: status.into(), detail, added,
+            });
+        };
+        if git_check(&engine, &["apply", "--reverse", "--check", &pabs]) {
+            println!("import: {name}: already applied, skipping");
+            push("already-applied", "reverse-check clean".into());
+            continue;
+        }
+        if check_only {
+            if git_check(&engine, &["apply", "--check", &pabs]) {
+                println!("import: {name}: would apply cleanly");
+                push("clean", "applies cleanly (git apply --check)".into());
+            } else {
+                let d = patch_dryrun_detail(&engine, &pabs);
+                println!("import: {name}: needs 3-way or conflicts ({d})");
+                push("needs-three-way-or-conflict", d);
+            }
+            continue;
+        }
+        if git_check(&engine, &["apply", "--check", &pabs]) {
+            match run("git", &["apply", "-v", &pabs], &engine) {
+                Ok(_) => {
+                    println!("import: {name}: applied cleanly");
+                    push("clean", "applies cleanly (git apply --check)".into());
+                }
+                Err(e) => {
+                    println!("import: {name}: CONFLICT ({e})");
+                    push("conflict", e);
+                    conflicts += 1;
+                }
+            }
+            continue;
+        }
+        let detail = patch_dryrun_detail(&engine, &pabs);
+        match run("git", &["apply", "--3way", "-v", &pabs], &engine) {
+            Ok(_) => {
+                println!("import: {name}: applied via 3-way ({detail})");
+                push("three-way", detail);
+            }
+            Err(e) => {
+                println!("import: {name}: CONFLICT ({e}; {detail})");
+                push("conflict", format!("{e}; {detail}"));
+                conflicts += 1;
+            }
+        }
+    }
+    write_health_json(root, &baseline, &report)?;
+    if conflicts > 0 {
+        return Err(format!("import: {conflicts} patch(es) conflicted (see out/patch-health.json)"));
+    }
+    if check_only {
+        println!("import: check only, engine/ untouched ({} patch(es) classified)", report.len());
+        return Ok(());
+    }
+    match update_docs_hook(root, &report) {
+        Ok(n) => println!("import: docs hook refreshed {n} UPSTREAM.md row(s)"),
+        Err(e) => println!("import: WARNING docs hook skipped ({e})"),
+    }
+    println!("import: done ({} patch(es), health in out/patch-health.json)", report.len());
+    Ok(())
+}
+
+fn write_health_json(root: &Path, baseline: &str, report: &[PatchStatus]) -> Result<(), String> {
+    let out_dir = root.join("out");
+    fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+    let up = read_upstream(root);
+    let version = up.get("version").cloned().unwrap_or_default();
+    let mut s = String::from("{\n");
+    s.push_str(&format!("  \"version\": \"{}\",\n", json_escape(&version)));
+    s.push_str(&format!("  \"baseline\": \"{}\",\n", json_escape(baseline)));
+    s.push_str("  \"patches\": [\n");
+    for (i, r) in report.iter().enumerate() {
+        s.push_str(&format!(
+            "    {{\"id\": \"{}\", \"file\": \"{}\", \"tier\": \"{}\", \"status\": \"{}\", \"added_lines\": {}, \"detail\": \"{}\"}}{}\n",
+            json_escape(&r.id), json_escape(&r.file), json_escape(&r.tier),
+            json_escape(&r.status), r.added, json_escape(&r.detail),
+            if i + 1 == report.len() { "" } else { "," }
+        ));
+    }
+    let n_conflict = report.iter().filter(|r| r.status == "conflict" || r.status == "bad-header").count();
+    s.push_str(&format!(
+        "  ],\n  \"summary\": {{\"total\": {}, \"conflicts\": {}}}\n}}\n",
+        report.len(), n_conflict
+    ));
+    fs::write(out_dir.join("patch-health.json"), &s).map_err(|e| e.to_string())?;
+    println!("import: wrote out/patch-health.json");
+    Ok(())
+}
+
+// Refresh the backticked leading status token of a Patch health Status
+// cell and stamp/refresh a "via `forge import` <date>" suffix. All other
+// prose (verification evidence from earlier phases) is preserved.
+fn refresh_status_cell(cell: &str, status: &str, date: &str) -> String {
+    let mut s = cell.trim().to_string();
+    if s.starts_with('`') {
+        if let Some(end) = s[1..].find('`') {
+            s.replace_range(..end + 2, &format!("`{status}`"));
+        } else {
+            s = format!("`{status}` {s}");
+        }
+    } else {
+        s = format!("`{status}` — {s}");
+    }
+    let stamp = "via `forge import` ";
+    if let Some(pos) = s.find(stamp) {
+        let after = pos + stamp.len();
+        let rest = s[after..].to_string();
+        let is_date = rest.len() >= 10
+            && rest.chars().take(10).enumerate().all(|(i, c)| {
+                if i == 4 || i == 7 { c == '-' } else { c.is_ascii_digit() }
+            });
+        if is_date {
+            s.replace_range(after..after + 10, date);
+        } else {
+            s.insert_str(after, &format!("{date} "));
+        }
+    } else {
+        s.push_str(&format!(" · {stamp}{date}"));
+    }
+    s
+}
+
+fn strip_parens(s: &str) -> String {
+    let mut o = String::with_capacity(s.len());
+    let mut depth: usize = 0;
+    for c in s.chars() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ => {
+                if depth == 0 {
+                    o.push(c);
+                }
+            }
+        }
+    }
+    o
+}
+
+fn first_ints(line: &str, n: usize) -> Vec<usize> {
+    // Budgets live inside "(...)" groups ("budget ≤ 1,500"); strip those
+    // so only the live counts are compared.
+    let scrubbed = strip_parens(line);
+    let line = scrubbed.as_str();
+    let mut nums = Vec::new();
+    let mut cur = String::new();
+    for c in line.chars() {
+        if c.is_ascii_digit() || c == ',' {
+            if c != ',' {
+                cur.push(c);
+            }
+        } else if !cur.is_empty() {
+            if let Ok(v) = cur.parse() {
+                nums.push(v);
+            }
+            cur.clear();
+            if nums.len() == n {
+                break;
+            }
+        }
+    }
+    if !cur.is_empty() && nums.len() < n {
+        if let Ok(v) = cur.parse() {
+            nums.push(v);
+        }
+    }
+    nums
+}
+fn update_docs_hook(root: &Path, report: &[PatchStatus]) -> Result<usize, String> {
+    let path = root.join("docs/astra/UPSTREAM.md");
+    if !path.exists() {
+        return Err("docs/astra/UPSTREAM.md missing".into());
+    }
+    let date = run("date", &["+%F"], root).unwrap_or_else(|_| "undated".into());
+    let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let fp = compute_footprint(root)?;
+    let mut touched = 0;
+    let mut out: Vec<String> = Vec::new();
+    for line in text.lines() {
+        if line.starts_with("- Footprint budget:") {
+            // Rewrite only when the numbers actually changed, so the
+            // sentence tail ("Headroom intact." etc.) written by humans
+            // is never clobbered by a no-op import.
+            let have = first_ints(line, 3);
+            let want = vec![fp.lines_p2_p3, fp.patches, fp.p3];
+            if have == want {
+                out.push(line.to_string());
+            } else {
+                out.push(format!(
+                    "- Footprint budget: {} upstream lines touched (budget ≤ 1,500), {} patches (≤ 60), {} P3.",
+                    fp.lines_p2_p3, fp.patches, fp.p3
+                ));
+            }
+            continue;
+        }
+        if line.starts_with('|') {
+            let cells: Vec<&str> = line.split('|').collect();
+            // | Patch | Tier | Upstream files touched | Status |
+            if cells.len() >= 5 {
+                let row_id = cells[1].trim().split_whitespace().next().unwrap_or("");
+                if let Some(r) = report.iter().find(|r| r.id == row_id) {
+                    // Table health reads `clean` when the patch is applied
+                    // (already or just now); the precise import status stays
+                    // in out/patch-health.json.
+                    let shown = if r.status == "already-applied" { "clean" } else { r.status.as_str() };
+                    let status = refresh_status_cell(cells[4], shown, date.trim());
+                    out.push(format!("|{}|{}|{}| {status} |", cells[1], cells[2], cells[3]));
+                    touched += 1;
+                    continue;
+                }
+            }
+        }
+        out.push(line.to_string());
+    }
+    let mut final_text = out.join("\n");
+    final_text.push('\n');
+    fs::write(&path, &final_text).map_err(|e| e.to_string())?;
+    Ok(touched)
+}
+
+struct Footprint {
+    lines_p2_p3: usize,
+    patches: usize,
+    p3: usize,
+}
+
+// §6.7 footprint: added+removed diff-body lines over Tier P2/P3 patches,
+// patch count, P3 count. Header lines never count (body only).
+fn compute_footprint(root: &Path) -> Result<Footprint, String> {
+    let entries = list_patches(root)?;
+    let mut lines = 0;
+    let mut p3 = 0;
+    for p in &entries {
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+        let (header, body) = split_header(&text)
+            .map_err(|e| format!("footprint: {name}: {e}"))?;
+        let map = header_map(&header);
+        let tier = map.get("Tier").map(|s| s.trim().to_string()).unwrap_or_default();
+        let (added, removed) = count_added(&body);
+        if tier == "P2" || tier == "P3" {
+            lines += added + removed;
+        }
+        if tier == "P3" {
+            p3 += 1;
+        }
+    }
+    Ok(Footprint { lines_p2_p3: lines, patches: entries.len(), p3 })
+}
+
+// `forge footprint`: enforce the §6.7 budget (defaults ≤1500 lines P2/P3,
+// ≤60 patches, ≤8 P3). Always writes out/footprint.json; exits 1 over
+// budget with the offending dimensions named.
+fn cmd_footprint(root: &Path, max_lines: usize, max_patches: usize, max_p3: usize) -> Result<(), String> {
+    let fp = compute_footprint(root)?;
+    let out_dir = root.join("out");
+    fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+    let ok = fp.lines_p2_p3 <= max_lines && fp.patches <= max_patches && fp.p3 <= max_p3;
+    let json = format!(
+        "{{\n  \"lines_p2_p3\": {}, \"patches\": {}, \"p3\": {},\n  \"budget\": {{\"lines\": {}, \"patches\": {}, \"p3\": {}}},\n  \"ok\": {}\n}}\n",
+        fp.lines_p2_p3, fp.patches, fp.p3, max_lines, max_patches, max_p3, ok
+    );
+    fs::write(out_dir.join("footprint.json"), &json).map_err(|e| e.to_string())?;
+    println!(
+        "footprint: {} P2/P3 line(s) (budget ≤ {}), {} patch(es) (≤ {}), {} P3 (≤ {})",
+        fp.lines_p2_p3, max_lines, fp.patches, max_patches, fp.p3, max_p3
+    );
+    if !ok {
+        let mut over = Vec::new();
+        if fp.lines_p2_p3 > max_lines {
+            over.push(format!("lines {} > {}", fp.lines_p2_p3, max_lines));
+        }
+        if fp.patches > max_patches {
+            over.push(format!("patches {} > {}", fp.patches, max_patches));
+        }
+        if fp.p3 > max_p3 {
+            over.push(format!("P3 {} > {}", fp.p3, max_p3));
+        }
+        return Err(format!("footprint: OVER BUDGET ({}) — see out/footprint.json", over.join(", ")));
+    }
+    println!("footprint: within budget (report in out/footprint.json)");
     Ok(())
 }
 
@@ -559,7 +1180,7 @@ fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String
 }
 
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|build [--faster] [--jobs N]>");
+    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]>");
     std::process::exit(2);
 }
 
@@ -571,6 +1192,40 @@ fn main() {
         Some("doctor") => cmd_doctor(&root),
         Some("overlay") => cmd_overlay(&root),
         Some("lint") => cmd_lint(&root),
+        Some("export") => cmd_export(&root),
+        Some("import") => {
+            let mut check_only = false;
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--check" => check_only = true,
+                    other => {
+                        eprintln!("astra-forge: error: unknown import flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_import(&root, check_only)
+        }
+        Some("footprint") => {
+            let mut max_lines = 1500usize;
+            let mut max_patches = 60usize;
+            let mut max_p3 = 8usize;
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                let mut val = || it.next().map(|s| s.as_str()).unwrap_or("");
+                match a.as_str() {
+                    "--max-lines" => max_lines = val().parse().unwrap_or(1500),
+                    "--max-patches" => max_patches = val().parse().unwrap_or(60),
+                    "--max-p3" => max_p3 = val().parse().unwrap_or(8),
+                    other => {
+                        eprintln!("astra-forge: error: unknown footprint flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_footprint(&root, max_lines, max_patches, max_p3)
+        }
         Some("config") => {
             let mut os = "linux";
             let mut branding = "astra";
