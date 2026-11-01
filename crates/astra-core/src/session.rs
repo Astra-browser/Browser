@@ -23,6 +23,7 @@
 //! Kill -9 acceptance: snapshot → kill → restore yields identical
 //! organisation (URLs, order, spaces, folders, pins, active tab, scroll).
 
+use crate::layout::SplitLayout;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -132,6 +133,10 @@ pub struct SessionSnapshot {
     pub tabs: Vec<TabSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_tab_id: Option<String>,
+    /// Split view arrangement (P3-T06). Optional so pre-P3-T06 rows without
+    /// the key keep parsing; validated when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<SplitLayout>,
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -182,7 +187,16 @@ impl SessionSnapshot {
             windows: Vec::new(),
             tabs: Vec::new(),
             active_tab_id: None,
+            layout: None,
         }
+    }
+
+    /// Attach a split view arrangement (P3-T06). Builder form so
+    /// [`SessionSnapshot::capture`] keeps its signature — this extends the
+    /// P2-T09 snapshot, it does not rewrite it.
+    pub fn with_layout(mut self, layout: SplitLayout) -> Self {
+        self.layout = Some(layout);
+        self
     }
 
     /// Build a snapshot from parts. Private windows (and their tabs) are
@@ -228,6 +242,7 @@ impl SessionSnapshot {
             windows,
             tabs,
             active_tab_id,
+            layout: None,
         }
     }
 
@@ -394,6 +409,11 @@ impl SessionSnapshot {
                     "active tab {active} not in snapshot"
                 )));
             }
+        }
+        if let Some(layout) = &self.layout {
+            layout
+                .validate()
+                .map_err(|e| SessionError::Invalid(format!("layout: {e}")))?;
         }
         Ok(())
     }
@@ -578,6 +598,7 @@ mod tests {
             windows,
             tabs,
             active_tab_id: Some("tab-b".to_owned()),
+            layout: None,
         }
     }
 
