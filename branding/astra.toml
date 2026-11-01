@@ -1,0 +1,27 @@
+# Astra branding — single source of names/IDs (D-19)
+# Anything marked OWNER_DECISION blocks release builds only;
+# dev builds use clearly-marked dev defaults.
+
+display_name = "Astra"
+binary_name = "astra"
+app_id = "OWNER_DECISION"            # reverse-DNS, e.g. com.example.astra (dev default: com.astra.dev)
+app_id_dev_suffix = "dev"
+vendor = "OWNER_DECISION"
+homepage = "OWNER_DECISION"
+update_host = "OWNER_DECISION"        # host serving MAR manifests (dev default: localhost fixture)
+support_url = "OWNER_DECISION"
+docs_url = "OWNER_DECISION"
+
+[profile_dirs]
+linux = "astra"
+windows = "Astra"
+macos = "Astra"
+
+# Placeholder artwork; owner supplies final logo/icon set.
+[icons]
+svg = "overlay/astra/branding/PLACEHOLDER-logo.svg"
+png_512 = "overlay/astra/branding/PLACEHOLDER-icon-512.png"
+icns = "OWNER_DECISION"
+ico = "OWNER_DECISION"
+
+ua_token = "Astra"                   # appended to the Firefox-compatible UA (D-14)
