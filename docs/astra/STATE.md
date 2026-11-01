@@ -83,7 +83,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T04 | Extension manager + curated gallery | todo | — | — | Needs mapping research |
 | P4-T05 | Importers (Chromium/Firefox/Zen/...) | doing | worker-imp | agent/P4-T05-import | Locked 2026-11-02; owns crates/astra-import only |
 | P4-T06 | Tab sleeping policy | todo | — | — | Next wave |
-| P4-T07 | Private windows (nothing persisted) | doing | worker-priv | agent/P4-T07-private | Locked 2026-11-02; owns private-mode core + test only |
+| P4-T07 | Private windows (nothing persisted) | done | orchestrator | agent/P4-T07-private | Merged 2026-11-02; guard + forensic tests green; host-excluded today, store wiring = caller contract (see PRIVATE.md status) |
 | P4-T08 | Downloads manager + PDF viewer | todo | — | — | Next wave |
 | P4-T09 | Password/autofill decision | todo | — | — | Needs owner confirm; propose + defer |
 | P4-T10 | Performance baselines | todo | — | — | After rebuild; measure vs stock ESR |
