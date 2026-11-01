@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/content-hide.json",
+  "title": "Host API v1 — ContentHide (P4-T03 element hiding)",
+  "type": "object",
+  "properties": {
+    "hideForPage": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "startPicking": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "cancelPicking": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "confirmPick": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "url": { "type": "string" },
+        "host": { "type": "string" },
+        "selector": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "addRule": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "host": { "type": "string" },
+        "url": { "type": "string" },
+        "selector": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "removeRule": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "host": { "type": "string" },
+        "url": { "type": "string" },
+        "selector": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "listRules": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "host": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "clearSite": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "host": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "HideRule": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "selector": { "type": "string" }
+      },
+      "required": ["host", "selector"],
+      "additionalProperties": false
+    },
+    "HideResult": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "host_api_version": { "type": "integer", "const": 1 },
+        "host": { "type": "string" },
+        "url": { "type": "string" },
+        "selectors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "hidden": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["request_id", "host_api_version"],
+      "additionalProperties": false
+    },
+    "HideError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["invalid_url", "invalid_host", "invalid_selector", "not_picking"]
+        },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "picking-started": { "type": "string", "const": "content-hide.picking-started" },
+        "picking-cancelled": { "type": "string", "const": "content-hide.picking-cancelled" },
+        "rule-added": { "type": "string", "const": "content-hide.rule-added" },
+        "rule-removed": { "type": "string", "const": "content-hide.rule-removed" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

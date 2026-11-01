@@ -79,7 +79,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 |---|---|---|---|---|---|
 | P4-T01 | `astra-blocker` crate (adblock-rust + seed lists) | done | orchestrator | agent/P4-T01-blocker | Merged 2026-11-02; blocker 23/23, workspace 223/223, seed byte-identical + attribution clean; NOTICE rebrand stands (own file) |
 | P4-T02 | In-tree Rust network-hook component | todo | — | — | After T01; needs engine vendor |
-| P4-T03 | Element hiding (cosmetic + click-to-hide) | doing | worker-hide | agent/P4-T03-hiding | Locked 2026-11-02; owns Content hiding + tests only |
+| P4-T03 | Element hiding (cosmetic + click-to-hide) | done | orchestrator | agent/P4-T03-hiding | Merged 2026-11-02; protocol+logic 36+44 green; live injection deferred to P4-T11 |
 | P4-T04 | Extension manager + curated gallery | todo | — | — | Next wave (needs mapping research) |
 | P4-T05 | Importers (Chromium/Firefox/Zen/...) | done | orchestrator | agent/P4-T05-import | Merged 2026-11-02; 9 sources + store round-trip, 45/45, zero net deps; FIXED latent T03 tokio macros gap (workspace build now green) |
 | P4-T06 | Tab sleeping policy | doing | worker-sleep | agent/P4-T06-sleeping | Locked 2026-11-02; owns sleeping policy + tests only |
@@ -87,6 +87,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T08 | Downloads manager + PDF viewer | doing | worker-dl | agent/P4-T08-downloads | Locked 2026-11-02; owns downloads UI + tests only |
 | P4-T09 | Password/autofill decision | todo | — | — | Needs owner confirm; propose + defer |
 | P4-T10 | Performance baselines | todo | — | — | After rebuild; measure vs stock ESR |
+| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 
 ## Later phases
 
