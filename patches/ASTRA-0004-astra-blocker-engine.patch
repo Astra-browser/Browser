@@ -8,19 +8,202 @@ Test: tools/blocker-wiring-check.sh; full-build proof in follow-up (docs/astra/B
 Verified-On: 153.6.0
 Removal-Plan: delete the directory + the DIRS line if the blocker moves out of tree (fallback proxy); new-file entries need the forge lint new-file carve-out (see BLOCKER_WIRING.md section 6)
 ---
-diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
---- a/toolkit/components/moz.build
-+++ b/toolkit/components/moz.build
-@@ -32,6 +32,7 @@ DIRS += [
-     "commandlines",
-     "content-classifier",
-     "content-classifier/content_classifier_engine",
-+    "astra_blocker_engine",
-     "contentanalysis",
-     "contentprefs",
-     "contentrelevancy",
+diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.cpp b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
+new file mode 100644
+index 0000000000..ce44c5e98b
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
+@@ -0,0 +1,138 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "mozilla/AstraBlocker.h"
++
++#include "astra_blocker_ffi.h"
++
++#include "mozilla/Preferences.h"
++#include "nsCOMPtr.h"
++#include "nsIChannel.h"
++#include "nsIContentPolicy.h"
++#include "nsILoadInfo.h"
++#include "nsIPrincipal.h"
++#include "nsIURI.h"
++
++namespace mozilla {
++namespace AstraBlocker {
++
++// Must match the pref registered by the Astra overlay (default false: no
++// rules installed at first boot means no blocks until the Host API Net
++// module pushes the seed — fail-closed arming, fail-open verdicts).
++static const char* kEnabledPref = "astra.blocker.enabled";
++
++// Maps Gecko content-policy types to adblock-rust request types. Mirrors the
++// mapping in ContentClassifierEngine.cpp so both engines classify resources
++// the same way.
++static void RequestTypeForPolicy(ExtContentPolicyType aType, nsACString& aOut) {
++  switch (aType) {
++    case ExtContentPolicyType::TYPE_CSP_REPORT:
++      aOut.AssignLiteral("csp_report");
++      break;
++    case ExtContentPolicyType::TYPE_DOCUMENT:
++      aOut.AssignLiteral("document");
++      break;
++    case ExtContentPolicyType::TYPE_FONT:
++      aOut.AssignLiteral("font");
++      break;
++    case ExtContentPolicyType::TYPE_IMAGE:
++    case ExtContentPolicyType::TYPE_IMAGESET:
++      aOut.AssignLiteral("image");
++      break;
++    case ExtContentPolicyType::TYPE_MEDIA:
++      aOut.AssignLiteral("media");
++      break;
++    case ExtContentPolicyType::TYPE_OBJECT:
++      aOut.AssignLiteral("object");
++      break;
++    case ExtContentPolicyType::TYPE_BEACON:
++    case ExtContentPolicyType::TYPE_PING:
++      aOut.AssignLiteral("ping");
++      break;
++    case ExtContentPolicyType::TYPE_SCRIPT:
++      aOut.AssignLiteral("script");
++      break;
++    case ExtContentPolicyType::TYPE_STYLESHEET:
++      aOut.AssignLiteral("stylesheet");
++      break;
++    case ExtContentPolicyType::TYPE_SUBDOCUMENT:
++      aOut.AssignLiteral("subdocument");
++      break;
++    case ExtContentPolicyType::TYPE_WEBSOCKET:
++      aOut.AssignLiteral("websocket");
++      break;
++    case ExtContentPolicyType::TYPE_XMLHTTPREQUEST:
++      aOut.AssignLiteral("xmlhttprequest");
++      break;
++    default:
++      aOut.AssignLiteral("other");
++      break;
++  }
++}
++
++bool IsInitialized() {
++  // Rules arrive from the Host API Net module after boot; before that every
++  // verdict fails open. Probing the Rust side keeps C++ and Rust consistent
++  // by construction (no mirrored state to drift).
++  return astra_blocker_is_installed();
++}
++
++bool IsEnabled() {
++  // Cheap pref gate first so disabled builds skip the FFI round-trip.
++  return Preferences::GetBool(kEnabledPref, false) && IsInitialized();
++}
++
++bool ShouldBlockChannel(nsIChannel* aChannel) {
++  if (!IsEnabled() || !aChannel) {
++    return false;
++  }
++
++  nsCOMPtr<nsIURI> uri;
++  if (NS_FAILED(aChannel->GetURI(getter_AddRefs(uri))) || !uri) {
++    return false;
++  }
++  nsCString url;
++  if (NS_FAILED(uri->GetAsciiSpec(url))) {
++    return false;
++  }
++
++  // System/chrome loads have no content principal: never block browser
++  // internals, updater pings, or extension machinery on Astra rules.
++  nsCOMPtr<nsILoadInfo> loadInfo;
++  if (NS_FAILED(aChannel->GetLoadInfo(getter_AddRefs(loadInfo))) || !loadInfo) {
++    return false;
++  }
++  nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
++  if (!loadingPrincipal || loadingPrincipal->IsSystemPrincipal()) {
++    return false;
++  }
++  nsCString sourceSpec;
++  if (NS_FAILED(loadingPrincipal->GetAsciiSpec(sourceSpec))) {
++    return false;
++  }
++
++  nsCString requestType;
++  RequestTypeForPolicy(loadInfo->GetExternalContentPolicyType(), requestType);
++
++  bool block = false;
++  nsresult rv = astra_blocker_should_block(
++      url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
++      requestType.get(), requestType.Length(), &block);
++  return NS_SUCCEEDED(rv) && block;
++}
++
++nsresult InstallRules(const nsACString& aRules) {
++  return astra_blocker_install_rules(aRules.BeginReading(), aRules.Length());
++}
++
++void SetEnabled(bool aEnabled) {
++  Preferences::SetBool(kEnabledPref, aEnabled);
++}
++
++void SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
++  astra_blocker_set_site_enabled(aHost.BeginReading(), aHost.Length(), aEnabled);
++}
++
++}  // namespace AstraBlocker
++}  // namespace mozilla
+diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.h b/toolkit/components/astra_blocker_engine/AstraBlocker.h
+new file mode 100644
+index 0000000000..ac7a04531e
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/AstraBlocker.h
+@@ -0,0 +1,43 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef mozilla_AstraBlocker_h
++#define mozilla_AstraBlocker_h
++
++#include "nsError.h"
++#include "nsString.h"
++
++class nsIChannel;
++
++namespace mozilla {
++
++// In-tree verdict interface for the Astra ad/tracker blocker (P4-T02).
++// Implemented in AstraBlocker.cpp; verdicts come from the
++// astra_blocker_engine Rust crate (adblock-rust) via astra_blocker_ffi.h.
++namespace AstraBlocker {
++
++// True once compiled rules have been installed (via InstallRules).
++bool IsInitialized();
++
++// True when blocking is armed: the astra.blocker.enabled pref is on AND
++// rules are installed. Cheap; safe to call per channel.
++bool IsEnabled();
++
++// Verdict for one channel: global switch, per-site toggle, then the
++// adblock-rust network match. Fail-open on any error. First- and
++// third-party loads are both classified (unlike the content classifier,
++// which exempts first-party loads for webcompat).
++bool ShouldBlockChannel(nsIChannel* aChannel);
++
++// Management entry points. Rules and toggles originate in astra-core and
++// cross the Host API Net module; the JS bridge calls these (directly or via
++// a future nsIAstraBlockerService XPCOM wrapper).
++nsresult InstallRules(const nsACString& aRules);
++void SetEnabled(bool aEnabled);
++void SetSiteEnabled(const nsACString& aHost, bool aEnabled);
++
++}  // namespace AstraBlocker
++}  // namespace mozilla
++
++#endif  // mozilla_AstraBlocker_h
 diff --git a/toolkit/components/astra_blocker_engine/Cargo.toml b/toolkit/components/astra_blocker_engine/Cargo.toml
 new file mode 100644
+index 0000000000..c78ee585cc
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/Cargo.toml
 @@ -0,0 +1,16 @@
@@ -40,8 +223,30 @@ new file mode 100644
 +# static Mutex below (the verdict runs on the classifier worker thread).
 +adblock = { version = "=0.12.1", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
 +nserror = { path = "../../../xpcom/rust/nserror" }
+diff --git a/toolkit/components/astra_blocker_engine/cbindgen.toml b/toolkit/components/astra_blocker_engine/cbindgen.toml
+new file mode 100644
+index 0000000000..f53a6d3400
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/cbindgen.toml
+@@ -0,0 +1,15 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++header = """/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */"""
++autogen_warning = """/* DO NOT MODIFY THIS MANUALLY! This file was generated using cbindgen. See RunCbindgen.py */
++"""
++include_version = true
++braces = "SameLine"
++line_length = 100
++tab_width = 2
++language = "C++"
++namespaces = []
++includes = ["nsError.h"]
 diff --git a/toolkit/components/astra_blocker_engine/moz.build b/toolkit/components/astra_blocker_engine/moz.build
 new file mode 100644
+index 0000000000..e965248008
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/moz.build
 @@ -0,0 +1,28 @@
@@ -73,28 +278,9 @@ new file mode 100644
 +        "!astra_blocker_ffi.h",
 +        "AstraBlocker.h",
 +    ]
-diff --git a/toolkit/components/astra_blocker_engine/cbindgen.toml b/toolkit/components/astra_blocker_engine/cbindgen.toml
-new file mode 100644
---- /dev/null
-+++ b/toolkit/components/astra_blocker_engine/cbindgen.toml
-@@ -0,0 +1,15 @@
-+/* This Source Code Form is subject to the terms of the Mozilla Public
-+ * License, v. 2.0. If a copy of the MPL was not distributed with this
-+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-+header = """/* This Source Code Form is subject to the terms of the Mozilla Public
-+ * License, v. 2.0. If a copy of the MPL was not distributed with this
-+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */"""
-+autogen_warning = """/* DO NOT MODIFY THIS MANUALLY! This file was generated using cbindgen. See RunCbindgen.py */
-+"""
-+include_version = true
-+braces = "SameLine"
-+line_length = 100
-+tab_width = 2
-+language = "C++"
-+namespaces = []
-+includes = ["nsError.h"]
 diff --git a/toolkit/components/astra_blocker_engine/src/lib.rs b/toolkit/components/astra_blocker_engine/src/lib.rs
 new file mode 100644
+index 0000000000..58cf01490b
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/src/lib.rs
 @@ -0,0 +1,254 @@
@@ -352,194 +538,15 @@ new file mode 100644
 +        assert_eq!(normalize_host("  Example.COM. "), "example.com");
 +    }
 +}
-diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.h b/toolkit/components/astra_blocker_engine/AstraBlocker.h
-new file mode 100644
---- /dev/null
-+++ b/toolkit/components/astra_blocker_engine/AstraBlocker.h
-@@ -0,0 +1,43 @@
-+/* This Source Code Form is subject to the terms of the Mozilla Public
-+ * License, v. 2.0. If a copy of the MPL was not distributed with this
-+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-+
-+#ifndef mozilla_AstraBlocker_h
-+#define mozilla_AstraBlocker_h
-+
-+#include "nsError.h"
-+#include "nsString.h"
-+
-+class nsIChannel;
-+
-+namespace mozilla {
-+
-+// In-tree verdict interface for the Astra ad/tracker blocker (P4-T02).
-+// Implemented in AstraBlocker.cpp; verdicts come from the
-+// astra_blocker_engine Rust crate (adblock-rust) via astra_blocker_ffi.h.
-+namespace AstraBlocker {
-+
-+// True once compiled rules have been installed (via InstallRules).
-+bool IsInitialized();
-+
-+// True when blocking is armed: the astra.blocker.enabled pref is on AND
-+// rules are installed. Cheap; safe to call per channel.
-+bool IsEnabled();
-+
-+// Verdict for one channel: global switch, per-site toggle, then the
-+// adblock-rust network match. Fail-open on any error. First- and
-+// third-party loads are both classified (unlike the content classifier,
-+// which exempts first-party loads for webcompat).
-+bool ShouldBlockChannel(nsIChannel* aChannel);
-+
-+// Management entry points. Rules and toggles originate in astra-core and
-+// cross the Host API Net module; the JS bridge calls these (directly or via
-+// a future nsIAstraBlockerService XPCOM wrapper).
-+nsresult InstallRules(const nsACString& aRules);
-+void SetEnabled(bool aEnabled);
-+void SetSiteEnabled(const nsACString& aHost, bool aEnabled);
-+
-+}  // namespace AstraBlocker
-+}  // namespace mozilla
-+
-+#endif  // mozilla_AstraBlocker_h
-diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.cpp b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-new file mode 100644
---- /dev/null
-+++ b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-@@ -0,0 +1,138 @@
-+/* This Source Code Form is subject to the terms of the Mozilla Public
-+ * License, v. 2.0. If a copy of the MPL was not distributed with this
-+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-+
-+#include "mozilla/AstraBlocker.h"
-+
-+#include "astra_blocker_ffi.h"
-+
-+#include "mozilla/Preferences.h"
-+#include "nsCOMPtr.h"
-+#include "nsIChannel.h"
-+#include "nsIContentPolicy.h"
-+#include "nsILoadInfo.h"
-+#include "nsIPrincipal.h"
-+#include "nsIURI.h"
-+
-+namespace mozilla {
-+namespace AstraBlocker {
-+
-+// Must match the pref registered by the Astra overlay (default false: no
-+// rules installed at first boot means no blocks until the Host API Net
-+// module pushes the seed — fail-closed arming, fail-open verdicts).
-+static const char* kEnabledPref = "astra.blocker.enabled";
-+
-+// Maps Gecko content-policy types to adblock-rust request types. Mirrors the
-+// mapping in ContentClassifierEngine.cpp so both engines classify resources
-+// the same way.
-+static void RequestTypeForPolicy(ExtContentPolicyType aType, nsACString& aOut) {
-+  switch (aType) {
-+    case ExtContentPolicyType::TYPE_CSP_REPORT:
-+      aOut.AssignLiteral("csp_report");
-+      break;
-+    case ExtContentPolicyType::TYPE_DOCUMENT:
-+      aOut.AssignLiteral("document");
-+      break;
-+    case ExtContentPolicyType::TYPE_FONT:
-+      aOut.AssignLiteral("font");
-+      break;
-+    case ExtContentPolicyType::TYPE_IMAGE:
-+    case ExtContentPolicyType::TYPE_IMAGESET:
-+      aOut.AssignLiteral("image");
-+      break;
-+    case ExtContentPolicyType::TYPE_MEDIA:
-+      aOut.AssignLiteral("media");
-+      break;
-+    case ExtContentPolicyType::TYPE_OBJECT:
-+      aOut.AssignLiteral("object");
-+      break;
-+    case ExtContentPolicyType::TYPE_BEACON:
-+    case ExtContentPolicyType::TYPE_PING:
-+      aOut.AssignLiteral("ping");
-+      break;
-+    case ExtContentPolicyType::TYPE_SCRIPT:
-+      aOut.AssignLiteral("script");
-+      break;
-+    case ExtContentPolicyType::TYPE_STYLESHEET:
-+      aOut.AssignLiteral("stylesheet");
-+      break;
-+    case ExtContentPolicyType::TYPE_SUBDOCUMENT:
-+      aOut.AssignLiteral("subdocument");
-+      break;
-+    case ExtContentPolicyType::TYPE_WEBSOCKET:
-+      aOut.AssignLiteral("websocket");
-+      break;
-+    case ExtContentPolicyType::TYPE_XMLHTTPREQUEST:
-+      aOut.AssignLiteral("xmlhttprequest");
-+      break;
-+    default:
-+      aOut.AssignLiteral("other");
-+      break;
-+  }
-+}
-+
-+bool IsInitialized() {
-+  // Rules arrive from the Host API Net module after boot; before that every
-+  // verdict fails open. Probing the Rust side keeps C++ and Rust consistent
-+  // by construction (no mirrored state to drift).
-+  return astra_blocker_is_installed();
-+}
-+
-+bool IsEnabled() {
-+  // Cheap pref gate first so disabled builds skip the FFI round-trip.
-+  return Preferences::GetBool(kEnabledPref, false) && IsInitialized();
-+}
-+
-+bool ShouldBlockChannel(nsIChannel* aChannel) {
-+  if (!IsEnabled() || !aChannel) {
-+    return false;
-+  }
-+
-+  nsCOMPtr<nsIURI> uri;
-+  if (NS_FAILED(aChannel->GetURI(getter_AddRefs(uri))) || !uri) {
-+    return false;
-+  }
-+  nsCString url;
-+  if (NS_FAILED(uri->GetAsciiSpec(url))) {
-+    return false;
-+  }
-+
-+  // System/chrome loads have no content principal: never block browser
-+  // internals, updater pings, or extension machinery on Astra rules.
-+  nsCOMPtr<nsILoadInfo> loadInfo;
-+  if (NS_FAILED(aChannel->GetLoadInfo(getter_AddRefs(loadInfo))) || !loadInfo) {
-+    return false;
-+  }
-+  nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
-+  if (!loadingPrincipal || loadingPrincipal->IsSystemPrincipal()) {
-+    return false;
-+  }
-+  nsCString sourceSpec;
-+  if (NS_FAILED(loadingPrincipal->GetAsciiSpec(sourceSpec))) {
-+    return false;
-+  }
-+
-+  nsCString requestType;
-+  RequestTypeForPolicy(loadInfo->GetExternalContentPolicyType(), requestType);
-+
-+  bool block = false;
-+  nsresult rv = astra_blocker_should_block(
-+      url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
-+      requestType.get(), requestType.Length(), &block);
-+  return NS_SUCCEEDED(rv) && block;
-+}
-+
-+nsresult InstallRules(const nsACString& aRules) {
-+  return astra_blocker_install_rules(aRules.BeginReading(), aRules.Length());
-+}
-+
-+void SetEnabled(bool aEnabled) {
-+  Preferences::SetBool(kEnabledPref, aEnabled);
-+}
-+
-+void SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
-+  astra_blocker_set_site_enabled(aHost.BeginReading(), aHost.Length(), aEnabled);
-+}
-+
-+}  // namespace AstraBlocker
-+}  // namespace mozilla
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 1435813505..dadce48433 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -32,6 +32,7 @@ DIRS += [
+     "commandlines",
+     "content-classifier",
+     "content-classifier/content_classifier_engine",
++    "astra_blocker_engine",
+     "contentanalysis",
+     "contentprefs",
+     "contentrelevancy",

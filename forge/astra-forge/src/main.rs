@@ -744,6 +744,29 @@ fn cmd_export(root: &Path) -> Result<(), String> {
         }
         items.push(Item { path: p.clone(), name, header, files });
     }
+    // Untouched-by-baseline new files are invisible to `git diff` until they
+    // are intent-to-add: register every listed Upstream-File that exists in
+    // the worktree but is untracked, so both the uncovered-drift check and
+    // the body refresh below see real `new file` hunks with full content.
+    // (Without this, export silently drops new files — e.g. ASTRA-0004's
+    // whole crate vanished on refresh.) Intent-to-add touches only the
+    // engine index, never file content.
+    {
+        let mut untracked: Vec<&str> = Vec::new();
+        for it in &items {
+            for f in &it.files {
+                let tracked = run("git", &["ls-files", "--error-unmatch", f], &engine).is_ok();
+                if !tracked && engine.join(f).exists() {
+                    untracked.push(f.as_str());
+                }
+            }
+        }
+        if !untracked.is_empty() {
+            let mut args: Vec<&str> = vec!["add", "--intent-to-add", "-N", "--"];
+            args.extend(untracked);
+            run("git", &args, &engine)?;
+        }
+    }
     // Fail fast on uncovered drift (before rewriting anything).
     let short = baseline.chars().take(12).collect::<String>();
     let touched = run("git", &["diff", "--name-only", &baseline, "--", "."], &engine)?;

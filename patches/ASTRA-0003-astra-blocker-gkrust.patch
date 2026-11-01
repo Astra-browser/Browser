@@ -1,14 +1,89 @@
 Patch-Id: ASTRA-0003
 Title: Link astra_blocker_engine into gkrust (libxul)
 Tier: P2
-Upstream-Files: toolkit/library/rust/shared/Cargo.toml, toolkit/library/rust/shared/lib.rs
+Upstream-Files: toolkit/library/rust/shared/Cargo.toml, toolkit/library/rust/shared/lib.rs, Cargo.lock
 Intent: link the Astra blocker engine crate into libxul via the gkrust unified crate (F-08 pattern: shared/Cargo.toml dep + extern crate in shared/lib.rs, mirroring content_classifier_engine); no configure option can add a crate to gkrust, so a hook is required
 Risk: low (one dep line + one extern crate line, adjacent to the content_classifier_engine precedent; requires `cargo update -p gkrust-shared` at build time)
 Test: tools/blocker-wiring-check.sh; full-build proof in follow-up (docs/astra/BLOCKER_WIRING.md section 5)
 Verified-On: 153.6.0
 Removal-Plan: drop both lines if the blocker moves out of tree (fallback proxy); keep if ESR rebase preserves the gkrust layout
 ---
+diff --git a/Cargo.lock b/Cargo.lock
+index 7286a0abdf..bfd3ad4c4c 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -32,6 +32,7 @@ version = "0.12.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "698c1e831aaee3d583efe775790acc7d59fd99d8060e7385b99d2d369a5cdca8"
+ dependencies = [
++ "addr",
+  "arrayvec",
+  "base64 0.22.1",
+  "bitflags 2.10.0",
+@@ -51,6 +52,16 @@ dependencies = [
+  "url",
+ ]
+ 
++[[package]]
++name = "addr"
++version = "0.15.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "a93b8a41dbe230ad5087cc721f8d41611de654542180586b315d9f4cf6b72bef"
++dependencies = [
++ "psl",
++ "psl-types",
++]
++
+ [[package]]
+ name = "adler2"
+ version = "2.0.1"
+@@ -304,6 +315,14 @@ dependencies = [
+  "serde_json",
+ ]
+ 
++[[package]]
++name = "astra_blocker_engine"
++version = "0.1.0"
++dependencies = [
++ "adblock",
++ "nserror",
++]
++
+ [[package]]
+ name = "async-task"
+ version = "4.3.0"
+@@ -2899,6 +2918,7 @@ dependencies = [
+  "abridged_certs",
+  "adblock",
+  "app_collator_glue",
++ "astra_blocker_engine",
+  "audio_thread_priority",
+  "audioipc2-client",
+  "audioipc2-server",
+@@ -6477,6 +6497,21 @@ dependencies = [
+  "syn",
+ ]
+ 
++[[package]]
++name = "psl"
++version = "2.1.245"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "46cce9bc841c0eeb395275a775d11e3cc91b904e6ab370a9a42369e111b3038e"
++dependencies = [
++ "psl-types",
++]
++
++[[package]]
++name = "psl-types"
++version = "2.0.11"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
++
+ [[package]]
+ name = "pulse"
+ version = "0.3.0"
 diff --git a/toolkit/library/rust/shared/Cargo.toml b/toolkit/library/rust/shared/Cargo.toml
+index cc4e5a6683..0899b3c93e 100644
 --- a/toolkit/library/rust/shared/Cargo.toml
 +++ b/toolkit/library/rust/shared/Cargo.toml
 @@ -123,6 +123,7 @@ uritemplate_glue = { path = "../../../../netwerk/base/uritemplate_glue" }
@@ -20,6 +95,7 @@ diff --git a/toolkit/library/rust/shared/Cargo.toml b/toolkit/library/rust/share
  libz-rs-sys = { version = "0.6", features = ["custom-prefix"], optional = true }
  zlib-rs = { version = "0.6", features = ["avx512"], optional = true }
 diff --git a/toolkit/library/rust/shared/lib.rs b/toolkit/library/rust/shared/lib.rs
+index 3483e33e61..6e57c68b89 100644
 --- a/toolkit/library/rust/shared/lib.rs
 +++ b/toolkit/library/rust/shared/lib.rs
 @@ -157,6 +157,7 @@ extern crate urlpattern_glue;

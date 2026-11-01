@@ -9,6 +9,7 @@ Verified-On: 153.6.0
 Removal-Plan: delete the 10-line block + include + LOCAL_INCLUDES line if the blocker moves out of tree (fallback proxy)
 ---
 diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+index 654ecffedd..c03f79021a 100644
 --- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
 +++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
 @@ -5,6 +5,7 @@
@@ -36,13 +37,14 @@ diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-
      return NS_ERROR_FAILURE;
    }
 diff --git a/netwerk/url-classifier/moz.build b/netwerk/url-classifier/moz.build
+index 9a0844621a..9f5bc2addf 100644
 --- a/netwerk/url-classifier/moz.build
 +++ b/netwerk/url-classifier/moz.build
-@@ -72,6 +72,7 @@ LOCAL_INCLUDES += [
+@@ -71,6 +71,7 @@ EXPORTS.mozilla.net += [
+ LOCAL_INCLUDES += [
      "/netwerk/base",
      "/netwerk/protocol/http",
-     "/toolkit/components/content-classifier",
 +    "/toolkit/components/astra_blocker_engine",
+     "/toolkit/components/content-classifier",
      "/toolkit/components/url-classifier",
  ]
- 

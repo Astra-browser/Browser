@@ -57,8 +57,13 @@ sorted="$(echo "$IDS" | tr ' ' '\n' | grep . | sort | tr '\n' ' ')"
 # The python block below prints its own PASS/FAIL lines; propagate failures:
 MARK="$(mktemp)"
 python3 - "$ENGINE_DIR" "${PATCHES[@]}" >"$MARK" 2>&1 <<'EOF'
-import re, sys
+import re, sys, subprocess
 engine, patches = sys.argv[1], sys.argv[2:]
+base = subprocess.run(["git", "-C", engine, "log", "--format=%H", "--grep=^baseline:", "--reverse"],
+                       capture_output=True, text=True).stdout.split()[0]
+def at_baseline(path):
+    return subprocess.run(["git", "-C", engine, "cat-file", "-e", f"{base}:{path}"],
+                          capture_output=True).returncode == 0
 for p in patches:
     name = p.split('/')[-1]
     text = open(p).read()
@@ -83,8 +88,11 @@ for p in patches:
     for f in files:
         newfile, seq = diffs[f]
         if newfile:
-            import os
-            if os.path.exists(f"{engine}/{f}"): print(f"FAIL: {name}: new file {f} exists at baseline")
+            # New files must NOT exist at the baseline commit (else the
+            # patch would fail to apply and Upstream-Files would be wrong).
+            # NB: the live worktree HAS them (patches applied) — that is
+            # expected and is not what this checks.
+            if at_baseline(f): print(f"FAIL: {name}: new file {f} exists at baseline")
             else: print(f"PASS: {name}: new file {f} absent at baseline, {len(seq)} lines")
             continue
         import os
