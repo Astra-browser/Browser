@@ -1,0 +1,11 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "export_browser_data",
+      "payload": {
+        "kind": {}
+      }
+    }
+  ]
+}

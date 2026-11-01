@@ -1,0 +1,54 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_human_check",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "page": {}
+      }
+    },
+    {
+      "command": "work_human_continue",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "page": {},
+        "account": {}
+      }
+    },
+    {
+      "command": "work_human_extend",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "page": {}
+      }
+    },
+    {
+      "command": "work_human_pages",
+      "payload": {
+        "expected_profile": "x",
+        "work": {}
+      }
+    },
+    {
+      "command": "work_human_present",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "page": {},
+        "region": {}
+      }
+    },
+    {
+      "command": "work_human_release",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "page": {}
+      }
+    }
+  ]
+}

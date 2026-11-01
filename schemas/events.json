@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/proto/events",
+  "title": "Astra protocol v1 -- event channels (P2-T02, generated)",
+  "x-astra-generated": {
+    "by": "crates/astra-proto/codegen/generate.py",
+    "from": "docs/astra/ipc-surface.md",
+    "version": 1
+  },
+  "version": 1,
+  "count": 35,
+  "renames": {
+    "prev:account-changed": "astra:account-changed",
+    "prev:import-progress": "astra:import-progress",
+    "prev:keymap-changed": "astra:keymap-changed",
+    "prev:page-assist-changed": "astra:page-assist-changed",
+    "prev:swipe": "astra:swipe",
+    "prev:voice-changed": "astra:voice-changed",
+    "prev:voice-levels": "astra:voice-levels",
+    "prev:work-decision-preference-changed": "astra:work-decision-preference-changed",
+    "prev:work-human-changed": "astra:work-human-changed",
+    "prev:work-models-changed": "astra:work-models-changed"
+  },
+  "events": {
+    "blocker-status-changed": {
+      "ts": "blockerStatusChanged",
+      "payload": {
+        "x-astra-rust-type": "BlockerStatusChanged"
+      }
+    },
+    "browser-credential-capability-changed": {
+      "ts": "browserCredentialCapabilityChanged",
+      "payload": {
+        "x-astra-rust-type": "BrowserCredentialCapabilityChanged"
+      }
+    },
+    "downloads-changed": {
+      "ts": "downloadsChanged",
+      "payload": {
+        "x-astra-rust-type": "DownloadsChanged"
+      }
+    },
+    "extension-action-failed": {
+      "ts": "extensionActionFailed",
+      "payload": {
+        "x-astra-rust-type": "ExtensionActionFailed"
+      }
+    },
+    "extension-action-shortcut": {
+      "ts": "extensionActionShortcut",
+      "payload": {
+        "x-astra-rust-type": "ExtensionActionShortcut"
+      }
+    },
+    "extension-actions-changed": {
+      "ts": "extensionActionsChanged",
+      "payload": {
+        "x-astra-rust-type": "ExtensionActionsChanged"
+      }
+    },
+    "favicons-changed": {
+      "ts": "faviconsChanged",
+      "payload": {
+        "x-astra-rust-type": "FaviconsChanged"
+      }
+    },
+    "find-changed": {
+      "ts": "findChanged",
+      "payload": {
+        "x-astra-rust-type": "FindChanged"
+      }
+    },
+    "focus-changed": {
+      "ts": "focusChanged",
+      "payload": {
+        "x-astra-rust-type": "FocusChanged"
+      }
+    },
+    "items-changed": {
+      "ts": "itemsChanged",
+      "payload": {
+        "x-astra-rust-type": "ItemsChanged"
+      }
+    },
+    "layout-changed": {
+      "ts": "layoutChanged",
+      "payload": {
+        "x-astra-rust-type": "LayoutChanged"
+      }
+    },
+    "media-player-changed": {
+      "ts": "mediaPlayerChanged",
+      "payload": {
+        "x-astra-rust-type": "MediaPlayerChanged"
+      }
+    },
+    "note-open-requested": {
+      "ts": "noteOpenRequested",
+      "payload": {
+        "x-astra-rust-type": "NoteOpenRequested"
+      }
+    },
+    "notes-changed": {
+      "ts": "notesChanged",
+      "payload": {
+        "x-astra-rust-type": "NotesChanged"
+      }
+    },
+    "operation-processed": {
+      "ts": "operationProcessed",
+      "payload": {
+        "x-astra-rust-type": "OperationProcessed"
+      }
+    },
+    "page-permission-prompt-changed": {
+      "ts": "pagePermissionPromptChanged",
+      "payload": {
+        "x-astra-rust-type": "PagePermissionPromptChanged"
+      }
+    },
+    "resource-changed": {
+      "ts": "resourceChanged",
+      "payload": {
+        "x-astra-rust-type": "ResourceChanged"
+      }
+    },
+    "runtime-status-changed": {
+      "ts": "runtimeStatusChanged",
+      "payload": {
+        "x-astra-rust-type": "RuntimeStatusChanged"
+      }
+    },
+    "search-changed": {
+      "ts": "searchChanged",
+      "payload": {
+        "x-astra-rust-type": "SearchChanged"
+      }
+    },
+    "tab-changed": {
+      "ts": "tabChanged",
+      "payload": {
+        "x-astra-rust-type": "TabChanged"
+      }
+    },
+    "ui-command": {
+      "ts": "uiCommand",
+      "payload": {
+        "x-astra-rust-type": "UiCommand"
+      }
+    },
+    "web-extension-access-requested": {
+      "ts": "webExtensionAccessRequested",
+      "payload": {
+        "x-astra-rust-type": "WebExtensionAccessRequested"
+      }
+    },
+    "web-extension-store-clicked": {
+      "ts": "webExtensionStoreClicked",
+      "payload": {
+        "x-astra-rust-type": "WebExtensionStoreClicked"
+      }
+    },
+    "work-changed": {
+      "ts": "workChanged",
+      "payload": {
+        "x-astra-rust-type": "WorkChanged"
+      }
+    },
+    "work-environment-changed": {
+      "ts": "workEnvironmentChanged",
+      "payload": {
+        "x-astra-rust-type": "WorkEnvironmentChanged"
+      }
+    },
+    "astra:account-changed": {
+      "ts": "astraAccountChanged",
+      "payload": {
+        "x-astra-rust-type": "AccountChanged"
+      },
+      "renamed_from": "prev:account-changed"
+    },
+    "astra:import-progress": {
+      "ts": "astraImportProgress",
+      "payload": {
+        "x-astra-rust-type": "ImportJobView"
+      },
+      "renamed_from": "prev:import-progress"
+    },
+    "astra:keymap-changed": {
+      "ts": "astraKeymapChanged",
+      "payload": {
+        "x-astra-rust-type": "KeymapChanged"
+      },
+      "renamed_from": "prev:keymap-changed"
+    },
+    "astra:page-assist-changed": {
+      "ts": "astraPageAssistChanged",
+      "payload": {
+        "x-astra-rust-type": "PageAssistChanged"
+      },
+      "renamed_from": "prev:page-assist-changed"
+    },
+    "astra:swipe": {
+      "ts": "astraSwipe",
+      "payload": {
+        "x-astra-rust-type": "SwipeScroll"
+      },
+      "renamed_from": "prev:swipe"
+    },
+    "astra:voice-changed": {
+      "ts": "astraVoiceChanged",
+      "payload": {
+        "x-astra-rust-type": "VoiceChanged"
+      },
+      "renamed_from": "prev:voice-changed"
+    },
+    "astra:voice-levels": {
+      "ts": "astraVoiceLevels",
+      "payload": {
+        "x-astra-rust-type": "VoiceLevels"
+      },
+      "renamed_from": "prev:voice-levels"
+    },
+    "astra:work-decision-preference-changed": {
+      "ts": "astraWorkDecisionPreferenceChanged",
+      "payload": {
+        "x-astra-rust-type": "WorkDecisionPreferenceChanged"
+      },
+      "renamed_from": "prev:work-decision-preference-changed"
+    },
+    "astra:work-human-changed": {
+      "ts": "astraWorkHumanChanged",
+      "payload": {
+        "x-astra-rust-type": "WorkHumanChanged"
+      },
+      "renamed_from": "prev:work-human-changed"
+    },
+    "astra:work-models-changed": {
+      "ts": "astraWorkModelsChanged",
+      "payload": {
+        "x-astra-rust-type": "WorkModelsChanged"
+      },
+      "renamed_from": "prev:work-models-changed"
+    }
+  }
+}

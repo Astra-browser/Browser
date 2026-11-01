@@ -1,0 +1,125 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "account_buy",
+      "payload": {
+        "purchase": {}
+      }
+    },
+    {
+      "command": "account_cancel_code",
+      "payload": {}
+    },
+    {
+      "command": "account_change_email",
+      "payload": {
+        "email": "x",
+        "code": "x"
+      }
+    },
+    {
+      "command": "account_delete",
+      "payload": {
+        "code": "x"
+      }
+    },
+    {
+      "command": "account_deletion_code",
+      "payload": {}
+    },
+    {
+      "command": "account_email_code",
+      "payload": {
+        "email": "x"
+      }
+    },
+    {
+      "command": "account_export",
+      "payload": {}
+    },
+    {
+      "command": "account_get",
+      "payload": {}
+    },
+    {
+      "command": "account_manage",
+      "payload": {}
+    },
+    {
+      "command": "account_plan_confirm",
+      "payload": {}
+    },
+    {
+      "command": "account_plan_dismiss",
+      "payload": {}
+    },
+    {
+      "command": "account_plan_preview",
+      "payload": {
+        "plan": "x",
+        "interval": "x"
+      }
+    },
+    {
+      "command": "account_reauth_code",
+      "payload": {}
+    },
+    {
+      "command": "account_receipt",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "account_refresh",
+      "payload": {}
+    },
+    {
+      "command": "account_revoke_session",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "account_send_code",
+      "payload": {
+        "email": "x"
+      }
+    },
+    {
+      "command": "account_sessions",
+      "payload": {}
+    },
+    {
+      "command": "account_set_daily_limit",
+      "payload": {}
+    },
+    {
+      "command": "account_set_name",
+      "payload": {}
+    },
+    {
+      "command": "account_set_server",
+      "payload": {}
+    },
+    {
+      "command": "account_sign_out",
+      "payload": {}
+    },
+    {
+      "command": "account_sign_out_everywhere",
+      "payload": {}
+    },
+    {
+      "command": "account_usage_history",
+      "payload": {}
+    },
+    {
+      "command": "account_verify",
+      "payload": {
+        "code": "x"
+      }
+    }
+  ]
+}

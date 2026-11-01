@@ -1,0 +1,8 @@
+{
+  "$comment": "tabs_navigate success response envelope (P2-T02 fixture).",
+  "v": 1,
+  "id": "req-0001",
+  "kind": "res",
+  "name": "tabs_navigate",
+  "payload": { "echo": "ok" }
+}

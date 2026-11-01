@@ -1,0 +1,67 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_activity",
+      "payload": {
+        "expected_profile": "x",
+        "work": {}
+      }
+    },
+    {
+      "command": "work_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "work_context_preview",
+      "payload": {
+        "expected_profile": "x",
+        "purpose": {},
+        "selection": {}
+      }
+    },
+    {
+      "command": "work_edit_draft",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "expected_revision": {},
+        "command": {},
+        "execution": {},
+        "artifact": {},
+        "body": "x"
+      }
+    },
+    {
+      "command": "work_operation",
+      "payload": {
+        "expected_profile": "x",
+        "operation": {},
+        "input": {}
+      }
+    },
+    {
+      "command": "work_operation_status",
+      "payload": {
+        "expected_profile": "x",
+        "work": {},
+        "operation": {},
+        "acknowledge": true
+      }
+    },
+    {
+      "command": "work_running",
+      "payload": {}
+    },
+    {
+      "command": "work_save_calendar",
+      "payload": {
+        "name": "x",
+        "text": "x"
+      }
+    }
+  ]
+}

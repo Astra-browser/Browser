@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/proto/envelope",
+  "title": "Astra protocol v1 -- Appendix C envelope (hand-written, stable)",
+  "$comment": "NOT generated. Frame: 4-byte big-endian length + UTF-8 JSON. Unknown fields are ignored on receipt; protocol version mismatch (v != 1) fails fast. `seq` is required on evt, absent otherwise.",
+  "type": "object",
+  "properties": {
+    "v": { "type": "integer", "const": 1 },
+    "id": { "type": "string" },
+    "kind": { "type": "string", "enum": ["req", "res", "evt"] },
+    "name": { "type": "string" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object" },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["v", "id", "kind", "name", "payload"],
+  "additionalProperties": true
+}

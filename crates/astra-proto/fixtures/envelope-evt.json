@@ -1,0 +1,9 @@
+{
+  "$comment": "tab-changed event envelope (P2-T02 fixture).",
+  "v": 1,
+  "id": "evt-0007",
+  "kind": "evt",
+  "name": "tab-changed",
+  "seq": 7,
+  "payload": {}
+}

@@ -1,0 +1,11 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "haptic",
+      "payload": {
+        "kind": {}
+      }
+    }
+  ]
+}

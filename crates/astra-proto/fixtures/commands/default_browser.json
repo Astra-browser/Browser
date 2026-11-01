@@ -1,0 +1,13 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "default_browser_request",
+      "payload": {}
+    },
+    {
+      "command": "default_browser_status",
+      "payload": {}
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "diagnostics_report",
+      "payload": {}
+    }
+  ]
+}

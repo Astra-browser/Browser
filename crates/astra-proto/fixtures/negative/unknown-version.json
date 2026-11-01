@@ -1,0 +1,8 @@
+{
+  "$comment": "NEGATIVE: unsupported protocol version. Must FAIL validation / fail fast.",
+  "v": 999,
+  "id": "req-0003",
+  "kind": "req",
+  "name": "tabs_navigate",
+  "payload": {}
+}

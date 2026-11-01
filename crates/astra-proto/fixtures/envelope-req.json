@@ -1,0 +1,8 @@
+{
+  "$comment": "tabs_navigate request envelope (P2-T02 fixture).",
+  "v": 1,
+  "id": "req-0001",
+  "kind": "req",
+  "name": "tabs_navigate",
+  "payload": { "id": "tab-1", "input": "https://example.invalid/" }
+}

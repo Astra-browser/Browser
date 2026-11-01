@@ -1,0 +1,14 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "history_menu_popup",
+      "payload": {
+        "id": "x",
+        "forward": true,
+        "x": 0.0,
+        "y": 0.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_clear_decision_key",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_decision_preference",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_set_decision_key",
+      "payload": {
+        "expected_profile": "x",
+        "secret": "x"
+      }
+    },
+    {
+      "command": "work_set_decision_preference",
+      "payload": {
+        "expected_profile": "x",
+        "choice": {}
+      }
+    }
+  ]
+}

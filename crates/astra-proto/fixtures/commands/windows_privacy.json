@@ -1,0 +1,13 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "windows_diagnostics_settings",
+      "payload": {}
+    },
+    {
+      "command": "windows_reputation_managed",
+      "payload": {}
+    }
+  ]
+}

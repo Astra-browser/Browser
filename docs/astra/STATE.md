@@ -44,7 +44,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P2-T01 | Bring over crates per PORTING_MAP (`BrowserHost`) | doing | worker-p2core | agent/P2-T01-crates | Locked 2026-11-02; owns crates/* except astra-proto |
-| P2-T02 | `astra-proto` schemas + generated Rust/TS types | doing | worker-p2proto | agent/P2-T02-proto | Locked 2026-11-02; builds on P1-T09 sketch; owns crates/astra-proto + schemas |
+| P2-T02 | `astra-proto` schemas + generated Rust/TS types | done | orchestrator | agent/P2-T02-proto | Merged 2026-11-02; 267/35 registries, cargo 6/6 + bun 7/7 + validate PASS, drift gate verified, brand-lint clean; fixed stale "8 channels" comment (10 renames); Specta full-typing deferred |
 | P2-T03 | IPC transport (framing, backpressure, crash recovery) | todo | — | — | After T02 |
 | P2-T04 | `astra-store` (rusqlite + migrations, WAL) | todo | — | — | — |
 | P2-T05 | `GeckoHost` + `MockHost` | todo | — | — | After T01 |

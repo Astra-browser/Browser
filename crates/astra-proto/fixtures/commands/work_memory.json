@@ -1,0 +1,11 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_release_memory",
+      "payload": {
+        "idle": true
+      }
+    }
+  ]
+}

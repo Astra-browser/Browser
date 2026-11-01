@@ -1,0 +1,7 @@
+{
+  "$comment": "NEGATIVE: missing required `name`. Must FAIL validation.",
+  "v": 1,
+  "id": "req-0004",
+  "kind": "req",
+  "payload": {}
+}

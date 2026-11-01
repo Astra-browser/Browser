@@ -1,0 +1,12 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "note_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    }
+  ]
+}

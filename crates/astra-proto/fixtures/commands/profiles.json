@@ -1,0 +1,41 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "profile_avatar_pick",
+      "payload": {}
+    },
+    {
+      "command": "profiles_create",
+      "payload": {
+        "name": "x",
+        "avatar": {},
+        "and_switch": true
+      }
+    },
+    {
+      "command": "profiles_get",
+      "payload": {}
+    },
+    {
+      "command": "profiles_rename",
+      "payload": {
+        "profile": "x",
+        "name": "x"
+      }
+    },
+    {
+      "command": "profiles_set_avatar",
+      "payload": {
+        "profile": "x",
+        "avatar": {}
+      }
+    },
+    {
+      "command": "profiles_switch",
+      "payload": {
+        "profile": "x"
+      }
+    }
+  ]
+}

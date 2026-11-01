@@ -1,0 +1,103 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "web_extension_answer_access",
+      "payload": {
+        "request": {},
+        "allowed": true
+      }
+    },
+    {
+      "command": "web_extension_cancel",
+      "payload": {
+        "review_id": "x"
+      }
+    },
+    {
+      "command": "web_extension_choose_file",
+      "payload": {
+        "folder": true
+      }
+    },
+    {
+      "command": "web_extension_confirm",
+      "payload": {
+        "id": "x",
+        "review_id": "x"
+      }
+    },
+    {
+      "command": "web_extension_list",
+      "payload": {}
+    },
+    {
+      "command": "web_extension_open_options",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "web_extension_prepare",
+      "payload": {
+        "tab_id": "x"
+      }
+    },
+    {
+      "command": "web_extension_prepare_file",
+      "payload": {
+        "path": "x"
+      }
+    },
+    {
+      "command": "web_extension_retry",
+      "payload": {
+        "profile_id": "x",
+        "install_id": "x"
+      }
+    },
+    {
+      "command": "web_extension_review_update",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "web_extension_set_access",
+      "payload": {
+        "id": "x",
+        "mode": "x",
+        "sites": []
+      }
+    },
+    {
+      "command": "web_extension_set_enabled",
+      "payload": {
+        "id": "x",
+        "enabled": true
+      }
+    },
+    {
+      "command": "web_extension_set_pinned",
+      "payload": {
+        "id": "x",
+        "pinned": true
+      }
+    },
+    {
+      "command": "web_extension_store_button",
+      "payload": {
+        "tab_id": "x",
+        "extension_id": "x",
+        "state": {},
+        "label": "x"
+      }
+    },
+    {
+      "command": "web_extension_uninstall",
+      "payload": {
+        "id": "x"
+      }
+    }
+  ]
+}

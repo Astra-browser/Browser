@@ -1,0 +1,58 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "spaces_create",
+      "payload": {
+        "name": "x",
+        "look": {}
+      }
+    },
+    {
+      "command": "spaces_delete",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "spaces_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "spaces_move_tab",
+      "payload": {
+        "tab": "x",
+        "space": "x"
+      }
+    },
+    {
+      "command": "spaces_reorder",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "spaces_step",
+      "payload": {
+        "step": 0
+      }
+    },
+    {
+      "command": "spaces_switch",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "spaces_update",
+      "payload": {
+        "space": "x",
+        "name": "x",
+        "look": {}
+      }
+    }
+  ]
+}
