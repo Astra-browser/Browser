@@ -16,6 +16,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T05 | Rebrand tooling + `brand-lint` | done | worker-1 | agent/P0-T05-rebrand | Merged 2026-11-01; lint exits 0 clean / 1 dirty |
 | P0-T06 | License/provenance | done | worker-1 | agent/P0-T06-license | Merged 2026-11-01; MPL LICENSE + NOTICE + 25/25 permissive |
 | P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
+| P1-T01 | `upstream.toml` + `forge fetch` (ESR 153.6.0, U-10 resolved) | doing | worker-1 | agent/P1-T01-fetch | Locked 2026-11-01; tarball URL 200 + .asc sig; GPG key TBD |
 | P0-T08 | CI skeleton | done | worker-1 | agent/P0-T08-ci | Merged 2026-11-01; ci-fast (brand-lint/state-check/plan-check) green locally |
 | P0-T09 | Spike briefs for U-01…U-13 | done | orchestrator | main | Index in `docs/astra/spikes/README.md`; spikes execute in Phase 1 |
 | P0-T10 | Repo hygiene docs | done | worker-1 | agent/P0-T10-hygiene | Merged 2026-11-01; SECURITY/CONTRIBUTING/CODEOWNERS added |
