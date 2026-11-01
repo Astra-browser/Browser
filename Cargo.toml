@@ -8,6 +8,7 @@ members = [
   "crates/astra-import",
   "crates/astra-blocker",
   "crates/astra-extensions",
+  "crates/astra-time",
 ]
 exclude = [
   # Standalone tool with its own lockfile/target dir (P1-T12); must not be

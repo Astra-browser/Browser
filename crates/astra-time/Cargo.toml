@@ -1,0 +1,15 @@
+[package]
+name = "astra-time"
+version = "0.1.0"
+edition = "2021"
+description = "Astra time tracking: per-site totals from tab-activity events, focus timer, focus-mode site blocking (P5-T04)"
+license = "MPL-2.0"
+
+[dependencies]
+astra-core = { path = "../astra-core" }
+astra-store = { path = "../astra-store" }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
