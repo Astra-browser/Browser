@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/dialogs.json",
+  "title": "Host API — Dialogs (P3-T09)",
+  "description": "Request events emitted when the engine needs a user decision (permissions, downloads, HTTP auth, certificate errors, find bar, print preview, page context menus), plus the resolve-command payload shapes. Only chrome-privileged code may resolve; the content actor can only file unverified reports (see docs/astra/DIALOGS.md SECURITY).",
+  "type": "object",
+  "properties": {
+    "permission.requested": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" },
+        "permission": {
+          "type": "string",
+          "enum": ["geolocation", "camera", "microphone", "notifications", "persistent-storage", "midi", "pointer-lock", "fullscreen"]
+        }
+      },
+      "required": ["dialog_id", "astra_tab_id", "url", "permission"],
+      "additionalProperties": false
+    },
+    "permission.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "decision": { "type": "string", "enum": ["grant", "deny"] }
+      },
+      "required": ["dialog_id", "decision"],
+      "additionalProperties": false
+    },
+    "download.started": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" },
+        "filename": { "type": "string" },
+        "mime": { "type": "string" }
+      },
+      "required": ["dialog_id", "astra_tab_id", "url", "filename"],
+      "additionalProperties": false
+    },
+    "download.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "decision": { "type": "string", "enum": ["allow", "deny"] }
+      },
+      "required": ["dialog_id", "decision"],
+      "additionalProperties": false
+    },
+    "auth.required": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "host": { "type": "string" },
+        "realm": { "type": "string" },
+        "scheme": { "type": "string", "enum": ["basic", "digest", "ntlm", "negotiate"] }
+      },
+      "required": ["dialog_id", "astra_tab_id", "host"],
+      "additionalProperties": false
+    },
+    "auth.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "provided": { "type": "boolean" }
+      },
+      "required": ["dialog_id", "provided"],
+      "additionalProperties": false
+    },
+    "cert.error": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" },
+        "code": { "type": "string" },
+        "untrusted": { "type": "boolean" }
+      },
+      "required": ["dialog_id", "astra_tab_id", "url", "code"],
+      "additionalProperties": false
+    },
+    "cert.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "decision": { "type": "string", "enum": ["proceed-once", "cancel"] }
+      },
+      "required": ["dialog_id", "decision"],
+      "additionalProperties": false
+    },
+    "find.opened": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "query": { "type": "string" }
+      },
+      "required": ["dialog_id", "astra_tab_id"],
+      "additionalProperties": false
+    },
+    "find.closed": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["dialog_id", "astra_tab_id"],
+      "additionalProperties": false
+    },
+    "print.preview-opened": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["dialog_id", "astra_tab_id"],
+      "additionalProperties": false
+    },
+    "print.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "decision": { "type": "string", "enum": ["print", "cancel"] }
+      },
+      "required": ["dialog_id", "decision"],
+      "additionalProperties": false
+    },
+    "contextmenu.requested": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "link_url": { "type": "string" },
+        "image_url": { "type": "string" },
+        "selection": { "type": "string" }
+      },
+      "required": ["dialog_id", "astra_tab_id", "x", "y"],
+      "additionalProperties": false
+    },
+    "contextmenu.resolved": {
+      "type": "object",
+      "properties": {
+        "dialog_id": { "type": "string" },
+        "action": { "type": "string" }
+      },
+      "required": ["dialog_id", "action"],
+      "additionalProperties": false
+    },
+    "dialog.content-report": {
+      "type": "object",
+      "description": "Unverified claim filed by the content actor. Never creates or resolves a dialog; chrome must independently verify before acting.",
+      "properties": {
+        "kind": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "untrusted": { "type": "boolean", "const": true }
+      },
+      "required": ["kind", "astra_tab_id", "untrusted"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

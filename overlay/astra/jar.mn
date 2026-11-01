@@ -34,6 +34,7 @@ astra.jar:
   content/astra/res/host/Content.sys.mjs (host/Content.sys.mjs)
   content/astra/res/host/History.sys.mjs (host/History.sys.mjs)
   content/astra/res/host/Containers.sys.mjs (host/Containers.sys.mjs)
+  content/astra/res/host/Dialogs.sys.mjs (host/Dialogs.sys.mjs)
   content/astra/res/host/schemas/tabs.json (host/schemas/tabs.json)
   content/astra/res/host/schemas/navigation.json (host/schemas/navigation.json)
   content/astra/res/host/schemas/panes.json (host/schemas/panes.json)
@@ -43,3 +44,4 @@ astra.jar:
   content/astra/res/host/schemas/session.json (host/schemas/session.json)
   content/astra/res/host/schemas/history.json (host/schemas/history.json)
   content/astra/res/host/schemas/containers.json (host/schemas/containers.json)
+  content/astra/res/host/schemas/dialogs.json (host/schemas/dialogs.json)
