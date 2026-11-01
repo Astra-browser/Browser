@@ -4,6 +4,9 @@ out/
 target/
 ui/node_modules/
 ui/dist/
+tools/golden-capture/dist/
+tools/golden-capture/node_modules/
+tools/golden-capture/.last-run.json
 tests/golden/baseline-local/
 tests/golden/diff-output/
 out/captures/
