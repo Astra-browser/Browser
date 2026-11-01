@@ -1,0 +1,11 @@
+[package]
+name = "astra-store"
+version = "0.1.0"
+edition = "2021"
+description = "Astra SQLite store skeleton (P2-T01); full schema history lands in P2-T04"
+license = "MPL-2.0"
+
+[dependencies]
+rusqlite = { version = "0.41", features = ["bundled"] }
+thiserror = "2"
+tracing = "0.1"

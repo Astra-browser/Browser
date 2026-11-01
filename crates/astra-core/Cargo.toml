@@ -1,0 +1,15 @@
+[package]
+name = "astra-core"
+version = "0.1.0"
+edition = "2021"
+description = "Astra core services: pure browser-logic domains decoupled from any shell runtime (P2-T01)"
+license = "MPL-2.0"
+
+[dependencies]
+astra-host-trait = { path = "../astra-host-trait" }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
