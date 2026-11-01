@@ -32,12 +32,12 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T04 | First full Linux build + sccache + dev loop | done | orchestrator | agent/P1-T04-build | Binary built (153.6.0esr, GUI-verified incl. chrome://astra/); BUILD_TIMES.md (~70 min, 16 GB objdir, -j8 OOM rule); faster loop ~2 s (U-02 closed, U-03 deferred); `forge build` added |
 | P1-T05 | Overlay wiring (`chrome://astra/`, ASTRA-0001) | done | orchestrator | agent/P1-T05-overlay | overlay/astra (moz.build/jar.mn/HostAPI stub/hello) staged by `forge overlay`; ASTRA-0001 applied; `forge lint` clean; configure complete with /astra in DIRS |
 | P1-T06 | `policies.json` + pref overrides (incl. Normandy/HR path from BUILD_FLAGS.md) | done | orchestrator | agent/P1-T06-policies | 15 impl-verified policies ACTIVE; mozilla.cfg autoconfig locks Normandy/shield/sponsored (contract 7/7 PASS) |
-| P1-T07 | Endpoint audit tool | todo | — | — | — |
+| P1-T07 | Endpoint audit tool | doing | worker-t07 | agent/P1-T07-endpoint-audit | Locked 2026-11-02; Go impl per owner request; Context7+Firecrawl required |
 | P1-T08 | Shell mount patch (ASTRA-0002) | done | orchestrator | agent/P1-T08-shell | #astra-root mounted, Svelte hello renders, FF chrome hidden (contract 5/5 PASS incl. nonzero-size guard; GUI-verified "Hello Tab", no toolbars) |
-| P1-T09 | Sidecar spike (U-01) | todo | — | — | — |
-| P1-T10 | Content slot + URL bar via Host API stub | todo | — | — | Needs P1-T05 Host API stub |
-| P1-T11 | Contract-test harness (geckodriver) | todo | — | — | `--enable-geckodriver` already in mozconfig |
-| P1-T12 | `forge export`/`import` round-trip + patch lint + footprint budget | todo | — | — | `forge lint` arrives with P1-T05 |
+| P1-T09 | Sidecar spike (U-01) | doing | worker-t09 | agent/P1-T09-sidecar | Locked 2026-11-02; stdio vs WS decision |
+| P1-T10 | Content slot + URL bar via Host API stub | doing | worker-t10 | agent/P1-T10-content | Locked 2026-11-02; needs Host API stub |
+| P1-T11 | Contract-test harness (geckodriver) | doing | worker-t11 | agent/P1-T11-contract | Locked 2026-11-02 |
+| P1-T12 | `forge export`/`import` round-trip + patch lint + footprint budget | doing | worker-t12 | agent/P1-T12-forge-rt | Locked 2026-11-02 |
 
 ## Later phases
 
