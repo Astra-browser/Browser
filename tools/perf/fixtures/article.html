@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Astra Perf Fixture — Article</title>
+<style>body { max-width: 70ch; margin: 2em auto; font-family: serif; line-height: 1.6; }</style>
+</head>
+<body>
+<h1 id="perf-marker">ASTRA-PERF-ARTICLE</h1>
+<article>
+<h2>Why local fixtures</h2>
+<p>Performance benchmarks must not touch the live web: no network variance, no
+flakiness, reproducible everywhere including CI sandboxes. This page stands in
+for a typical documentation article: headings, paragraphs, links, one table,
+one code block. Ten- and fifty-tab memory tests load this page with distinct
+query strings so each tab has its own history entry while sharing the cache.</p>
+<h2>Method notes</h2>
+<p>Startup is measured as process spawn to Marionette listen. Memory is summed
+VmRSS over the browser process group. Scroll cost is main-thread time for a
+scripted full-page sweep plus a rAF frame-delta probe. All numbers are medians
+of three runs on local fixtures only.</p>
+<table><tr><th>k</th><th>v</th></tr><tr><td>fixture</td><td>article</td></tr></table>
+<pre><code>let x = 1; // deterministic code block for layout cost</code></pre>
+<p>Further reading: <a href="#method">method</a>, <a href="#budgets">budgets</a>.</p>
+</article>
+</body>
+</html>
