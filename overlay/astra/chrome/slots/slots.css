@@ -1,0 +1,58 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Astra content slots (spike S-01, P3-T02): CSS-grid placement for one AND
+ * many remote `<browser>` elements. Each `.astra-slot` cell permanently
+ * owns exactly one browser; the container's `data-layout` picks the grid
+ * variant. Showing/hiding panes toggles `hidden` on cells — DOM nodes are
+ * never moved (no reparenting), so docshells, history, and focus survive
+ * layout switches. Browsers flex-fill their cell; `min-*: 0` keeps the
+ * grid from overflowing the chrome window (same XUL-flex lesson as P1-T10:
+ * sizing flows from the flex/grid parent, never from position:fixed). */
+
+.astra-slots {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+  background: #1c1b22;
+  padding: 4px;
+}
+
+/* 1 pane: single cell fills the content area (P1-T10 shape). */
+.astra-slots[data-layout="single"] {
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+}
+
+/* 2 panes: side-by-side columns (classic split view). */
+.astra-slots[data-layout="cols-2"] {
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* 3-4 panes: 2x2 grid (Work canvas shape; 3 panes leave one cell hidden). */
+.astra-slots[data-layout="grid-2x2"] {
+  grid-template-rows: 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
+}
+
+.astra-slot {
+  min-width: 0;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.astra-slot[hidden] {
+  display: none;
+}
+
+.astra-slot > [data-astra-browser] {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
