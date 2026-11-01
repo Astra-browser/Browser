@@ -17,6 +17,8 @@ dependencies = [
 name = "astra-host-trait"
 version = "0.1.0"
 dependencies = [
+ "astra-ipc",
+ "astra-proto",
  "serde",
  "serde_json",
  "thiserror",
