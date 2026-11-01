@@ -3,6 +3,8 @@ import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import "$styles/global.css";
 import type { KeymapEntry, LauncherTrigger } from "$shared/ipc/bindings";
+import { IS_MAC } from "$shared/platform";
+import { acceleratorKeys } from "$shared/lib/accelerator";
 import { keymap } from "$domain/keymap";
 import KeyboardPage from "../components/sections/KeyboardPage.svelte";
 
@@ -64,19 +66,19 @@ test("records a shortcut, names a conflict, and takes the keys when asked", asyn
     .mockResolvedValueOnce({ kind: "applied" });
   const screen = await render(KeyboardPage);
   const newTab = screen.getByRole("button", { name: "Change the shortcut for New tab" });
-  await expect.element(newTab).toHaveTextContent("⌘T");
+  // Keycaps follow the platform: ⌘ on macOS, Win/Ctrl names elsewhere.
+  await expect.element(newTab).toHaveTextContent(acceleratorKeys("Cmd+T", IS_MAC).join(""));
 
   await newTab.click();
   expect(native.record).toHaveBeenLastCalledWith(true);
   await userEvent.keyboard("{Meta>}w{/Meta}");
-  await vi.waitFor(() =>
-    expect(native.bind).toHaveBeenLastCalledWith("tab.new", "Cmd+KeyW", false),
-  );
+  const pressed = IS_MAC ? "Cmd+KeyW" : "Super+KeyW";
+  await vi.waitFor(() => expect(native.bind).toHaveBeenLastCalledWith("tab.new", pressed, false));
   expect(native.record).toHaveBeenLastCalledWith(false);
   await expect.element(screen.getByText("Already used by Close tab.")).toBeVisible();
 
   await screen.getByRole("button", { name: "Use here" }).click();
-  await vi.waitFor(() => expect(native.bind).toHaveBeenLastCalledWith("tab.new", "Cmd+KeyW", true));
+  await vi.waitFor(() => expect(native.bind).toHaveBeenLastCalledWith("tab.new", pressed, true));
   await expect.element(screen.getByText("Already used by Close tab.")).not.toBeInTheDocument();
 
   document.documentElement.dataset.theme = "dark";
