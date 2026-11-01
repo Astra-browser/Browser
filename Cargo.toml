@@ -3,6 +3,7 @@ members = [
   "crates/astra-core",
   "crates/astra-host-trait",
   "crates/astra-store",
+  "crates/astra-tasks",
   "crates/astra-proto",
   "crates/astra-ipc",
   "crates/astra-import",
