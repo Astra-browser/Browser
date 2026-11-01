@@ -20,3 +20,12 @@ jobs:
       # The previous product name must not appear outside the allow-list
       # (PROVENANCE.md carries the required attribution).
       - run: ./tools/brand-lint.sh plan.md docs/astra tools branding
+  contract-harness:
+    # P1-T11: no-browser self-test of the geckodriver contract harness.
+    # Proves runner + fixture are sound without a 70-minute engine build.
+    # Full `forge test` (needs the built binary) runs where a build exists.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/contract-runner/run.py --fixture-only
+      - run: python3 tests/contract/p1t11-contract.py --fixture-only

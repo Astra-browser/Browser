@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!-- Astra contract fixture (P1-T11). Served by the harness fixture server
+   (tools/contract-runner/run.py) over loopback. Static on purpose: the
+   contract asserts the built browser can navigate to a local page and read
+   its DOM, nothing more. Marker protocol: #astra-fixture-ok must contain
+   exactly "ASTRA-FIXTURE-OK". -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Astra Contract Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Contract fixture</h1>
+      <p id="astra-fixture-ok">ASTRA-FIXTURE-OK</p>
+    </main>
+  </body>
+</html>
