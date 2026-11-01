@@ -12,6 +12,7 @@ pub mod history;
 pub mod keymap;
 pub mod policy;
 pub mod search;
+pub mod session;
 pub mod settings;
 pub mod tabs;
 
@@ -19,6 +20,10 @@ pub use history::{filter_history, HistoryEntry, HistoryFilter};
 pub use keymap::{Keymap, KeymapEntry, KeymapError, KeymapOutcome};
 pub use policy::{authorize, Caller};
 pub use search::{rank, score_match};
+pub use session::{
+    FolderSnapshot, OrganisationRow, RestorePlan, ScrollState, SessionError, SessionSnapshot,
+    SpaceSnapshot, TabSnapshot, WindowSnapshot, SESSION_NAME_LAST, SESSION_SNAPSHOT_VERSION,
+};
 pub use settings::{default_for, validate, SettingsError, KNOWN_SETTINGS};
 pub use tabs::{TabEntry, TabStrip, TabStripError};
 
