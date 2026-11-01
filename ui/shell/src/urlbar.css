@@ -1,0 +1,50 @@
+.astra-urlbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem;
+  background: #2b2a33;
+  border-bottom: 1px solid #52525e;
+}
+.astra-urlbar .nav {
+  font: inherit;
+  color: #fbfbfe;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  min-width: 2rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+.astra-urlbar .nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.astra-urlbar .nav:not(:disabled):hover {
+  background: #52525e;
+}
+.astra-urlbar .urlform {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+}
+.astra-urlbar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: #fbfbfe;
+  background: #1c1b22;
+  border: 1px solid #52525e;
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+}
+.astra-urlbar input:focus {
+  outline: 1px solid #00ddff;
+  border-color: #00ddff;
+}
+.astra-urlbar .tabcount {
+  font-size: 0.75rem;
+  color: #cfcfd8;
+  white-space: nowrap;
+  padding: 0 0.25rem;
+}

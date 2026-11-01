@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/navigation.json",
+  "title": "Host API v1 — Navigation (P1-T10 stub; live browser binding in P2-T06)",
+  "type": "object",
+  "properties": {
+    "loadURL": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "goBack": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "goForward": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "reload": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

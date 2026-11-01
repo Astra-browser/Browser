@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/panes.json",
+  "title": "Host API v1 — Panes (P1-T10 stub; full implementation in P2-T06)",
+  "type": "object",
+  "properties": {
+    "show": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "pane_id": { "type": "string" }
+      },
+      "required": ["pane_id"],
+      "additionalProperties": false
+    },
+    "hide": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "pane_id": { "type": "string" }
+      },
+      "required": ["pane_id"],
+      "additionalProperties": false
+    },
+    "list": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
