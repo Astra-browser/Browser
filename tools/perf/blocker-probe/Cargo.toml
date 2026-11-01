@@ -1,0 +1,11 @@
+[package]
+name = "blocker-probe"
+version = "0.1.0"
+edition = "2021"
+description = "In-process astra-blocker microbench harness (P4-T10 perf tool)"
+license = "MPL-2.0"
+
+[workspace]
+
+[dependencies]
+astra-blocker = { path = "../../../crates/astra-blocker" }
