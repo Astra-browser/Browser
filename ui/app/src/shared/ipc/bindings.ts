@@ -97,7 +97,7 @@ export const commands = {
 	/**  Ollama and LM Studio on their default ports, for one-click setup. */
 	workLocalServers: () => __TAURI_INVOKE<WorkLocalServerV1[]>("work_local_servers"),
 	voiceStatus: () => __TAURI_INVOKE<VoiceStatusV1>("voice_status"),
-	voiceChooseEngine: (engine: "on_device" | "zephium" | "open_ai" | "groq" | null) => __TAURI_INVOKE<VoiceStatusV1>("voice_choose_engine", { engine }),
+	voiceChooseEngine: (engine: "on_device" | "astra" | "open_ai" | "groq" | null) => __TAURI_INVOKE<VoiceStatusV1>("voice_choose_engine", { engine }),
 	voiceChooseLanguage: (language: string | null) => __TAURI_INVOKE<VoiceStatusV1>("voice_choose_language", { language }),
 	/**
 	 *  Opens the microphone and starts a take. On first use this waits while
@@ -2932,7 +2932,7 @@ export type RuntimeSecurityAdvisoryKind = "review_overdue" | "update_recommended
  *  Fixed destination of the recommended maintenance action. No page or
  *  network response can select this value.
  */
-export type RuntimeSecurityUpdateTarget = "zephium" | "operating_system" | "browser_runtime";
+export type RuntimeSecurityUpdateTarget = "astra" | "operating_system" | "browser_runtime";
 
 /**
  *  Process-local browser-runtime status. Once `restart_required` becomes true
@@ -3423,7 +3423,7 @@ export type VoiceChanged = {
 	fault: VoiceFaultV1 | null,
 };
 
-export type VoiceEngineV1 = "on_device" | "zephium" | "open_ai" | "groq";
+export type VoiceEngineV1 = "on_device" | "astra" | "open_ai" | "groq";
 
 /**  Why a take could not start or produce words. Closed; no system text. */
 export type VoiceFaultV1 = "microphone_denied" | "recognition_denied" | "no_microphone" | "language_unavailable" |

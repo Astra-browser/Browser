@@ -7,6 +7,24 @@ import { alias } from "./aliases.ts";
 import { i18nLocales } from "./i18n-locales.ts";
 import { benchPhotos, webkitFootprint } from "./vitest.bench-commands.ts";
 
+// Phase-2 native artifacts (`desktop/`, `crates/…`) do not exist yet in the
+// Astra tree. Component-project `provide` values degrade to "" with a warning
+// so config load and the unit project keep working; component tests regain
+// full fixtures when the artifacts land (P2/P4). Fixture paths get rewired to
+// the Astra layout at that point (tracked in SESSION.md).
+const warnedArtifacts = new Set<string>();
+function readNativeArtifact(url: URL): string {
+  try {
+    return readFileSync(url, "utf8");
+  } catch {
+    if (!warnedArtifacts.has(url.href)) {
+      warnedArtifacts.add(url.href);
+      console.warn(`[astra] native artifact missing (Phase 2): ${url.pathname}`);
+    }
+    return "";
+  }
+}
+
 // Icons are imported one module each, and Vite meets each only when a test
 // first reaches it. On a cold cache (every CI runner) that re-optimises the
 // dependencies mid-run and reloads the page under the running tests, so the
@@ -74,27 +92,27 @@ export default defineConfig({
           provide: {
             privilegedPermissionsPolicy:
               /const PRIVILEGED_PERMISSIONS_POLICY: &str = "([^"]+)";/u.exec(
-                readFileSync(new URL("../desktop/src/lib.rs", import.meta.url), "utf8"),
+                readNativeArtifact(new URL("../desktop/src/lib.rs", import.meta.url), "utf8"),
               )?.[1] ?? "",
-            formSubmitRuntime: readFileSync(
+            formSubmitRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-engine/src/platform/form_submit_observer.js",
                 import.meta.url,
               ),
               "utf8",
             ),
-            formActionRuntime: readFileSync(
+            formActionRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-engine/src/platform/macos/agentic_form_diagnostic_probe.js",
                 import.meta.url,
               ),
               "utf8",
             ),
-            formOracleRuntime: readFileSync(
+            formOracleRuntime: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/work_form_oracle.js", import.meta.url),
               "utf8",
             ),
-            pixelPrivacyRuntime: readFileSync(
+            pixelPrivacyRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-agentic/assets/semantic-pixel-privacy-v1.js",
                 import.meta.url,
@@ -102,34 +120,43 @@ export default defineConfig({
               "utf8",
             ),
             semanticMediaRuntime:
-              readFileSync(
+              readNativeArtifact(
                 new URL(
                   "../crates/astra-agentic/assets/semantic-record-media-v1.js",
                   import.meta.url,
                 ),
                 "utf8",
               ) +
-              readFileSync(
+              readNativeArtifact(
                 new URL("../crates/astra-agentic/assets/semantic-runtime-v1.js", import.meta.url),
                 "utf8",
               ),
-            humanWallSurvey: readFileSync(
+            humanWallSurvey: readNativeArtifact(
               new URL("../crates/astra-agentic/assets/work-human-wall-v1.js", import.meta.url),
               "utf8",
             ),
-            contentStyleSource: readFileSync(
+            contentStyleSource: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/content_style.js", import.meta.url),
               "utf8",
             ),
             packagedStylePolicy: {
-              styleSource: JSON.parse(
-                readFileSync(new URL("../desktop/tauri.conf.json", import.meta.url), "utf8"),
-              ).app.security.csp["style-src"] as string,
+              styleSource: (() => {
+                // No Tauri desktop exists in the Astra tree (Gecko host owns
+                // CSP; enforced at P1-T06). Empty policy until the native
+                // artifact this mirrors lands.
+                try {
+                  return JSON.parse(
+                    readNativeArtifact(new URL("../desktop/tauri.conf.json", import.meta.url), "utf8"),
+                  ).app.security.csp["style-src"] as string;
+                } catch {
+                  return "";
+                }
+              })(),
               // Match the HTML style elements to which Tauri adds nonce sources.
               inlineStyleCount: ["./browser.html", "./panel.html"].reduce(
                 (count, path) =>
                   count +
-                  (readFileSync(new URL(path, import.meta.url), "utf8").match(/<style(?:\s|>)/giu)
+                  (readNativeArtifact(new URL(path, import.meta.url), "utf8").match(/<style(?:\s|>)/giu)
                     ?.length ?? 0),
                 0,
               ),

@@ -38,12 +38,29 @@ export function i18nLocales(): Plugin {
       const key = /[\\/]src[\\/]shared[\\/]i18n[\\/]messages[\\/](\w+)\.js$/u.exec(id)?.[1];
       const at = key === undefined ? undefined : indexOf(key);
       if (key === undefined || at === undefined) return null;
-      const call = `return en_${key}(inputs)`;
-      if (!code.includes(call)) return null;
+      // Paraglide ≤2.25 shape: `return en_<key>(inputs)`.
+      const legacy = `return en_${key}(inputs)`;
+      // Paraglide ≥2.26 shape: `return /** @type {LocalizedString} */ (…)` with
+      // the message inputs as the arrow's first parameter (usually `inputs`,
+      // sometimes `i` — read the actual name so the lookup compiles). The
+      // JSDoc type cast also contains a `((name …` prefix, so anchor on the
+      // real signature: name followed by `,`/`=` then `options`.
+      const param = /\(\((\w+)(?:\s*=[^,)]*)?,\s*options/u.exec(code)?.[1];
+      if (param === undefined) return null;
+      const current = `return /** @type {LocalizedString} */ (`;
+      let next = code;
+      if (next.includes(legacy)) {
+        next = next.replace(legacy, `return translated(${at}, inputs) ?? en_${key}(inputs)`);
+      } else if (next.includes(current)) {
+        next = next.replace(
+          current,
+          `return translated(${at}, ${param}) ?? /** @type {LocalizedString} */ (`,
+        );
+      } else {
+        return null;
+      }
       return {
-        code:
-          `import { translated } from "$shared/lib/translations";\n` +
-          code.replace(call, `return translated(${at}, inputs) ?? en_${key}(inputs)`),
+        code: `import { translated } from "$shared/lib/translations";\n` + next,
         map: null,
       };
     },
