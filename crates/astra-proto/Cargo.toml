@@ -1,0 +1,8 @@
+[package]
+name = "astra-proto"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sidecar-stub"
+path = "src/main.rs"
