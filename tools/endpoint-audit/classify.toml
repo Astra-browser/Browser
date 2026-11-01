@@ -1,0 +1,200 @@
+# Endpoint classification for Astra (P1-T07).
+# class: KEEP = security-critical, stays · REPLACE = reroute to Astra infra ·
+#        REMOVE = must produce zero traffic (pref/policy/build flag in `disable`).
+# owner_signoff: false = seeded by worker-t07, pending owner review.
+# Every `source` was verified against ESR 153.6.0 in engine/ or fetched docs.
+
+[[endpoint]]
+host = "detectportal.firefox.com"
+match = "suffix"
+class = "REMOVE"
+reason = "Captive-portal + connectivity checks; already off via P1-T06 (CaptivePortal policy + network.connectivity-service.enabled=false)."
+disable = "policies.json CaptivePortal=false; prefs network.captive-portal-service.enabled=false, network.connectivity-service.enabled=false"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js:3257-3282 (IPv4/IPv6/canonical URLs); engine/browser/app/profile/firefox.js:1378"
+
+[[endpoint]]
+host = "example.org"
+match = "exact"
+class = "REMOVE"
+reason = "Connectivity-service DNS check domain (DNSv4/DNSv6); dies with connectivity-service.enabled=false."
+disable = "pref network.connectivity-service.enabled=false"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js:3258-3259"
+
+[[endpoint]]
+host = "cloudflare-dns.com"
+match = "suffix"
+class = "REMOVE"
+reason = "Connectivity-service DNS_HTTPS check domain; dies with connectivity-service.enabled=false."
+disable = "pref network.connectivity-service.enabled=false"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js:3260"
+
+[[endpoint]]
+host = "incoming.telemetry.mozilla.org"
+match = "exact"
+class = "REMOVE"
+reason = "Telemetry submission; locked off by P1-T06 DisableTelemetry policy + autoconfig."
+disable = "policies.json DisableTelemetry=true; pref toolkit.telemetry.server (P1-T06)"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (toolkit.telemetry.server); P1-T06 policies.json"
+
+[[endpoint]]
+host = "normandy.cdn.mozilla.net"
+match = "exact"
+class = "REMOVE"
+reason = "Normandy/Shield recipe server; locked off by P1-T06 mozilla.cfg (app.normandy.enabled=false)."
+disable = "mozilla.cfg lockPref app.normandy.enabled=false, app.normandy.api_url=''"
+owner_signoff = false
+source = "engine/toolkit/components/normandy/lib/NormandyApi.sys.mjs:16; engine/browser/app/profile/firefox.js (app.normandy.api_url)"
+
+[[endpoint]]
+host = "location.services.mozilla.com"
+match = "exact"
+class = "REMOVE"
+reason = "Region/geo lookup; blanked by abcdesktop-verified pref override; no Astra feature needs it."
+disable = "pref browser.region.network.url=''"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (browser.region.network.url); https://www.abcdesktop.io/faq/disable-firefox-connections/"
+
+[[endpoint]]
+host = "contile.services.mozilla.com"
+match = "exact"
+class = "REMOVE"
+reason = "Sponsored Top Sites (Contile); Astra ships no sponsored tiles."
+disable = "pref browser.topsites.contile.enabled=false, browser.topsites.contile.endpoint=''"
+owner_signoff = false
+source = "engine/browser/app/profile/firefox.js (browser.topsites.contile.endpoint)"
+
+[[endpoint]]
+host = "spocs.getpocket.com"
+match = "exact"
+class = "REMOVE"
+reason = "Pocket Discover feed; Pocket surfaces die via P1-T06 newtab prefs."
+disable = "pref browser.newtabpage.activity-stream.discoverystream.enabled=false (P1-T06)"
+owner_signoff = false
+source = "https://www.abcdesktop.io/faq/disable-firefox-connections/; docs/astra/PRIVACY_PREFS.md"
+
+[[endpoint]]
+host = "push.services.mozilla.com"
+match = "exact"
+class = "REMOVE"
+reason = "WebPush gateway; Astra v1 needs no push. Revisit if web-push support is specced."
+disable = "pref dom.push.connection.enabled=false, dom.push.serverURL=''"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (dom.push.serverURL)"
+
+[[endpoint]]
+host = "firefox.com"
+match = "suffix"
+class = "REMOVE"
+reason = "Accounts/Sync + captive canonical redirect target (api.accounts.firefox.com, support kb). Sync is P1-T06-disabled; no FxA in v1."
+disable = "policies.json DisableFirefoxAccounts=true (P1-T06)"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (identity.fxaccounts.auth.uri); all.js:3280 canonicalContent"
+
+[[endpoint]]
+host = "shavar.services.mozilla.com"
+match = "exact"
+class = "KEEP"
+reason = "Security-critical: SafeBrowsing list updates (Mozilla provider). D-15 allow-list."
+disable = ""
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (browser.safebrowsing.provider.mozilla.updateURL/gethashURL)"
+
+[[endpoint]]
+host = "safebrowsing.google.com"
+match = "exact"
+class = "KEEP"
+reason = "Security-critical: SafeBrowsing list downloads (Google provider). D-15 allow-list."
+disable = ""
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js:3387-3392"
+
+[[endpoint]]
+host = "phish-error.mozilla.com"
+match = "suffix"
+class = "REMOVE"
+reason = "Phish-mistake reporting page; user-initiated report flow only, no background traffic."
+disable = "pref browser.safebrowsing.provider.google.reportPhishMistakeURL (blank if needed)"
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js:3392"
+
+[[endpoint]]
+host = "versioncheck.addons.mozilla.org"
+match = "exact"
+class = "KEEP"
+reason = "Security-critical: extension update checks (extensions.update.url). Curated-gallery replacement is Phase 4+; until then AMO stays."
+disable = ""
+owner_signoff = false
+source = "engine/modules/libpref/init/all.js (extensions.update.url)"
+
+[[endpoint]]
+host = "aus5.mozilla.org"
+match = "exact"
+class = "REPLACE"
+reason = "App + GMP update endpoint (MOZ_APPUPDATE_HOST default). D-16: repoint at Astra's own update host via MOZ_APPUPDATE_HOST at build time."
+disable = "build: MOZ_APPUPDATE_HOST=<astra-update-host> (config/mozconfig.linux)"
+owner_signoff = false
+source = "engine/build/moz.build:95-97; engine/build/application.ini.in:55; engine/modules/libpref/init/all.js:3474 (GMP)"
+
+[[endpoint]]
+host = "firefox.settings.services.mozilla.com"
+match = "exact"
+class = "REPLACE"
+reason = "Remote Settings (search config, blocklists, cert intermediates). Needed for security lists; self-host or proxy — owner decision required."
+disable = "pref services.settings.server=<astra-mirror> (decision pending)"
+owner_signoff = false
+source = "engine/toolkit/components/search/docs/SearchEngineConfiguration.rst:42-45"
+
+[[endpoint]]
+host = "content-signature-2.cdn.mozilla.net"
+match = "exact"
+class = "REPLACE"
+reason = "Remote Settings content-signature chain. Follows the Remote Settings decision above."
+disable = "follows services.settings.server decision"
+owner_signoff = false
+source = "engine/services/settings/dumps/main/moz-essential-domain-fallbacks.json"
+
+[[endpoint]]
+host = "ciscobinary.openh264.org"
+match = "exact"
+class = "REPLACE"
+reason = "GMP OpenH264 codec download manifest (Cisco-hosted). Observed at idle in live run. Owner decision: repoint GMP distribution or drop (WebRTC H.264 requirement?)."
+disable = "pref media.gmp-manager.url=<astra-gmp> or media.gmp-manager.updateEnabled=false"
+owner_signoff = false
+source = "engine/toolkit/content/gmp-sources/openh264.json:9-33; engine/modules/libpref/init/all.js:3465-3474"
+
+[[endpoint]]
+host = "firefox-settings-attachments.cdn.mozilla.net"
+match = "exact"
+class = "REPLACE"
+reason = "Remote Settings attachments CDN (models, icons, lists). Follows the Remote Settings self-host decision."
+disable = "follows services.settings.server decision"
+owner_signoff = false
+source = "live audit 2026-11-01 (idle); https://www.abcdesktop.io/faq/disable-firefox-connections/ (proxy.pac)"
+
+[[endpoint]]
+host = "update.googleapis.com"
+match = "exact"
+class = "REPLACE"
+reason = "Widevine CDM Chromium update URL. Observed at idle in live run. Owner decision: ship Widevine (proprietary) or drop."
+disable = "pref media.gmp-widevinecdm.allow-chromium-update=false / media.gmp-manager.url repoint"
+owner_signoff = false
+source = "engine/browser/app/profile/firefox.js:2373 (media.gmp-manager.chromium-update-url)"
+
+[[endpoint]]
+host = "www.google.com"
+match = "suffix"
+class = "REPLACE"
+reason = "Observed once at idle in live run (2026-11-01); no static pref pins it — suspected search-service icon/config fetch for the default engine. No Astra feature needs direct Google contact; ship Astra search config instead. Exact trigger to pin in follow-up."
+disable = "follows services.settings.server + own search-config decision"
+owner_signoff = false
+source = "live audit 2026-11-01 (idle); engine/toolkit/components/search/SearchStaticData.sys.mjs (engine-side Google refs)"
+
+# NOTE (verified ABSENT from ESR 153.6.0 source — do not add unless observed):
+# tracking-protection.cdn.mozilla.net, classify-client.services.mozilla.com,
+# search.services.mozilla.com, aus-stage: zero hits in engine/ (browser/,
+# toolkit/, services/, modules/, dom/). Third-party guides referencing them
+# are stale for this ESR.
