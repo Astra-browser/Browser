@@ -96,7 +96,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P5-T01 | Tasks domain (lists, priorities, NL parser) | done | orchestrator | agent/P5-T01-tasks | Merged 2026-11-02; tasks 31/31, workspace 284/284, clippy/fmt/brand clean |
 | P5-T02 | Tasks UI + "make task" palette | todo | — | — | After T01 |
 | P5-T03 | Notes (Markdown files + index + watcher) | done | orchestrator | agent/P5-T03-notes | Merged 2026-11-02; notes 12/12, workspace 253/253, clippy/fmt/brand clean |
-| P5-T04 | Time tracking (per-site, focus mode) | doing | worker-time | agent/P5-T04-time | Locked 2026-11-02; owns time domain + tests only |
+| P5-T04 | Time tracking (per-site, focus mode) | done | orchestrator | agent/P5-T04-time | Merged 2026-11-02; time 12/12, workspace 296/296, clippy/fmt/brand clean; private-aware writes from day one |
 | P5-T05 | Export/import (JSON + Markdown) | todo | — | — | After T01/T03 |
 
 ## Later phases
