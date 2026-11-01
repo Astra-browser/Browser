@@ -1,0 +1,15 @@
+{
+  "name": "@astra/shell-hello",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Minimal Svelte shell proving U-04: Svelte output loads as a chrome-privileged ES module (P1-T08)",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.2.0",
+    "svelte": "5.56.8",
+    "vite": "8.3.5"
+  }
+}

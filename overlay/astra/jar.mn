@@ -4,7 +4,11 @@
 
 # Astra chrome/resource registration (P1-T05). Single astra.jar hosts both
 # schemes so the overlay stays one packaging unit (model: asrouter/jar.mn,
-# contextualidentity/jar.mn in the pinned source).
+# contextualidentity/jar.mn in the pinned source). resource://astra is
+# verified 200 in chrome context; chrome:// serves the shell/hello pages.
+# NOTE (P1-T08 probe): fetch() of chrome:// URLs from the Marionette chrome
+# sandbox fails even for in-tree pages — that probe path is misleading.
+# Ground truth is the running window (P1-T08 GUI check), not fetch probes.
 #   chrome://astra/hello.html            -> overlay/astra/chrome/hello.html
 #   resource://astra/host/HostAPI.sys.mj -> overlay/astra/host/HostAPI.sys.mjs
 
@@ -12,4 +16,7 @@ astra.jar:
 % content astra %content/astra/ contentaccessible=yes
 % resource astra %content/astra/res/ contentaccessible=yes
   content/astra/hello.html               (chrome/hello.html)
+  content/astra/res/shell-chrome.css     (chrome/shell-chrome.css)
+  content/astra/res/shell/shell.mjs      (chrome/shell/shell.mjs)
+  content/astra/res/shell/shell.css      (chrome/shell/shell.css)
   content/astra/res/host/HostAPI.sys.mjs (host/HostAPI.sys.mjs)

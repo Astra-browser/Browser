@@ -1,0 +1,31 @@
+Patch-Id: ASTRA-0002
+Title: Mount Astra shell root in the main browser window
+Tier: P2
+Upstream-Files: browser/base/content/browser.xhtml
+Intent: mount #astra-root + shell CSS/module in the main window; cannot be done by config/overlay (upstream file needs the mount point)
+Risk: low (hook after toolbox include, all lines inside one comment-marked hunk; upstream rarely restructures window root)
+Test: forge overlay + forge lint; tests/contract/p1t08-shell.py (geckodriver chrome context: hello rendered, toolbox hidden)
+Verified-On: 153.6.0
+Removal-Plan: none anticipated; shell mount is the product UI
+---
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index 661a815519..35804fb55a 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -136,6 +136,16 @@
+ 
+ #include navigator-toolbox.inc.xhtml
+ 
++<!-- ASTRA-0002: Astra shell mount (P1-T08). The Svelte UI in #astra-root is
++   the only visible chrome; Firefox toolbox/tabbox hidden by shell-chrome.css.
++   resource:// URLs: proven to load in chrome context (chrome:// content
++   fetch is unreliable in this build config); html: prefixes because the
++   document default namespace is XUL. -->
++<html:link rel="stylesheet" href="resource://astra/shell-chrome.css"/>
++<html:link rel="stylesheet" href="resource://astra/shell/shell.css"/>
++<html:div id="astra-root"/>
++<html:script type="module" src="resource://astra/shell/shell.mjs"/>
++
+ #include browser-box.inc.xhtml
+ 
+   <html:template id="customizationPanel">

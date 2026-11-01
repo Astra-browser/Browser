@@ -33,7 +33,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T05 | Overlay wiring (`chrome://astra/`, ASTRA-0001) | done | orchestrator | agent/P1-T05-overlay | overlay/astra (moz.build/jar.mn/HostAPI stub/hello) staged by `forge overlay`; ASTRA-0001 applied; `forge lint` clean; configure complete with /astra in DIRS |
 | P1-T06 | `policies.json` + pref overrides (incl. Normandy/HR path from BUILD_FLAGS.md) | done | orchestrator | agent/P1-T06-policies | 15 impl-verified policies ACTIVE; mozilla.cfg autoconfig locks Normandy/shield/sponsored (contract 7/7 PASS) |
 | P1-T07 | Endpoint audit tool | todo | — | — | — |
-| P1-T08 | Shell mount patch (ASTRA-0002) | todo | — | — | Needs P1-T05 overlay + P3 UI |
+| P1-T08 | Shell mount patch (ASTRA-0002) | done | orchestrator | agent/P1-T08-shell | #astra-root mounted, Svelte hello renders, FF chrome hidden (contract 5/5 PASS incl. nonzero-size guard; GUI-verified "Hello Tab", no toolbars) |
 | P1-T09 | Sidecar spike (U-01) | todo | — | — | — |
 | P1-T10 | Content slot + URL bar via Host API stub | todo | — | — | Needs P1-T05 Host API stub |
 | P1-T11 | Contract-test harness (geckodriver) | todo | — | — | `--enable-geckodriver` already in mozconfig |

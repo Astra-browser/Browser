@@ -1,0 +1,29 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Astra shell chrome (P1-T08): Firefox's own chrome is hidden; the Svelte UI
+ * in #astra-root is the only visible chrome. #astra-root is a normal flex
+ * item of the window body (which is display:flex column): position:fixed does
+ * NOT size elements inside XUL layout (measured 0x0 in GUI, D-30) while flex
+ * sizing mirrors #tabbrowser-tabbox. P1-T10 reworks this into the
+ * content-slot layout (tabs as <browser> elements placed by CSS). */
+#navigator-toolbox,
+#tabbrowser-tabbox,
+#sidebar-container,
+#sidebar-box,
+#sidebar-splitter,
+#sidebar-launcher-splitter,
+#ai-window-box,
+#ai-window-splitter {
+  display: none !important;
+}
+
+#astra-root {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1c1b22;
+}
