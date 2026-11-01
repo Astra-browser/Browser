@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "app"
+    "app",
+    "shell"
   ],
   "scripts": {
     "check": "bun run --filter @astra/frame check",
