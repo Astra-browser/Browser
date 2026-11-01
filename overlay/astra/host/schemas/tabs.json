@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "resource://astra/host/schemas/tabs.json",
-  "title": "Host API v1 — Tabs (P1-T10 stub; live gBrowser binding in P2-T06)",
+  "title": "Host API v1 — Tabs",
   "type": "object",
   "properties": {
     "create": {
@@ -9,7 +9,9 @@
       "properties": {
         "request_id": { "type": "string" },
         "url": { "type": "string" },
-        "background": { "type": "boolean" }
+        "background": { "type": "boolean" },
+        "window_id": { "type": "string" },
+        "index": { "type": "integer" }
       },
       "additionalProperties": false
     },
@@ -34,8 +36,94 @@
     "list": {
       "type": "object",
       "properties": {
-        "request_id": { "type": "string" }
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" }
       },
+      "additionalProperties": false
+    },
+    "get": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "move": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "index": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["astra_tab_id", "index"],
+      "additionalProperties": false
+    },
+    "duplicate": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "background": { "type": "boolean" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "pin": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "unpin": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "discard": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "wakeup": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "setTitle": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["astra_tab_id", "title"],
+      "additionalProperties": false
+    },
+    "setMuted": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "muted": { "type": "boolean" }
+      },
+      "required": ["astra_tab_id"],
       "additionalProperties": false
     },
     "Tab": {
@@ -45,10 +133,15 @@
         "url": { "type": "string" },
         "title": { "type": "string" },
         "selected": { "type": "boolean" },
+        "window_id": { "type": "string" },
+        "index": { "type": "integer", "minimum": 0 },
+        "pinned": { "type": "boolean" },
+        "discarded": { "type": "boolean" },
+        "muted": { "type": "boolean" },
         "canGoBack": { "type": "boolean" },
         "canGoForward": { "type": "boolean" }
       },
-      "required": ["astra_tab_id", "url", "selected", "canGoBack", "canGoForward"],
+      "required": ["astra_tab_id", "url", "selected", "window_id", "index", "pinned", "discarded", "canGoBack", "canGoForward"],
       "additionalProperties": false
     }
   },

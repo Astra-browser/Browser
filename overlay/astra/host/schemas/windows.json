@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/windows.json",
+  "title": "Host API v1 — Windows",
+  "description": "Multi-window model. Tabs reference their window via window_id (default win-1). Closing a window closes its tabs. The last window cannot be closed.",
+  "type": "object",
+  "properties": {
+    "create": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "private": { "type": "boolean" },
+        "background": { "type": "boolean" },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "close": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" }
+      },
+      "required": ["window_id"],
+      "additionalProperties": false
+    },
+    "focus": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" }
+      },
+      "required": ["window_id"],
+      "additionalProperties": false
+    },
+    "setFullscreen": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" },
+        "fullscreen": { "type": "boolean" }
+      },
+      "required": ["window_id"],
+      "additionalProperties": false
+    },
+    "setTitle": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["window_id", "title"],
+      "additionalProperties": false
+    },
+    "get": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "window_id": { "type": "string" }
+      },
+      "required": ["window_id"],
+      "additionalProperties": false
+    },
+    "list": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Window": {
+      "type": "object",
+      "properties": {
+        "window_id": { "type": "string" },
+        "focused": { "type": "boolean" },
+        "fullscreen": { "type": "boolean" },
+        "private": { "type": "boolean" },
+        "title": { "type": "string" }
+      },
+      "required": ["window_id", "focused", "fullscreen", "private"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

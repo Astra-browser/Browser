@@ -1,38 +1,48 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * License, v. 2.0. If a copy of the MPL was obtained with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Host API entry point. The versioned seam from plan §6.4: everything Astra
 // owns talks to Firefox internals only through this module tree. P1-T05
-// proved the `resource://astra/` registration resolves; P1-T10 splits the
+// proved the `resource://astra/` registration resolves; P1-T10 split the
 // stub into per-domain modules (Tabs, Navigation, Panes) over a shared
-// event pump (Events), all pure logic with no Firefox internals so Node
-// contract tests can import them by path. Full live bindings (real
-// `gBrowser` tabs) land in P2-T06; the protocol shape here is authoritative.
+// event pump (Events); P2-T06 completes Host API v1 with Boot (handshake +
+// version negotiation), Windows (multi-window model), extended Tabs
+// (move/duplicate/pin/discard), Navigation (stop/zoom/find/print/reader),
+// Panes (slots/rects/generation guards), gap-resync events (`eventsSince`),
+// and the Content feedback path (progress listeners feed external loads
+// back into the model). All modules are pure logic with no Firefox
+// internals (Content.sys.mjs is the single exception and is loaded
+// separately by the shell), so Node contract tests import them by path.
 
-import { addEventListener, emit, eventSeq } from "./Events.sys.mjs";
+import { addEventListener, bufferedCount, emit, eventSeq, eventsSince } from "./Events.sys.mjs";
+import { Boot } from "./Boot.sys.mjs";
 import { HOST_API_VERSION, Tabs, __resetTabsForTests } from "./Tabs.sys.mjs";
-import { Navigation } from "./Navigation.sys.mjs";
+import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
+import { Windows, __resetWindowsForTests } from "./Windows.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
-export { HOST_API_VERSION, Tabs, Navigation, Panes, addEventListener, emit, eventSeq };
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-export const Boot = {
-  async handshake({ request_id = "boot-0", core_version = 0 } = {}) {
-    const result = ok(request_id, { core_version, event_seq: eventSeq() });
-    emit("boot.ready", { host_api_version: HOST_API_VERSION });
-    return result;
-  },
+export {
+  HOST_API_VERSION,
+  Boot,
+  Windows,
+  Tabs,
+  Navigation,
+  Panes,
+  addEventListener,
+  emit,
+  eventSeq,
+  eventsSince,
+  bufferedCount,
+  __commitExternal,
 };
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.
 export function __resetForTests() {
   __resetTabsForTests();
+  __resetNavigationForTests();
+  __resetWindowsForTests();
   __resetPanesForTests();
   __resetEventsForTests();
 }
