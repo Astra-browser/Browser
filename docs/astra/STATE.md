@@ -73,6 +73,21 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | done | orchestrator | agent/P3-T13-assembly | Merged 2026-11-02; assembly 57 + all stub suites green, live-vs-current-binary green; TRUE live verify of new bundle needs rebuild (P3-T14) |
 | P3-T14 | Engine rebuild + full live re-verify (new Host/chrome/shell bundle) | done | orchestrator | main | Rebuilt (faster, 8s); all live suites green on new binary; FIXED: localStorage guard (tabstrip/split), Frame URL, XUL dup div; frame_live rewritten to probe real shell; goldens recaptured 18/18 |
 
+## Phase 4 — Browse core: blocker, extensions, import, privacy
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P4-T01 | `astra-blocker` crate (adblock-rust + seed lists) | doing | worker-blk | agent/P4-T01-blocker | Locked 2026-11-02; owns crates/astra-blocker only |
+| P4-T02 | In-tree Rust network-hook component | todo | — | — | After T01; needs engine vendor |
+| P4-T03 | Element hiding (cosmetic + click-to-hide) | todo | — | — | After Content actor review |
+| P4-T04 | Extension manager + curated gallery | todo | — | — | Needs mapping research |
+| P4-T05 | Importers (Chromium/Firefox/Zen/...) | doing | worker-imp | agent/P4-T05-import | Locked 2026-11-02; owns crates/astra-import only |
+| P4-T06 | Tab sleeping policy | todo | — | — | Next wave |
+| P4-T07 | Private windows (nothing persisted) | doing | worker-priv | agent/P4-T07-private | Locked 2026-11-02; owns private-mode core + test only |
+| P4-T08 | Downloads manager + PDF viewer | todo | — | — | Next wave |
+| P4-T09 | Password/autofill decision | todo | — | — | Needs owner confirm; propose + defer |
+| P4-T10 | Performance baselines | todo | — | — | After rebuild; measure vs stock ESR |
+
 ## Later phases
 
 All `todo` — see `plan.md` §§8–11.
