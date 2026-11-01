@@ -26,3 +26,5 @@ Seeded from `plan.md` §2. New entries append as `D-21`, `D-22`, …
 | D-20 | Linux packaging order: tarball → AppImage → `.deb` | Accepted (plan) |
 | D-21 | Reference source for the port = `folder_context` snapshot (git-ignored), not any external checkout | Decided 2026-11-01 (owner direction) |
 | D-22 | `plan.md` carries Astra branding only; provenance/attribution lives in `PROVENANCE.md` | Decided 2026-11-01 (owner direction) |
+| D-23 | Orchestration: one orchestrator (plan/assign/test/review) + worker subagents, one locked task + one `agent/<task>-<slug>` branch each, STATE.md as lock registry | Decided 2026-11-01 (owner direction); plan §1.5 + §10.3 |
+| D-24 | Commit every change; workers push branches, only the orchestrator merges to `main` | Decided 2026-11-01 (owner direction); plan §1.1 + §1.5 |

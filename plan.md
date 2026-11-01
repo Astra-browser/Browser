@@ -28,12 +28,13 @@
 - **Everything is test-gated.** A task is not done until its acceptance test exists, passes locally, and passes in CI.
 - **Brand hygiene.** Never introduce the strings of the previous product name (any case variant) outside allow-listed provenance files (§3). CI enforces this.
 - **Stop and ask the owner** (write to `docs/astra/OWNER_QUESTIONS.md`, do not guess) for: logo/artwork, domain names, bundle/app IDs for release, update-server hostname, code-signing certificates, any legal doubt, any patch that would exceed the upstream-footprint budget.
-- **Commit hygiene:** one logical change per commit; conventional-commit prefixes (`feat:`, `fix:`, `patch:`, `test:`, `ci:`, `docs:`, `chore:`); every upstream patch has a header (see §6.3).
+- **Commit hygiene:** one logical change per commit; conventional-commit prefixes (`feat:`, `fix:`, `patch:`, `test:`, `ci:`, `docs:`, `chore:`); every upstream patch has a header (see §6.3). **Commit every change:** no task's work stays uncommitted — commit when the task completes, and commit checkpoints for multi-step tasks. Never batch several tasks into one commit.
+- **Orchestration model (§1.5).** One orchestrator agent plans, assigns, tests and reviews; worker subagents execute exactly one locked task each on their own branch. No agent touches a task or branch locked by another agent.
 
 ### 1.2 Progress tracking files (create in Phase 0, keep updated)
 | File | Purpose |
 |---|---|
-| `docs/astra/STATE.md` | Table of all task IDs with status (`todo / doing / blocked / done`), PR link, notes |
+| `docs/astra/STATE.md` | Table of all task IDs with status (`todo / doing / blocked / done`), owning agent, branch, PR link, notes — the task-lock registry (§1.5) |
 | `docs/astra/DECISIONS.md` | ADR log; start from §2 of this plan. New decisions get a new `D-xx` entry |
 | `docs/astra/OWNER_QUESTIONS.md` | Blocking questions for the human owner |
 | `docs/astra/PARITY.md` | Feature parity matrix (generated in P0, kept live; see §7) |
@@ -54,6 +55,17 @@ Task IDs are `P<phase>-T<nn>`. Work is split into parallel **lanes**; agents on 
 ### 1.4 Definitions
 - **Definition of Ready:** inputs exist, verification items resolved, acceptance test described.
 - **Definition of Done:** code merged, tests green on Linux CI (and on the platform in scope), docs/STATE updated, no new lint/brand/license violations, upstream-footprint budget still met.
+
+### 1.5 Orchestration: one orchestrator, many locked workers
+- **Roles.** Exactly one **orchestrator** (the main agent) owns planning, task assignment, integration, testing and feedback. **Worker** subagents execute implementation. Workers never assign, reassign, merge, or review each other's work.
+- **One task, one agent, one branch.** A worker claims a task only via the lock protocol below, works exclusively on branch `agent/<task-id>-<short-slug>` cut from current `main`, and touches only that task's files (task tables list them; lanes in §1.3 bound the directories). A second worker on the same task or branch is forbidden.
+- **Lock protocol (tracked in `docs/astra/STATE.md`).**
+  1. Orchestrator marks the task `doing`, writes the worker's name in the Agent column and the branch name in the Branch column, and commits that row **before** the worker starts.
+  2. The worker rebases onto `main` at start; if the task's files changed under it, it stops and reports instead of forcing through.
+  3. While `doing`, no other agent may edit the task's rows, files, or branch. Questions go to the orchestrator, never to a side edit.
+  4. Worker finishes by pushing its branch and reporting tests + diff summary. Only the orchestrator verifies (rebuilds/tests the acceptance criteria), merges to `main`, marks `done`, and commits the STATE row.
+- **Conflict-free by construction.** Task tables declare non-overlapping file scopes; the orchestrator refuses to unlock two `doing` tasks whose scopes intersect. Shared files (`STATE.md`, `DECISIONS.md`, `branding/*`) are orchestrator-only edits.
+- **Feedback loop.** The orchestrator runs the acceptance tests itself (or in CI), writes failures back to the task's Notes field in STATE.md, and re-locks the same task to the same worker for fixes. No new task starts on broken `main`.
 
 ---
 
@@ -661,7 +673,7 @@ No live web in PR CI. Use local fixture servers (static pages, iframes, shadow D
 | `windows-*`, `macos-*` | added in P9/P10 | platform build/test/sign |
 
 ### 10.3 Branching and versioning
-Trunk-based: `main` is always releasable to `nightly`. Release branches `release/<major.minor>` for hotfixes. Version string: Astra semver plus upstream base in build metadata, e.g. `1.4.2+esr153.5`. Conventional commits generate the changelog. Every release artifact carries a build-provenance attestation and an SBOM.
+Trunk-based: `main` is always releasable to `nightly`. Release branches `release/<major.minor>` for hotfixes. Task work happens on `agent/<task-id>-<short-slug>` branches (one per locked task, §1.5); only the orchestrator merges them into `main`. Version string: Astra semver plus upstream base in build metadata, e.g. `1.4.2+esr153.5`. Conventional commits generate the changelog. Every release artifact carries a build-provenance attestation and an SBOM.
 
 ### 10.4 Release pipeline
 `build (reproducible-as-possible) → test suites → sign → package + MARs → upload to *staging* update channel → smoke-install/update tests on clean machines → owner approval gate → promote nightly → beta → release (staged % rollout) → monitor via opt-in crash reports? (none by default; use user-submitted diagnostics bundles only)`. A "pause rollout" switch and previous-version rollback are mandatory before the first public release.
