@@ -71,7 +71,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T11 | Golden suite (in-Firefox vs baseline) | done | orchestrator | agent/P3-T11-goldff | Merged 2026-11-02; 13/16 PASS reproduced, 3 text-raster FAILs + 2 narrow SKIP documented; CI job report-only until gate tuning |
 | P3-T12 | Accessibility pass | done | orchestrator | agent/P3-T12-a11y | Merged 2026-11-02; A11Y checklist + landmarks/focus/contrast tests, ui 1153/1153, conflict vs T13 assembly resolved (landmarks kept); engine bundle refresh rides P3-T14 |
 | P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | done | orchestrator | agent/P3-T13-assembly | Merged 2026-11-02; assembly 57 + all stub suites green, live-vs-current-binary green; TRUE live verify of new bundle needs rebuild (P3-T14) |
-| P3-T14 | Engine rebuild + full live re-verify (new Host/chrome/shell bundle) | todo | — | — | New: jar.mn gained Boot/Windows/Session/History/Containers/Dialogs + frame + assembled shell since last build; faster attempt failed at link, needs quiet-tree rebuild |
+| P3-T14 | Engine rebuild + full live re-verify (new Host/chrome/shell bundle) | doing | orchestrator | main | Rebuild in main checkout (worktrees lack out/mozconfig); overlay + faster + full live suite |
 
 ## Later phases
 
