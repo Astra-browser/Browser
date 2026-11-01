@@ -1,0 +1,14 @@
+{
+  "name": "@astra/golden-capture",
+  "private": true,
+  "version": "0.1.0",
+  "description": "P0-T07 golden screenshot capture: serves the mocked golden UI build and captures the baseline matrix with headless Chromium.",
+  "type": "module",
+  "scripts": {
+    "capture": "bun ./capture.ts",
+    "build": "bunx vite build --config vite.golden.config.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}
