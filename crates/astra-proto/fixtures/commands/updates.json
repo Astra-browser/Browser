@@ -1,0 +1,25 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "open_software_update",
+      "payload": {}
+    },
+    {
+      "command": "update_check",
+      "payload": {}
+    },
+    {
+      "command": "update_highlights",
+      "payload": {}
+    },
+    {
+      "command": "update_relaunch",
+      "payload": {}
+    },
+    {
+      "command": "update_status",
+      "payload": {}
+    }
+  ]
+}

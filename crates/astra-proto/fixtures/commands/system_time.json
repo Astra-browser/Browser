@@ -1,0 +1,9 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "system_clock_24h",
+      "payload": {}
+    }
+  ]
+}

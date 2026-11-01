@@ -1,0 +1,11 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "page_source",
+      "payload": {
+        "id": "x"
+      }
+    }
+  ]
+}

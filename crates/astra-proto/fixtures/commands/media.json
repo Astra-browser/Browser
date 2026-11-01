@@ -1,0 +1,55 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "link_describe",
+      "payload": {
+        "expected_profile": "x",
+        "environment": "x",
+        "element": "x"
+      }
+    },
+    {
+      "command": "media_admit_remote",
+      "payload": {
+        "expected_profile": "x",
+        "environment": "x",
+        "element": "x",
+        "url": "x"
+      }
+    },
+    {
+      "command": "media_import",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "media_open",
+      "payload": {
+        "expected_profile": "x",
+        "id": "x"
+      }
+    },
+    {
+      "command": "work_admit_folder",
+      "payload": {
+        "expected_profile": "x",
+        "path": "x"
+      }
+    },
+    {
+      "command": "work_pick_folder",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_reveal_path",
+      "payload": {
+        "expected_profile": "x",
+        "path": "x"
+      }
+    }
+  ]
+}

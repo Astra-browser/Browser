@@ -1,0 +1,69 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_choose_model",
+      "payload": {
+        "expected_profile": "x",
+        "role": {}
+      }
+    },
+    {
+      "command": "work_clear_provider_key",
+      "payload": {
+        "expected_profile": "x",
+        "provider": {}
+      }
+    },
+    {
+      "command": "work_local_servers",
+      "payload": {}
+    },
+    {
+      "command": "work_models",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_models_ready",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_more_models",
+      "payload": {
+        "expected_profile": "x",
+        "provider": {}
+      }
+    },
+    {
+      "command": "work_set_model_effort",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_set_model_endpoint",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_set_provider_key",
+      "payload": {
+        "expected_profile": "x",
+        "provider": {},
+        "key": "x"
+      }
+    },
+    {
+      "command": "work_test_provider_key",
+      "payload": {
+        "expected_profile": "x",
+        "provider": {}
+      }
+    }
+  ]
+}

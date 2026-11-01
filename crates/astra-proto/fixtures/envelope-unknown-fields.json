@@ -1,0 +1,10 @@
+{
+  "$comment": "Unknown fields everywhere MUST still validate (Appendix C: ignored).",
+  "v": 1,
+  "id": "req-0002",
+  "kind": "req",
+  "name": "tabs_navigate",
+  "payload": { "id": "tab-1", "input": "https://example.invalid/" },
+  "future_field": "ignore me",
+  "another": { "nested": [1, 2, 3] }
+}

@@ -1,0 +1,19 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "login_item_open_settings",
+      "payload": {}
+    },
+    {
+      "command": "login_item_set",
+      "payload": {
+        "enabled": true
+      }
+    },
+    {
+      "command": "login_item_status",
+      "payload": {}
+    }
+  ]
+}

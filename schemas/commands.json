@@ -1,0 +1,6464 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/proto/commands",
+  "title": "Astra protocol v1 -- command registry (P2-T02, generated)",
+  "x-astra-generated": {
+    "by": "crates/astra-proto/codegen/generate.py",
+    "from": "docs/astra/ipc-surface.md",
+    "version": 1
+  },
+  "version": 1,
+  "count": 267,
+  "commands": {
+    "about_info": {
+      "ts": "aboutInfo",
+      "rust": "d:about.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AboutInfo"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<AboutInfo>"
+      }
+    },
+    "account_avatar_discard": {
+      "ts": "accountAvatarDiscard",
+      "rust": "d:account/avatar.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_avatar_pick": {
+      "ts": "accountAvatarPick",
+      "rust": "d:account/avatar.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountAvatarPickV1"
+        },
+        "ts": "unknown",
+        "rust": "Result<AccountAvatarPickV1, ()>"
+      }
+    },
+    "account_avatar_remove": {
+      "ts": "accountAvatarRemove",
+      "rust": "d:account/avatar.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_avatar_save": {
+      "ts": "accountAvatarSave",
+      "rust": "d:account/avatar.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "crop": {
+            "x-astra-rust-type": "AccountAvatarCropV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token",
+          "crop"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_buy": {
+      "ts": "accountBuy",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "purchase": {
+            "x-astra-rust-type": "AccountPurchaseV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "purchase"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_cancel_code": {
+      "ts": "accountCancelCode",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_change_email": {
+      "ts": "accountChangeEmail",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "code"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_delete": {
+      "ts": "accountDelete",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_deletion_code": {
+      "ts": "accountDeletionCode",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_email_code": {
+      "ts": "accountEmailCode",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_export": {
+      "ts": "accountExport",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountExportV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountExportV1"
+      }
+    },
+    "account_get": {
+      "ts": "accountGet",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_manage": {
+      "ts": "accountManage",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_plan_confirm": {
+      "ts": "accountPlanConfirm",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_plan_dismiss": {
+      "ts": "accountPlanDismiss",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_plan_preview": {
+      "ts": "accountPlanPreview",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string"
+          },
+          "interval": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "plan",
+          "interval"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_reauth_code": {
+      "ts": "accountReauthCode",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_receipt": {
+      "ts": "accountReceipt",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReceiptV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReceiptV1"
+      }
+    },
+    "account_refresh": {
+      "ts": "accountRefresh",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_revoke_session": {
+      "ts": "accountRevokeSession",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_send_code": {
+      "ts": "accountSendCode",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_sessions": {
+      "ts": "accountSessions",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountSessionsV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountSessionsV1"
+      }
+    },
+    "account_set_daily_limit": {
+      "ts": "accountSetDailyLimit",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_set_name": {
+      "ts": "accountSetName",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_set_server": {
+      "ts": "accountSetServer",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "server": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_sign_out": {
+      "ts": "accountSignOut",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_sign_out_everywhere": {
+      "ts": "accountSignOutEverywhere",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "account_usage_history": {
+      "ts": "accountUsageHistory",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountHistoryV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountHistoryV1"
+      }
+    },
+    "account_verify": {
+      "ts": "accountVerify",
+      "rust": "d:account.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "AccountReplyV1"
+        },
+        "ts": "unknown",
+        "rust": "AccountReplyV1"
+      }
+    },
+    "add_menu_popup": {
+      "ts": "addMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "can_split": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "can_split"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "blocker_picker": {
+      "ts": "blockerPicker",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "x-astra-rust-type": "prev_ipc::BlockerSiteContext"
+          },
+          "action": {
+            "x-astra-rust-type": "prev_ipc::BlockerPickerAction"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "action"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BlockerPickerView"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Result<Option<prev_ipc::BlockerPickerView>, ()>"
+      }
+    },
+    "blocker_refresh_sources": {
+      "ts": "blockerRefreshSources",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_retry": {
+      "ts": "blockerRetry",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "failed_generation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "failed_generation"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_set_enabled": {
+      "ts": "blockerSetEnabled",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_site_change": {
+      "ts": "blockerSiteChange",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "x-astra-rust-type": "prev_ipc::BlockerSiteContext"
+          },
+          "action": {
+            "x-astra-rust-type": "prev_ipc::BlockerSiteAction"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "context",
+          "action"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_stats": {
+      "ts": "blockerStats",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BlockerStatsView"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::BlockerStatsView, ()>"
+      }
+    },
+    "blocker_status": {
+      "ts": "blockerStatus",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BlockerStatusView"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::BlockerStatusView, ()>"
+      }
+    },
+    "bookmark_call": {
+      "ts": "bookmarkCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::BookmarkCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BookmarkResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::BookmarkResponse"
+      }
+    },
+    "bookmark_menu_popup": {
+      "ts": "bookmarkMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "folder": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "folder"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "browser_credential_capability": {
+      "ts": "browserCredentialCapability",
+      "rust": "d:browser_credentials.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "BrowserCredentialCapabilityView"
+        },
+        "ts": "unknown",
+        "rust": "BrowserCredentialCapabilityView"
+      }
+    },
+    "browser_open_url": {
+      "ts": "browserOpenUrl",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "new_tab": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "new_tab"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "browser_passkey_authorization_request": {
+      "ts": "browserPasskeyAuthorizationRequest",
+      "rust": "d:browser_credentials.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "browsing_data_call": {
+      "ts": "browsingDataCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::BrowsingDataCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BrowsingDataResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::BrowsingDataResponse"
+      }
+    },
+    "chrome_menu_popup": {
+      "ts": "chromeMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "page": {
+            "type": "boolean"
+          },
+          "can_split": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "page",
+          "can_split"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "default_browser_request": {
+      "ts": "defaultBrowserRequest",
+      "rust": "d:default_browser.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "DefaultBrowserStatus"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<DefaultBrowserStatus>"
+      }
+    },
+    "default_browser_status": {
+      "ts": "defaultBrowserStatus",
+      "rust": "d:default_browser.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "DefaultBrowserStatus"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<DefaultBrowserStatus>"
+      }
+    },
+    "diagnostics_report": {
+      "ts": "diagnosticsReport",
+      "rust": "d:diagnostic_report.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "string"
+        },
+        "ts": "(string | null)",
+        "rust": "Option<String>"
+      }
+    },
+    "diagnostics_show_logs": {
+      "ts": "diagnosticsShowLogs",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "divider_drag": {
+      "ts": "dividerDrag",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "divider_grab": {
+      "ts": "dividerGrab",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "divider_release": {
+      "ts": "dividerRelease",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "download_call": {
+      "ts": "downloadCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_core::downloads::DownloadCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_core::downloads::DownloadResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_core::downloads::DownloadResponse"
+      }
+    },
+    "download_open_access_settings": {
+      "ts": "downloadOpenAccessSettings",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "essentials_keep": {
+      "ts": "essentialsKeep",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "essentials_release": {
+      "ts": "essentialsRelease",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "export_browser_data": {
+      "ts": "exportBrowserData",
+      "rust": "d:data_export.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "x-astra-rust-type": "ExportKindView"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "ExportOutcomeView"
+        },
+        "ts": "unknown",
+        "rust": "ExportOutcomeView"
+      }
+    },
+    "extension_action_invoke": {
+      "ts": "extensionActionInvoke",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "install_id": {
+            "type": "string"
+          },
+          "runtime_generation": {
+            "type": "string"
+          },
+          "action_revision": {
+            "type": "string"
+          },
+          "anchor_x": {
+            "type": "number"
+          },
+          "anchor_y": {
+            "type": "number"
+          },
+          "anchor_width": {
+            "type": "number"
+          },
+          "anchor_height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "install_id",
+          "runtime_generation",
+          "action_revision",
+          "anchor_x",
+          "anchor_y",
+          "anchor_width",
+          "anchor_height"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "extension_action_menu": {
+      "ts": "extensionActionMenu",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "install_id": {
+            "type": "string"
+          },
+          "runtime_generation": {
+            "type": "string"
+          },
+          "action_revision": {
+            "type": "string"
+          },
+          "anchor_x": {
+            "type": "number"
+          },
+          "anchor_y": {
+            "type": "number"
+          },
+          "anchor_width": {
+            "type": "number"
+          },
+          "anchor_height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "install_id",
+          "runtime_generation",
+          "action_revision",
+          "anchor_x",
+          "anchor_y",
+          "anchor_width",
+          "anchor_height"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "favicon_probe": {
+      "ts": "faviconProbe",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "origins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "origins"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "focus_control": {
+      "ts": "focusControl",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "control": {
+            "x-astra-rust-type": "prev_ipc::FocusControl"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "control"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "haptic": {
+      "ts": "haptic",
+      "rust": "d:haptics.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "x-astra-rust-type": "HapticKind"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "history_call": {
+      "ts": "historyCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::HistoryCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::HistoryResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::HistoryResponse"
+      }
+    },
+    "history_menu_popup": {
+      "ts": "historyMenuPopup",
+      "rust": "d:history_menu.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "forward": {
+            "type": "boolean"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "forward",
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "import_cancel": {
+      "ts": "importCancel",
+      "rust": "d:browser_import.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "import_open_permission": {
+      "ts": "importOpenPermission",
+      "rust": "d:browser_import.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "import_sources": {
+      "ts": "importSources",
+      "rust": "d:browser_import.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "x-astra-rust-type": "ImportSourceView"
+          }
+        },
+        "ts": "Array<unknown>",
+        "rust": "Vec<ImportSourceView>"
+      }
+    },
+    "import_start": {
+      "ts": "importStart",
+      "rust": "d:browser_import.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "x-astra-rust-type": "ImportKindView"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "profile",
+          "kinds"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "keymap_bind": {
+      "ts": "keymapBind",
+      "rust": "d:keymap.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accelerator": {
+            "type": "string"
+          },
+          "replace": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "replace"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "KeymapOutcome"
+        },
+        "ts": "unknown",
+        "rust": "KeymapOutcome"
+      }
+    },
+    "keymap_entries": {
+      "ts": "keymapEntries",
+      "rust": "d:keymap.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "x-astra-rust-type": "KeymapEntry"
+          }
+        },
+        "ts": "Array<unknown>",
+        "rust": "Vec<KeymapEntry>"
+      }
+    },
+    "keymap_record": {
+      "ts": "keymapRecord",
+      "rust": "d:keymap.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "active"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "keymap_reset": {
+      "ts": "keymapReset",
+      "rust": "d:keymap.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "launcher_edit": {
+      "ts": "launcherEdit",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab_id",
+          "url"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "launcher_open_accessibility": {
+      "ts": "launcherOpenAccessibility",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "launcher_record_shortcut": {
+      "ts": "launcherRecordShortcut",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "active"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "launcher_run": {
+      "ts": "launcherRun",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "x-astra-rust-type": "prev_ipc::SearchAction"
+          },
+          "context": {
+            "x-astra-rust-type": "prev_ipc::SearchContext"
+          },
+          "background": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "context",
+          "background"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "launcher_search": {
+      "ts": "launcherSearch",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "request_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "launcher_set_double_tap": {
+      "ts": "launcherSetDoubleTap",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "x-astra-rust-type": "launcher_trigger::DoubleTap"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "launcher_trigger::LauncherTrigger"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<launcher_trigger::LauncherTrigger>"
+      }
+    },
+    "launcher_set_shortcut": {
+      "ts": "launcherSetShortcut",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "accelerator": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accelerator"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "launcher_trigger::TriggerChange"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<launcher_trigger::TriggerChange>"
+      }
+    },
+    "launcher_trigger": {
+      "ts": "launcherTrigger",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "launcher_trigger::LauncherTrigger"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<launcher_trigger::LauncherTrigger>"
+      }
+    },
+    "link_describe": {
+      "ts": "linkDescribe",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "element": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "environment",
+          "element"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "Result<bool, ()>"
+      }
+    },
+    "login_item_open_settings": {
+      "ts": "loginItemOpenSettings",
+      "rust": "d:login_item.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "login_item_set": {
+      "ts": "loginItemSet",
+      "rust": "d:login_item.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "LoginItemStatus"
+        },
+        "ts": "unknown",
+        "rust": "LoginItemStatus"
+      }
+    },
+    "login_item_status": {
+      "ts": "loginItemStatus",
+      "rust": "d:login_item.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "LoginItemStatus"
+        },
+        "ts": "unknown",
+        "rust": "LoginItemStatus"
+      }
+    },
+    "media_admit_remote": {
+      "ts": "mediaAdmitRemote",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "element": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "environment",
+          "element",
+          "url"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::MediaAdmitV1"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::MediaAdmitV1, ()>"
+      }
+    },
+    "media_import": {
+      "ts": "mediaImport",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "MediaImportV1"
+        },
+        "ts": "unknown",
+        "rust": "Result<MediaImportV1, ()>"
+      }
+    },
+    "media_open": {
+      "ts": "mediaOpen",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "Result<bool, ()>"
+      }
+    },
+    "media_player": {
+      "ts": "mediaPlayer",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "x-astra-rust-type": "prev_ipc::MediaPlayerAction"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "action"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "menu_popup": {
+      "ts": "menuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "newtab_cancel": {
+      "ts": "newtabCancel",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "x-astra-rust-type": "prev_ipc::SearchContext"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "context"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "newtab_run": {
+      "ts": "newtabRun",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "x-astra-rust-type": "prev_ipc::SearchAction"
+          },
+          "context": {
+            "x-astra-rust-type": "prev_ipc::SearchContext"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "context"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "newtab_search": {
+      "ts": "newtabSearch",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "context": {
+            "x-astra-rust-type": "prev_ipc::SearchContext"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "context"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "newtab_search_context": {
+      "ts": "newtabSearchContext",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::SearchContext"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<prev_ipc::SearchContext>"
+      }
+    },
+    "note_call": {
+      "ts": "noteCall",
+      "rust": "d:notes.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "NoteCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "NoteReply"
+        },
+        "ts": "unknown",
+        "rust": "NoteReply"
+      }
+    },
+    "onboarding_finish": {
+      "ts": "onboardingFinish",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "onboarding_play_intro": {
+      "ts": "onboardingPlayIntro",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "open_software_update": {
+      "ts": "openSoftwareUpdate",
+      "rust": "d:updates.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "operation_acknowledge": {
+      "ts": "operationAcknowledge",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "operation_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "operation_status": {
+      "ts": "operationStatus",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "operation_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationStatus"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationStatus"
+      }
+    },
+    "operations_reconcile": {
+      "ts": "operationsReconcile",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "x-astra-rust-type": "prev_ipc::OperationDisposition"
+          }
+        },
+        "ts": "Array<unknown>",
+        "rust": "Vec<prev_ipc::OperationDisposition>"
+      }
+    },
+    "page_assist_ask": {
+      "ts": "pageAssistAsk",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "x-astra-rust-type": "PageAssistAskV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "request"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageAssistAskResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "PageAssistAskResponseV1"
+      }
+    },
+    "page_assist_cite": {
+      "ts": "pageAssistCite",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "integer"
+          },
+          "n": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "reply",
+          "n"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_close": {
+      "ts": "pageAssistClose",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_continue": {
+      "ts": "pageAssistContinue",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "integer"
+          },
+          "block": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "reply",
+          "block"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageAssistContinueV1"
+        },
+        "ts": "unknown",
+        "rust": "PageAssistContinueV1"
+      }
+    },
+    "page_assist_decide": {
+      "ts": "pageAssistDecide",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "integer"
+          },
+          "block": {
+            "type": "integer"
+          },
+          "decision": {
+            "x-astra-rust-type": "PageAssistDecisionV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "reply",
+          "block",
+          "decision"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_delete": {
+      "ts": "pageAssistDelete",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "conversation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space",
+          "conversation"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_detach": {
+      "ts": "pageAssistDetach",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          },
+          "pick": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab",
+          "pick"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_focus": {
+      "ts": "pageAssistFocus",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "integer"
+          },
+          "block": {
+            "type": "integer"
+          },
+          "n": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "reply",
+          "block"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_history": {
+      "ts": "pageAssistHistory",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageAssistHistoryV1"
+        },
+        "ts": "unknown",
+        "rust": "PageAssistHistoryV1"
+      }
+    },
+    "page_assist_new": {
+      "ts": "pageAssistNew",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_open": {
+      "ts": "pageAssistOpen",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "conversation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space",
+          "conversation"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_pick": {
+      "ts": "pageAssistPick",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "tab": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space",
+          "tab"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageAssistPickResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "PageAssistPickResponseV1"
+      }
+    },
+    "page_assist_pick_cancel": {
+      "ts": "pageAssistPickCancel",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_resume": {
+      "ts": "pageAssistResume",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation",
+          "reply"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_assist_status": {
+      "ts": "pageAssistStatus",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "tab": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageAssistStatusV1"
+        },
+        "ts": "unknown",
+        "rust": "PageAssistStatusV1"
+      }
+    },
+    "page_assist_stop": {
+      "ts": "pageAssistStop",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_find": {
+      "ts": "pageFind",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "forward": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "forward"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "page_permission_card_host": {
+      "ts": "pagePermissionCardHost",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "available"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "page_permission_respond": {
+      "ts": "pagePermissionRespond",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "decision": {
+            "x-astra-rust-type": "PagePermissionPromptDecisionInput"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "item_id",
+          "request_id",
+          "decision"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "page_source": {
+      "ts": "pageSource",
+      "rust": "d:page_source.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageSourceView"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<PageSourceView>"
+      }
+    },
+    "page_style_remove": {
+      "ts": "pageStyleRemove",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab",
+          "style"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesV1"
+      }
+    },
+    "page_style_remove_for": {
+      "ts": "pageStyleRemoveFor",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "site",
+          "style"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesAllV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesAllV1"
+      }
+    },
+    "page_style_toggle": {
+      "ts": "pageStyleToggle",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab",
+          "style",
+          "enabled"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesV1"
+      }
+    },
+    "page_style_toggle_for": {
+      "ts": "pageStyleToggleFor",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "site",
+          "style",
+          "enabled"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesAllV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesAllV1"
+      }
+    },
+    "page_styles": {
+      "ts": "pageStyles",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesV1"
+      }
+    },
+    "page_styles_all": {
+      "ts": "pageStylesAll",
+      "rust": "d:page_assist.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PageStylesAllV1"
+        },
+        "ts": "unknown",
+        "rust": "PageStylesAllV1"
+      }
+    },
+    "panel_hide": {
+      "ts": "panelHide",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "panel_intent": {
+      "ts": "panelIntent",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "x-astra-rust-type": "prev_ipc::PanelIntent"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "intent"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "panel_layout": {
+      "ts": "panelLayout",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "layout": {
+            "x-astra-rust-type": "prev_ipc::PanelLayout"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "layout"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "panel_ready": {
+      "ts": "panelReady",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PanelState"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<prev_ipc::PanelState>"
+      }
+    },
+    "profile_avatar_pick": {
+      "ts": "profileAvatarPick",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "ProfileAvatarPickV1"
+        },
+        "ts": "unknown",
+        "rust": "Result<ProfileAvatarPickV1, ()>"
+      }
+    },
+    "profile_menu_popup": {
+      "ts": "profileMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "profile_rename": {
+      "ts": "profileRename",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "profiles_create": {
+      "ts": "profilesCreate",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "x-astra-rust-type": "ProfileAvatarInputV1"
+          },
+          "and_switch": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "avatar",
+          "and_switch"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "profiles_delete": {
+      "ts": "profilesDelete",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "profiles_get": {
+      "ts": "profilesGet",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "ProfilesView"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Result<Option<ProfilesView>, ()>"
+      }
+    },
+    "profiles_rename": {
+      "ts": "profilesRename",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "name"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "profiles_set_avatar": {
+      "ts": "profilesSetAvatar",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "avatar": {
+            "x-astra-rust-type": "ProfileAvatarInputV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "avatar"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "profiles_switch": {
+      "ts": "profilesSwitch",
+      "rust": "d:profiles.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "resource_call": {
+      "ts": "resourceCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::ResourceCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::ResourceReply"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::ResourceReply"
+      }
+    },
+    "resource_close_ready": {
+      "ts": "resourceCloseReady",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token",
+          "success"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "run_command": {
+      "ts": "runCommand",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "setting_get": {
+      "ts": "settingGet",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "string"
+        },
+        "ts": "(string | null)",
+        "rust": "Option<String>"
+      }
+    },
+    "setting_set": {
+      "ts": "settingSet",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "sidebar_menu_popup": {
+      "ts": "sidebarMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "site_protected": {
+            "type": "boolean"
+          },
+          "can_hide": {
+            "type": "boolean"
+          },
+          "can_clear_data": {
+            "type": "boolean"
+          },
+          "manage_extensions": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "can_hide",
+          "can_clear_data",
+          "manage_extensions"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "sidebar_peek": {
+      "ts": "sidebarPeek",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "peek": {
+            "type": "boolean"
+          },
+          "lights": {
+            "type": "boolean"
+          },
+          "slide": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "peek",
+          "lights",
+          "slide"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "sidebar_resize": {
+      "ts": "sidebarResize",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "width",
+          "enabled",
+          "revision"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "sidebar_resize_guide": {
+      "ts": "sidebarResizeGuide",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "sidebar_set_hidden": {
+      "ts": "sidebarSetHidden",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hidden"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "sidebar_set_width": {
+      "ts": "sidebarSetWidth",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "animate": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "width",
+          "animate",
+          "revision"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "site_permission_set": {
+      "ts": "sitePermissionSet",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "kind": {
+            "x-astra-rust-type": "prev_ipc::SitePermissionKindView"
+          },
+          "decision": {
+            "x-astra-rust-type": "prev_ipc::SitePermissionDecisionView"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "kind"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "site_permissions": {
+      "ts": "sitePermissions",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::SitePermissionsView"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::SitePermissionsView, ()>"
+      }
+    },
+    "spaces_create": {
+      "ts": "spacesCreate",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "look": {
+            "x-astra-rust-type": "SpaceLookInputV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "look"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_delete": {
+      "ts": "spacesDelete",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_menu_popup": {
+      "ts": "spacesMenuPopup",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "spaces_move_tab": {
+      "ts": "spacesMoveTab",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "string"
+          },
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab",
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_reorder": {
+      "ts": "spacesReorder",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_step": {
+      "ts": "spacesStep",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "step"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_switch": {
+      "ts": "spacesSwitch",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "spaces_update": {
+      "ts": "spacesUpdate",
+      "rust": "d:spaces.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "look": {
+            "x-astra-rust-type": "SpaceLookInputV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space",
+          "name",
+          "look"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "OperationAdmission"
+      }
+    },
+    "swipe_region": {
+      "ts": "swipeRegion",
+      "rust": "d:swipe.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "x-astra-rust-type": "SwipeRegion"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "system_clock_24h": {
+      "ts": "systemClock24h",
+      "rust": "d:system_time.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "(boolean | null)",
+        "rust": "Option<bool>"
+      }
+    },
+    "tab_drag_over": {
+      "ts": "tabDragOver",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "tab_drop": {
+      "ts": "tabDrop",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tab_menu_popup": {
+      "ts": "tabMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "context": {
+            "x-astra-rust-type": "TabMenuContext"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "x",
+          "y",
+          "context"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "tab_set_muted": {
+      "ts": "tabSetMuted",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "muted": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "muted"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_activate": {
+      "ts": "tabsActivate",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_answer_page_request": {
+      "ts": "tabsAnswerPageRequest",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "answer": {
+            "x-astra-rust-type": "prev_ipc::PageRequestAnswer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "answer"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_answer_sign_in": {
+      "ts": "tabsAnswerSignIn",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "request": {
+            "type": "integer"
+          },
+          "credentials": {
+            "x-astra-rust-type": "prev_ipc::SignInCredentials"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "request"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_back": {
+      "ts": "tabsBack",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_bootstrap": {
+      "ts": "tabsBootstrap",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "tabs_close": {
+      "ts": "tabsClose",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_continue_past_certificate": {
+      "ts": "tabsContinuePastCertificate",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_forward": {
+      "ts": "tabsForward",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_leave_split": {
+      "ts": "tabsLeaveSplit",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_navigate": {
+      "ts": "tabsNavigate",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "input"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_open": {
+      "ts": "tabsOpen",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_reload": {
+      "ts": "tabsReload",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_set_essential": {
+      "ts": "tabsSetEssential",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "essential": {
+            "type": "boolean"
+          },
+          "before": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "essential"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_split": {
+      "ts": "tabsSplit",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "other": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "other"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "tabs_unsplit": {
+      "ts": "tabsUnsplit",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "time_call": {
+      "ts": "timeCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::TimeCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::TimeResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::TimeResponse"
+      }
+    },
+    "tools_menu_popup": {
+      "ts": "toolsMenuPopup",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "ui_info": {
+      "ts": "uiInfo",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "UiInfo"
+        },
+        "ts": "unknown",
+        "rust": "UiInfo"
+      }
+    },
+    "ui_ready": {
+      "ts": "uiReady",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "update_check": {
+      "ts": "updateCheck",
+      "rust": "d:updates.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "UpdateStatus"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<UpdateStatus>"
+      }
+    },
+    "update_highlights": {
+      "ts": "updateHighlights",
+      "rust": "d:updates.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "UpdateHighlights"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<UpdateHighlights>"
+      }
+    },
+    "update_relaunch": {
+      "ts": "updateRelaunch",
+      "rust": "d:updates.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "update_status": {
+      "ts": "updateStatus",
+      "rust": "d:updates.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "UpdateStatus"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Option<UpdateStatus>"
+      }
+    },
+    "voice_cancel": {
+      "ts": "voiceCancel",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "voice_choose_engine": {
+      "ts": "voiceChooseEngine",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "engine": {
+            "x-astra-rust-type": "VoiceEngineV1"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "VoiceStatusV1"
+        },
+        "ts": "unknown",
+        "rust": "VoiceStatusV1"
+      }
+    },
+    "voice_choose_language": {
+      "ts": "voiceChooseLanguage",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "VoiceStatusV1"
+        },
+        "ts": "unknown",
+        "rust": "VoiceStatusV1"
+      }
+    },
+    "voice_open_privacy": {
+      "ts": "voiceOpenPrivacy",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "x-astra-rust-type": "VoicePrivacyV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "voice_start": {
+      "ts": "voiceStart",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "VoiceStartV1"
+        },
+        "ts": "unknown",
+        "rust": "VoiceStartV1"
+      }
+    },
+    "voice_status": {
+      "ts": "voiceStatus",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "VoiceStatusV1"
+        },
+        "ts": "unknown",
+        "rust": "VoiceStatusV1"
+      }
+    },
+    "voice_stop": {
+      "ts": "voiceStop",
+      "rust": "d:voice.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "take": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "take"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "web_extension_answer_access": {
+      "ts": "webExtensionAnswerAccess",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "x-astra-rust-type": "prev_ipc::WebExtensionAccessRequestView"
+          },
+          "allowed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "request",
+          "allowed"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_cancel": {
+      "ts": "webExtensionCancel",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "review_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "review_id"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "web_extension_choose_file": {
+      "ts": "webExtensionChooseFile",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folder"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WebExtensionReview"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Result<Option<WebExtensionReview>, String>"
+      }
+    },
+    "web_extension_confirm": {
+      "ts": "webExtensionConfirm",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "review_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "review_id"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_list": {
+      "ts": "webExtensionList",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "x-astra-rust-type": "WebExtensionView"
+          }
+        },
+        "ts": "Array<unknown>",
+        "rust": "Result<Vec<WebExtensionView>, String>"
+      }
+    },
+    "web_extension_open_options": {
+      "ts": "webExtensionOpenOptions",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_prepare": {
+      "ts": "webExtensionPrepare",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WebExtensionReview"
+        },
+        "ts": "unknown",
+        "rust": "Result<WebExtensionReview, String>"
+      }
+    },
+    "web_extension_prepare_file": {
+      "ts": "webExtensionPrepareFile",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WebExtensionReview"
+        },
+        "ts": "unknown",
+        "rust": "Result<WebExtensionReview, String>"
+      }
+    },
+    "web_extension_retry": {
+      "ts": "webExtensionRetry",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "install_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "install_id"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_review_update": {
+      "ts": "webExtensionReviewUpdate",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WebExtensionReview"
+        },
+        "ts": "unknown",
+        "rust": "Result<WebExtensionReview, String>"
+      }
+    },
+    "web_extension_set_access": {
+      "ts": "webExtensionSetAccess",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "mode",
+          "sites"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_set_enabled": {
+      "ts": "webExtensionSetEnabled",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "enabled"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_set_pinned": {
+      "ts": "webExtensionSetPinned",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "pinned"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_store_button": {
+      "ts": "webExtensionStoreButton",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tab_id": {
+            "type": "string"
+          },
+          "extension_id": {
+            "type": "string"
+          },
+          "state": {
+            "x-astra-rust-type": "WebExtensionStoreButtonState"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tab_id",
+          "extension_id",
+          "state",
+          "label"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "web_extension_uninstall": {
+      "ts": "webExtensionUninstall",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "windows_diagnostics_settings": {
+      "ts": "windowsDiagnosticsSettings",
+      "rust": "d:windows_privacy.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "windows_reputation_managed": {
+      "ts": "windowsReputationManaged",
+      "rust": "d:windows_privacy.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "(boolean | null)",
+        "rust": "Option<bool>"
+      }
+    },
+    "work_activity": {
+      "ts": "workActivity",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::work::WorkActivityResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::work::WorkActivityResponseV1"
+      }
+    },
+    "work_admit_folder": {
+      "ts": "workAdmitFolder",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "path"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::WorkFolderAdmitV1"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::WorkFolderAdmitV1, ()>"
+      }
+    },
+    "work_call": {
+      "ts": "workCall",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "WorkCallV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkResponseV1"
+      }
+    },
+    "work_cancel_connection_sign_in": {
+      "ts": "workCancelConnectionSignIn",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "id",
+          "request_id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "work_change_memory": {
+      "ts": "workChangeMemory",
+      "rust": "d:work_personal.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "query": {
+            "x-astra-rust-type": "WorkMemoryQueryV1"
+          },
+          "change": {
+            "x-astra-rust-type": "WorkMemoryChangeV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "query",
+          "change"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkMemoryResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkMemoryResponseV1"
+      }
+    },
+    "work_change_skill": {
+      "ts": "workChangeSkill",
+      "rust": "d:work_personal.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "change": {
+            "x-astra-rust-type": "WorkSkillChangeV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "change"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkSkillsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkSkillsResponseV1"
+      }
+    },
+    "work_check_connection": {
+      "ts": "workCheckConnection",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkServerCheckV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkServerCheckV1"
+      }
+    },
+    "work_choose_folder": {
+      "ts": "workChooseFolder",
+      "rust": "d:work_folders.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::WorkFolderAdmitV1"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Result<Option<prev_ipc::WorkFolderAdmitV1>, ()>"
+      }
+    },
+    "work_choose_model": {
+      "ts": "workChooseModel",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "role": {
+            "x-astra-rust-type": "WorkModelRole"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "role"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_clear_decision_key": {
+      "ts": "workClearDecisionKey",
+      "rust": "d:work_decision.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkDecisionPreferenceV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkDecisionPreferenceV1"
+      }
+    },
+    "work_clear_provider_key": {
+      "ts": "workClearProviderKey",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "provider": {
+            "x-astra-rust-type": "WorkModelProvider"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "provider"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_clear_website_data": {
+      "ts": "workClearWebsiteData",
+      "rust": "d:work_website_data.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "work_connections": {
+      "ts": "workConnections",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkConnectionsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkConnectionsResponseV1"
+      }
+    },
+    "work_context_preview": {
+      "ts": "workContextPreview",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "purpose": {
+            "x-astra-rust-type": "prev_core::work::context::WorkContextPurpose"
+          },
+          "selection": {
+            "x-astra-rust-type": "prev_core::work::context::WorkContextSelectionV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "purpose",
+          "selection"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::work::WorkContextPreviewV1"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::work::WorkContextPreviewV1"
+      }
+    },
+    "work_decision_preference": {
+      "ts": "workDecisionPreference",
+      "rust": "d:work_decision.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkDecisionPreferenceV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkDecisionPreferenceV1"
+      }
+    },
+    "work_edit_draft": {
+      "ts": "workEditDraft",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "expected_revision": {
+            "x-astra-rust-type": "prev_core::work::WorkRevision"
+          },
+          "command": {
+            "x-astra-rust-type": "WorkCommandId"
+          },
+          "execution": {
+            "x-astra-rust-type": "prev_core::work::WorkExecutionId"
+          },
+          "artifact": {
+            "x-astra-rust-type": "prev_core::work::WorkArtifactId"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "expected_revision",
+          "command",
+          "execution",
+          "artifact",
+          "body"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkResponseV1"
+      }
+    },
+    "work_human_check": {
+      "ts": "workHumanCheck",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "page": {
+            "x-astra-rust-type": "WorkHumanPageIdV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "page"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanCheckResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanCheckResponseV1"
+      }
+    },
+    "work_human_continue": {
+      "ts": "workHumanContinue",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "page": {
+            "x-astra-rust-type": "WorkHumanPageIdV1"
+          },
+          "account": {
+            "x-astra-rust-type": "WorkHumanAccountV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "page",
+          "account"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanResponseV1"
+      }
+    },
+    "work_human_extend": {
+      "ts": "workHumanExtend",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "page": {
+            "x-astra-rust-type": "WorkHumanPageIdV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "page"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanResponseV1"
+      }
+    },
+    "work_human_pages": {
+      "ts": "workHumanPages",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanResponseV1"
+      }
+    },
+    "work_human_present": {
+      "ts": "workHumanPresent",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "page": {
+            "x-astra-rust-type": "WorkHumanPageIdV1"
+          },
+          "region": {
+            "x-astra-rust-type": "WorkHumanRegionV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "page",
+          "region"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanResponseV1"
+      }
+    },
+    "work_human_release": {
+      "ts": "workHumanRelease",
+      "rust": "d:work_human.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "page": {
+            "x-astra-rust-type": "WorkHumanPageIdV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "page"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkHumanResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkHumanResponseV1"
+      }
+    },
+    "work_local_servers": {
+      "ts": "workLocalServers",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "x-astra-rust-type": "WorkLocalServerV1"
+          }
+        },
+        "ts": "Array<unknown>",
+        "rust": "Vec<WorkLocalServerV1>"
+      }
+    },
+    "work_memories": {
+      "ts": "workMemories",
+      "rust": "d:work_personal.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "query": {
+            "x-astra-rust-type": "WorkMemoryQueryV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "query"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkMemoryResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkMemoryResponseV1"
+      }
+    },
+    "work_models": {
+      "ts": "workModels",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_models_ready": {
+      "ts": "workModelsReady",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsReadyV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsReadyV1"
+      }
+    },
+    "work_more_models": {
+      "ts": "workMoreModels",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "provider": {
+            "x-astra-rust-type": "WorkModelProvider"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "provider"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkMoreModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkMoreModelsV1"
+      }
+    },
+    "work_operation": {
+      "ts": "workOperation",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "operation": {
+            "x-astra-rust-type": "WorkCommandId"
+          },
+          "input": {
+            "x-astra-rust-type": "WorkOperationV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "operation",
+          "input"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkOperationResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkOperationResponseV1"
+      }
+    },
+    "work_operation_status": {
+      "ts": "workOperationStatus",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "work": {
+            "x-astra-rust-type": "WorkId"
+          },
+          "operation": {
+            "x-astra-rust-type": "WorkCommandId"
+          },
+          "acknowledge": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "work",
+          "operation",
+          "acknowledge"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkOperationResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkOperationResponseV1"
+      }
+    },
+    "work_pane_hide": {
+      "ts": "workPaneHide",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "work_pane_set_rect": {
+      "ts": "workPaneSetRect",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "rect": {
+            "x-astra-rust-type": "prev_ipc::WorkPaneRect"
+          },
+          "generation": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rect",
+          "generation"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "void",
+        "rust": ""
+      }
+    },
+    "work_pane_show": {
+      "ts": "workPaneShow",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "x-astra-rust-type": "prev_ipc::WorkPaneTarget"
+          },
+          "rect": {
+            "x-astra-rust-type": "prev_ipc::WorkPaneRect"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "rect"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "work_pick_folder": {
+      "ts": "workPickFolder",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::WorkFolderAdmitV1"
+        },
+        "ts": "(unknown | null)",
+        "rust": "Result<Option<prev_ipc::WorkFolderAdmitV1>, ()>"
+      }
+    },
+    "work_preview_connection": {
+      "ts": "workPreviewConnection",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "draft": {
+            "x-astra-rust-type": "WorkServerDraftV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "draft"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkServerCheckV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkServerCheckV1"
+      }
+    },
+    "work_release_memory": {
+      "ts": "workReleaseMemory",
+      "rust": "d:work_memory.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "idle": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "idle"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "work_remove_connection": {
+      "ts": "workRemoveConnection",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkConnectionsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkConnectionsResponseV1"
+      }
+    },
+    "work_reveal_path": {
+      "ts": "workRevealPath",
+      "rust": "d:media.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "path"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "Result<bool, ()>"
+      }
+    },
+    "work_running": {
+      "ts": "workRunning",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "work_save_calendar": {
+      "ts": "workSaveCalendar",
+      "rust": "d:work_product.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "text"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "work_save_connection": {
+      "ts": "workSaveConnection",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "draft": {
+            "x-astra-rust-type": "WorkServerDraftV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "draft"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkConnectionsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkConnectionsResponseV1"
+      }
+    },
+    "work_screenshot_sites": {
+      "ts": "workScreenshotSites",
+      "rust": "d:work_sites.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::work::WorkScreenshotSitesResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::work::WorkScreenshotSitesResponseV1"
+      }
+    },
+    "work_set_decision_key": {
+      "ts": "workSetDecisionKey",
+      "rust": "d:work_decision.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "secret"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkDecisionPreferenceV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkDecisionPreferenceV1"
+      }
+    },
+    "work_set_decision_preference": {
+      "ts": "workSetDecisionPreference",
+      "rust": "d:work_decision.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "choice": {
+            "x-astra-rust-type": "WorkDecisionChoiceV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "choice"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkDecisionPreferenceV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkDecisionPreferenceV1"
+      }
+    },
+    "work_set_model_effort": {
+      "ts": "workSetModelEffort",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "effort": {
+            "x-astra-rust-type": "WorkModelReasoning"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_set_model_endpoint": {
+      "ts": "workSetModelEndpoint",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_set_provider_key": {
+      "ts": "workSetProviderKey",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "provider": {
+            "x-astra-rust-type": "WorkModelProvider"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "provider",
+          "key"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "work_set_screenshot_site": {
+      "ts": "workSetScreenshotSite",
+      "rust": "d:work_sites.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "change": {
+            "x-astra-rust-type": "prev_ipc::work::WorkScreenshotSiteChangeV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "change"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::work::WorkScreenshotSitesResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::work::WorkScreenshotSitesResponseV1"
+      }
+    },
+    "work_set_site": {
+      "ts": "workSetSite",
+      "rust": "d:work_sites.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "change": {
+            "x-astra-rust-type": "WorkSiteChangeV1"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "change"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkSiteAccessResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkSiteAccessResponseV1"
+      }
+    },
+    "work_sign_in_connection": {
+      "ts": "workSignInConnection",
+      "rust": "d:work_connections.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "id"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkServerCheckV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkServerCheckV1"
+      }
+    },
+    "work_sites": {
+      "ts": "workSites",
+      "rust": "d:work_sites.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkSiteAccessResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkSiteAccessResponseV1"
+      }
+    },
+    "work_skill_text": {
+      "ts": "workSkillText",
+      "rust": "d:work_personal.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "name"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkSkillsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkSkillsResponseV1"
+      }
+    },
+    "work_skills": {
+      "ts": "workSkills",
+      "rust": "d:work_personal.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkSkillsResponseV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkSkillsResponseV1"
+      }
+    },
+    "work_test_provider_key": {
+      "ts": "workTestProviderKey",
+      "rust": "d:work_models.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "provider": {
+            "x-astra-rust-type": "WorkModelProvider"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "provider"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "WorkModelsV1"
+        },
+        "ts": "unknown",
+        "rust": "WorkModelsV1"
+      }
+    },
+    "zoom_call": {
+      "ts": "zoomCall",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::ZoomCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::ZoomResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::ZoomResponse"
+      }
+    }
+  }
+}

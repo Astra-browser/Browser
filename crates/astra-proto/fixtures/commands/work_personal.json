@@ -1,0 +1,40 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_change_memory",
+      "payload": {
+        "expected_profile": "x",
+        "query": {},
+        "change": {}
+      }
+    },
+    {
+      "command": "work_change_skill",
+      "payload": {
+        "expected_profile": "x",
+        "change": {}
+      }
+    },
+    {
+      "command": "work_memories",
+      "payload": {
+        "expected_profile": "x",
+        "query": {}
+      }
+    },
+    {
+      "command": "work_skill_text",
+      "payload": {
+        "expected_profile": "x",
+        "name": "x"
+      }
+    },
+    {
+      "command": "work_skills",
+      "payload": {
+        "expected_profile": "x"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "keymap_bind",
+      "payload": {
+        "id": "x",
+        "replace": true
+      }
+    },
+    {
+      "command": "keymap_entries",
+      "payload": {}
+    },
+    {
+      "command": "keymap_record",
+      "payload": {
+        "active": true
+      }
+    },
+    {
+      "command": "keymap_reset",
+      "payload": {}
+    }
+  ]
+}

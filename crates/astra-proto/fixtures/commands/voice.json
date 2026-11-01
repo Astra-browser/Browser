@@ -1,0 +1,37 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "voice_cancel",
+      "payload": {}
+    },
+    {
+      "command": "voice_choose_engine",
+      "payload": {}
+    },
+    {
+      "command": "voice_choose_language",
+      "payload": {}
+    },
+    {
+      "command": "voice_open_privacy",
+      "payload": {
+        "kind": {}
+      }
+    },
+    {
+      "command": "voice_start",
+      "payload": {}
+    },
+    {
+      "command": "voice_status",
+      "payload": {}
+    },
+    {
+      "command": "voice_stop",
+      "payload": {
+        "take": 0
+      }
+    }
+  ]
+}

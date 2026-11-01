@@ -1,0 +1,31 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_screenshot_sites",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_set_screenshot_site",
+      "payload": {
+        "expected_profile": "x",
+        "change": {}
+      }
+    },
+    {
+      "command": "work_set_site",
+      "payload": {
+        "expected_profile": "x",
+        "change": {}
+      }
+    },
+    {
+      "command": "work_sites",
+      "payload": {
+        "expected_profile": "x"
+      }
+    }
+  ]
+}

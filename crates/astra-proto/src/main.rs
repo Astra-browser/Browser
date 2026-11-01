@@ -2,14 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! P1-T09 sidecar spike stub (U-01). Minimal echo core: reads Appendix C
-//! frames (4-byte big-endian length + UTF-8 JSON) on stdin, writes a `res`
-//! envelope per request on stdout. Stdlib only, no dependencies.
+//! P1-T09 sidecar spike stub (U-01), now on the `astra-proto` library:
+//! reads Appendix C frames on stdin, writes a `res` envelope per request
+//! on stdout. Version-gated: requests with `v != PROTOCOL_VERSION` get a
+//! `version_mismatch` error response instead of an echo.
 //!
-//! Shutdown: `{"...,\"name\":\"core.shutdown\",...}` replies then exits 0;
+//! Shutdown: a request named `core.shutdown` replies then exits 0;
 //! stdin EOF also exits 0 (models browser-death cleanup).
 
 use std::io::{self, Read, Write};
+
+use astra_proto::{decode_frame, encode_frame, Envelope, Kind, ProtoError, PROTOCOL_VERSION};
 
 fn read_exact_n<R: Read>(r: &mut R, n: usize) -> io::Result<Option<Vec<u8>>> {
     let mut buf = vec![0u8; n];
@@ -31,32 +34,13 @@ fn read_exact_n<R: Read>(r: &mut R, n: usize) -> io::Result<Option<Vec<u8>>> {
     Ok(Some(buf))
 }
 
-fn extract_str_field(body: &str, key: &str) -> Option<String> {
-    let pat = format!("\"{}\"", key);
-    let mut search = body;
-    loop {
-        let i = search.find(&pat)?;
-        let mut rest = search[i + pat.len()..].trim_start();
-        if !rest.starts_with(':') {
-            search = &search[i + pat.len()..];
-            continue;
-        }
-        rest = rest[1..].trim_start().strip_prefix('"')?;
-        let mut out = String::new();
-        let mut esc = false;
-        for c in rest.chars() {
-            if esc {
-                out.push(c);
-                esc = false;
-            } else if c == '\\' {
-                esc = true;
-            } else if c == '"' {
-                return Some(out);
-            } else {
-                out.push(c);
-            }
-        }
-        return None;
+fn respond(out: &mut impl Write, env: &Envelope) {
+    let frame = encode_frame(env);
+    if out.write_all(&frame).is_err() {
+        std::process::exit(1);
+    }
+    if out.flush().is_err() {
+        std::process::exit(1);
     }
 }
 
@@ -65,44 +49,55 @@ fn main() {
     let stdout = io::stdout();
     let mut inp = stdin.lock();
     let mut out = stdout.lock();
+    let mut pending: Vec<u8> = Vec::new();
 
     loop {
-        let len_buf = match read_exact_n(&mut inp, 4) {
+        let chunk = match read_exact_n(&mut inp, 4) {
             Ok(None) => std::process::exit(0),
             Ok(Some(b)) => b,
             Err(_) => std::process::exit(1),
         };
-        let len = u32::from_be_bytes([len_buf[0], len_buf[1], len_buf[2], len_buf[3]]) as usize;
-        if len > 16 * 1024 * 1024 {
-            std::process::exit(1);
-        }
+        let len = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as usize;
         let body = match read_exact_n(&mut inp, len) {
             Ok(Some(b)) => b,
             _ => std::process::exit(1),
         };
-        let text = match String::from_utf8(body) {
-            Ok(t) => t,
-            Err(_) => std::process::exit(1),
-        };
-        let id = extract_str_field(&text, "id").unwrap_or_default();
-        let name = extract_str_field(&text, "name").unwrap_or_default();
-        let resp = format!(
-            "{{\"v\":1,\"id\":{:?},\"kind\":\"res\",\"name\":{:?},\"seq\":0,\"payload\":{{\"echo\":{}}}}}",
-            id, name, text
-        );
-        let bytes = resp.as_bytes();
-        let n = bytes.len() as u32;
-        if out.write_all(&n.to_be_bytes()).is_err() {
-            std::process::exit(1);
-        }
-        if out.write_all(bytes).is_err() {
-            std::process::exit(1);
-        }
-        if out.flush().is_err() {
-            std::process::exit(1);
-        }
-        if name == "core.shutdown" {
-            std::process::exit(0);
+        pending.extend_from_slice(&chunk);
+        pending.extend_from_slice(&body);
+        match decode_frame(&mut pending) {
+            Ok(Some(env)) => {
+                let shutdown = env.name == "core.shutdown";
+                let res = Envelope {
+                    v: PROTOCOL_VERSION,
+                    id: env.id.clone(),
+                    kind: Kind::Res,
+                    name: env.name.clone(),
+                    seq: None,
+                    payload: serde_json::json!({"echo": env.name}),
+                    error: None,
+                };
+                respond(&mut out, &res);
+                if shutdown {
+                    std::process::exit(0);
+                }
+            }
+            Ok(None) => std::process::exit(1), // cannot happen: full frame buffered
+            Err(e) => {
+                let res = Envelope {
+                    v: PROTOCOL_VERSION,
+                    id: String::new(),
+                    kind: Kind::Res,
+                    name: String::new(),
+                    seq: None,
+                    payload: serde_json::Value::Null,
+                    error: Some(ProtoError {
+                        code: e.code,
+                        message: e.message,
+                    }),
+                };
+                respond(&mut out, &res);
+                std::process::exit(1);
+            }
         }
     }
 }

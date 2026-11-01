@@ -1,0 +1,159 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "page_assist_ask",
+      "payload": {
+        "request": {}
+      }
+    },
+    {
+      "command": "page_assist_cite",
+      "payload": {
+        "conversation": "x",
+        "reply": 0,
+        "n": 0
+      }
+    },
+    {
+      "command": "page_assist_close",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "page_assist_continue",
+      "payload": {
+        "conversation": "x",
+        "reply": 0,
+        "block": 0
+      }
+    },
+    {
+      "command": "page_assist_decide",
+      "payload": {
+        "conversation": "x",
+        "reply": 0,
+        "block": 0,
+        "decision": {}
+      }
+    },
+    {
+      "command": "page_assist_delete",
+      "payload": {
+        "space": "x",
+        "conversation": "x"
+      }
+    },
+    {
+      "command": "page_assist_detach",
+      "payload": {
+        "tab": "x",
+        "pick": "x"
+      }
+    },
+    {
+      "command": "page_assist_focus",
+      "payload": {
+        "conversation": "x",
+        "reply": 0,
+        "block": 0
+      }
+    },
+    {
+      "command": "page_assist_history",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "page_assist_new",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "page_assist_open",
+      "payload": {
+        "space": "x",
+        "conversation": "x"
+      }
+    },
+    {
+      "command": "page_assist_pick",
+      "payload": {
+        "space": "x",
+        "tab": "x"
+      }
+    },
+    {
+      "command": "page_assist_pick_cancel",
+      "payload": {
+        "tab": "x"
+      }
+    },
+    {
+      "command": "page_assist_resume",
+      "payload": {
+        "conversation": "x",
+        "reply": 0
+      }
+    },
+    {
+      "command": "page_assist_status",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "page_assist_stop",
+      "payload": {
+        "space": "x"
+      }
+    },
+    {
+      "command": "page_style_remove",
+      "payload": {
+        "tab": "x",
+        "style": "x"
+      }
+    },
+    {
+      "command": "page_style_remove_for",
+      "payload": {
+        "profile": "x",
+        "site": "x",
+        "style": "x"
+      }
+    },
+    {
+      "command": "page_style_toggle",
+      "payload": {
+        "tab": "x",
+        "style": "x",
+        "enabled": true
+      }
+    },
+    {
+      "command": "page_style_toggle_for",
+      "payload": {
+        "profile": "x",
+        "site": "x",
+        "style": "x",
+        "enabled": true
+      }
+    },
+    {
+      "command": "page_styles",
+      "payload": {
+        "tab": "x"
+      }
+    },
+    {
+      "command": "page_styles_all",
+      "payload": {
+        "profile": "x"
+      }
+    }
+  ]
+}

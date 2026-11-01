@@ -1,0 +1,11 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_choose_folder",
+      "payload": {
+        "expected_profile": "x"
+      }
+    }
+  ]
+}

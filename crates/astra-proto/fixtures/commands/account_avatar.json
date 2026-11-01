@@ -1,0 +1,26 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "account_avatar_discard",
+      "payload": {
+        "token": "x"
+      }
+    },
+    {
+      "command": "account_avatar_pick",
+      "payload": {}
+    },
+    {
+      "command": "account_avatar_remove",
+      "payload": {}
+    },
+    {
+      "command": "account_avatar_save",
+      "payload": {
+        "token": "x",
+        "crop": {}
+      }
+    }
+  ]
+}

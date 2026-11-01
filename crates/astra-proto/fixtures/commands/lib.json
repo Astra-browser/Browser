@@ -1,0 +1,605 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "add_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0,
+        "can_split": true
+      }
+    },
+    {
+      "command": "blocker_picker",
+      "payload": {
+        "context": {},
+        "action": {}
+      }
+    },
+    {
+      "command": "blocker_refresh_sources",
+      "payload": {}
+    },
+    {
+      "command": "blocker_retry",
+      "payload": {
+        "failed_generation": "x"
+      }
+    },
+    {
+      "command": "blocker_set_enabled",
+      "payload": {
+        "enabled": true
+      }
+    },
+    {
+      "command": "blocker_site_change",
+      "payload": {
+        "context": {},
+        "action": {}
+      }
+    },
+    {
+      "command": "blocker_stats",
+      "payload": {
+        "profile": "x"
+      }
+    },
+    {
+      "command": "blocker_status",
+      "payload": {}
+    },
+    {
+      "command": "bookmark_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "bookmark_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0,
+        "folder": true
+      }
+    },
+    {
+      "command": "browser_open_url",
+      "payload": {
+        "url": "x",
+        "new_tab": true
+      }
+    },
+    {
+      "command": "browsing_data_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "chrome_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0,
+        "page": true,
+        "can_split": true
+      }
+    },
+    {
+      "command": "diagnostics_show_logs",
+      "payload": {}
+    },
+    {
+      "command": "divider_drag",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "divider_grab",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "divider_release",
+      "payload": {}
+    },
+    {
+      "command": "download_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "download_open_access_settings",
+      "payload": {}
+    },
+    {
+      "command": "essentials_keep",
+      "payload": {
+        "site": "x"
+      }
+    },
+    {
+      "command": "essentials_release",
+      "payload": {
+        "site": "x"
+      }
+    },
+    {
+      "command": "extension_action_invoke",
+      "payload": {
+        "profile_id": "x",
+        "install_id": "x",
+        "runtime_generation": "x",
+        "action_revision": "x",
+        "anchor_x": 0.0,
+        "anchor_y": 0.0,
+        "anchor_width": 0.0,
+        "anchor_height": 0.0
+      }
+    },
+    {
+      "command": "extension_action_menu",
+      "payload": {
+        "profile_id": "x",
+        "install_id": "x",
+        "runtime_generation": "x",
+        "action_revision": "x",
+        "anchor_x": 0.0,
+        "anchor_y": 0.0,
+        "anchor_width": 0.0,
+        "anchor_height": 0.0
+      }
+    },
+    {
+      "command": "favicon_probe",
+      "payload": {
+        "expected_profile": "x",
+        "origins": []
+      }
+    },
+    {
+      "command": "focus_control",
+      "payload": {
+        "control": {}
+      }
+    },
+    {
+      "command": "history_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "launcher_edit",
+      "payload": {
+        "tab_id": "x",
+        "url": "x"
+      }
+    },
+    {
+      "command": "launcher_open_accessibility",
+      "payload": {}
+    },
+    {
+      "command": "launcher_record_shortcut",
+      "payload": {
+        "active": true
+      }
+    },
+    {
+      "command": "launcher_run",
+      "payload": {
+        "action": {},
+        "context": {},
+        "background": true
+      }
+    },
+    {
+      "command": "launcher_search",
+      "payload": {
+        "query": "x",
+        "request_id": "x"
+      }
+    },
+    {
+      "command": "launcher_set_double_tap",
+      "payload": {
+        "mode": {}
+      }
+    },
+    {
+      "command": "launcher_set_shortcut",
+      "payload": {
+        "accelerator": "x"
+      }
+    },
+    {
+      "command": "launcher_trigger",
+      "payload": {}
+    },
+    {
+      "command": "media_player",
+      "payload": {
+        "id": "x",
+        "action": {}
+      }
+    },
+    {
+      "command": "menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "newtab_cancel",
+      "payload": {
+        "context": {}
+      }
+    },
+    {
+      "command": "newtab_run",
+      "payload": {
+        "action": {},
+        "context": {}
+      }
+    },
+    {
+      "command": "newtab_search",
+      "payload": {
+        "query": "x",
+        "context": {}
+      }
+    },
+    {
+      "command": "newtab_search_context",
+      "payload": {
+        "tab_id": "x"
+      }
+    },
+    {
+      "command": "onboarding_finish",
+      "payload": {}
+    },
+    {
+      "command": "onboarding_play_intro",
+      "payload": {}
+    },
+    {
+      "command": "operation_acknowledge",
+      "payload": {
+        "operation_id": "x"
+      }
+    },
+    {
+      "command": "operation_status",
+      "payload": {
+        "operation_id": "x"
+      }
+    },
+    {
+      "command": "operations_reconcile",
+      "payload": {}
+    },
+    {
+      "command": "page_find",
+      "payload": {
+        "forward": true
+      }
+    },
+    {
+      "command": "page_permission_card_host",
+      "payload": {
+        "available": true
+      }
+    },
+    {
+      "command": "page_permission_respond",
+      "payload": {
+        "profile_id": "x",
+        "item_id": "x",
+        "request_id": "x",
+        "decision": {}
+      }
+    },
+    {
+      "command": "panel_hide",
+      "payload": {}
+    },
+    {
+      "command": "panel_intent",
+      "payload": {
+        "intent": {}
+      }
+    },
+    {
+      "command": "panel_layout",
+      "payload": {
+        "layout": {}
+      }
+    },
+    {
+      "command": "panel_ready",
+      "payload": {}
+    },
+    {
+      "command": "profile_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "profile_rename",
+      "payload": {
+        "name": "x"
+      }
+    },
+    {
+      "command": "profiles_delete",
+      "payload": {
+        "profile": "x"
+      }
+    },
+    {
+      "command": "resource_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "resource_close_ready",
+      "payload": {
+        "token": "x",
+        "success": true
+      }
+    },
+    {
+      "command": "run_command",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "setting_get",
+      "payload": {
+        "key": "x"
+      }
+    },
+    {
+      "command": "setting_set",
+      "payload": {
+        "key": "x",
+        "value": "x"
+      }
+    },
+    {
+      "command": "sidebar_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0,
+        "can_hide": true,
+        "can_clear_data": true,
+        "manage_extensions": true
+      }
+    },
+    {
+      "command": "sidebar_peek",
+      "payload": {
+        "peek": true,
+        "lights": true,
+        "slide": true
+      }
+    },
+    {
+      "command": "sidebar_resize",
+      "payload": {
+        "width": 0.0,
+        "enabled": true,
+        "revision": 0.0
+      }
+    },
+    {
+      "command": "sidebar_resize_guide",
+      "payload": {}
+    },
+    {
+      "command": "sidebar_set_hidden",
+      "payload": {
+        "hidden": true
+      }
+    },
+    {
+      "command": "sidebar_set_width",
+      "payload": {
+        "width": 0.0,
+        "animate": true,
+        "revision": 0.0
+      }
+    },
+    {
+      "command": "site_permission_set",
+      "payload": {
+        "origin": "x",
+        "kind": {}
+      }
+    },
+    {
+      "command": "site_permissions",
+      "payload": {}
+    },
+    {
+      "command": "tab_drag_over",
+      "payload": {}
+    },
+    {
+      "command": "tab_drop",
+      "payload": {
+        "id": "x",
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "tab_menu_popup",
+      "payload": {
+        "id": "x",
+        "x": 0.0,
+        "y": 0.0,
+        "context": {}
+      }
+    },
+    {
+      "command": "tab_set_muted",
+      "payload": {
+        "id": "x",
+        "muted": true
+      }
+    },
+    {
+      "command": "tabs_activate",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_answer_page_request",
+      "payload": {
+        "id": "x",
+        "answer": {}
+      }
+    },
+    {
+      "command": "tabs_answer_sign_in",
+      "payload": {
+        "id": "x",
+        "request": 0
+      }
+    },
+    {
+      "command": "tabs_back",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_bootstrap",
+      "payload": {}
+    },
+    {
+      "command": "tabs_close",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_continue_past_certificate",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_forward",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_leave_split",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_navigate",
+      "payload": {
+        "id": "x",
+        "input": "x"
+      }
+    },
+    {
+      "command": "tabs_open",
+      "payload": {}
+    },
+    {
+      "command": "tabs_reload",
+      "payload": {
+        "id": "x"
+      }
+    },
+    {
+      "command": "tabs_set_essential",
+      "payload": {
+        "id": "x",
+        "essential": true
+      }
+    },
+    {
+      "command": "tabs_split",
+      "payload": {
+        "other": "x"
+      }
+    },
+    {
+      "command": "tabs_unsplit",
+      "payload": {}
+    },
+    {
+      "command": "time_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
+      "command": "tools_menu_popup",
+      "payload": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    },
+    {
+      "command": "ui_info",
+      "payload": {}
+    },
+    {
+      "command": "ui_ready",
+      "payload": {}
+    },
+    {
+      "command": "work_pane_hide",
+      "payload": {}
+    },
+    {
+      "command": "work_pane_set_rect",
+      "payload": {
+        "rect": {},
+        "generation": 0
+      }
+    },
+    {
+      "command": "work_pane_show",
+      "payload": {
+        "target": {},
+        "rect": {}
+      }
+    },
+    {
+      "command": "zoom_call",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    }
+  ]
+}

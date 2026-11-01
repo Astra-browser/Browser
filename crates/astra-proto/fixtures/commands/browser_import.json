@@ -1,0 +1,27 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "import_cancel",
+      "payload": {}
+    },
+    {
+      "command": "import_open_permission",
+      "payload": {
+        "source": "x"
+      }
+    },
+    {
+      "command": "import_sources",
+      "payload": {}
+    },
+    {
+      "command": "import_start",
+      "payload": {
+        "source": "x",
+        "profile": "x",
+        "kinds": []
+      }
+    }
+  ]
+}

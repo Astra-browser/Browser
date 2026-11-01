@@ -1,0 +1,54 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "work_cancel_connection_sign_in",
+      "payload": {
+        "expected_profile": "x",
+        "id": "x",
+        "request_id": "x"
+      }
+    },
+    {
+      "command": "work_check_connection",
+      "payload": {
+        "expected_profile": "x",
+        "id": "x"
+      }
+    },
+    {
+      "command": "work_connections",
+      "payload": {
+        "expected_profile": "x"
+      }
+    },
+    {
+      "command": "work_preview_connection",
+      "payload": {
+        "expected_profile": "x",
+        "draft": {}
+      }
+    },
+    {
+      "command": "work_remove_connection",
+      "payload": {
+        "expected_profile": "x",
+        "id": "x"
+      }
+    },
+    {
+      "command": "work_save_connection",
+      "payload": {
+        "expected_profile": "x",
+        "draft": {}
+      }
+    },
+    {
+      "command": "work_sign_in_connection",
+      "payload": {
+        "expected_profile": "x",
+        "id": "x"
+      }
+    }
+  ]
+}
