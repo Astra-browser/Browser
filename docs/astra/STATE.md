@@ -37,7 +37,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T09 | Sidecar spike (U-01) | doing | worker-t09 | agent/P1-T09-sidecar | Locked 2026-11-02; stdio vs WS decision |
 | P1-T10 | Content slot + URL bar via Host API stub | doing | worker-t10 | agent/P1-T10-content | Locked 2026-11-02; needs Host API stub |
 | P1-T11 | Contract-test harness (geckodriver) | doing | worker-t11 | agent/P1-T11-contract | Locked 2026-11-02 |
-| P1-T12 | `forge export`/`import` round-trip + patch lint + footprint budget | doing | worker-t12 | agent/P1-T12-forge-rt | Locked 2026-11-02 |
+| P1-T12 | `forge export`/`import` round-trip + patch lint + footprint budget | done | orchestrator | agent/P1-T12-forge-rt | Merged 2026-11-02; build+lint+footprint green (14 lines/2 patches/0 P3), roundtrip PASS vs live engine, brand-lint/state-check green |
 
 ## Later phases
 

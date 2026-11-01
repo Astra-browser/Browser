@@ -12,8 +12,8 @@
 
 | Patch | Tier | Upstream files touched | Status |
 |---|---|---|---|
-| ASTRA-0001 `patches/ASTRA-0001-astra-dir-hook.patch` | P2 (3 added lines) | `browser/app.mozbuild` | `clean` — applied by `forge overlay`; `forge lint` green; configure passes with `/astra` in `DIRS` |
-| ASTRA-0002 `patches/ASTRA-0002-shell-mount.patch` | P2 (7 added lines) | `browser/base/content/browser.xhtml` | `clean` — `#astra-root` + `resource://` CSS/module mount; `tests/contract/p1t08-shell.py` 5/5 PASS; "Hello Tab" GUI-verified, no Firefox chrome |
+| ASTRA-0001 `patches/ASTRA-0001-astra-dir-hook.patch` | P2 (3 added lines) | `browser/app.mozbuild` | `clean` — applied by `forge overlay`; `forge lint` green; configure passes with `/astra` in `DIRS` · via `forge import` 2026-11-02 |
+| ASTRA-0002 `patches/ASTRA-0002-shell-mount.patch` | P2 (7 added lines) | `browser/base/content/browser.xhtml` | `clean` — `#astra-root` + `resource://` CSS/module mount; `tests/contract/p1t08-shell.py` 5/5 PASS; "Hello Tab" GUI-verified, no Firefox chrome · via `forge import` 2026-11-02 |
 
 - **Branding active (P1-T03, 2026-11-01):** `out/mozconfig.linux` renders
   `--with-branding=astra/branding`; `brandShortName=Astra Nightly` in the

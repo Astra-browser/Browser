@@ -1,0 +1,15 @@
+# footprint (P1-T12): enforces the §6.7 patch-series footprint budget
+# (≤1500 P2/P3 lines, ≤60 patches, ≤8 P3) plus the §6.3 header lint.
+# Engine-free: lint skips apply-checks and footprint reads patches/*.patch
+# only, so no Firefox tarball fetch is needed.
+name: footprint
+on: [push, pull_request]
+jobs:
+  footprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --manifest-path forge/astra-forge/Cargo.toml
+      - run: ./forge/astra-forge/target/debug/astra-forge lint
+      - run: ./forge/astra-forge/target/debug/astra-forge footprint
