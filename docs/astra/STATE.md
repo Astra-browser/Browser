@@ -30,7 +30,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P1-T02 | `forge config` + `config/mozconfig.linux` (F-05 flags verified) | done | orchestrator | agent/P1-T02-forge-config | BUILD_FLAGS.md (3 F-05 corrections); `forge doctor` mozconfig check green; `./mach configure` complete, config.status proof |
 | P1-T03 | Branding overlay | todo | — | — | Needs OWNER_DECISION values from `branding/astra.toml` |
 | P1-T04 | First full Linux build + sccache + dev loop | todo | — | — | Blocked on nothing; configure already proven by P1-T02 |
-| P1-T05 | Overlay wiring (`chrome://astra/`, ASTRA-0001) | todo | — | — | Next in line after P1-T02 |
+| P1-T05 | Overlay wiring (`chrome://astra/`, ASTRA-0001) | done | orchestrator | agent/P1-T05-overlay | overlay/astra (moz.build/jar.mn/HostAPI stub/hello) staged by `forge overlay`; ASTRA-0001 applied; `forge lint` clean; configure complete with /astra in DIRS |
 | P1-T06 | `policies.json` + pref overrides (incl. Normandy/HR path from BUILD_FLAGS.md) | todo | — | — | — |
 | P1-T07 | Endpoint audit tool | todo | — | — | — |
 | P1-T08 | Shell mount patch (ASTRA-0002) | todo | — | — | Needs P1-T05 overlay + P3 UI |

@@ -1,6 +1,6 @@
-// astra-forge (P1-T01, P1-T02): assemble Astra = pinned upstream + patch series + overlay.
-// Zero-dependency CLI (std only; shells out to curl/tar/gpg/grep). Commands:
-// fetch, doctor, config. import/overlay/build/test/package/export/bump arrive
+// astra-forge (P1-T01, P1-T02, P1-T05): assemble Astra = pinned upstream + patch series + overlay.
+// Zero-dependency CLI (std only; shells out to curl/tar/gpg/grep/git/cp). Commands:
+// fetch, doctor, config, overlay, lint. import/build/test/package/export/bump arrive
 // with their phase tasks.
 use std::env;
 use std::fs;
@@ -320,8 +320,132 @@ fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
     Ok(())
 }
 
+// Copy overlay/astra/** into engine/astra/ and apply the P2 hook list (P1-T05).
+// Idempotent: re-copies the tree, skips patches that already apply reversed.
+fn cmd_overlay(root: &Path) -> Result<(), String> {
+    let src = root.join("overlay/astra");
+    if !src.join("moz.build").exists() {
+        return Err("overlay/astra/moz.build missing".into());
+    }
+    let engine = root.join("engine");
+    if !engine.join("mach").exists() {
+        return Err("engine/ source absent (run `forge fetch` first)".into());
+    }
+    let dest = engine.join("astra");
+    if dest.exists() {
+        fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+    run("cp", &["-a", &format!("{}/.", src.to_string_lossy()), &dest.to_string_lossy()], root)?;
+    println!("overlay: copied overlay/astra -> engine/astra");
+    // Apply hook patches in order (P2 list; full series handling is P1-T12).
+    let mut patches: Vec<std::path::PathBuf> = Vec::new();
+    let dir = root.join("patches");
+    if dir.exists() {
+        let mut entries: Vec<_> = fs::read_dir(&dir)
+            .map_err(|e| e.to_string())?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().map(|x| x == "patch").unwrap_or(false))
+            .collect();
+        entries.sort();
+        patches = entries;
+    }
+    if patches.is_empty() {
+        println!("overlay: no patches/*.patch to apply");
+    }
+    for p in &patches {
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        // Already applied? `git apply --reverse --check` exits 0 only then.
+        let applied = Command::new("git")
+            .args(["apply", "--reverse", "--check", &p.to_string_lossy()])
+            .current_dir(&engine)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if applied {
+            println!("overlay: {name} already applied, skipping");
+            continue;
+        }
+        run("git", &["apply", "-v", &p.to_string_lossy()], &engine)?;
+        println!("overlay: applied {name}");
+    }
+    // Sanity: the wiring targets must exist after overlay.
+    for f in ["astra/moz.build", "astra/jar.mn", "astra/host/HostAPI.sys.mjs", "astra/chrome/hello.html", "browser/app.mozbuild"] {
+        if !engine.join(f).exists() {
+            return Err(format!("overlay: expected {f} missing after apply"));
+        }
+    }
+    println!("overlay: done (chrome://astra/ + resource://astra/ staged)");
+    Ok(())
+}
+
+// Patch header lint: §6.3 mandatory fields + `git apply --check` (P1-T05/P1-T12).
+fn cmd_lint(root: &Path) -> Result<(), String> {
+    let dir = root.join("patches");
+    if !dir.exists() {
+        println!("lint: no patches/ dir yet, nothing to check");
+        return Ok(());
+    }
+    let mut entries: Vec<_> = fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map(|x| x == "patch").unwrap_or(false))
+        .collect();
+    entries.sort();
+    if entries.is_empty() {
+        println!("lint: no patches to check");
+        return Ok(());
+    }
+    let required = ["Patch-Id:", "Title:", "Tier:", "Upstream-Files:", "Intent:", "Risk:", "Test:", "Verified-On:", "Removal-Plan:"];
+    let mut ok = true;
+    for p in &entries {
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+        for field in required {
+            if !text.lines().any(|l| l.trim_start().starts_with(field)) {
+                println!("lint: {name}: missing header field {field}");
+                ok = false;
+            }
+        }
+        if let Some(tier) = text.lines().find_map(|l| l.trim_start().strip_prefix("Tier:")) {
+            let tier = tier.trim();
+            if !["P0", "P1", "P2", "P3"].contains(&tier) {
+                println!("lint: {name}: bad Tier {tier}");
+                ok = false;
+            }
+        }
+        // Must apply cleanly OR already be applied (reverse-checks clean).
+        let engine = root.join("engine");
+        if engine.join("mach").exists() {
+            let clean = Command::new("git")
+                .args(["apply", "--check", &p.to_string_lossy()])
+                .current_dir(&engine)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            let applied = Command::new("git")
+                .args(["apply", "--reverse", "--check", &p.to_string_lossy()])
+                .current_dir(&engine)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if clean || applied {
+                println!("lint: {name}: applies {}", if applied { "(already applied)" } else { "cleanly" });
+            } else {
+                println!("lint: {name}: DOES NOT APPLY");
+                ok = false;
+            }
+        }
+    }
+    if !ok {
+        return Err("lint: patch header/apply failures (see above)".into());
+    }
+    println!("lint: all {} patch(es) clean", entries.len());
+    Ok(())
+}
+
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]>");
+    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint>");
     std::process::exit(2);
 }
 
@@ -331,6 +455,8 @@ fn main() {
     let res = match args.first().map(|s| s.as_str()) {
         Some("fetch") => cmd_fetch(&root),
         Some("doctor") => cmd_doctor(&root),
+        Some("overlay") => cmd_overlay(&root),
+        Some("lint") => cmd_lint(&root),
         Some("config") => {
             let mut os = "linux";
             let mut branding = "astra";

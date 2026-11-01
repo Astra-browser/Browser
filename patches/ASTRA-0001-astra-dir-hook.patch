@@ -1,0 +1,25 @@
+Patch-Id: ASTRA-0001
+Title: Wire Astra overlay dir into the browser app build
+Tier: P2
+Upstream-Files: browser/app.mozbuild
+Intent: include /astra (overlay: chrome://astra/, resource://astra/) in the build; no configure option can add a new top-level dir, so a hook is required
+Risk: low (one DIRS line before /browser; upstream rarely reorders this file)
+Test: forge overlay + forge lint; configure proof in UPSTREAM.md; full-build proof in P1-T04
+Verified-On: 153.6.0
+Removal-Plan: none anticipated; drop if upstream ever supports out-of-tree app dirs
+---
+diff --git a/browser/app.mozbuild b/browser/app.mozbuild
+index 04cfef370d..2487a3dc81 100644
+--- a/browser/app.mozbuild
++++ b/browser/app.mozbuild
+@@ -6,6 +6,10 @@ include("/toolkit/toolkit.mozbuild")
+ 
+ DIRS += ["/%s" % CONFIG["MOZ_BRANDING_DIRECTORY"]]
+ 
++# ASTRA-0001: include the Astra overlay (chrome://astra/, resource://astra/).
++# Must precede /browser (dirs after browser are not packaged properly on Mac).
++DIRS += ["/astra"]
++
+ # Never add dirs after browser because they apparently won't get
+ # packaged properly on Mac.
+ DIRS += ["/browser"]

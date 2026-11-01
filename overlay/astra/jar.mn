@@ -1,0 +1,15 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra chrome/resource registration (P1-T05). Single astra.jar hosts both
+# schemes so the overlay stays one packaging unit (model: asrouter/jar.mn,
+# contextualidentity/jar.mn in the pinned source).
+#   chrome://astra/hello.html            -> overlay/astra/chrome/hello.html
+#   resource://astra/host/HostAPI.sys.mj -> overlay/astra/host/HostAPI.sys.mjs
+
+astra.jar:
+% content astra %content/astra/ contentaccessible=yes
+% resource astra %content/astra/res/ contentaccessible=yes
+  content/astra/hello.html               (chrome/hello.html)
+  content/astra/res/host/HostAPI.sys.mjs (host/HostAPI.sys.mjs)
