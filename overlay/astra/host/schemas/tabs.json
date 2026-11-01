@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/tabs.json",
+  "title": "Host API v1 — Tabs (P1-T10 stub; live gBrowser binding in P2-T06)",
+  "type": "object",
+  "properties": {
+    "create": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "url": { "type": "string" },
+        "background": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "select": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "close": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "list": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Tab": {
+      "type": "object",
+      "properties": {
+        "astra_tab_id": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "selected": { "type": "boolean" },
+        "canGoBack": { "type": "boolean" },
+        "canGoForward": { "type": "boolean" }
+      },
+      "required": ["astra_tab_id", "url", "selected", "canGoBack", "canGoForward"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
