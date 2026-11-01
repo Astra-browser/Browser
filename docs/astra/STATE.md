@@ -85,7 +85,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T06 | Tab sleeping policy | done | orchestrator | agent/P4-T06-sleeping | Merged 2026-11-02; policy 9/9, core 94/94, workspace 232/232, clippy/fmt/brand clean |
 | P4-T07 | Private windows (nothing persisted) | done | orchestrator | agent/P4-T07-private | Merged 2026-11-02; guard + forensic tests green; host-excluded today, store wiring = caller contract (see PRIVATE.md status) |
 | P4-T08 | Downloads manager + PDF viewer | done | orchestrator | agent/P4-T08-downloads | Merged 2026-11-02; ui 1176/1176 + svelte-check clean; bridge download routes stubbed (follow-up noted) |
-| P4-T09 | Password/autofill decision | doing | worker-pw | agent/P4-T09-password | Locked 2026-11-02; research + proposal only, no UI; decision deferred to owner |
+| P4-T09 | Password/autofill decision | done | orchestrator | agent/P4-T09-password | Research merged; recommends extension-only; owner decision pending (OWNER_QUESTIONS #6 expanded) |
 | P4-T10 | Performance baselines | doing | worker-perf | agent/P4-T10-perf | Locked 2026-11-02; owns perf scripts + docs only |
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
