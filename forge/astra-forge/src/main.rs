@@ -1179,8 +1179,40 @@ fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String
     Ok(())
 }
 
+// Run the P1-T11 contract-test harness (P1-T11). Thin wrapper over
+// tools/contract-runner/run.py (stdlib Python): boots the built binary via
+// the in-tree geckodriver and asserts branding, Host API version and the
+// local fixture page. `--smoke` runs the fast subset; `--fixture-only`
+// runs the no-browser self-test (works without a build, used in CI).
+// Artifacts land in out/contract-p1t11-*/ (gitignored).
+fn cmd_test(root: &Path, mode: &str) -> Result<(), String> {
+    let runner = root.join("tools/contract-runner/run.py");
+    if !runner.exists() {
+        return Err("tools/contract-runner/run.py missing".into());
+    }
+    let mode_arg = match mode {
+        "full" => "--full",
+        "smoke" => "--smoke",
+        "fixture-only" => "--fixture-only",
+        other => return Err(format!("unknown test mode {other} (want --smoke|--fixture-only)")),
+    };
+    let st = Command::new("python3")
+        .args([&runner.to_string_lossy() as &str, mode_arg])
+        .current_dir(root)
+        .status()
+        .map_err(|e| format!("spawn python3: {e}"))?;
+    match st.code() {
+        Some(0) => {
+            println!("test: PASS");
+            Ok(())
+        }
+        Some(2) => Err("test: SKIP — built binary absent (run a full build first); see out/contract-p1t11-*/".into()),
+        _ => Err("test: FAIL (see out/contract-p1t11-*/results.json + geckodriver.log)".into()),
+    }
+}
+
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]>");
+    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>");
     std::process::exit(2);
 }
 
@@ -1257,6 +1289,21 @@ fn main() {
                 }
             }
             cmd_build(&root, faster, jobs)
+        }
+        Some("test") => {
+            let mut mode = "full";
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--smoke" => mode = "smoke",
+                    "--fixture-only" => mode = "fixture-only",
+                    other => {
+                        eprintln!("astra-forge: error: unknown test flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_test(&root, mode)
         }
         _ => usage(),
     };
