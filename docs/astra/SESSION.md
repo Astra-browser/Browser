@@ -47,7 +47,12 @@ verified), `LICENSE` (MPL), `NOTICE`, `LICENSES.md` (25/25 permissive),
    rebranded (~2900 replacements, report in `docs/astra/REBRAND-ui.md`),
    generated `bindings.ts` excluded (regenerated P2-T02). `bun install` clean
    (456 pkgs; `@hugeicons/svelte` postinstall trusted). `bun run typecheck`
-   running in background; then unit tests, then `vite build` standalone.
+   clean (0 errors). Unit tests: 1061 passed / 2 failed, both diagnosed as
+   porting debt: (a) 3 wire literals in generated bindings fixed with recorded
+   deviation; (b) paraglide-js floated 2.25.0→2.29.3, new compiler shape broke
+   the `i18nLocales()` transform — transform updated for both shapes;
+   (c) skills/native cross-boundary tests skip-if-missing until
+   `crates/astra-*` land (P2/P4/P6). Full suite re-running; then `vite build`.
 3. **Context-length duty (owner direction)**: if this session passes ~35–40%
    context, compact and announce; SESSION.md is the carry-over.
 
