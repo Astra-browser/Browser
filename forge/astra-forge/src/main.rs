@@ -773,7 +773,13 @@ fn cmd_export(root: &Path) -> Result<(), String> {
     let uncovered: Vec<&str> = touched
         .lines()
         .map(str::trim)
-        .filter(|f| !f.is_empty() && !covered.contains_key(*f))
+        .filter(|f| {
+            !f.is_empty()
+            && !covered.contains_key(*f)
+            // Vendored Rust sources are reproducible derived artifacts
+            // (`mach vendor rust` in import regenerates them; see §6.4).
+            && !f.starts_with("third_party/rust/")
+        })
         .collect();
     if !uncovered.is_empty() {
         let mut msg = format!(
@@ -969,6 +975,32 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
     match update_docs_hook(root, &report) {
         Ok(n) => println!("import: docs hook refreshed {n} UPSTREAM.md row(s)"),
         Err(e) => println!("import: WARNING docs hook skipped ({e})"),
+    }
+    // Vendored Rust sources are derived artifacts (Cargo.toml/lock +
+    // registry), not patch content: regenerate them so the tree builds.
+    // Failures are warnings, not errors — `cargo vet` drift on Mozilla's
+    // own crates can block vendoring while our deps are fine (P4-T02);
+    // the build fails fast with a missing-crate error if anything needed
+    // is actually absent.
+    {
+        use std::process::Command;
+        let mut cmd = Command::new("./mach");
+        cmd.args(["vendor", "rust", "--ignore-modified"])
+            .current_dir(&engine);
+        if std::env::var("MOZCONFIG").is_err() {
+            let rendered = root.join("out/mozconfig.linux");
+            if rendered.exists() {
+                cmd.env("MOZCONFIG", &rendered);
+            }
+        }
+        match cmd.output().map_err(|e| format!("spawn mach: {e}")) {
+            Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
+            Ok(o) => println!(
+                "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
+                String::from_utf8_lossy(&o.stderr).trim().lines().last().unwrap_or("")
+            ),
+            Err(e) => println!("import: WARNING vendor skipped ({e})"),
+        }
     }
     println!("import: done ({} patch(es), health in out/patch-health.json)", report.len());
     Ok(())

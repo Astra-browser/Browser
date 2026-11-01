@@ -225,13 +225,10 @@ index 0000000000..c78ee585cc
 +nserror = { path = "../../../xpcom/rust/nserror" }
 diff --git a/toolkit/components/astra_blocker_engine/cbindgen.toml b/toolkit/components/astra_blocker_engine/cbindgen.toml
 new file mode 100644
-index 0000000000..f53a6d3400
+index 0000000000..1a153a7dd2
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/cbindgen.toml
-@@ -0,0 +1,15 @@
-+/* This Source Code Form is subject to the terms of the Mozilla Public
-+ * License, v. 2.0. If a copy of the MPL was not distributed with this
-+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -0,0 +1,12 @@
 +header = """/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */"""
