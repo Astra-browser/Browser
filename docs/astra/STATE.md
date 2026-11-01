@@ -11,7 +11,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T02 | Clean repo + record base snapshot | doing | orchestrator | main | Repo initialised; base = `folder_context` snapshot (no VCS metadata), see `PROVENANCE.md` |
 | P0-T03 | Full inventory (crates, IPC, UI, storage, skills) | doing | orchestrator | main | First cut in `docs/astra/INVENTORY.md`; sub-rows below |
 | P0-T03a | IPC surface: every command/event + payloads | done | worker-1 | agent/P0-T03a-ipc-surface | Merged 2026-11-01; 267 cmds + 35 events, zero mismatches |
-| P0-T03b | PARITY.md (README claims vs code) | todo | — | — | Blocked on T03a for command coverage |
+| P0-T03b | PARITY.md (README claims vs code) | doing | worker-1 | agent/P0-T03b-parity | Locked 2026-11-01 |
 | P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | todo | — | — | Draft in `docs/astra/PORTING_MAP.md` |
 | P0-T05 | Rebrand tooling + `brand-lint` | doing | orchestrator | main | `plan.md` cleaned of previous product name; `tools/rebrand` spec pending |
 | P0-T06 | License/provenance | doing | orchestrator | main | `PROVENANCE.md` drafted; `cargo-about`/Bun license scan pending |
