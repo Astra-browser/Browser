@@ -87,11 +87,7 @@ impl TabStrip {
     }
 
     /// Move `id` before `before` (`None` appends at the end).
-    pub fn move_tab(
-        &mut self,
-        id: &TabId,
-        before: Option<&TabId>,
-    ) -> Result<(), TabStripError> {
+    pub fn move_tab(&mut self, id: &TabId, before: Option<&TabId>) -> Result<(), TabStripError> {
         let pos = self
             .tabs
             .iter()
@@ -169,8 +165,11 @@ mod tests {
         let a = strip.open("https://a.example");
         strip.open("https://b.example");
         strip.set_essential(&a, true).unwrap();
-        let essential: Vec<TabId> =
-            strip.essentials().into_iter().map(|t| t.id.clone()).collect();
+        let essential: Vec<TabId> = strip
+            .essentials()
+            .into_iter()
+            .map(|t| t.id.clone())
+            .collect();
         assert_eq!(essential, vec![a]);
     }
 }

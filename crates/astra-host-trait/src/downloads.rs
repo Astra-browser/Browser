@@ -10,9 +10,16 @@ use serde::{Deserialize, Serialize};
 /// Download lifecycle state.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DownloadState {
-    InProgress { received_bytes: u64, total_bytes: Option<u64> },
-    Done { path: String },
-    Failed { reason: String },
+    InProgress {
+        received_bytes: u64,
+        total_bytes: Option<u64>,
+    },
+    Done {
+        path: String,
+    },
+    Failed {
+        reason: String,
+    },
     Cancelled,
 }
 

@@ -302,7 +302,7 @@ def gen_rust(commands, events):
     lines.append("        }")
     lines.append("    }")
     lines.append("    /// Parse a wire name; unknown names fail (fail fast, Appendix C).")
-    lines.append("    pub fn from_str(s: &str) -> Option<CommandName> {")
+    lines.append("    pub fn from_name(s: &str) -> Option<CommandName> {")
     lines.append("        match s {")
     for c in commands:
         lines.append(f'            "{c["wire"]}" => Some(CommandName::{var_name(c["wire"])}),')

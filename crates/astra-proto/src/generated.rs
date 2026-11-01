@@ -678,7 +678,9 @@ impl CommandName {
             CommandName::BookmarkMenuPopup => "bookmark_menu_popup",
             CommandName::BrowserCredentialCapability => "browser_credential_capability",
             CommandName::BrowserOpenUrl => "browser_open_url",
-            CommandName::BrowserPasskeyAuthorizationRequest => "browser_passkey_authorization_request",
+            CommandName::BrowserPasskeyAuthorizationRequest => {
+                "browser_passkey_authorization_request"
+            }
             CommandName::BrowsingDataCall => "browsing_data_call",
             CommandName::ChromeMenuPopup => "chrome_menu_popup",
             CommandName::DefaultBrowserRequest => "default_browser_request",
@@ -906,7 +908,7 @@ impl CommandName {
         }
     }
     /// Parse a wire name; unknown names fail (fail fast, Appendix C).
-    pub fn from_str(s: &str) -> Option<CommandName> {
+    pub fn from_name(s: &str) -> Option<CommandName> {
         match s {
             "about_info" => Some(CommandName::AboutInfo),
             "account_avatar_discard" => Some(CommandName::AccountAvatarDiscard),
@@ -950,7 +952,9 @@ impl CommandName {
             "bookmark_menu_popup" => Some(CommandName::BookmarkMenuPopup),
             "browser_credential_capability" => Some(CommandName::BrowserCredentialCapability),
             "browser_open_url" => Some(CommandName::BrowserOpenUrl),
-            "browser_passkey_authorization_request" => Some(CommandName::BrowserPasskeyAuthorizationRequest),
+            "browser_passkey_authorization_request" => {
+                Some(CommandName::BrowserPasskeyAuthorizationRequest)
+            }
             "browsing_data_call" => Some(CommandName::BrowsingDataCall),
             "chrome_menu_popup" => Some(CommandName::ChromeMenuPopup),
             "default_browser_request" => Some(CommandName::DefaultBrowserRequest),
@@ -1185,7 +1189,9 @@ impl EventChannel {
     pub fn as_str(self) -> &'static str {
         match self {
             EventChannel::EvtBlockerStatusChanged => "blocker-status-changed",
-            EventChannel::EvtBrowserCredentialCapabilityChanged => "browser-credential-capability-changed",
+            EventChannel::EvtBrowserCredentialCapabilityChanged => {
+                "browser-credential-capability-changed"
+            }
             EventChannel::EvtDownloadsChanged => "downloads-changed",
             EventChannel::EvtExtensionActionFailed => "extension-action-failed",
             EventChannel::EvtExtensionActionShortcut => "extension-action-shortcut",
@@ -1216,7 +1222,9 @@ impl EventChannel {
             EventChannel::EvtAstraSwipe => "astra:swipe",
             EventChannel::EvtAstraVoiceChanged => "astra:voice-changed",
             EventChannel::EvtAstraVoiceLevels => "astra:voice-levels",
-            EventChannel::EvtAstraWorkDecisionPreferenceChanged => "astra:work-decision-preference-changed",
+            EventChannel::EvtAstraWorkDecisionPreferenceChanged => {
+                "astra:work-decision-preference-changed"
+            }
             EventChannel::EvtAstraWorkHumanChanged => "astra:work-human-changed",
             EventChannel::EvtAstraWorkModelsChanged => "astra:work-models-changed",
         }

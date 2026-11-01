@@ -153,11 +153,16 @@ mod tests {
 
     #[test]
     fn entries_sorted_and_complete() {
-        let ids: Vec<String> =
-            Keymap::new().entries().into_iter().map(|e| e.id).collect();
+        let ids: Vec<String> = Keymap::new().entries().into_iter().map(|e| e.id).collect();
         assert_eq!(
             ids,
-            vec!["launcher.open", "sidebar.toggle", "tabs.close", "tabs.open", "tabs.reload"]
+            vec![
+                "launcher.open",
+                "sidebar.toggle",
+                "tabs.close",
+                "tabs.open",
+                "tabs.reload"
+            ]
         );
     }
 
@@ -177,7 +182,9 @@ mod tests {
     #[test]
     fn bind_with_replace_steals_accelerator() {
         let mut map = Keymap::new();
-        let outcome = map.bind("sidebar.toggle", Some("CmdOrCtrl+T"), true).unwrap();
+        let outcome = map
+            .bind("sidebar.toggle", Some("CmdOrCtrl+T"), true)
+            .unwrap();
         assert_eq!(outcome, KeymapOutcome::Bound { replaced: None });
         let stolen = map
             .entries()

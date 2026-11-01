@@ -233,9 +233,7 @@ impl crate::BrowserHost for MockHost {
 
     async fn setting_set(&self, key: &str, value: &str) -> Result<Admission, MockError> {
         let mut state = self.state.lock().unwrap();
-        state
-            .settings
-            .insert(key.to_owned(), value.to_owned());
+        state.settings.insert(key.to_owned(), value.to_owned());
         Ok(Self::record_and_admit(&mut state, "setting_set"))
     }
 
@@ -275,9 +273,7 @@ impl crate::BrowserHost for MockHost {
         decision: PermissionDecision,
     ) -> Result<Admission, MockError> {
         let mut state = self.state.lock().unwrap();
-        state
-            .permission_decisions
-            .push((req.clone(), decision));
+        state.permission_decisions.push((req.clone(), decision));
         Ok(Self::record_and_admit(&mut state, "permission_decide"))
     }
 
@@ -338,7 +334,9 @@ mod tests {
         let host = MockHost::new();
         let profile = ProfileId::new("default");
         let tab = host.tab_open(&profile).await.unwrap();
-        host.tab_navigate(&tab, "https://example.com").await.unwrap();
+        host.tab_navigate(&tab, "https://example.com")
+            .await
+            .unwrap();
         host.tab_set_muted(&tab, true).await.unwrap();
         let snap = host.tab_snapshot(&tab).await.unwrap().unwrap();
         assert_eq!(snap.url, "https://example.com");

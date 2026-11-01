@@ -68,7 +68,13 @@ mod tests {
     #[test]
     fn filters_and_orders_most_recent_first() {
         let entries = sample();
-        let got = filter_history(&entries, &HistoryFilter { query: "EXAMPLE", limit: 10 });
+        let got = filter_history(
+            &entries,
+            &HistoryFilter {
+                query: "EXAMPLE",
+                limit: 10,
+            },
+        );
         assert_eq!(got.len(), 2);
         assert_eq!(got[0].visited_at, 4);
         assert_eq!(got[1].visited_at, 3);
@@ -77,7 +83,13 @@ mod tests {
     #[test]
     fn limit_applies() {
         let entries = sample();
-        let got = filter_history(&entries, &HistoryFilter { query: "", limit: 1 });
+        let got = filter_history(
+            &entries,
+            &HistoryFilter {
+                query: "",
+                limit: 1,
+            },
+        );
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].visited_at, 5);
     }

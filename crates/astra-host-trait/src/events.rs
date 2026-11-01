@@ -31,15 +31,13 @@ impl EventChannel {
     pub const NOTE_OPEN_REQUESTED: Self = Self("note-open-requested");
     pub const NOTES_CHANGED: Self = Self("notes-changed");
     pub const OPERATION_PROCESSED: Self = Self("operation-processed");
-    pub const PAGE_PERMISSION_PROMPT_CHANGED: Self =
-        Self("page-permission-prompt-changed");
+    pub const PAGE_PERMISSION_PROMPT_CHANGED: Self = Self("page-permission-prompt-changed");
     pub const RESOURCE_CHANGED: Self = Self("resource-changed");
     pub const RUNTIME_STATUS_CHANGED: Self = Self("runtime-status-changed");
     pub const SEARCH_CHANGED: Self = Self("search-changed");
     pub const TAB_CHANGED: Self = Self("tab-changed");
     pub const UI_COMMAND: Self = Self("ui-command");
-    pub const WEB_EXTENSION_ACCESS_REQUESTED: Self =
-        Self("web-extension-access-requested");
+    pub const WEB_EXTENSION_ACCESS_REQUESTED: Self = Self("web-extension-access-requested");
     pub const WEB_EXTENSION_STORE_CLICKED: Self = Self("web-extension-store-clicked");
     pub const WORK_CHANGED: Self = Self("work-changed");
     pub const WORK_ENVIRONMENT_CHANGED: Self = Self("work-environment-changed");

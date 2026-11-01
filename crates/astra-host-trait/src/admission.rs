@@ -42,9 +42,7 @@ impl Admission {
     /// Combine two admissions, keeping the most restrictive outcome.
     pub fn combine(self, other: Self) -> Self {
         match (self, other) {
-            (Self::Denied { reason }, _) | (_, Self::Denied { reason }) => {
-                Self::Denied { reason }
-            }
+            (Self::Denied { reason }, _) | (_, Self::Denied { reason }) => Self::Denied { reason },
             (Self::Deferred { reason }, _) | (_, Self::Deferred { reason }) => {
                 Self::Deferred { reason }
             }
@@ -67,8 +65,7 @@ mod tests {
         let deferred = Admission::admitted().combine(Admission::deferred("later"));
         assert_eq!(deferred, Admission::deferred("later"));
         // Denied wins over deferred.
-        let both =
-            Admission::deferred("later").combine(Admission::denied("never"));
+        let both = Admission::deferred("later").combine(Admission::denied("never"));
         assert_eq!(both, Admission::denied("never"));
     }
 }

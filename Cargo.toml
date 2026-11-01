@@ -4,6 +4,7 @@ members = [
   "crates/astra-host-trait",
   "crates/astra-store",
   "crates/astra-proto",
+  "crates/astra-ipc",
 ]
 exclude = [
   # Standalone tool with its own lockfile/target dir (P1-T12); must not be

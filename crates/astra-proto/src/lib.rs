@@ -19,8 +19,8 @@
 
 pub mod generated;
 
-pub use generated::{EventChannel, COMMANDS, COMMAND_COUNT, EVENTS, EVENT_COUNT};
 pub use generated::CommandName;
+pub use generated::{EventChannel, COMMANDS, COMMAND_COUNT, EVENTS, EVENT_COUNT};
 
 use serde::{Deserialize, Serialize};
 
@@ -189,7 +189,10 @@ mod tests {
         // Renamed channels carry the new prefix, never the old one.
         assert!(EVENTS.contains(&"astra:account-changed"));
         assert!(!EVENTS.iter().any(|e| e.starts_with("prev:")));
-        assert_eq!(CommandName::from_str("tabs_navigate"), Some(CommandName::TabsNavigate));
-        assert_eq!(CommandName::from_str("nope"), None);
+        assert_eq!(
+            CommandName::from_name("tabs_navigate"),
+            Some(CommandName::TabsNavigate)
+        );
+        assert_eq!(CommandName::from_name("nope"), None);
     }
 }
