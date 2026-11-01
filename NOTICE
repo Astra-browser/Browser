@@ -1,0 +1,36 @@
+# NOTICE — Astra third-party attributions (P0-T06)
+
+Astra is licensed under MPL-2.0 (`LICENSE`). This file records required
+attributions. It is engineering guidance, not legal advice; the owner runs
+the final license/trademark review before public distribution.
+
+## Derived source (MPL-2.0)
+
+Portions derived from the Zephium browser source, MPL-2.0
+(see `docs/astra/PROVENANCE.md`). The Zephium name, logo and branded assets
+are not licensed and are not used. Modified MPL files stay MPL.
+
+## Blocker seed lists
+
+EasyList / EasyPrivacy attribution (CC BY-SA 3.0) per the source snapshot's
+`assets/blocker-seed/v1/NOTICE`, carried over when `astra-blocker` lands
+(Phase 4). Seed content is data, not code; attribution preserved verbatim.
+
+## Rust dependencies (selection at port time)
+
+`adblock-rust` (Brave, Apache-2.0/MIT), `rusqlite` (MIT), `rusqlite_migration`
+(MIT/Apache-2.0), `tokio` (MIT), `serde` (MIT/Apache-2.0), `tracing` (MIT),
+RustCrypto crates (MIT/Apache-2.0), `tauri-specta`/`specta` types replaced by
+`astra-proto` at port time. Full transitive inventory via `cargo-about` /
+`cargo deny` enforced in CI (P0-T08); no unknown licenses allowed.
+
+## JS dependencies
+
+Bun workspace packages (P3-T01): license scan via Bun package metadata in CI;
+no unknown licenses allowed.
+
+## Firefox (engine, not shipped as source)
+
+Gecko engine per pinned `upstream.toml`, MPL-2.0. Mozilla names/logos are not
+shipped; custom branding only. The `Firefox` token remains solely in the
+compatible UA string and required legal notices.
