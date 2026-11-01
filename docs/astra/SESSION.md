@@ -34,11 +34,14 @@ verified), `LICENSE` (MPL), `NOTICE`, `LICENSES.md` (25/25 permissive),
 
 1. **P1-T01 engine fetch (worker-1, `agent/P1-T01-fetch`)**: tarball URL
    verified HTTP 200 + `.asc` sig; `forge/astra-forge` written (zero-dep Rust:
-   `fetch`, `doctor`), `doctor` all green (incl. bun 1.4.4). `./forge … fetch`
-   running in background 2026-11-01 ~20:50 (675 MB tarball downloading, then
-   GPG verify + extract to `engine/` + git baseline). GPG key for `.asc`
-   still TBD — fetch warns and continues if no signature file (release builds
-   must refuse; record rule in P1-T05 overlay work).
+   `fetch`, `doctor`), `doctor` all green (incl. bun 1.4.4). Fetch round 1
+   downloaded the tarball but GPG verify failed (no key). Round 2: imported
+   `release@mozilla.com` master `14F2 6682 D091 6CDD 81E3 7B6D 61B7 B526
+   D98F 0353` (created 2015-07-17, matches long-published release key; UID
+   email verified by keys.openpgp.org), signing subkey `827E … 7AA3`
+   (2026-08-06, expires 2028-08-05). Old ESRs (115/140) signed by previous
+   subkey `5ECB…20256` — rotation, same master lineage. Rerun in background:
+   verify + extract to `engine/` + git baseline.
 2. **P3-T01 UI port (worker-2, `agent/P3-T01-ui`)**: `folder_context/frame`
    → `ui/app`, Bun workspace (`ui/package.json`, `bun.lock`), 214 files
    rebranded (~2900 replacements, report in `docs/astra/REBRAND-ui.md`),
