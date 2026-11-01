@@ -90,6 +90,16 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 | P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 
+## Phase 5 — Tasks, Notes, Time
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P5-T01 | Tasks domain (lists, priorities, NL parser) | doing | worker-task | agent/P5-T01-tasks | Locked 2026-11-02; owns tasks domain + tests only |
+| P5-T02 | Tasks UI + "make task" palette | todo | — | — | After T01 |
+| P5-T03 | Notes (Markdown files + index + watcher) | doing | worker-notes | agent/P5-T03-notes | Locked 2026-11-02; owns notes domain + tests only |
+| P5-T04 | Time tracking (per-site, focus mode) | doing | worker-time | agent/P5-T04-time | Locked 2026-11-02; owns time domain + tests only |
+| P5-T05 | Export/import (JSON + Markdown) | todo | — | — | After T01/T03 |
+
 ## Later phases
 
 All `todo` — see `plan.md` §§8–11.
