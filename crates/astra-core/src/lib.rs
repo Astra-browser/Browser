@@ -18,6 +18,7 @@ pub mod search;
 pub mod session;
 pub mod settings;
 pub mod settings_ext;
+pub mod spaces;
 pub mod tabs;
 
 pub use diagnostics::{check_db_integrity, collect as collect_diagnostics, log_tail};
@@ -41,6 +42,8 @@ pub use session::{
 pub use settings::{default_for, validate, SettingsError, KNOWN_SETTINGS};
 pub use settings_ext::{apply_defaults, defaults as settings_defaults, migrate, validate_all};
 pub use settings_ext::{MigrationReport, SettingsExtError};
+pub use spaces::{container_name_for_space, profile_dir_name, valid_container_ref};
+pub use spaces::{Space, SpaceError, SpaceStore};
 pub use tabs::{TabEntry, TabStrip, TabStripError};
 
 use astra_host_trait::{Admission, BrowserHost};

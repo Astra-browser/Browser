@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resource://astra/host/schemas/containers.json",
+  "title": "Host API v1 — Containers",
+  "description": "Isolated storage contexts for Astra spaces/profiles/agent sessions (spike S-02, plan D-12). One Astra space maps to one contextual identity (cookieStoreId firefox-container-N); one Astra profile maps to one Firefox profile directory. Core owns the space↔container_ref mapping; the host mints/deletes identities, binds tabs via userContextId, and wipes site data on remove (engine deleteDataFromOriginAttributesPattern).",
+  "type": "object",
+  "properties": {
+    "Container": {
+      "type": "object",
+      "properties": {
+        "cookieStoreId": { "type": "string", "pattern": "^firefox-container-[0-9]+$" },
+        "userContextId": { "type": "integer", "minimum": 1 },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "icon": { "type": "string" },
+        "ephemeral": { "type": "boolean" }
+      },
+      "required": ["cookieStoreId", "userContextId", "name", "color", "icon", "ephemeral"],
+      "additionalProperties": false
+    },
+    "create": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "icon": { "type": "string" },
+        "ephemeral": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "get": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "cookieStoreId": { "type": "string" }
+      },
+      "required": ["cookieStoreId"],
+      "additionalProperties": false
+    },
+    "list": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "update": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "cookieStoreId": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "icon": { "type": "string" }
+      },
+      "required": ["cookieStoreId"],
+      "additionalProperties": false
+    },
+    "remove": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "cookieStoreId": { "type": "string" },
+        "forgetData": { "type": "boolean" }
+      },
+      "required": ["cookieStoreId"],
+      "additionalProperties": false
+    },
+    "bindTab": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "cookieStoreId": { "type": "string" }
+      },
+      "required": ["astra_tab_id", "cookieStoreId"],
+      "additionalProperties": false
+    },
+    "containerForTab": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "clearData": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "cookieStoreId": { "type": "string" }
+      },
+      "required": ["cookieStoreId"],
+      "additionalProperties": false
+    },
+    "setCookie": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["astra_tab_id", "name", "value"],
+      "additionalProperties": false
+    },
+    "getCookies": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "required": ["astra_tab_id"],
+      "additionalProperties": false
+    },
+    "setLocalItem": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["astra_tab_id", "key", "value"],
+      "additionalProperties": false
+    },
+    "getLocalItem": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" },
+        "key": { "type": "string" }
+      },
+      "required": ["astra_tab_id", "key"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
