@@ -8,8 +8,10 @@ license = "MPL-2.0"
 [dependencies]
 astra-host-trait = { path = "../astra-host-trait" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "json"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
