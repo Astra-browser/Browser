@@ -1,0 +1,17 @@
+[Desktop Entry]
+Version=1.0
+# Astra Linux desktop entry (P1-T03). RENDERED by `forge overlay` from
+# branding/astra.toml. Binary rename (firefox -> astra) lands with release
+# packaging (P8); dev Exec points at the objdir binary name.
+Name=@ASTRA_DISPLAY_NAME@ Nightly
+GenericName=Web Browser
+Comment=Browse the web with @ASTRA_DISPLAY_NAME@
+Exec=firefox %u
+Icon=@ASTRA_BINARY_NAME@
+Terminal=false
+Type=Application
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true
+StartupWMClass=@ASTRA_WM_CLASS@
+Categories=Network;WebBrowser;
+Keywords=web;browser;internet;

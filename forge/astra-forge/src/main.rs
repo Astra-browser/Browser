@@ -265,6 +265,80 @@ fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// Branding values from branding/astra.toml (D-19). OWNER_DECISION gaps fall
+// back to dev defaults with a warning (release builds refuse them elsewhere).
+fn read_branding(root: &Path) -> Result<std::collections::HashMap<String, String>, String> {
+    let text = fs::read_to_string(root.join("branding/astra.toml")).map_err(|e| e.to_string())?;
+    let mut raw = std::collections::HashMap::new();
+    for line in text.lines() {
+        let line = line.split('#').next().unwrap_or("").trim().to_string();
+        if let Some((k, v)) = line.split_once('=') {
+            raw.insert(k.trim().to_string(), v.trim().trim_matches('"').trim().to_string());
+        }
+    }
+    let dev = |key: &str, fallback: &str| match raw.get(key) {
+        Some(v) if !v.is_empty() && v != "OWNER_DECISION" => v.clone(),
+        _ => {
+            println!("branding: WARNING {key} is OWNER_DECISION; using dev default {fallback}");
+            fallback.to_string()
+        }
+    };
+    let mut m = std::collections::HashMap::new();
+    let display = raw.get("display_name").cloned().unwrap_or_else(|| "Astra".into());
+    let binary = raw.get("binary_name").cloned().unwrap_or_else(|| "astra".into());
+    m.insert("ASTRA_DISPLAY_NAME".into(), display);
+    m.insert("ASTRA_BINARY_NAME".into(), binary.clone());
+    m.insert("ASTRA_APP_ID".into(), dev("app_id", "com.astra.dev"));
+    m.insert("ASTRA_VENDOR".into(), dev("vendor", "Astra (dev placeholder)"));
+    m.insert(
+        "ASTRA_UPDATE_HOST".into(),
+        dev("update_host", "https://localhost:0/placeholder-astra-update"),
+    );
+    m.insert("ASTRA_WM_CLASS".into(), format!("{binary}-nightly"));
+    Ok(m)
+}
+
+// Render overlay/astra/branding/**/*.in templates into engine/astra/branding/
+// (P1-T03). Called by cmd_overlay after the copy; strips the .in files.
+fn render_branding(root: &Path) -> Result<(), String> {
+    let vals = read_branding(root)?;
+    let dir = root.join("engine/astra/branding");
+    if !dir.exists() {
+        return Ok(());
+    }
+    // Collect first (recursive walk without external deps).
+    let mut templates: Vec<std::path::PathBuf> = Vec::new();
+    let mut stack = vec![dir.clone()];
+    while let Some(d) = stack.pop() {
+        for e in fs::read_dir(&d).map_err(|e| e.to_string())? {
+            let p = e.map_err(|e| e.to_string())?.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().map(|x| x == "in").unwrap_or(false) {
+                templates.push(p);
+            }
+        }
+    }
+    if templates.is_empty() {
+        println!("branding: no .in templates to render");
+        return Ok(());
+    }
+    for t in &templates {
+        let mut text = fs::read_to_string(t).map_err(|e| e.to_string())?;
+        for (k, v) in &vals {
+            text = text.replace(&format!("@{k}@"), v);
+        }
+        if text.contains("@ASTRA_") {
+            return Err(format!("branding: unsubstituted placeholder in {}", t.display()));
+        }
+        let dest = t.with_extension("");
+        fs::write(&dest, &text).map_err(|e| e.to_string())?;
+        fs::remove_file(t).map_err(|e| e.to_string())?;
+        println!("branding: rendered {}", dest.strip_prefix(root).unwrap_or(&dest).display());
+    }
+    Ok(())
+}
+
 // Render config/mozconfig.<os> into out/mozconfig.<os> (P1-T02).
 // Substitutes @ASTRA_*@ placeholders from branding/astra.toml.
 fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
@@ -376,6 +450,7 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
             return Err(format!("overlay: expected {f} missing after apply"));
         }
     }
+    render_branding(root)?;
     println!("overlay: done (chrome://astra/ + resource://astra/ staged)");
     Ok(())
 }

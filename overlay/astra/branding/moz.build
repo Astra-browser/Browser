@@ -1,0 +1,28 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra branding packaging (P1-T03). Inlines what
+# browser/branding/branding-common.mozbuild::FirefoxBranding() does for
+# unofficial in the pinned source, so the overlay does not depend on an
+# upstream file that lives outside overlay/ (bump-proof):
+#  - brand prefs file (plain: forge renders it, no preprocessing needed)
+#  - GTK window/taskbar icons (default*.png)
+
+DIRS += ["content", "locales"]
+
+DIST_SUBDIR = "browser"
+export("DIST_SUBDIR")
+
+JS_PREFERENCE_FILES += [
+    "pref/astra-branding.js",
+]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    FINAL_TARGET_FILES.chrome.icons.default += [
+        "default128.png",
+        "default16.png",
+        "default32.png",
+        "default48.png",
+        "default64.png",
+    ]

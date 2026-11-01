@@ -14,6 +14,11 @@
 |---|---|---|---|
 | ASTRA-0001 `patches/ASTRA-0001-astra-dir-hook.patch` | P2 (3 added lines) | `browser/app.mozbuild` | `clean` — applied by `forge overlay`; `forge lint` green; configure passes with `/astra` in `DIRS` |
 
+- **Branding active (P1-T03, 2026-11-01):** `out/mozconfig.linux` renders
+  `--with-branding=astra/branding`; `brandShortName=Astra Nightly` in the
+  packaged build, placeholder art + `astra.desktop` staged, window title
+  GUI-verified. Dev defaults stand in for all `OWNER_DECISION` values
+  (see `docs/astra/RELEASE_CHECKLIST.md`).
 - Footprint budget: 3 upstream lines touched (budget ≤ 1,500), 1 patch (≤ 60), 0 P3. Headroom intact.
 - **Full-build proof (P1-T04, 2026-11-01):** `obj-astra-linux/dist/bin/firefox`
   → `Mozilla Firefox 153.6.0esr`; `chrome/astra.manifest` registers

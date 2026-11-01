@@ -1,0 +1,12 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra branding directory (P1-T03). RENDERED by `forge overlay` from
+# branding/astra.toml — do not edit the rendered copy in engine/.
+# @VAR@ placeholders are filled from the single source of truth (D-19);
+# OWNER_DECISION gaps fall back to dev defaults with a forge warning.
+
+# Dev channel suffix per owner direction (release drops it, P8).
+MOZ_APP_DISPLAYNAME="@ASTRA_DISPLAY_NAME@ Nightly"
+MOZ_MACBUNDLE_ID=astra-nightly
