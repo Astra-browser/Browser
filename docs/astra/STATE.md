@@ -81,7 +81,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T02 | In-tree Rust network-hook component | todo | — | — | After T01; needs engine vendor |
 | P4-T03 | Element hiding (cosmetic + click-to-hide) | todo | — | — | After Content actor review |
 | P4-T04 | Extension manager + curated gallery | todo | — | — | Needs mapping research |
-| P4-T05 | Importers (Chromium/Firefox/Zen/...) | doing | worker-imp | agent/P4-T05-import | Locked 2026-11-02; owns crates/astra-import only |
+| P4-T05 | Importers (Chromium/Firefox/Zen/...) | done | orchestrator | agent/P4-T05-import | Merged 2026-11-02; 9 sources + store round-trip, 45/45, zero net deps; FIXED latent T03 tokio macros gap (workspace build now green) |
 | P4-T06 | Tab sleeping policy | todo | — | — | Next wave |
 | P4-T07 | Private windows (nothing persisted) | done | orchestrator | agent/P4-T07-private | Merged 2026-11-02; guard + forensic tests green; host-excluded today, store wiring = caller contract (see PRIVATE.md status) |
 | P4-T08 | Downloads manager + PDF viewer | todo | — | — | Next wave |
