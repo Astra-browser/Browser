@@ -18,7 +18,7 @@ import { addEventListener } from "./Events.sys.mjs";
 import { Tabs, __applyExternalUpdate } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xhtml";
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 // ESR 153 removed resource://gre/modules/Services.sys.mjs; chrome windows
 // still expose the `Services` lazy global, so reach it through the owning
