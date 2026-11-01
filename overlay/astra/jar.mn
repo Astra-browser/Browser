@@ -24,6 +24,7 @@ astra.jar:
   content/astra/res/host/HostAPI.sys.mjs (host/HostAPI.sys.mjs)
   content/astra/res/host/Boot.sys.mjs (host/Boot.sys.mjs)
   content/astra/res/host/Windows.sys.mjs (host/Windows.sys.mjs)
+  content/astra/res/host/Session.sys.mjs (host/Session.sys.mjs)
   content/astra/res/host/Events.sys.mjs  (host/Events.sys.mjs)
   content/astra/res/host/Tabs.sys.mjs    (host/Tabs.sys.mjs)
   content/astra/res/host/Navigation.sys.mjs (host/Navigation.sys.mjs)
@@ -35,3 +36,4 @@ astra.jar:
   content/astra/res/host/schemas/events.json (host/schemas/events.json)
   content/astra/res/host/schemas/boot.json (host/schemas/boot.json)
   content/astra/res/host/schemas/windows.json (host/schemas/windows.json)
+  content/astra/res/host/schemas/session.json (host/schemas/session.json)
