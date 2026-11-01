@@ -18,6 +18,7 @@
 pub mod admission;
 pub mod downloads;
 pub mod events;
+pub mod gecko;
 pub mod ids;
 pub mod mock;
 pub mod native;
@@ -29,6 +30,7 @@ pub mod windows;
 pub use admission::Admission;
 pub use downloads::{DownloadInfo, DownloadState};
 pub use events::{EventChannel, HostEvent};
+pub use gecko::{GeckoError, GeckoHost};
 pub use ids::{DownloadId, ProfileId, SpaceId, TabId, WindowId};
 pub use mock::{MockError, MockHost};
 pub use native::HapticKind;
