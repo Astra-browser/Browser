@@ -1,0 +1,32 @@
+Patch-Id: ASTRA-0003
+Title: Link astra_blocker_engine into gkrust (libxul)
+Tier: P2
+Upstream-Files: toolkit/library/rust/shared/Cargo.toml, toolkit/library/rust/shared/lib.rs
+Intent: link the Astra blocker engine crate into libxul via the gkrust unified crate (F-08 pattern: shared/Cargo.toml dep + extern crate in shared/lib.rs, mirroring content_classifier_engine); no configure option can add a crate to gkrust, so a hook is required
+Risk: low (one dep line + one extern crate line, adjacent to the content_classifier_engine precedent; requires `cargo update -p gkrust-shared` at build time)
+Test: tools/blocker-wiring-check.sh; full-build proof in follow-up (docs/astra/BLOCKER_WIRING.md section 5)
+Verified-On: 153.6.0
+Removal-Plan: drop both lines if the blocker moves out of tree (fallback proxy); keep if ESR rebase preserves the gkrust layout
+---
+diff --git a/toolkit/library/rust/shared/Cargo.toml b/toolkit/library/rust/shared/Cargo.toml
+--- a/toolkit/library/rust/shared/Cargo.toml
++++ b/toolkit/library/rust/shared/Cargo.toml
+@@ -123,6 +123,7 @@ uritemplate_glue = { path = "../../../../netwerk/base/uritemplate_glue" }
+ 
+ adblock = { version = "0.12.1", features = ["full-regex-handling", "single-thread"], default-features = false }
+ content_classifier_engine = { path = "../../../components/content-classifier/content_classifier_engine" }
++astra_blocker_engine = { path = "../../../components/astra_blocker_engine" }
+ 
+ libz-rs-sys = { version = "0.6", features = ["custom-prefix"], optional = true }
+ zlib-rs = { version = "0.6", features = ["avx512"], optional = true }
+diff --git a/toolkit/library/rust/shared/lib.rs b/toolkit/library/rust/shared/lib.rs
+--- a/toolkit/library/rust/shared/lib.rs
++++ b/toolkit/library/rust/shared/lib.rs
+@@ -157,6 +157,7 @@ extern crate urlpattern_glue;
+ 
+ extern crate adblock;
+ extern crate content_classifier_engine;
++extern crate astra_blocker_engine;
+ 
+ #[cfg(feature = "libz-rs-sys")]
+ extern crate libz_rs_sys;

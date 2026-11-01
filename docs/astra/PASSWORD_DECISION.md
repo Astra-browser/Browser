@@ -4,12 +4,13 @@ Owner question 6 in `OWNER_QUESTIONS.md`: keep Firefox's login-manager
 surfaces, or rely on password-manager extensions as the base browser does?
 This doc is the research + recommendation. No code changed.
 
-## 1. What the base browser (Zephium snapshot) does today
+## 1. What the base browser does today (base snapshot; origin in `PROVENANCE.md`)
 
-Evidence from `folder_context/Zephium` (all paths below are snapshot-relative):
+Evidence from the `folder_context` base snapshot (all paths below are snapshot-relative):
 
 - **No built-in web login manager.** There is no save-password prompt, no
-  `about:logins` equivalent, no `logins.json`. `crates/zephium-credentials`
+  `about:logins` equivalent, no `logins.json`. The base `credentials` crate
+  is an OS-vault wrapper (Windows Credential Manager / macOS login Keychain)
   is an OS-vault wrapper (Windows Credential Manager / macOS login Keychain)
   for *app* secrets (provider API keys, connection strings) — bounded,
   content-free errors, never web credentials (`lib.rs`, `macos.rs`).
@@ -18,10 +19,10 @@ Evidence from `folder_context/Zephium` (all paths below are snapshot-relative):
   mode); `docs/product-system.md:25` lists 1Password as a validated difficult
   extension alongside Vimium and Dark Reader; README/docs mention Bitwarden.
   On macOS the browser additionally defers to the OS AutoFill passwords panel
-  (`zephium-engine/src/platform/macos/autofill.rs`); a password-manager
+  (`engine/src/platform/macos/autofill.rs` in the snapshot); a password-manager
   extension toggles the browser's own filling via
   `chrome.privacy.services.passwordSavingEnabled`.
-- **Import does not cover passwords.** `zephium-import` handles bookmarks,
+- **Import does not cover passwords.** The base `import` crate handles bookmarks,
   history and essentials only — `firefox.rs` / `chromium.rs` contain no
   login/password handling. A user migrating with saved passwords in Chrome or
   Firefox must re-enter them or go through their password-manager extension.
@@ -95,11 +96,11 @@ Disable built-in save/fill/management; passwords come from Bitwarden,
     with install/test evidence; extension-release-scope evidence already
     exists for 1Password.
 - UX: no built-in prompts on day one; users without a password manager get a
-  settings nudge toward the gallery instead of a save dialog. Matches Zephium
-  behaviour exactly, including the import gap (no password import — same as
-  Zephium today).
+  settings nudge toward the gallery instead of a save dialog. Matches the
+  base browser's behaviour exactly, including the import gap (no password
+  import — same as the base snapshot today).
 - Security review: minimal — no new privileged UI, no NSS/SDR reliance, no
-  passwords in P7 sync scope. OS-keychain secret storage (`zephium-credentials`
+  passwords in P7 sync scope. OS-keychain secret storage (the `credentials`
   port) still covers provider keys.
 - Cost: near-zero. No patches to carry across rebases; the disable is
   config-only and reversible by the user.
@@ -141,9 +142,9 @@ to false / suppress save prompts, letting users opt in.
    password manager. Is shipping without one acceptable for the daily-driver
    gate, with the gallery + settings nudge as the answer? (If no → Option A.)
 2. **Password import:** should P4-T05 import saved logins (CSV / Chrome /
-   Firefox `logins.json`), or stay at Zephium parity (bookmarks/history only)?
+   Firefox `logins.json`), or stay at base-snapshot parity (bookmarks/history only)?
    (Import only makes sense under Option A; under B it has nowhere to land.)
-3. **Credit-card/address autofill:** disable both with passwords (Zephium
+3. **Credit-card/address autofill:** disable both with passwords (base-snapshot
    parity), or keep address autofill while dropping passwords? (Splitting them
    is one pref apart, but doubles the review surface justification.)
 4. **Primary Password / OS keychain:** under Option B, OS-vault storage covers

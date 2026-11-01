@@ -514,6 +514,29 @@ fn upstream_files_of(map: &std::collections::HashMap<String, String>) -> Vec<Str
         .unwrap_or_default()
 }
 
+/// True when the patch body creates `path` as a new file (`new file mode`
+/// hunk with a matching `+++ b/<path>`). Used by the lint carve-out for
+/// patches that add new files (e.g. ASTRA-0004): the Upstream-Files entries
+/// for those files cannot exist at the engine baseline by construction.
+fn patch_adds_new_file(body: &str, path: &str) -> bool {
+    let mut new_file = false;
+    for line in body.lines() {
+        if line.starts_with("new file mode") {
+            new_file = true;
+            continue;
+        }
+        if line.starts_with("+++ b/") {
+            if new_file && line["+++ b/".len()..].trim() == path {
+                return true;
+            }
+            new_file = false;
+        } else if !line.starts_with("+++") && !line.starts_with("---") && !line.starts_with("diff ") && !line.starts_with("index ") {
+            new_file = false;
+        }
+    }
+    false
+}
+
 // Root (baseline) commit of the engine/ git repo — the `forge fetch`
 // `baseline: firefox <version>` commit. Falls back to the root commit.
 fn find_baseline(engine: &Path) -> Result<String, String> {
@@ -579,7 +602,7 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
     for p in &entries {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
         let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
-        let (header, _body) = match split_header(&text) {
+        let (header, body) = match split_header(&text) {
             Ok(v) => v,
             Err(e) => {
                 println!("lint: {name}: {e}");
@@ -633,8 +656,17 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
                 None => engine.join(f).exists(),
             };
             if have_engine_git && baseline.is_some() && !exists {
-                println!("lint: {name}: Upstream-Files entry missing at baseline: {f}");
-                ok = false;
+                // Carve-out (P4-T02, BLOCKER_WIRING.md §6): an entry missing
+                // at baseline is accepted when the patch body creates it
+                // (`new file` hunk). `forge export` requires the entry to
+                // keep covering the new file; without the entry the next
+                // export would silently drop it.
+                if patch_adds_new_file(&body, f) {
+                    println!("lint: {name}: Upstream-Files entry is patch-added new file: {f}");
+                } else {
+                    println!("lint: {name}: Upstream-Files entry missing at baseline: {f}");
+                    ok = false;
+                }
             } else if !have_engine_git && !engine.join(f).exists() {
                 println!("lint: {name}: (no engine checkout) cannot verify Upstream-Files entry: {f}");
             }

@@ -1,0 +1,48 @@
+Patch-Id: ASTRA-0005
+Title: Consult AstraBlocker verdict in the URL-classifier channel check
+Tier: P2
+Upstream-Files: netwerk/url-classifier/AsyncUrlChannelClassifier.cpp, netwerk/url-classifier/moz.build
+Intent: cancel channels whose Astra blocker verdict is Block before the fetch is issued, at the same pipeline point as classifier blocking; gated on aPerformBlocking so annotation-only passes never cancel; an upstream-file edit is required because only CheckChannelHelper sees every channel pre-connect
+Risk: medium (10 added lines at one call site; wrong verdicts fail open, and the pref defaults off so unconfigured builds are unaffected; needs the p95 latency measurement in the follow-up build)
+Test: tools/blocker-wiring-check.sh; live block/unblock contract test in follow-up build (docs/astra/BLOCKER_WIRING.md section 5)
+Verified-On: 153.6.0
+Removal-Plan: delete the 10-line block + include + LOCAL_INCLUDES line if the blocker moves out of tree (fallback proxy)
+---
+diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+--- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
++++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+@@ -5,6 +5,7 @@
+ #include "ChannelClassifierService.h"
+ #include "Classifier.h"
+ #include "ContentClassifierService.h"
++#include "mozilla/AstraBlocker.h"
+ #include "HttpBaseChannel.h"
+ #include "mozilla/Components.h"
+ #include "mozilla/ErrorNames.h"
+@@ -974,6 +975,15 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+     contentClassifierRequest.emplace(aChannel);
+   }
+ 
++  // ASTRA-0005: query the Astra blocker verdict (P4-T02). Gated on
++  // aPerformBlocking like the classifier cancel below: annotation-only
++  // passes (CheckChannelBeforeProcessResponse) must never cancel. Unlike
++  // the content classifier, Astra verdicts apply to first- and third-party
++  // loads. Cancel lands before the fetch is issued.
++  if (aPerformBlocking && AstraBlocker::ShouldBlockChannel(aChannel)) {
++    aChannel->Cancel(NS_ERROR_ABORT);
++  }
++
+   if (!task && !(contentClassifier && contentClassifier->IsInitialized())) {
+     return NS_ERROR_FAILURE;
+   }
+diff --git a/netwerk/url-classifier/moz.build b/netwerk/url-classifier/moz.build
+--- a/netwerk/url-classifier/moz.build
++++ b/netwerk/url-classifier/moz.build
+@@ -72,6 +72,7 @@ LOCAL_INCLUDES += [
+     "/netwerk/base",
+     "/netwerk/protocol/http",
+     "/toolkit/components/content-classifier",
++    "/toolkit/components/astra_blocker_engine",
+     "/toolkit/components/url-classifier",
+ ]
+ 
