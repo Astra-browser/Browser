@@ -20,7 +20,7 @@
   packaged build, placeholder art + `astra.desktop` staged, window title
   GUI-verified. Dev defaults stand in for all `OWNER_DECISION` values
   (see `docs/astra/RELEASE_CHECKLIST.md`).
-- Footprint budget: 14 upstream lines touched (budget ≤ 1,500), 2 patches (≤ 60), 0 P3. Headroom intact.
+- Footprint budget: 522 upstream lines touched (budget ≤ 1,500), 5 patches (≤ 60), 0 P3.
 - **Full-build proof (P1-T04, 2026-11-01):** `obj-astra-linux/dist/bin/firefox`
   → `Mozilla Firefox 153.6.0esr`; `chrome/astra.manifest` registers
   `content`+`resource astra`; `hello.html` + `HostAPI.sys.mjs` packaged
