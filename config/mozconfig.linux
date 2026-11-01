@@ -42,4 +42,9 @@ ac_add_options --enable-geckodriver
 # neutralised via policies/prefs in P1-T06 — see BUILD_FLAGS.md F-05b/F-05c.
 
 # sccache (P1-T04 installs it; documented option: configuring_build_options.rst).
-# ac_add_options --with-ccache=sccache
+ac_add_options --with-ccache=sccache
+
+# Release-like first build (owner direction 2026-11-01): prod-representative
+# numbers for BUILD_TIMES.md despite the slower build. Revisit if the dev
+# loop needs a faster default (plan: --disable-optimize for iteration).
+ac_add_options --enable-release

@@ -165,6 +165,7 @@ fn configure_files(engine: &Path) -> Vec<String> {
         "build/moz.configure/init.configure",
         "build/moz.configure/util.configure",
         "build/moz.configure/update-programs.configure",
+        "build/moz.configure/toolchain.configure",
         "moz.configure",
         "toolkit/moz.configure",
         "browser/moz.configure",
