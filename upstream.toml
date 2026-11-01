@@ -1,6 +1,6 @@
 # Pinned Firefox upstream (D-01). Bump via `forge bump <version>` only.
 channel = "esr"
-version = "153.0"          # UNVERIFIED U-10: exact point-release + tarball URL/checksum
+version = "153.6.0"          # verified 2026-11-01 via endoflife.date (released 2026-10-27); see docs/astra/UPSTREAM.md
 source = "tarball"         # or "git"
 url = "UNVERIFIED"         # verify against Mozilla release layout at implementation (P1-T01)
 sha256 = "UNVERIFIED"

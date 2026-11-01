@@ -1,0 +1,22 @@
+# ci-fast (P0-T08 skeleton): runs on every push/PR. Engine, UI and eval jobs
+# arrive with their phases; this skeleton gates what exists today.
+name: ci-fast
+on: [push, pull_request]
+jobs:
+  brand-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/brand-lint.sh
+  state-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/state-check.py
+  plan-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The previous product name must not appear outside the allow-list
+      # (PROVENANCE.md carries the required attribution).
+      - run: ./tools/brand-lint.sh plan.md docs/astra tools branding

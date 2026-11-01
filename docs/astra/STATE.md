@@ -14,9 +14,9 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T03b | PARITY.md (README claims vs code) | done | worker-1 | agent/P0-T03b-parity | Merged 2026-11-01; no new deviations beyond X-01…X-06 |
 | P0-T04 | KEEP/ADAPT/DROP + `BrowserHost` trait | done | worker-1 | agent/P0-T04-porting | Merged 2026-11-01; groups mapped to Host API modules |
 | P0-T05 | Rebrand tooling + `brand-lint` | done | worker-1 | agent/P0-T05-rebrand | Merged 2026-11-01; lint exits 0 clean / 1 dirty |
-| P0-T06 | License/provenance | doing | worker-1 | agent/P0-T06-license | Locked 2026-11-01; fetching MPL text + dep inventory |
+| P0-T06 | License/provenance | done | worker-1 | agent/P0-T06-license | Merged 2026-11-01; MPL LICENSE + NOTICE + 25/25 permissive |
 | P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
-| P0-T08 | CI skeleton | todo | — | — | — |
+| P0-T08 | CI skeleton | doing | worker-1 | agent/P0-T08-ci | Locked 2026-11-01; brand-lint + state-check jobs |
 | P0-T09 | Spike briefs for U-01…U-13 | doing | orchestrator | main | Index in `docs/astra/spikes/README.md` |
 | P0-T10 | Repo hygiene docs | doing | orchestrator | main | STATE (lock registry) + DECISIONS + OWNER_QUESTIONS created; orchestration rules added to plan |
 
