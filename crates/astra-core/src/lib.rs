@@ -8,18 +8,34 @@
 //! [`BrowserHost`][astra_host_trait::BrowserHost]; this crate only holds the
 //! logic that can be tested without an engine.
 
+pub mod diagnostics;
 pub mod history;
 pub mod keymap;
+pub mod keymap_ext;
+pub mod logging;
 pub mod policy;
 pub mod search;
 pub mod settings;
+pub mod settings_ext;
 pub mod tabs;
 
+pub use diagnostics::{check_db_integrity, collect as collect_diagnostics, log_tail};
+pub use diagnostics::{DbIntegrity, DiagnosticsBundle};
 pub use history::{filter_history, HistoryEntry, HistoryFilter};
 pub use keymap::{Keymap, KeymapEntry, KeymapError, KeymapOutcome};
+pub use keymap_ext::{
+    conflicts_in, export_keymap, find_conflicts, import_keymap, ConflictReport, KeyConflict,
+    KeymapImport, KeymapStoreError,
+};
+pub use logging::{
+    init_logging, is_secret_key, log_path_for_today, redact_pair, redact_text, today_log_path,
+    LoggingError, LoggingGuard, RedactingFileWriter, RedactingSink, MAX_LOG_BYTES, REDACTED,
+};
 pub use policy::{authorize, Caller};
 pub use search::{rank, score_match};
 pub use settings::{default_for, validate, SettingsError, KNOWN_SETTINGS};
+pub use settings_ext::{apply_defaults, defaults as settings_defaults, migrate, validate_all};
+pub use settings_ext::{MigrationReport, SettingsExtError};
 pub use tabs::{TabEntry, TabStrip, TabStripError};
 
 use astra_host_trait::{Admission, BrowserHost};
