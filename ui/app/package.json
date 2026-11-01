@@ -22,6 +22,7 @@
     "installer-art": "node scripts/render-installer-art.mjs"
   },
   "dependencies": {
+    "@astra/bridge": "workspace:*",
     "@hugeicons/svelte": "1.1.4",
     "@tauri-apps/api": "2.11.1",
     "@tiptap/core": "3.31.3",

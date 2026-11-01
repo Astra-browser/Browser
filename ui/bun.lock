@@ -8,6 +8,7 @@
     "app": {
       "name": "@astra/frame",
       "dependencies": {
+        "@astra/bridge": "workspace:*",
         "@hugeicons/svelte": "1.1.4",
         "@tauri-apps/api": "2.11.1",
         "@tiptap/core": "3.31.3",
@@ -65,6 +66,10 @@
         "vitest-browser-svelte": "^3.1.0",
       },
     },
+    "packages/bridge": {
+      "name": "@astra/bridge",
+      "version": "0.1.0",
+    },
     "shell": {
       "name": "@astra/shell-hello",
       "version": "0.1.0",
@@ -79,6 +84,8 @@
     "@hugeicons/svelte",
   ],
   "packages": {
+    "@astra/bridge": ["@astra/bridge@workspace:packages/bridge"],
+
     "@astra/frame": ["@astra/frame@workspace:app"],
 
     "@astra/shell-hello": ["@astra/shell-hello@workspace:shell"],

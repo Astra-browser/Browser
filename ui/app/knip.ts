@@ -50,7 +50,10 @@ export default {
     },
   },
   // Loaded by the Inlang JSON configuration and Tailwind's CSS import respectively.
-  ignoreDependencies: ["@inlang/plugin-message-format"],
+  ignoreDependencies: ["@inlang/plugin-message-format", "resource"],
+  // `resource` is the `resource://astra/…` chrome URL scheme dynamically
+  // imported by shared/ipc/bridge.ts (P2-T08, cf. ui/shell/src/host.js),
+  // not an npm package.
   // macOS tools the WebKit benches read memory with, and the sky baker's encoder.
   ignoreBinaries: ["footprint", "ffmpeg", "sips"],
 } satisfies KnipConfig;
