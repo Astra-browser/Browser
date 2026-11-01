@@ -7,7 +7,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P0-T01 | Machine/toolchain check (Linux) | doing | orchestrator | main | Initial facts in `docs/astra/DEV_SETUP.md`; `mach` absent, Firefox build reqs unverified |
+| P0-T01 | Machine/toolchain check (Linux) | done | orchestrator | main | DEV_SETUP.md facts + ESR 153.6.0 verified in UPSTREAM.md; build-reqs check deferred to P1-T04 |
 | P0-T02 | Clean repo + record base snapshot | doing | orchestrator | main | Repo initialised; base = `folder_context` snapshot (no VCS metadata), see `PROVENANCE.md` |
 | P0-T03 | Full inventory (crates, IPC, UI, storage, skills) | doing | orchestrator | main | First cut in `docs/astra/INVENTORY.md`; sub-rows below |
 | P0-T03a | IPC surface: every command/event + payloads | done | worker-1 | agent/P0-T03a-ipc-surface | Merged 2026-11-01; 267 cmds + 35 events, zero mismatches |
@@ -16,7 +16,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P0-T05 | Rebrand tooling + `brand-lint` | done | worker-1 | agent/P0-T05-rebrand | Merged 2026-11-01; lint exits 0 clean / 1 dirty |
 | P0-T06 | License/provenance | done | worker-1 | agent/P0-T06-license | Merged 2026-11-01; MPL LICENSE + NOTICE + 25/25 permissive |
 | P0-T07 | Golden capture harness | todo | — | — | Blocked on UI port + rebrand completion |
-| P0-T08 | CI skeleton | doing | worker-1 | agent/P0-T08-ci | Locked 2026-11-01; brand-lint + state-check jobs |
+| P0-T08 | CI skeleton | done | worker-1 | agent/P0-T08-ci | Merged 2026-11-01; ci-fast (brand-lint/state-check/plan-check) green locally |
 | P0-T09 | Spike briefs for U-01…U-13 | doing | orchestrator | main | Index in `docs/astra/spikes/README.md` |
 | P0-T10 | Repo hygiene docs | doing | orchestrator | main | STATE (lock registry) + DECISIONS + OWNER_QUESTIONS created; orchestration rules added to plan |
 
