@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./ui-core-BtSVXPC0.css","./AccountSummary-HsQmQZcK.css","./Disclosure-Dl6z3mqW.css","./ProfileAvatar-XF3JwCJI.css","./AccountButton-kKsgirbb.css"])))=>i.map(i=>d[i]);
-import{Sn as e}from"./chrome-shared-Qs88FKHQ.js";var t=()=>e(()=>import(`./AccountButton-_IQpbsoO.js`),__vite__mapDeps([0,1,2,3,4]),import.meta.url);export{t as loadAccountButton};

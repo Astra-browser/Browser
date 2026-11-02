@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-wDzEbHAi.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(55,n)??`Tasks`)),r=((n={},r={})=>(r.locale??e(),t(18,n)??`Search or enter an address`));export{n,r as t};

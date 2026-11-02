@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-wDzEbHAi.js";var n=((n={},r={})=>(r.locale??t(),e(753,n)??`Close tool`));export{n as t};

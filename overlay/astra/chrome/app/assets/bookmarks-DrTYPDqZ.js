@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./ui-core-BtSVXPC0.css","./IconButton-CtSiShXh.css","./EmptyState-Bn6bdKqO.css","./BookmarksPanel-LOIx8TV_.css"])))=>i.map(i=>d[i]);
-import"./compose.svelte-rzzpZW3h.js";import{Sn as e}from"./chrome-shared-Qs88FKHQ.js";var t=()=>e(()=>import(`./BookmarksPanel-Cf6f5QRn.js`),__vite__mapDeps([0,1,2,3]),import.meta.url);export{t};

@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-Qs88FKHQ.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(198,n)??`Models`)),r=((n={},r={})=>(r.locale??e(),t(267,n)??`Sign in to Astra`));export{n,r as t};
