@@ -51,6 +51,7 @@ function fail(message: string, error: unknown): void {
   }
   const target = document.getElementById("root");
   if (target instanceof HTMLElement) {
+    target.style.opacity = "";
     target.innerHTML = "";
     const doc = target.ownerDocument;
     try {
@@ -83,6 +84,64 @@ try {
   // Test seam (live suites + SHELL_APP.md): which bridge mode actually booted.
   target.dataset.bridgeMode = bridge.mode;
 
+  // First-paint gate (P3-T22): the window must never show a half-built chrome.
+  // The app mounts immediately but stays invisible until its first projection
+  // (sidebar Space section, tab rows, essentials target) has been applied, so
+  // the first visible frame is the finished UI — no late sections popping in.
+  let revealed = false;
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+    target.style.opacity = "";
+    // Perf seam: when the first complete frame became visible, in document
+    // time. Live suites assert it stays inside the boot budget.
+    try {
+      document.documentElement.dataset.astraReveal = String(Math.round(performance.now()));
+    } catch {
+      // Diagnostics only.
+    }
+  };
+  // Everything the person sees in the first frame must already be there and
+  // settled: the Space bar (with its label), the tab row (with its title), the
+  // essentials drop target and the account foot. The sidebar can render an
+  // empty shell first and fill in a pass later, so require the condition to
+  // hold for three consecutive frames before showing anything.
+  const sectionsReady = () => {
+    const bar = target.querySelector(".space-bar");
+    const row = target.querySelector("[data-astra-tab-id]");
+    return (
+      !!bar &&
+      (bar.textContent ?? "").includes("Space") &&
+      !!row &&
+      (row.textContent ?? "").trim().length > 0 &&
+      !!target.querySelector("[data-essentials-drop]") &&
+      !!target.querySelector(".shelf .case")
+    );
+  };
+  let gateTimer = 0;
+  let stable = 0;
+  const waitForStablePaint = () => {
+    if (revealed) return;
+    requestAnimationFrame(() => {
+      stable = sectionsReady() ? stable + 1 : 0;
+      if (stable >= 3) {
+        reveal();
+        return;
+      }
+      gateTimer = window.setTimeout(waitForStablePaint, 32);
+    });
+  };
+  // `visibility` would leak: a descendant can set `visibility: visible` and
+  // paint through it (measured — the sidebar did). `opacity` composites the
+  // whole subtree and cannot be overridden by children, while still laying
+  // out normally (the app measures its own box).
+  target.style.opacity = "0";
+
+  try {
+    document.title = "Astra";
+  } catch {
+    // Title is best-effort diagnostics; the mount below is the real work.
+  }
   // --- Bridge events → the DOM channels the app listens on -----------------
   // In the Tauri build Rust dispatches `astra:*` CustomEvents into the
   // webview, so `native-events.ts` subscribes to `window`. Re-dispatch the
@@ -103,18 +162,31 @@ try {
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {
       window.dispatchEvent(new CustomEvent(dom, { detail: event.payload }));
+      if (wire === "items-changed" && !revealed) {
+        waitForStablePaint();
+      }
     });
   }
 
-  try {
-    document.title = "Astra";
-  } catch {
-    // Title is best-effort diagnostics; the mount below is the real work.
-  }
   mount(App, { target });
   // The presentation barrier observes this DOM synchronously.
   flushSync();
   announce(bridge);
+  // Guarantee the first projection: the app asks for its own snapshot during
+  // onMount, but if that request raced the listener wiring the sidebar would
+  // paint an empty Space section for a frame. `bootstrap` is idempotent and
+  // re-emits `items-changed`, so this costs one in-process call and makes the
+  // first paint complete.
+  void bridge.invoke("tabs_bootstrap").catch(() => {
+    // The app's own bootstrap still runs; this is only a safety net.
+  });
+  // Start the gate as soon as the app is mounted, and never leave the window
+  // blank if a section never arrives.
+  waitForStablePaint();
+  setTimeout(() => {
+    window.clearTimeout(gateTimer);
+    reveal();
+  }, 1200);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error), error);
 }

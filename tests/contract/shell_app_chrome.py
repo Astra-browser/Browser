@@ -104,8 +104,19 @@ PROBE = """return JSON.stringify((() => {
         title: d.title,
         bridgeMode: root ? root.dataset.bridgeMode ?? null : null,
         rootKids: root ? root.children.length : null,
+        visible: root ? (root.style.opacity || "1") !== "0" : false,
+        revealMs: d.documentElement ? (d.documentElement.dataset.astraReveal ?? null) : null,
         sidebar: !!d.querySelector('[data-astra-sidebar], aside'),
         newTab: !!d.querySelector('[data-astra-new-tab]'),
+        // The first paint must already carry these: they used to arrive a
+        // frame or two late (Space header, essentials drop target, account).
+        // Real selectors from the app: SpaceBar + essentials drop + TabRow.
+        // (textContent, not innerText: the root is hidden until first paint.)
+        spaceHeader: !!d.querySelector('.space-bar')
+          || /\bSpace\b/.test(d.body ? d.body.textContent : ''),
+        dropTarget: !!d.querySelector('[data-essentials-drop]'),
+        accountFoot: !!d.querySelector('.shelf .case'),
+        tabRow: d.querySelectorAll('[data-astra-tab-id]').length > 0,
         alerts: [...d.querySelectorAll('[role=alert]')].map(a => a.textContent.slice(0, 160)),
       };
     }
@@ -157,13 +168,24 @@ def main():
 
         state = None
         deadline = time.time() + 90
+        first_doc = None
+        complete = None
+        # Snapshot the exact state at the moment the app becomes visible: that
+        # frame must already contain every sidebar section.
+        first_visible = None
         while time.time() < deadline:
             raw = m.cmd("WebDriver:ExecuteScript", {"script": PROBE, "args": []})["value"]
             state = json.loads(raw)
             app = state.get("app") or {}
-            if app.get("bridgeMode") == "host" and (app.get("rootKids") or 0) > 0:
+            now = time.time()
+            if first_doc is None and app.get("url"):
+                first_doc = now
+            if app.get("visible"):
+                if first_visible is None:
+                    first_visible = dict(app)
+                complete = now
                 break
-            time.sleep(2)
+            time.sleep(0.05)
 
         app = state.get("app") or {}
         check("app frame is a chrome:// document",
@@ -178,6 +200,27 @@ def main():
         check("app painted its own chrome",
               bool(app.get("sidebar")) and bool(app.get("newTab")),
               f"sidebar={app.get('sidebar')} newTab={app.get('newTab')}")
+        # First-paint completeness: these sections are the ones that used to
+        # appear a beat after the rest of the UI.
+        fv = first_visible or {}
+        check("first visible frame is complete (Space bar, tab row, drop target, account foot)",
+              bool(fv.get("spaceHeader")) and bool(fv.get("tabRow"))
+              and bool(fv.get("dropTarget")) and bool(fv.get("accountFoot")),
+              f"space={fv.get('spaceHeader')} tab={fv.get('tabRow')} "
+              f"drop={fv.get('dropTarget')} account={fv.get('accountFoot')}")
+        check("Space section present", bool(app.get("spaceHeader")), str(app.get("spaceHeader")))
+        check("essentials drop target present", bool(app.get("dropTarget")), str(app.get("dropTarget")))
+        check("tab row present", bool(app.get("tabRow")), str(app.get("tabRow")))
+        # "Instant" is measurable: the full sidebar must be on screen shortly
+        # after the app document exists (no late Space section / drop target).
+        elapsed_ms = None if (first_doc is None or complete is None) else round((complete - first_doc) * 1000)
+        reveal_ms = app.get("revealMs")
+        check("first complete frame revealed within 1200ms of document start",
+              reveal_ms is not None and int(reveal_ms) <= 1200,
+              f"reveal={reveal_ms}ms")
+        check("sidebar complete within 1200ms of the app document",
+              elapsed_ms is not None and elapsed_ms <= 1200,
+              f"elapsed={elapsed_ms}ms")
         check("no app error alert", not app.get("alerts"), str(app.get("alerts"))[:200])
         check("shell retired fallback chrome",
               state.get("shellBooted") == "true", str(state.get("shellBooted")))
