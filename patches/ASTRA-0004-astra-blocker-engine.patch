@@ -10,10 +10,10 @@ Removal-Plan: delete the directory + the DIRS line if the blocker moves out of t
 ---
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.cpp b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
 new file mode 100644
-index 0000000000..85dbae9c33
+index 0000000000..95970aa350
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,170 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -129,7 +129,10 @@ index 0000000000..85dbae9c33
 +    return false;
 +  }
 +  nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
-+  if (!loadingPrincipal || loadingPrincipal->IsSystemPrincipal()) {
++  bool isSystem = false;
++  if (!loadingPrincipal ||
++      (NS_SUCCEEDED(loadingPrincipal->GetIsSystemPrincipal(&isSystem)) &&
++       isSystem)) {
 +    return false;
 +  }
 +  nsCString sourceSpec;

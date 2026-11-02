@@ -30,7 +30,9 @@
 - `engine/` workspace state (git-ignored in this repo): branch `astra/esr153`
   on top of baseline `61e41ec4` (`forge fetch` tarball, GPG-verified):
   `6977cf4` hooks (ASTRA-0001..0005) + `5fbb7b9` overlay tree + `fcdb2ae`
-  vendor refresh. Reproduce with `forge fetch && forge overlay && forge import`.
+  vendor refresh + `d0c2ee2` blocker link fix (system-principal via XPCOM
+  getter; inline helper is an undefined hidden symbol at libxul link).
+  Reproduce with `forge fetch && forge overlay && forge import`.
 - Upstream sync: `engine/` has a read-only `mozilla` remote
   (`https://github.com/mozilla-firefox/firefox.git`, the official mirror;
   push disabled). Pinned tag `FIREFOX_153_6_0esr_RELEASE`, branch `esr153`.
