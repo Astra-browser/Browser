@@ -82,6 +82,25 @@ impl<'a> TimeService<'a> {
         self.scope
             .gate("time", || self.store.focus_rule_set(&host, mode))
     }
+
+    /// Bulk export (sessions plus focus rules) through the `"time"` gate:
+    /// `None` without touching the store in private scope.
+    pub fn export_json(&self) -> Option<Result<String, crate::export::ExportError>> {
+        let store = self.store;
+        self.scope
+            .gate("time", || crate::export::export_time_json(store))
+    }
+
+    /// Bulk import through the `"time"` gate: `None` without touching the
+    /// store in private scope.
+    pub fn import_json(
+        &self,
+        json: &str,
+    ) -> Option<Result<crate::export::TimeImportReport, crate::export::ExportError>> {
+        let store = self.store;
+        self.scope
+            .gate("time", || crate::export::import_time_json(store, json))
+    }
 }
 
 #[cfg(test)]

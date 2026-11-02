@@ -9,7 +9,10 @@ license = "MPL-2.0"
 astra-core = { path = "../astra-core" }
 astra-store = { path = "../astra-store" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
 
 [dev-dependencies]
+astra-notes = { path = "../astra-notes" }
+astra-tasks = { path = "../astra-tasks" }
 tempfile = "3"

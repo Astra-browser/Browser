@@ -25,6 +25,7 @@
 
 mod calendar;
 mod domain;
+mod export;
 mod parser;
 
 pub use calendar::{
@@ -32,6 +33,10 @@ pub use calendar::{
     WEEKDAY_SATURDAY,
 };
 pub use domain::{NewTask, Priority, Task, TaskLink, TaskList, TaskNode, Tasks, TasksError};
+pub use export::{
+    TaskExport, TaskLinkExport, TaskListExport, TasksBundle, TasksImportReport,
+    TASKS_EXPORT_VERSION,
+};
 pub use parser::{
     due_timestamp_utc, parse_capture, parse_capture_with_week_start, parse_time, parse_tokens,
     today_in_zone, Capture, TokenKind, Tokens,

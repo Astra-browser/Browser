@@ -16,6 +16,7 @@
 
 #![forbid(unsafe_code)]
 
+mod export;
 mod markdown;
 mod watch;
 
@@ -24,6 +25,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use astra_store::StoreError;
+pub use export::{NoteExport, NotesBundle, NOTES_EXPORT_VERSION};
 pub use markdown::{extract_title, MAX_TITLE_CHARS};
 pub use watch::{NoteWatcher, WatcherMode, POLL_INTERVAL};
 
@@ -55,6 +57,12 @@ pub enum NotesError {
     /// The file is not valid UTF-8 text.
     #[error("note is not valid UTF-8: {0}")]
     NotUtf8(String),
+    /// Export payload is not valid JSON.
+    #[error("notes JSON error: {0}")]
+    Json(String),
+    /// Export payload names an unsupported version.
+    #[error("unsupported notes export version {0} (expected {1})")]
+    VersionMismatch(u32, u32),
 }
 
 /// Live view of one note: where it is plus what the index knows.
@@ -149,7 +157,8 @@ impl NoteLibrary {
     /// Validate `rel` and resolve it inside the root. Accepts `/`-separated
     /// relative paths ending in `.md` (case-insensitive); rejects absolutes,
     /// `.`/`..`, empty segments and anything that would leave the root.
-    fn resolve(&self, rel: &str) -> Result<(String, PathBuf), NotesError> {
+    /// `pub(crate)` so the export module can validate imported paths.
+    pub(crate) fn resolve(&self, rel: &str) -> Result<(String, PathBuf), NotesError> {
         if rel.is_empty() {
             return Err(NotesError::OutsideRoot("<empty>".to_owned()));
         }
@@ -180,7 +189,8 @@ impl NoteLibrary {
     }
 
     /// The live metadata of the file at `path`, named `rel`.
-    fn stat(&self, rel: &str, path: &Path) -> Result<NoteMeta, NotesError> {
+    /// `pub(crate)` so the export module can index imported files.
+    pub(crate) fn stat(&self, rel: &str, path: &Path) -> Result<NoteMeta, NotesError> {
         let bytes = std::fs::read(path)?;
         if bytes.len() as u64 > MAX_NOTE_BYTES {
             return Err(NotesError::TooLarge {

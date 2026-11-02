@@ -16,11 +16,16 @@
 //! `time_start` / `time_end` / `focus_rule_set` never reach the store in
 //! private scope, and total reads return zero without touching disk.
 
+pub mod export;
 pub mod focus;
 pub mod host;
 pub mod service;
 pub mod tracker;
 
+pub use export::{
+    export_time_bundle, export_time_json, import_time_bundle, import_time_json, ExportError,
+    FocusRuleExport, TimeBundle, TimeImportReport, TimeSessionExport, TIME_EXPORT_VERSION,
+};
 pub use focus::{FocusBlockHook, FocusSession, FocusVerdict};
 pub use host::canonical_host;
 pub use service::TimeService;

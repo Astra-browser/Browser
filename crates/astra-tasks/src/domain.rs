@@ -116,6 +116,10 @@ pub enum TasksError {
     NotFound(i64),
     #[error("invalid input: {0}")]
     Invalid(String),
+    #[error("tasks JSON error: {0}")]
+    Json(String),
+    #[error("unsupported tasks export version {0} (expected {1})")]
+    VersionMismatch(u32, u32),
 }
 
 fn now_utc() -> i64 {
@@ -322,6 +326,26 @@ impl Tasks {
             .query_map(params![parent_id], Self::map_task_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    /// Every non-deleted task, including completed ones, in stable order.
+    /// The export uses this (not [`Tasks::open_tasks`]) so completed work
+    /// survives the round-trip too.
+    pub fn all_tasks(&self) -> Result<Vec<Task>, TasksError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, uuid, list_id, parent_id, title, notes, due_at,
+                    priority, position, completed_at
+             FROM tasks WHERE deleted_at IS NULL ORDER BY position, id",
+        )?;
+        let rows = stmt
+            .query_map([], Self::map_task_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Raw handle for the export module's UUID-preserving restores.
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
     }
 
     /// Open-task forest for a list (or the whole inbox), nested by parent.
