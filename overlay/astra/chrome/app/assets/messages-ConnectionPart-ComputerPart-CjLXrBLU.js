@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-BmfYdpMW.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(2749,n)??`Declined`)),r=((n={},r={})=>(r.locale??e(),t(2748,n)??`Waiting for you`));export{n,r as t};

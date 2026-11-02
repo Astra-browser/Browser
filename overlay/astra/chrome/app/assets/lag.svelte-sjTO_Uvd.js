@@ -1,1 +1,0 @@
-import{Jt as e,Kt as t,Lt as n,Ot as r}from"./chrome-shared-C8p95Hmz.js";var i=500;function a(a,o=i){let s=e(!1);return n(()=>{if(!a()){t(s,!1);return}let e=setTimeout(()=>t(s,!0),o);return()=>clearTimeout(e)}),{get current(){return r(s)}}}export{a as t};

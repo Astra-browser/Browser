@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-BmfYdpMW.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3754,n)??`Show fewer`)),r=((n={},r={})=>(r.locale??e(),t(3753,n)??`Recently closed`));export{n,r as t};

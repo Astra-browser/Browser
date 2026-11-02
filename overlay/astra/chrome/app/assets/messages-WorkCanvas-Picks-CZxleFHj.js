@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-BmfYdpMW.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1935,n)??`Ask`)),r=((n={},r={})=>(r.locale??e(),t(2099,n)??`Choose`)),i=((n={},r={})=>(r.locale??e(),t(1936,n)??`Decided`));export{r as n,n as r,i as t};
