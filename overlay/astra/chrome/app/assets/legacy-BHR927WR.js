@@ -1,0 +1,1 @@
+import{pn as e}from"./chrome-shared-Bi1jrgok.js";e();
