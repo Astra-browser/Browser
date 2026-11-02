@@ -35,6 +35,8 @@ export interface HostModules {
   Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -73,6 +75,14 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   time_call: ["Time", "call"],
   focus_control: ["Time", "focus"],
   history_call: ["HistoryCall", "call"],
+  about_info: ["System", "aboutInfo"],
+  system_clock_24h: ["System", "systemClock24h"],
+  update_status: ["System", "updateStatus"],
+  update_check: ["System", "updateCheck"],
+  default_browser_status: ["System", "defaultBrowserStatus"],
+  login_item_status: ["System", "loginItemStatus"],
+  ui_info: ["System", "uiInfo"],
+  resource_call: ["Resources", "call"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {

@@ -33,7 +33,7 @@
 // state, so there is no `focus-changed` to announce. The shell projects focus
 // status once the engine exists.
 
-/** The wire's own bounds (`zephium-core/src/time.rs`). */
+/** The wire's own bounds (`crates/astra-time`). */
 const MAX_SITE_BYTES = 253;
 const MAX_REPORT_BUCKETS = 31;
 const INT32_MIN = -2147483648;
