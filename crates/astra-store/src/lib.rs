@@ -422,10 +422,86 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("unsupported schema version {0} (expected {1})")]
+    VersionMismatch(u32, u32),
+    #[error("import error: {0}")]
+    Import(String),
 }
 
 fn lock_err() -> StoreError {
     StoreError::Poisoned
+}
+
+/// Table names accepted by [`Store::import_json`]: alphanumerics plus
+/// underscore only, so interpolated identifiers cannot escape quoting.
+fn is_safe_ident(name: &str) -> bool {
+    !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Decode the hex blob encoding written by [`Store::export_json`].
+fn decode_hex_blob(hex: &str, table: &str, column: &str) -> Result<Vec<u8>, StoreError> {
+    if !hex.len().is_multiple_of(2) {
+        return Err(StoreError::Import(format!(
+            "table {table} column {column}: odd-length hex blob"
+        )));
+    }
+    let bytes = hex.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len() / 2);
+    for pair in bytes.chunks(2) {
+        let text = std::str::from_utf8(pair).map_err(|_| {
+            StoreError::Import(format!("table {table} column {column}: non-UTF-8 hex blob"))
+        })?;
+        out.push(u8::from_str_radix(text, 16).map_err(|_| {
+            StoreError::Import(format!("table {table} column {column}: invalid hex blob"))
+        })?);
+    }
+    Ok(out)
+}
+
+/// Map one exported JSON value back to SQLite using the column's declared
+/// type. Missing keys arrive here as `Null`; blobs arrive hex-encoded (see
+/// [`Store::export_json`]).
+fn sqlite_value_for(
+    value: &serde_json::Value,
+    decltype: &str,
+    table: &str,
+    column: &str,
+) -> Result<rusqlite::types::Value, StoreError> {
+    use rusqlite::types::Value;
+    let bad = || StoreError::Import(format!("table {table} column {column}: type mismatch"));
+    let upper = decltype.to_ascii_uppercase();
+    if value.is_null() {
+        return Ok(Value::Null);
+    }
+    if upper.contains("INT") {
+        return match value {
+            serde_json::Value::Number(n) if n.as_i64().is_some() => {
+                Ok(Value::Integer(n.as_i64().unwrap_or(0)))
+            }
+            serde_json::Value::Bool(b) => Ok(Value::Integer(i64::from(*b))),
+            _ => Err(bad()),
+        };
+    }
+    if upper.contains("BLOB") {
+        return match value {
+            serde_json::Value::String(s) => Ok(Value::Blob(decode_hex_blob(s, table, column)?)),
+            _ => Err(bad()),
+        };
+    }
+    if upper.contains("REAL") || upper.contains("FLOA") || upper.contains("DOUB") {
+        return match value {
+            serde_json::Value::Number(n) if n.as_f64().is_some() => {
+                Ok(Value::Real(n.as_f64().unwrap_or(0.0)))
+            }
+            _ => Err(bad()),
+        };
+    }
+    match value {
+        serde_json::Value::String(s) => Ok(Value::Text(s.clone())),
+        serde_json::Value::Number(n) => Ok(Value::Text(n.to_string())),
+        serde_json::Value::Bool(b) => Ok(Value::Text(b.to_string())),
+        _ => Err(bad()),
+    }
 }
 
 /// Current UTC time in whole seconds.
@@ -969,6 +1045,117 @@ impl Store {
         }
         out.insert("tables".to_owned(), serde_json::Value::Object(dump));
         Ok(serde_json::Value::Object(out).to_string())
+    }
+
+    /// Restore a database from [`Store::export_json`].
+    ///
+    /// Version-checked against [`SCHEMA_VERSION`] (mirrors the
+    /// `astra-core` session/layout precedent: old payloads fail loudly with
+    /// [`StoreError::VersionMismatch`], never silently). Every table present
+    /// in the payload is replaced wholesale (`DELETE` + re-`INSERT` with the
+    /// original ids/UUIDs, so a re-export is byte-identical); tables absent
+    /// from the payload are left alone. Unknown tables are an error.
+    /// Foreign keys are disabled during the load and verified with
+    /// `foreign_key_check` afterwards.
+    #[tracing::instrument(skip(self, json))]
+    pub fn import_json(&self, json: &str) -> Result<(), StoreError> {
+        let value: serde_json::Value = serde_json::from_str(json)
+            .map_err(|e| StoreError::Import(format!("invalid JSON: {e}")))?;
+        let version = value
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| StoreError::Import("missing schema_version".to_owned()))?;
+        if version as u32 != SCHEMA_VERSION {
+            return Err(StoreError::VersionMismatch(version as u32, SCHEMA_VERSION));
+        }
+        let tables = value
+            .get("tables")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| StoreError::Import("missing tables object".to_owned()))?;
+        let mut conn = self.conn.lock().map_err(|_| lock_err())?;
+        let known: Vec<String> = {
+            let mut stmt = conn.prepare(
+                "SELECT name FROM sqlite_master
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )?;
+            let names: Vec<String> = stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            names
+        };
+        for table in tables.keys() {
+            if !is_safe_ident(table) || !known.iter().any(|k| k == table) {
+                return Err(StoreError::Import(format!("unknown table: {table}")));
+            }
+        }
+        conn.execute("PRAGMA foreign_keys=OFF", [])?;
+        let result = (|| -> Result<(), StoreError> {
+            let tx = conn.transaction()?;
+            for (table, rows) in tables {
+                let rows = rows
+                    .as_array()
+                    .ok_or_else(|| StoreError::Import(format!("table {table} is not an array")))?;
+                let mut info_stmt = tx.prepare(&format!("PRAGMA table_info(\"{table}\")"))?;
+                let columns: Vec<(String, String)> = info_stmt
+                    .query_map([], |row| {
+                        Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                if columns.is_empty() {
+                    return Err(StoreError::Import(format!("unknown table: {table}")));
+                }
+                tx.execute(&format!("DELETE FROM \"{table}\""), [])?;
+                let names: Vec<String> = columns
+                    .iter()
+                    .map(|(name, _)| format!("\"{name}\""))
+                    .collect();
+                let placeholders: Vec<String> =
+                    (0..columns.len()).map(|_| "?".to_owned()).collect();
+                let sql = format!(
+                    "INSERT INTO \"{table}\" ({}) VALUES ({})",
+                    names.join(", "),
+                    placeholders.join(", ")
+                );
+                let mut insert = tx.prepare(&sql)?;
+                for row in rows {
+                    let obj = row.as_object().ok_or_else(|| {
+                        StoreError::Import(format!("table {table} holds a non-object row"))
+                    })?;
+                    let mut values: Vec<rusqlite::types::Value> = Vec::with_capacity(columns.len());
+                    for (name, decltype) in &columns {
+                        let json_value = obj.get(name).unwrap_or(&serde_json::Value::Null);
+                        values.push(sqlite_value_for(json_value, decltype, table, name)?);
+                    }
+                    let refs: Vec<&dyn rusqlite::ToSql> =
+                        values.iter().map(|v| v as &dyn rusqlite::ToSql).collect();
+                    insert.execute(refs.as_slice())?;
+                }
+            }
+            tx.commit()?;
+            Ok(())
+        })();
+        conn.execute("PRAGMA foreign_keys=ON", [])?;
+        result?;
+        let violations: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA foreign_key_check")?;
+            let found: Vec<String> = stmt
+                .query_map([], |row| {
+                    Ok(format!(
+                        "table {} row {}",
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            found
+        };
+        if !violations.is_empty() {
+            return Err(StoreError::Import(format!(
+                "foreign key violations: {}",
+                violations.join(", ")
+            )));
+        }
+        Ok(())
     }
 
     // -- settings / keymap / meta -------------------------------------------
@@ -1612,6 +1799,141 @@ impl Store {
             |row| row.get(0),
         )?;
         Ok(total.unwrap_or(0))
+    }
+
+    /// Every live time session, oldest first. Used by the `astra-time`
+    /// JSON export; the aggregate [`Store::time_for_host`] is not enough
+    /// for a lossless round-trip.
+    pub fn time_session_list(&self) -> Result<Vec<TimeSessionRow>, StoreError> {
+        let conn = self.conn.lock().map_err(|_| lock_err())?;
+        let mut stmt = conn.prepare(
+            "SELECT id, uuid, url, host, title, started_at, ended_at, duration_secs
+             FROM time_sessions WHERE deleted_at IS NULL ORDER BY started_at, id",
+        )?;
+        let collected = stmt
+            .query_map([], |row| {
+                Ok(TimeSessionRow {
+                    id: row.get(0)?,
+                    uuid: row.get(1)?,
+                    url: row.get(2)?,
+                    host: row.get(3)?,
+                    title: row.get(4)?,
+                    started_at: row.get(5)?,
+                    ended_at: row.get(6)?,
+                    duration_secs: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(StoreError::from);
+        collected
+    }
+
+    /// Restore one time session with its original UUID (upsert): the write
+    /// half of the `astra-time` JSON round-trip.
+    #[allow(clippy::too_many_arguments)]
+    pub fn time_session_upsert(
+        &self,
+        uuid: &str,
+        url: &str,
+        host: &str,
+        title: &str,
+        started_at: i64,
+        ended_at: Option<i64>,
+        duration_secs: i64,
+    ) -> Result<TimeSessionRow, StoreError> {
+        let conn = self.conn.lock().map_err(|_| lock_err())?;
+        let now = now_utc();
+        conn.execute(
+            "INSERT INTO time_sessions
+             (uuid, url, host, title, started_at, ended_at, duration_secs, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT (uuid) DO UPDATE SET
+               url = excluded.url, host = excluded.host, title = excluded.title,
+               started_at = excluded.started_at, ended_at = excluded.ended_at,
+               duration_secs = excluded.duration_secs, deleted_at = NULL",
+            params![
+                uuid,
+                url,
+                host,
+                title,
+                started_at,
+                ended_at,
+                duration_secs,
+                now
+            ],
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT id, uuid, url, host, title, started_at, ended_at, duration_secs
+             FROM time_sessions WHERE uuid = ?1",
+        )?;
+        stmt.query_row(params![uuid], |row| {
+            Ok(TimeSessionRow {
+                id: row.get(0)?,
+                uuid: row.get(1)?,
+                url: row.get(2)?,
+                host: row.get(3)?,
+                title: row.get(4)?,
+                started_at: row.get(5)?,
+                ended_at: row.get(6)?,
+                duration_secs: row.get(7)?,
+            })
+        })
+        .map_err(StoreError::from)
+    }
+
+    /// Restore one focus rule with its original UUID (upsert by host, the
+    /// natural key): the write half of the `astra-time` JSON round-trip.
+    /// On conflict the existing row's UUID is kept; fresh inserts use the
+    /// supplied UUID so a re-export is identical.
+    pub fn focus_rule_upsert(
+        &self,
+        uuid: &str,
+        host: &str,
+        mode: &str,
+    ) -> Result<FocusRuleRow, StoreError> {
+        let conn = self.conn.lock().map_err(|_| lock_err())?;
+        let now = now_utc();
+        conn.execute(
+            "INSERT INTO focus_rules (uuid, host, mode, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT (host) DO UPDATE SET
+               mode = excluded.mode, updated_at = excluded.updated_at,
+               deleted_at = NULL",
+            params![uuid, host, mode, now],
+        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, uuid, host, mode FROM focus_rules WHERE host = ?1")?;
+        stmt.query_row(params![host], |row| {
+            Ok(FocusRuleRow {
+                id: row.get(0)?,
+                uuid: row.get(1)?,
+                host: row.get(2)?,
+                mode: row.get(3)?,
+            })
+        })
+        .map_err(StoreError::from)
+    }
+
+    /// Every live focus rule, by host. Used by the `astra-time` JSON
+    /// export alongside [`Store::time_session_list`].
+    pub fn focus_rule_list(&self) -> Result<Vec<FocusRuleRow>, StoreError> {
+        let conn = self.conn.lock().map_err(|_| lock_err())?;
+        let mut stmt = conn.prepare(
+            "SELECT id, uuid, host, mode FROM focus_rules
+             WHERE deleted_at IS NULL ORDER BY host",
+        )?;
+        let collected = stmt
+            .query_map([], |row| {
+                Ok(FocusRuleRow {
+                    id: row.get(0)?,
+                    uuid: row.get(1)?,
+                    host: row.get(2)?,
+                    mode: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(StoreError::from);
+        collected
     }
 
     pub fn focus_rule_set(&self, host: &str, mode: &str) -> Result<FocusRuleRow, StoreError> {
@@ -2648,5 +2970,156 @@ mod tests {
         ] {
             assert!(v["tables"].get(table).is_some(), "missing table {table}");
         }
+    }
+
+    #[test]
+    fn import_json_round_trip_is_byte_identical() {
+        let seeded = migrated();
+        seeded.setting_set("theme", "dark").unwrap();
+        seeded
+            .keymap_set("launcher.toggle", "ctrl+shift+space")
+            .unwrap();
+        seeded.history_add("https://a.example/p", "A", 42).unwrap();
+        seeded.bookmark_add("https://b.example", "B", 7).unwrap();
+        let profile = seeded.profile_create("work", true).unwrap();
+        let space = seeded.space_create(Some(profile.id), "inbox", 0).unwrap();
+        seeded.folder_create(space.id, None, "proj", 0).unwrap();
+        seeded
+            .tab_place(
+                Some(space.id),
+                None,
+                "tab-1",
+                "https://a.example",
+                "A",
+                false,
+                0,
+            )
+            .unwrap();
+        seeded.session_save("win-1", "{\"tabs\":[]}").unwrap();
+        seeded
+            .favicon_upsert(
+                "https://a.example",
+                Some("https://a.example/i.png"),
+                Some(&[1, 2, 3]),
+            )
+            .unwrap();
+        let list = seeded.task_list_create("today", 0).unwrap();
+        let task = seeded
+            .task_create(Some(list.id), "call Anna", Some(99), 1)
+            .unwrap();
+        seeded.task_link(task.id, "https://a.example", "A").unwrap();
+        seeded.note_upsert("notes/a.md", "abc", 5, "A").unwrap();
+        let ts = seeded
+            .time_start("https://a.example/x", "a.example", "X", 100)
+            .unwrap();
+        seeded.time_end(ts.id, 160).unwrap();
+        seeded.focus_rule_set("a.example", "block").unwrap();
+        seeded
+            .blocker_list_upsert("easylist", "https://example.invalid/easy", true)
+            .unwrap();
+        seeded.blocker_override_set("ads.example", "allow").unwrap();
+        seeded
+            .extension_upsert("ext-1", "Ext", "1.0", true)
+            .unwrap();
+        let run = seeded.agent_run_start("research", "test-model").unwrap();
+        seeded
+            .agent_step_add(run.id, 0, "search", "s", "d")
+            .unwrap();
+        seeded
+            .canvas_put(Some(run.id), "table", "T", "|a|", 0)
+            .unwrap();
+        seeded.memory_put("global", "m").unwrap();
+        seeded
+            .skill_register("plan", "planning skill", "skills/plan.md")
+            .unwrap();
+        seeded.mcp_register("gh", "gh", "[\"mcp\"]").unwrap();
+        seeded
+            .provider_register("anthropic", "anthropic", "")
+            .unwrap();
+        seeded
+            .approval_record(Some(run.id), "run_command", "ls", "approved")
+            .unwrap();
+        seeded.sync_state_set("cursor", "abc").unwrap();
+        seeded
+            .outbox_enqueue("spaces", "uuid-1", "upsert", "{}")
+            .unwrap();
+
+        let json = seeded.export_json().unwrap();
+        let fresh = migrated();
+        fresh.import_json(&json).unwrap();
+        assert_eq!(fresh.export_json().unwrap(), json);
+    }
+
+    #[test]
+    fn import_json_rejects_bad_versions_and_shapes() {
+        let store = migrated();
+        // Wrong schema version fails loudly, never silently.
+        let bad_version = serde_json::json!({"schema_version": 999, "tables": {}}).to_string();
+        assert!(matches!(
+            store.import_json(&bad_version),
+            Err(StoreError::VersionMismatch(999, SCHEMA_VERSION))
+        ));
+        // Missing version / tables / garbage are import errors.
+        for bad in [
+            "{}".to_owned(),
+            serde_json::json!({"schema_version": SCHEMA_VERSION}).to_string(),
+            serde_json::json!({"schema_version": SCHEMA_VERSION, "tables": []}).to_string(),
+            "{not json".to_owned(),
+        ] {
+            assert!(
+                matches!(store.import_json(&bad), Err(StoreError::Import(_))),
+                "payload must be rejected: {bad}"
+            );
+        }
+        // Unknown tables fail loudly (cross-version payload, not silent loss).
+        let unknown = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "tables": {"nope_table": []}
+        })
+        .to_string();
+        assert!(matches!(
+            store.import_json(&unknown),
+            Err(StoreError::Import(_))
+        ));
+        // A failed import leaves the store usable.
+        store.setting_set("k", "v").unwrap();
+        assert_eq!(store.setting_get("k").unwrap(), Some("v".to_owned()));
+    }
+
+    #[test]
+    fn import_json_after_migration_from_v3_preserves_tasks_and_time() {
+        let store = upgrade_from(3, false);
+        let list = store.task_list_create("today", 0).unwrap();
+        store
+            .task_create(Some(list.id), "call Anna", Some(99), 1)
+            .unwrap();
+        let ts = store
+            .time_start("https://a.example/x", "a.example", "X", 100)
+            .unwrap();
+        store.time_end(ts.id, 160).unwrap();
+        store.focus_rule_set("a.example", "block").unwrap();
+
+        let json = store.export_json().unwrap();
+        let fresh = migrated();
+        fresh.import_json(&json).unwrap();
+        assert_eq!(fresh.task_list_open(Some(list.id)).unwrap().len(), 1);
+        assert_eq!(fresh.time_for_host("a.example").unwrap(), 60);
+        assert_eq!(fresh.focus_rule_list().unwrap().len(), 1);
+        assert_eq!(fresh.export_json().unwrap(), json);
+    }
+
+    #[test]
+    fn import_json_replaces_tables_wholesale() {
+        let store = migrated();
+        store.setting_set("theme", "dark").unwrap();
+        let json = store.export_json().unwrap();
+
+        // Diverge first: the import must converge back to the payload.
+        store.setting_set("theme", "light").unwrap();
+        store.setting_set("extra", "stale").unwrap();
+        store.import_json(&json).unwrap();
+        assert_eq!(store.setting_get("theme").unwrap(), Some("dark".to_owned()));
+        assert_eq!(store.setting_get("extra").unwrap(), None);
+        assert_eq!(store.export_json().unwrap(), json);
     }
 }

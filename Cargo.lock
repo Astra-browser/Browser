@@ -139,6 +139,8 @@ dependencies = [
  "astra-store",
  "notify",
  "pulldown-cmark",
+ "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.21",
@@ -186,8 +188,11 @@ name = "astra-time"
 version = "0.1.0"
 dependencies = [
  "astra-core",
+ "astra-notes",
  "astra-store",
+ "astra-tasks",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
 ]
