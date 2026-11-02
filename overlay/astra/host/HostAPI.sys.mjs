@@ -40,6 +40,7 @@ import { Downloads } from "./Downloads.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
+import { Time } from "./Time.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -65,6 +66,7 @@ export {
   Media,
   Notes,
   Bookmarks,
+  Time,
   addEventListener,
   emit,
   eventSeq,

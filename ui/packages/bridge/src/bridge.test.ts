@@ -196,6 +196,7 @@ describe("host transport", () => {
       Media: {},
       Notes: {},
       Bookmarks: {},
+      Time: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -212,6 +213,7 @@ describe("host transport", () => {
       Commands: {}, Keymap: {}, Work: {}, Downloads: {}, Media: {},
       Notes: {},
       Bookmarks: {},
+      Time: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
