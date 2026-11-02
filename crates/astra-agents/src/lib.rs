@@ -15,12 +15,15 @@
 //! session/layout precedent: a `*_VERSION` constant, a `version` field,
 //! `to_json` / `from_json` with a loud [`VersionMismatch`]-style error, and
 //! `validate`. Helpers (parallel sub-agents, P6-T05) reuse [`run::AgentRun`]
-//! with a `parent_run_id` link; see `docs/astra/AGENTS_DESIGN.md`.
+//! with a `parent_run_id` link plus the [`helpers`] runtime (own container
+//! per helper, budgets, cancellation); see `docs/astra/AGENTS_DESIGN.md`.
 
 #![forbid(unsafe_code)]
 
 pub mod approvals;
 pub mod audit;
+pub mod handoff;
+pub mod helpers;
 pub mod memory;
 pub mod planner;
 pub mod providers;
