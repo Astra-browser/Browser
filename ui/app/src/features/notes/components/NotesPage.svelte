@@ -135,16 +135,14 @@
 
   /** Text the host has not taken yet, or a brand-new note that already has
    *  words in it. Leaving with either asks first. */
-  const unsaved = () => {
-    if (!session?.note) return false;
-    if (session.saveState !== "saved") return true;
-    return !session.note.id && session.markdown.trim() !== "";
-  };
+  /** A note with words in it: leaving it asks, saved or not, so a delete is
+   *  always one step away and nothing goes without a word. */
+  const hasWords = () => !!session?.note && session.markdown.trim() !== "";
 
   let asking = $state(false);
 
   async function leave(force = false) {
-    if (!force && unsaved()) {
+    if (!force && hasWords()) {
       asking = true;
       return;
     }
@@ -175,7 +173,7 @@
       event.preventDefault();
       // Words the host has not taken yet are worth a question before the
       // caret leaves them.
-      if (unsaved()) {
+      if (hasWords()) {
         asking = true;
         return;
       }

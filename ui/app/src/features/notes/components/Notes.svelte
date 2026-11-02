@@ -8,6 +8,7 @@
   import NoteList from "./NoteList.svelte";
   import NoteView from "./NoteView.svelte";
   import NoteNotice from "./NoteNotice.svelte";
+  import NoteLeavePrompt from "./NoteLeavePrompt.svelte";
   import { enter } from "../lib/enter";
 
   let { session }: { session: NoteSession } = $props();
@@ -22,12 +23,60 @@
 
   let scroll = $state<HTMLDivElement>();
 
+  /** Words the host has not taken yet, or a draft that already has some. */
+  /** A note with words in it: leaving it asks, saved or not, so a delete is
+   *  always one step away and nothing goes without a word. */
+  const hasWords = () => !!session.note && session.markdown.trim() !== "";
+
+  let asking = $state(false);
+
+  /** Back out of the note, asking first when there is something to lose. */
+  async function back(force = false) {
+    if (!force && hasWords()) {
+      asking = true;
+      return;
+    }
+    asking = false;
+    await session.close();
+  }
+
+  async function saveThenBack() {
+    asking = false;
+    await session.settle();
+    await back(true);
+  }
+
+  async function deleteThenBack() {
+    asking = false;
+    const id = session.note?.id;
+    if (id) await session.moveToTrash(id);
+    else session.discardDraft();
+    await back(true);
+  }
+
+  function keydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !open || event.defaultPrevented) return;
+    const target = event.target as HTMLElement;
+    if (!target.closest(".note-document")) return;
+    event.preventDefault();
+    void back();
+  }
+
   function edit() {
     scroll?.querySelector<HTMLElement>(".note-document")?.focus();
   }
 </script>
 
-<div class="notes" data-view={open ? "note" : "list"} data-note-bounds>
+{#if asking}
+  <NoteLeavePrompt
+    onsave={() => void saveThenBack()}
+    ondelete={() => void deleteThenBack()}
+    oncancel={() => (asking = false)}
+  />
+{/if}
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="notes" data-view={open ? "note" : "list"} data-note-bounds onkeydown={keydown}>
   {#if session.note}
     {#key session.note.version}
       <div class="note-scroll" bind:this={scroll} use:enter={direction}>
