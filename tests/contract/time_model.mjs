@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Time module contract (wiring): `time_call` and `focus_control` answer the
-// UI's Time and Focus projections natively instead of failing with
-// `unknown_command`.
+// Time module contract: `time_call` and `focus_control` answer the UI's Time
+// and Focus projections natively instead of failing with `unknown_command`.
 //
 //   - the reads the UI makes (`report`, `focus_days`) answer well-formed
 //     replies with zeroed buckets and no days: the host has counted nothing,
@@ -12,9 +11,17 @@
 //     rows
 //   - the profile the caller asked for is echoed on every reply, so no
 //     profile's state can be read as another's
-//   - focus control never admits a start (or any other control): a session
-//     that cannot block a site is refused, not reported as applied
-//   - a malformed or unknown call answers `error: "invalid"` and never throws
+//   - focus is a real session clock: start opens a focus phase with the
+//     right ends, stop returns to idle, skip ends the running phase and
+//     enters the next one (counting a skipped round), every fourth round
+//     takes a long break, and `allow` lets a site through for a few minutes
+//   - a phase that ended is advanced by the next status/report read, and
+//     every change — plus every admitted control — emits `focus-changed`
+//     with the new `FocusStatus`
+//   - `shut` stays empty: the clock is real, blocking sites still needs the
+//     engine's Net hook, and nothing here claims a site is blocked
+//   - a malformed or unknown call answers `error: "invalid"`; a malformed
+//     control is refused, changes nothing, and nothing throws
 //
 // Usage: node tests/contract/time_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
@@ -26,7 +33,9 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Time } = await import(path.join(HOST, "Time.sys.mjs"));
+const { Time, __setClockForTests, __resetTimeForTests } = await import(
+  path.join(HOST, "Time.sys.mjs"),
+);
 
 let passed = 0;
 let failed = 0;
@@ -254,35 +263,210 @@ for (const kind of ["page", "clear", "entries", "focus", "time", ""]) {
     nullInput.kind === "error" && nullInput.error === "invalid");
 }
 
-// === Focus control: nothing may claim a started session ====================
-for (const control of [
-  { kind: "start", minutes: 25, breaks: false },
-  { kind: "start", minutes: 5, breaks: true },
-  { kind: "start", minutes: 180, breaks: false },
-  { kind: "stop" },
-  { kind: "skip" },
-  { kind: "allow", site: "x.com" },
-]) {
-  const res = await Time.focus({ control });
-  check(`focus ${control.kind} is refused`, refused(res));
-  check(`focus ${control.kind} claims no operation`, res.operation_id === null);
+// === Focus control: a real session clock ==================================
+//
+// The clock is injected so a whole session can be walked without waiting.
+// Enforcement is still deferred: `shut` stays empty and no test claims a
+// site is blocked.
+const Events = await import(path.join(HOST, "Events.sys.mjs"));
+Events.__resetEventsForTests();
+
+const announced = [];
+const stopListening = Events.addEventListener((event) => announced.push(event));
+const lastEvent = () => announced[announced.length - 1];
+const lastStatus = () => lastEvent()?.data;
+
+const T0 = Date.UTC(2026, 10, 3, 9, 0, 0);
+let now = T0;
+function reset(at = T0) {
+  __resetTimeForTests();
+  now = at;
+  __setClockForTests(() => now);
+}
+reset();
+
+// --- start ----------------------------------------------------------------
+{
+  const began = now;
+  const res = await Time.focus({
+    control: { kind: "start", minutes: 25, breaks: true },
+  });
+  check("start is admitted", res.accepted === true && res.operation_id === null);
+  const status = Time.status();
+  check("start opens a focus phase", !!status.session && status.session.phase === "focus");
+  check("the session starts at the start instant", status.session.started_at === began);
+  check("the focus phase starts now", status.session.phase_started_at === began);
+  check("the focus phase ends 25 minutes on",
+    status.session.phase_ends_at === began + 25 * 60_000);
+  check("a new session has no finished round", status.session.rounds === 0);
+  check("a new session has counted no focused seconds", status.session.focused === 0);
+  check("a new session lets no site through",
+    Array.isArray(status.session.allowed) && status.session.allowed.length === 0);
+  check("the view echoes the length and the breaks choice",
+    status.session.minutes === 25 && status.session.breaks === true);
+  check("the view carries the break lengths",
+    status.session.break_minutes === 5 && status.session.long_break_minutes === 15);
+  check("a session shuts nothing yet (enforcement deferred)",
+    Array.isArray(status.shut) && status.shut.length === 0);
+  check("start announces focus-changed", lastEvent()?.type === "focus-changed");
+  check("the event carries a FocusStatus",
+    lastStatus()?.session?.phase === "focus" && Array.isArray(lastStatus().shut));
 }
 
+// --- the clock advances the phase ----------------------------------------
 {
-  const start = await Time.focus({ control: { kind: "start", minutes: 25, breaks: false } });
-  check("a start is never accepted", start.accepted === false);
-  check("a start names no session", !("session" in start) && !("focus" in start));
-  check("a start has no operation to observe", start.operation_id === null);
+  const endedAt = now + 25 * 60_000;
+  now = endedAt;
+  const before = announced.length;
+  const status = Time.status();
+  check("an ended focus round advances to a break", status.session.phase === "break");
+  check("the break starts where the round ended",
+    status.session.phase_started_at === endedAt);
+  check("the short break lasts five minutes",
+    status.session.phase_ends_at === endedAt + 5 * 60_000);
+  check("the finished round is counted", status.session.rounds === 1);
+  check("the finished round's seconds are counted", status.session.focused === 25 * 60);
+  check("the advance announces focus-changed",
+    announced.length === before + 1 && lastStatus().session.phase === "break");
 }
 
-// === Malformed controls are refused the same way, and never throw =========
+// --- skip a break ---------------------------------------------------------
 {
+  const skippedAt = now;
+  const res = await Time.focus({ control: { kind: "skip" } });
+  check("skipping a break is admitted", res.accepted === true);
+  const status = Time.status();
+  check("skipping a break opens the next round", status.session.phase === "focus");
+  check("the next round starts at the skip",
+    status.session.phase_started_at === skippedAt);
+  check("the next round ends a full length on",
+    status.session.phase_ends_at === skippedAt + 25 * 60_000);
+  check("skipping a break counts no extra round", status.session.rounds === 1);
+}
+
+// --- skip a round ---------------------------------------------------------
+{
+  now += 10 * 60_000;
+  const skippedAt = now;
+  const res = await Time.focus({ control: { kind: "skip" } });
+  check("skipping a focus round is admitted", res.accepted === true);
+  const status = Time.status();
+  check("skipping a focus round opens a break", status.session.phase === "break");
+  check("a skipped round is a finished round", status.session.rounds === 2);
+  check("a skipped round keeps the seconds it ran",
+    status.session.focused === 25 * 60 + 10 * 60);
+  check("the break starts at the skip", status.session.phase_started_at === skippedAt);
+  check("the break ends five minutes later",
+    status.session.phase_ends_at === skippedAt + 5 * 60_000);
+}
+
+// --- every fourth round takes a long break -------------------------------
+{
+  await Time.focus({ control: { kind: "skip" } }); // break -> focus (round 3)
+  now += 60_000;
+  await Time.focus({ control: { kind: "skip" } }); // focus -> break (round 3 done)
+  await Time.focus({ control: { kind: "skip" } }); // break -> focus (round 4)
+  now += 60_000;
+  await Time.focus({ control: { kind: "skip" } }); // focus -> long break (round 4 done)
+  const status = Time.status();
+  check("the fourth round opens a long break", status.session.phase === "long_break");
+  check("four rounds are counted", status.session.rounds === 4);
+  check("the long break lasts fifteen minutes",
+    status.session.phase_ends_at - status.session.phase_started_at === 15 * 60_000);
+}
+
+// --- allow ----------------------------------------------------------------
+{
+  reset();
+  await Time.focus({ control: { kind: "start", minutes: 25, breaks: true } });
+  const allowed = await Time.focus({ control: { kind: "allow", site: "x.com" } });
+  check("allow is admitted", allowed.accepted === true);
+  check("allow names the site", Time.status().session.allowed.includes("x.com"));
+  await Time.focus({ control: { kind: "allow", site: "x.com" } });
+  check("a repeated allow keeps one entry",
+    Time.status().session.allowed.filter((site) => site === "x.com").length === 1);
+  await Time.focus({ control: { kind: "allow", site: "news.example" } });
+  check("allow keeps every site", Time.status().session.allowed.length === 2);
+  now += 5 * 60_000;
+  check("an allowance ends after a few minutes",
+    Time.status().session.allowed.length === 0);
+  check("the phase outlives the allowance", Time.status().session.phase === "focus");
+}
+
+// --- stop -----------------------------------------------------------------
+{
+  const res = await Time.focus({ control: { kind: "stop" } });
+  check("stop is admitted", res.accepted === true);
+  const status = Time.status();
+  check("stop returns to idle", status.session === null);
+  check("idle shuts nothing", Array.isArray(status.shut) && status.shut.length === 0);
+  check("stop announces the idle status",
+    lastStatus()?.session === null && Array.isArray(lastStatus().shut));
+}
+
+// --- breaks off: a finished round opens the next round --------------------
+{
+  reset();
+  await Time.focus({ control: { kind: "start", minutes: 1, breaks: false } });
+  now += 60_000;
+  const status = Time.status();
+  check("without breaks the next phase is another round",
+    status.session.phase === "focus" && status.session.rounds === 1);
+  check("the next round starts where the last ended",
+    status.session.phase_started_at === T0 + 60_000);
+}
+
+// --- a read advances the clock too ---------------------------------------
+{
+  reset();
+  await Time.focus({ control: { kind: "start", minutes: 1, breaks: true } });
+  now += 60_000;
+  const before = announced.length;
+  const report = await call(P, {
+    kind: "report",
+    from_hour: 0,
+    bucket_hours: 1,
+    buckets: 1,
+    site: null,
+  });
+  check("a report still answers a report", report.kind === "report");
+  check("a report read advances an ended phase", Time.status().session.phase === "break");
+  check("the read announces the advance",
+    announced.length === before + 1 && lastStatus().session.phase === "break");
+}
+
+// --- every admitted control announces, a refused one does not -------------
+{
+  reset();
+  const before = announced.length;
+  const stopped = await Time.focus({ control: { kind: "stop" } });
+  check("stop while idle is admitted", stopped.accepted === true);
+  check("an admitted control announces focus-changed", announced.length === before + 1);
+  const quiet = announced.length;
+  const refusedStart = await Time.focus({
+    control: { kind: "start", minutes: 0, breaks: true },
+  });
+  check("a malformed start is refused", refused(refusedStart));
+  check("a refused control announces nothing", announced.length === quiet);
+}
+
+// === Malformed controls are refused, change nothing, and never throw ======
+{
+  reset();
+  await Time.focus({ control: { kind: "start", minutes: 25, breaks: true } });
+  const before = JSON.stringify(Time.status());
   const controls = [
-    { kind: "start", minutes: 0, breaks: false },
-    { kind: "start", minutes: 181, breaks: false },
+    { kind: "start", minutes: 0, breaks: true },
+    { kind: "start", minutes: 181, breaks: true },
+    { kind: "start", minutes: 25.5, breaks: true },
+    { kind: "start", minutes: "25", breaks: true },
     { kind: "start", minutes: 25, breaks: "yes" },
+    { kind: "start", minutes: 25 },
+    { kind: "start" },
     { kind: "allow", site: "" },
     { kind: "allow", site: "a".repeat(254) },
+    { kind: "allow", site: 7 },
+    { kind: "allow" },
     { kind: "unknown" },
     {},
     null,
@@ -299,6 +483,7 @@ for (const control of [
     }
   }
   check("malformed controls are refused without throwing", threw === false);
+  check("a refused control changes nothing", JSON.stringify(Time.status()) === before);
 }
 
 {
@@ -343,6 +528,8 @@ for (const control of [
   }
   check("hostile focus inputs answer instead of throwing", focusThrew === false);
 }
+
+stopListening();
 
 console.log(`\ntime_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
