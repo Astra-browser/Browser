@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-5kjHEXbq.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3138,n)??`End focus?`)),r=((n={},r={})=>(r.locale??e(),t(3140,n)??`Focus couldn't change. Try again.`));export{n,r as t};

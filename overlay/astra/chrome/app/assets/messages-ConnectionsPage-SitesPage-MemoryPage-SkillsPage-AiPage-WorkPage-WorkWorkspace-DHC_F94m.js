@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-5kjHEXbq.js";var n=((n={},r={})=>(r.locale??t(),e(1879,n)??`Choose a regular profile to use Work.`));export{n as t};
