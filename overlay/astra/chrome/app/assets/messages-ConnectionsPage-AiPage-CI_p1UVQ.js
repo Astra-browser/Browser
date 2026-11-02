@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-JfE8-7ou.js";var n=((n={},r={})=>(r.locale??t(),e(2782,n)??`Couldn’t open the page. Try again.`));export{n as t};

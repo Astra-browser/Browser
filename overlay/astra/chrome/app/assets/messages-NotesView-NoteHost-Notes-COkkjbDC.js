@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-JfE8-7ou.js";var n=((n={},r={})=>(r.locale??t(),e(1392,n)??`Notes are unavailable right now`));export{n as t};
