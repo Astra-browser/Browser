@@ -109,7 +109,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P6-T04 | Approval gate engine + injection suite | todo | — | — | After T01 |
 | P6-T05 | Helpers (parallel sub-agents, containers, Panes) | todo | — | — | After T01+T03 |
 | P6-T06 | Canvas UI (tables/charts/plans/code/docs) | todo | — | — | After T01 |
-| P6-T07 | Skills: port 25 bundled (rebranded) + loader | doing | worker-3 | agent/P6-T07-skills | Locked 2026-11-02; INVENTORY.md:63-71 source list; data + validation, loader later |
+| P6-T07 | Skills: port 25 bundled (rebranded) + loader | done | orchestrator | agent/P6-T07-skills | Merged 2026-11-02; 25 full ports + skill-lint clean + SKILLS.md loader contract; runtime loader rides P6-T01 |
 | P6-T08 | Memory + history recall (view/edit/delete) | todo | — | — | After T01 |
 | P6-T09 | Hand-off to Claude Code / Codex | todo | — | — | After T01+T03 |
 | P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | doing | worker-2 | agent/P6-T10-eval | Locked 2026-11-02; INVENTORY.md:73-81 harness shape; local fixtures + baselines |
