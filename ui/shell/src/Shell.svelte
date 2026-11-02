@@ -27,11 +27,20 @@
   let slot;
   let slotError = $state("");
   // P3-T15 full-app shell: the packaged app mounts into appMount (remote
-  // content browser + host relay); the interim bar/split/slot mounts stay
-  // visible and wired as the fallback (shown with appError when the Host
-  // API — and therefore the app — is unavailable).
+  // content browser + host relay). The interim mounts stay wired as the
+  // fallback: hidden once the app boots in host mode (P3-T16), shown with
+  // appError/slotError whenever the app is unavailable. The interim content
+  // slot is NEVER hidden — it is the only web-page surface (the app drives
+  // it through Host navigation events); the titlebar stays for window
+  // controls and dragging.
   let appMount;
   let appError = $state("");
+  // True once the packaged app announces host-ready. The interim chrome
+  // (titlebar/toolbar/sidebar/urlbar/split/content) is the fallback shell:
+  // it stays mounted and wired, but hides while the app owns the window so
+  // the user sees one product UI, not two nested chromes. Any app failure
+  // flips this back and surfaces appError beside the interim chrome.
+  let appBooted = $state(false);
   let appApi = null;
 
   const SIDEBAR_ITEMS = [
@@ -60,15 +69,21 @@
     }
     // P3-T15: mount the full app into the main column. The relay terminates
     // in this window's host modules, so the app boots in host mode. The
-    // interim bar/split/slot mounts stay visible and wired (live contract
-    // tests drive them; they are the fallback if the app is unavailable).
+    // interim mounts stay wired (live contract tests drive them); they hide
+    // on host-ready and return only if the app fails (P3-T16).
     appApi = mountAppFrame(appMount, host, {
       // Records the mode the app actually booted in (P3-T15 contract seam:
-      // live suites assert `host` here). Failure leaves appError set below.
+      // live suites assert `host` here). Ready also retires the interim
+      // chrome (P3-T16); a failure keeps it visible with appError set.
       onReady: (mode) => {
         appMount.dataset.appReady = mode;
+        appBooted = mode === "host";
+        if (!appBooted) {
+          appError = `app booted in ${mode} mode, expected host`;
+        }
       },
       onFailure: (message) => {
+        appBooted = false;
         appError = message;
       },
     });
@@ -281,9 +296,9 @@
 
 <div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" bind:this={frameRoot}>
   <div class="astra-titlebar-mount" bind:this={titleMount}></div>
-  <div class="astra-toolbar-mount" bind:this={toolMount}></div>
+  <div class="astra-toolbar-mount" hidden={appBooted} bind:this={toolMount}></div>
   <div class="astra-frame-body">
-    <div class="astra-sidebar-col">
+    <div class="astra-sidebar-col" hidden={appBooted}>
       <div class="astra-sidebar-mount" bind:this={sideMount}></div>
       <div class="astra-tabs-mount" bind:this={tabsMount}></div>
     </div>
@@ -293,8 +308,8 @@
           <p class="slot-error" role="alert">{appError}</p>
         {/if}
       </div>
-      <div class="astra-bar-mount" role="banner" bind:this={barMount}></div>
-      <div class="astra-split-mount" bind:this={splitMount}></div>
+      <div class="astra-bar-mount" role="banner" hidden={appBooted} bind:this={barMount}></div>
+      <div class="astra-split-mount" hidden={appBooted} bind:this={splitMount}></div>
       <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
         {#if slotError}
           <p class="slot-error" role="alert">{slotError}</p>
@@ -357,11 +372,13 @@
     flex-direction: column;
     min-height: 0;
   }
-  /* Same UA-`[hidden]` defeat as .astra-split-cell (see split.css): without
-     this the mount paints even while blankSplit() keeps a single slot.
-     :global so the compiler keeps it — `hidden` is set imperatively in
-     onMount, which the unused-selector check cannot see. */
-  :global(.astra-split-mount[hidden]) {
+  /* Author `display` rules defeat the UA `[hidden]` rule, so mounts with
+     a `hidden` binding need explicit opt-outs (same as .astra-split-cell).
+     Covers the P3-T16 app-booted retirement (sidebar/urlbar/split hide;
+     content slot and titlebar never hide) and imperative hiding in onMount. */
+  :global(.astra-split-mount[hidden]),
+  :global(.astra-sidebar-col[hidden]),
+  :global(.astra-bar-mount[hidden]) {
     display: none;
   }
   .astra-split-mount > :global(.astra-split) {
