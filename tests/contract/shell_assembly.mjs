@@ -288,7 +288,7 @@ check("shell seam keeps Tabs/Navigation/Panes/addEventListener",
   shell.includes("Tabs: host.Tabs") && shell.includes("Navigation: host.Navigation")
   && shell.includes("Panes: host.Panes") && shell.includes("addEventListener"));
 check("shell imports Frame.sys.mjs over resource://",
-  shell.includes("resource://astra/res/frame/Frame.sys.mjs"));
+  shell.includes("resource://astra/frame/Frame.sys.mjs"));
 check("shell builds DOM-window chrome adapter",
   shell.includes("chromeAdapter") && shell.includes('"minimize"')
   && shell.includes('"maximize"') && shell.includes('"restore"'));
