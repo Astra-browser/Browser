@@ -104,13 +104,13 @@ lock it: no other agent may touch that task, its files, or its branch.
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P6-T01 | Agent design doc + `astra-agents` skeleton | done | orchestrator | agent/P6-T01-agentcore | Merged 2026-11-02; 27/27 + workspace 30 green; deeper machinery (shutdown proofs, plan-lease) deferred to P6-T02+ |
-| P6-T02 | Provider layer (BYO + local, keychain keys) | todo | — | — | After T01 |
+| P6-T02 | Provider layer (BYO + local, keychain keys) | doing | worker-1 | agent/P6-T02-providers | Locked 2026-11-02; fills providers.rs + keychain; recorded fixtures + opt-in live smoke |
 | P6-T03 | Tool layer (browser/FS/command/MCP/gh) | todo | — | — | After T01 |
 | P6-T04 | Approval gate engine + injection suite | todo | — | — | After T01 |
 | P6-T05 | Helpers (parallel sub-agents, containers, Panes) | todo | — | — | After T01+T03 |
-| P6-T06 | Canvas UI (tables/charts/plans/code/docs) | todo | — | — | After T01 |
+| P6-T06 | Canvas UI (tables/charts/plans/code/docs) | doing | worker-2 | agent/P6-T06-canvas | Locked 2026-11-02; ui/app/src/features/work/canvas/** + goldens; memory UI excluded (T08) |
 | P6-T07 | Skills: port 25 bundled (rebranded) + loader | done | orchestrator | agent/P6-T07-skills | Merged 2026-11-02; 25 full ports + skill-lint clean + SKILLS.md loader contract; runtime loader rides P6-T01 |
-| P6-T08 | Memory + history recall (view/edit/delete) | todo | — | — | After T01 |
+| P6-T08 | Memory + history recall (view/edit/delete) | doing | worker-3 | agent/P6-T08-memory | Locked 2026-11-02; store memory_* + agents memory.rs + work/memory UI subdir only; canvas excluded (T06) |
 | P6-T09 | Hand-off to Claude Code / Codex | todo | — | — | After T01+T03 |
 | P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | done | orchestrator | agent/P6-T10-eval | Merged 2026-11-02; 21/21 + smoke 5/5 + cap-negative; note: contract-runner has same log_message flaw, left untouched (follow-up) |
 
