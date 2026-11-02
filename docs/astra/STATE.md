@@ -104,7 +104,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P6-T01 | Agent design doc + `astra-agents` skeleton | done | orchestrator | agent/P6-T01-agentcore | Merged 2026-11-02; 27/27 + workspace 30 green; deeper machinery (shutdown proofs, plan-lease) deferred to P6-T02+ |
-| P6-T02 | Provider layer (BYO + local, keychain keys) | doing | worker-1 | agent/P6-T02-providers | Locked 2026-11-02; fills providers.rs + keychain; recorded fixtures + opt-in live smoke |
+| P6-T02 | Provider layer (BYO + local, keychain keys) | done | orchestrator | agent/P6-T02-providers | Merged 2026-11-02; 34 unit + 27 conformance; keyring4+ureq3; keys redacted, live smokes opt-in |
 | P6-T03 | Tool layer (browser/FS/command/MCP/gh) | todo | — | — | After T01 |
 | P6-T04 | Approval gate engine + injection suite | todo | — | — | After T01 |
 | P6-T05 | Helpers (parallel sub-agents, containers, Panes) | todo | — | — | After T01+T03 |
