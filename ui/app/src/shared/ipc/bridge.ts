@@ -23,19 +23,16 @@ async function loadHostModules(): Promise<HostModules> {
 }
 
 // Schemes that always take the in-memory MOCK host. `http(s)`/`file` cover
-// goldens, `bun run dev` and static previews; `resource:` covers the packaged
-// page opened in a plain content tab (no chrome privilege, so the
+// goldens, `bun run dev` and static previews; `resource:`/`about:` cover the
+// packaged page opened in a plain content tab (no chrome privilege, so the
 // `resource://astra/host` import above would throw instead of booting
-// cleanly); `chrome:`/`about:` cover chrome/about documents, which never
-// carry the app's host relay (embedded host mode arrives over the shell
-// relay, never through a direct host import here). Anything else tries the
-// host import.
+// cleanly). `chrome:` is NOT here: the packaged app is a first-party chrome
+// document (P3-T21) and imports the Host API directly.
 const STANDALONE_PROTOCOLS = new Set([
   "http:",
   "https:",
   "file:",
   "resource:",
-  "chrome:",
   "about:",
 ]);
 

@@ -40,7 +40,10 @@
   // it stays mounted and wired, but hides while the app owns the window so
   // the user sees one product UI, not two nested chromes. Any app failure
   // flips this back and surfaces appError beside the interim chrome.
-  let appBooted = $state(false);
+  // null while the app is still booting: the window paints the app's own
+  // ground colour instead of a throwaway skeleton, so the first thing the
+  // person sees is the product UI, never the fallback chrome (P3-T21).
+  let appBooted = $state(null);
   let appApi = null;
 
   const SIDEBAR_ITEMS = [
@@ -322,11 +325,11 @@
   });
 </script>
 
-<div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" data-app-booted={appBooted} bind:this={frameRoot}>
+<div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" data-app-booted={appBooted === null ? "pending" : appBooted ? "true" : "false"} bind:this={frameRoot}>
   <div class="astra-titlebar-mount" bind:this={titleMount}></div>
-  <div class="astra-toolbar-mount" hidden={appBooted} bind:this={toolMount}></div>
+  <div class="astra-toolbar-mount" hidden={appBooted !== false} bind:this={toolMount}></div>
   <div class="astra-frame-body">
-    <div class="astra-sidebar-col" hidden={appBooted}>
+    <div class="astra-sidebar-col" hidden={appBooted !== false}>
       <div class="astra-sidebar-mount" bind:this={sideMount}></div>
       <div class="astra-tabs-mount" bind:this={tabsMount}></div>
     </div>
@@ -336,8 +339,8 @@
           <p class="slot-error" role="alert">{appError}</p>
         {/if}
       </div>
-      <div class="astra-bar-mount" role="banner" hidden={appBooted} bind:this={barMount}></div>
-      <div class="astra-split-mount" hidden={appBooted} bind:this={splitMount}></div>
+      <div class="astra-bar-mount" role="banner" hidden={appBooted !== false} bind:this={barMount}></div>
+      <div class="astra-split-mount" hidden={appBooted !== false} bind:this={splitMount}></div>
       <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
         {#if slotError}
           <p class="slot-error" role="alert">{slotError}</p>
@@ -420,24 +423,39 @@
      `hidden` bindings no longer reach them: hide by frame state instead. */
   .astra-frame[data-app-booted="true"] :global(.astra-titlebar),
   .astra-frame[data-app-booted="true"] :global(.astra-toolbar),
-  .astra-frame[data-app-booted="true"] .astra-about {
+  .astra-frame[data-app-booted="true"] .astra-about,
+  /* While booting, none of the fallback chrome is shown at all: no titlebar,
+     no toolbar, no sidebar, no split, no status strip. The app's ground
+     colour fills the window until the app announces itself. */
+  .astra-frame[data-app-booted="pending"] :global(.astra-titlebar),
+  .astra-frame[data-app-booted="pending"] :global(.astra-toolbar),
+  .astra-frame[data-app-booted="pending"] :global(.astra-sidebar-col),
+  .astra-frame[data-app-booted="pending"] .astra-sidebar-col,
+  .astra-frame[data-app-booted="pending"] :global(.astra-bar-mount),
+  .astra-frame[data-app-booted="pending"] .astra-bar-mount,
+  .astra-frame[data-app-booted="pending"] :global(.astra-split-mount),
+  .astra-frame[data-app-booted="pending"] .astra-split-mount,
+  .astra-frame[data-app-booted="pending"] .astra-about {
     display: none;
   }
-  .astra-frame[data-app-booted="true"] .astra-main {
+  .astra-frame[data-app-booted="true"] .astra-main,
+  .astra-frame[data-app-booted="pending"] .astra-main {
     position: relative;
   }
   /* The app fills the window. The content slot is only a surface for real
      pages: empty (no committed page) it takes no space at all; with a page it
      overlays the app's stage, inset by the sidebar width the app publishes
      (`sidebar_set_width` → `--astra-sidebar-width`). */
-  .astra-frame[data-app-booted="true"] .astra-content {
+  .astra-frame[data-app-booted="true"] .astra-content,
+  .astra-frame[data-app-booted="pending"] .astra-content {
     position: absolute;
     inset: 0;
     z-index: 2;
     inset-inline-start: var(--astra-sidebar-width, 0px);
     background: transparent;
   }
-  .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]) {
+  .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]),
+  .astra-frame[data-app-booted="pending"] .astra-content:not([data-has-page="true"]) {
     display: none;
   }
   /* P3-T17: the native `#browser` box is empty (toolbox, tabbox and sidebars

@@ -1,289 +1,132 @@
-// P3-T15 app frame: mounts the full product UI into the shell.
-//
-// The app is packaged at `overlay/astra/chrome/app/` (built by
-// `bun run --filter @astra/frame build:chrome`, registered in jar.mn).
-//
-// Loading mechanism (every alternative measured dead, 2026-11-02):
-//   - Subframe navigation to chrome:// or resource:// URLs fails in this
-//     build config (`No chrome package registered` / silent error events —
-//     even for the long-registered `chrome://astra/hello.html`).
-//   - An about:blank iframe + fetch + document.write DOES boot the app, but
-//     the resulting system/about-principal document sanitizes innerHTML
-//     (drops button/input/form/script — see ShouldSanitize in
-//     engine/dom/base/nsContentUtils.cpp), and Svelte builds every template
-//     with innerHTML, so the app dies in `document.importNode` on its first
-//     component. No overlay-side code can lift that sanitizer.
-// Hence: the app runs in a REMOTE content <browser> (like the P1-T10 content
-// slot) pointed at the staged files through their file:// URL (resolved from
-// the `resource://astra-app/` mapping at runtime, so no path is hardcoded).
-// file:// documents carry a content principal — no sanitizer, Svelte works —
-// and module scripts resolve same-directory.
-// The bridge crosses the privilege boundary over the message manager:
-// `window.parent.postMessage` from out-of-process content never reaches the
-// chrome window (measured: zero messages delivered), so a tiny framescript
-// (`relay-framescript.js`, loaded per-browser) forwards the entry's relay
-// frames up, and re-posts chrome's replies down into the page. The relay
-// terminates in the existing host transport (`createHostDispatch` over the
-// loaded Host API, exactly like `ui/shell/src/host.js`), and host events
-// pump back into the frame. A per-mount nonce (delivered in the shell's
-// `hello`, echoed on every frame) authenticates the mount; the shell polls
-// hello until the entry announces, so a slow boot still links up (and a
-// standalone open with no shell falls back to the entry's MOCK path).
-// The interim P1-T10/P3 bar/split/slot mounts stay visible and wired as the
-// fallback (live contract tests drive them). On any failure here the app
-// region shows the `slot-error` pattern and names the cause.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { createHostDispatch } from "../../packages/bridge/src/host-transport.js";
+// P3-T21: the product UI is a first-party chrome package, not a page loaded
+// from disk.
+//
+// The app ships as `chrome://astra/content/app/browser-chrome.html` (staged
+// into the jar by `bun run --filter @astra/frame build:chrome`), and this
+// frame embeds it as a chrome-privileged document. Because both documents are
+// `chrome://astra/` they share one principal and one process: the app imports
+// the Host API directly (`resource://astra/host/HostAPI.sys.mjs`) and there is
+// no message relay, no nonce, no `file://` URL and no out-of-process browser.
+//
+// The engine change that makes this possible is the `chrome://astra/`
+// exemption from the default system-principal innerHTML sanitization
+// (`nsContentUtils.cpp`, `IsAstraTrustedChromeDocument`): Svelte compiles
+// every component template through `template.innerHTML`, which the sanitizer
+// would otherwise strip.
+//
+// The embed is an XHTML <iframe> on purpose: a XUL <browser> created outside
+// the tabbrowser has an inert docshell on this ESR, while a chrome-privileged
+// iframe runs its own document normally. Readiness is reported by the app
+// itself (a `postMessage` handshake), so the shell never guesses when to
+// retire its fallback chrome.
 
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
-const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-/** Packaged app page (jar.mn: content + resource registrations). */
-export const APP_PAGE = "resource://astra-app/browser-chrome.html";
+/** Packaged app page (jar.mn: `% content astra %content/astra/`). */
+export const APP_PAGE = "chrome://astra/content/app/browser-chrome.html";
 
-/** Relay framescript (staged next to the app by stage-chrome.mjs). */
-export const RELAY_FRAME_SCRIPT = "resource://astra-app/relay-framescript.js";
+/** Handshake namespace between the app document and this frame. */
+export const SHELL_NS = "astra-shell";
 
-const RELAY_NS = "astra-app-relay";
-
-/** How long to wait for the app entry's ready/error report before giving up. */
+/** How long to wait for the app to announce before falling back. */
 export const APP_BOOT_TIMEOUT_MS = 60000;
 
-/** Interval for the shell's `hello` poll until the entry announces. */
-const HELLO_INTERVAL_MS = 2000;
-
-function chromeServices() {
-  const services = globalThis.Services;
-  if (!services || !services.io || !services.scriptSecurityManager) {
-    throw new Error("chrome services unavailable");
-  }
-  return services;
-}
-
-/** Resolve the staged page to a file:// URL (content browsers need one). */
-export function resolveAppFileURL() {
-  const Services = chromeServices();
-  const handler = Services.io
-    .getProtocolHandler("resource")
-    .QueryInterface(Components.interfaces.nsIResProtocolHandler);
-  const fileURL = handler.resolveURI(Services.io.newURI(APP_PAGE));
-  if (!fileURL.startsWith("file://")) {
-    throw new Error(`packaged app not on disk (${fileURL.slice(0, 24)}…)`);
-  }
-  return fileURL;
-}
-
-export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
+/**
+ * Mount the packaged app into `container`.
+ *
+ * @param {Element} container chrome-window element that owns the app
+ * @param {object} _host retained for the call signature; the app imports the
+ *   Host API itself now, so the frame does not relay anything
+ * @param {{onReady?: (mode: string) => void, onFailure?: (message: string) => void}} hooks
+ */
+export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView ?? null;
   if (!win) {
-    if (onFailure) onFailure("app frame failed to load");
+    if (onFailure) {
+      onFailure("app frame failed to load");
+    }
     return { url: APP_PAGE, element: null, destroy() {} };
   }
 
   let settled = false;
   let timer = 0;
-  let helloTimer = 0;
-  let browser = null;
-  let mm = null;
-  let commitTimer = 0;
-  const ready = (mode) => {
-    if (settled) return;
-    settled = true;
-    clearTimeout(timer);
-    clearInterval(helloTimer);
-    if (mode !== "host") {
-      if (onFailure) onFailure(`app booted in ${mode} mode, expected host`);
+  let frame = null;
+
+  const settle = (fn, value) => {
+    if (settled) {
       return;
     }
-    if (onReady) onReady(mode);
-  };
-  const fail = (message) => {
-    if (settled) return;
     settled = true;
     clearTimeout(timer);
-    clearInterval(helloTimer);
-    if (onFailure) onFailure(message);
-  };
-
-  const nonce = (() => {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      return `relay-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-    }
-  })();
-
-  const postToFrame = (frame) => {
-    try {
-      // Re-fetch per send: the message manager object is replaced across
-      // navigations (measured: a pre-commit manager throws
-      // NS_ERROR_NOT_INITIALIZED afterwards).
-      browser.messageManager.sendAsyncMessage("astra-relay-chrome", {
-        ns: RELAY_NS,
-        nonce,
-        ...frame,
-      });
-    } catch {
-      // Frame tearing down; the entry side times its relay out.
+    win.removeEventListener("message", onMessage);
+    if (fn) {
+      fn(value);
     }
   };
 
-  const onRelayMessage = (msg) => {
-    const data = msg.data;
-    if (!data || data.ns !== RELAY_NS) return;
-    try {
-      const el = container;
-      el.dataset.relaySeen = String((Number(el.dataset.relaySeen ?? 0) || 0) + 1);
-      el.dataset.relayLast = `${data.kind ?? "?"}:${data.nonce === nonce ? "ok" : "nonce-mismatch"}`;
-    } catch {
-      // Best-effort diagnostics only.
+  const onMessage = (event) => {
+    const data = event.data;
+    if (!data || data.ns !== SHELL_NS) {
+      return;
     }
-    if (data.nonce !== nonce) return;
-    if (data.kind === "req" && data.req) {
-      const req = data.req;
+    // Chrome-privileged documents share one principal, so `event.source` is
+    // null here (measured) and `origin` is the system principal's
+    // `chrome://browser` for every sender. Only our own chrome documents can
+    // reach this listener at all — web content is never a child of the
+    // browser window — so the namespace is the whole authentication.
+    if (data.kind === "ready") {
+      const mode = typeof data.mode === "string" ? data.mode : "host";
       try {
-        // Diagnostics: the last few commands the app asked the host for.
-        const log = (container.dataset.relayLog ?? "").split(",").filter(Boolean);
-        log.push(req.name);
-        container.dataset.relayLog = log.slice(-14).join(",");
+        container.dataset.appReady = mode;
       } catch {
-        // Best-effort diagnostics only.
+        // Diagnostics only.
       }
-      void (async () => {
-        let res;
-        try {
-          res = await dispatch(req);
-        } catch (error) {
-          res = {
-            v: 1,
-            id: req.id,
-            kind: "res",
-            name: req.name,
-            payload: {},
-            error: {
-              code: "relay_error",
-              message: error instanceof Error ? error.message : String(error),
-            },
-          };
-        }
-        postToFrame({ kind: "res", res });
-      })();
-    } else if (data.kind === "ready") {
-      ready(data.mode);
-    } else if (data.kind === "error") {
-      fail(`app reported: ${data.message ?? "unknown error"}`);
-    }
-  };
-
-  let dispatch;
-  try {
-    // Host event pump: forwarded into the frame, where the entry ingests
-    // them with their event_seq (end-to-end gap detection).
-    dispatch = createHostDispatch(host, (event) => {
-      postToFrame({ kind: "evt", event });
-    });
-  } catch (error) {
-    fail(`app relay unavailable (${error instanceof Error ? error.message : String(error)})`);
-    return { url: APP_PAGE, element: null, destroy() {} };
-  }
-
-  try {
-    const fileURL = resolveAppFileURL();
-    browser = doc.createElementNS(XUL_NS, "browser");
-    // Remote content browser: on ESR 153 a non-remote type=content browser
-    // created outside the tabbrowser has an inert docshell (loads never
-    // commit); remote is the only live path (see Content.sys.mjs).
-    browser.setAttribute("type", "content");
-    browser.setAttribute("remote", "true");
-    browser.setAttribute("remoteType", "web");
-    browser.setAttribute("maychangeremoteness", "true");
-    browser.setAttribute("class", "astra-app-frame");
-    browser.setAttribute("data-astra-app-frame", "");
-    browser.setAttribute("flex", "1");
-    container.appendChild(browser);
-    // Channel setup happens after the file:// navigation commits (below):
-    // the message manager object is replaced across navigations (a cached
-    // pre-commit manager throws NS_ERROR_NOT_INITIALIZED), so the framescript
-    // loads and the listener registers on the committed manager.
-    const principal = chromeServices().scriptSecurityManager.getSystemPrincipal();
-    browser.fixupAndLoadURIString(fileURL, { triggeringPrincipal: principal });
-    const started = Date.now();
-    commitTimer = setInterval(() => {
-      if (settled) {
-        clearInterval(commitTimer);
-        return;
-      }
-      let spec = "";
-      try {
-        spec = browser.currentURI ? browser.currentURI.spec : "";
-      } catch {
-        return;
-      }
-      if (spec.startsWith("about:neterror")) {
-        clearInterval(commitTimer);
-        fail("app page failed to load");
-        return;
-      }
-      if (!spec.includes("browser-chrome.html")) {
-        if (Date.now() - started > APP_BOOT_TIMEOUT_MS) {
-          clearInterval(commitTimer);
-          fail("app frame failed to commit");
-        }
-        return;
-      }
-      clearInterval(commitTimer);
-      try {
-        mm = browser.messageManager;
-        mm.loadFrameScript(RELAY_FRAME_SCRIPT, false);
-        mm.addMessageListener("astra-relay-content", onRelayMessage);
-      } catch (error) {
-        fail(`app frame failed to load (${error instanceof Error ? error.message : String(error)})`);
-      }
-    }, 250);
-  } catch (error) {
-    fail(`app frame failed to load (${error instanceof Error ? error.message : String(error)})`);
-    return { url: APP_PAGE, element: browser, destroy };
-  }
-  // The entry announces after mounting; poll hello in case the framescript
-  // attached after the entry's first announce. Sends go through the current
-  // manager (see postToFrame); failures surface on the dataset until one
-  // gets through.
-  helloTimer = setInterval(() => {
-    if (settled) return;
-    const before = Number(container.dataset.relaySeen ?? 0) || 0;
-    postToFrame({ kind: "hello" });
-    try {
-      const seen = Number(container.dataset.relaySeen ?? 0) || 0;
-      if (seen === before) {
-        container.dataset.relayHelloError = "no relay traffic yet";
+      if (mode === "host") {
+        settle(onReady, mode);
       } else {
-        delete container.dataset.relayHelloError;
+        settle(onFailure, `app booted in ${mode} mode, expected host`);
       }
-    } catch {
-      // Best-effort diagnostics only.
+    } else if (data.kind === "error") {
+      const message = typeof data.message === "string" ? data.message : "app reported an error";
+      settle(onFailure, message);
     }
-  }, HELLO_INTERVAL_MS);
-  timer = setTimeout(() => fail("app frame timed out"), APP_BOOT_TIMEOUT_MS);
+  };
+
+  win.addEventListener("message", onMessage);
+
+  try {
+    frame = doc.createElementNS(XHTML_NS, "iframe");
+    frame.setAttribute("class", "astra-app-frame");
+    frame.setAttribute("data-astra-app-frame", "");
+    frame.setAttribute("allow", "clipboard-read; clipboard-write");
+    // The embed is first-party chrome, so it may run with the chrome
+    // principal it already has; nothing here grants page content anything.
+    frame.setAttribute("src", APP_PAGE);
+    container.appendChild(frame);
+  } catch (error) {
+    settle(onFailure, `app frame failed to load (${error instanceof Error ? error.message : String(error)})`);
+    return { url: APP_PAGE, element: frame, destroy() {} };
+  }
+
+  timer = setTimeout(() => settle(onFailure, "app frame timed out"), APP_BOOT_TIMEOUT_MS);
 
   function destroy() {
     settled = true;
     clearTimeout(timer);
-    clearInterval(helloTimer);
-    clearInterval(commitTimer);
+    win.removeEventListener("message", onMessage);
     try {
-      // Listener may live on a replaced manager; removal is best-effort —
-      // the browser element (and its managers) is removed just below.
-      if (mm) mm.removeMessageListener("astra-relay-content", onRelayMessage);
-    } catch {
-      // Already torn down with the window.
-    }
-    try {
-      if (browser) browser.remove();
+      if (frame) {
+        frame.remove();
+      }
     } catch {
       // Window teardown: the frame is already gone.
     }
   }
 
-  return { url: APP_PAGE, element: browser, destroy };
+  return { url: APP_PAGE, element: frame, destroy };
 }

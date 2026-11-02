@@ -1,10 +1,36 @@
-# Full-app shell (P3-T15)
+# Full-app shell (P3-T15 → P3-T21)
 
-> Status: the running browser mounts the real product UI — not the P1-T08
-> hello skeleton — as the shell. `chrome://astra/app/browser-chrome.html`
-> (packaged from `ui/app`, golden-verified sources, HOST-mode bridge) loads
-> in a content `<browser>` inside `#astra-root`, driven by the shell loader
-> (`ui/shell/src/app-frame.js`, wired in `Shell.svelte`).
+> Status (P3-T21): the product UI **is** the browser chrome. `ui/app` ships as
+> the first-party package document
+> `chrome://astra/content/app/browser-chrome.html` and the main window embeds
+> it in a chrome-privileged `<iframe>` (`ui/shell/src/app-frame.js`). Same
+> principal, same process: the app imports the Host API directly
+> (`resource://astra/host/HostAPI.sys.mjs`). There is no `file://` page, no
+> out-of-process content browser, no framescript and no message relay.
+>
+> The one engine change this needs is patch **ASTRA-0006**: documents whose
+> URI begins `chrome://astra/` are exempt from the *default* system-principal
+> `innerHTML` sanitization (`dom/base/nsContentUtils.cpp`,
+> `IsAstraTrustedChromeDocument`). Svelte compiles every component template
+> through `template.innerHTML`; the sanitizer strips
+> button/input/form/script, so without the exemption a chrome-privileged
+> mount cannot work. The package is first-party, fully bundled, with no
+> remote or user-controlled markup; explicit `setHTML`/`setHTMLUnsafe`/
+> ParserUtils callers keep their own flags. Rationale: `DECISIONS.md` D-32.
+>
+> Boot is skeleton-free (D-33): the shell's interim titlebar/toolbar/sidebar/
+> split/status strip is a failure-only surface. While the app boots the frame
+> carries `data-app-booted="pending"`, all fallback chrome is `display:none`,
+> and the app's ground colour fills the window, so the first painted frame is
+> the product UI.
+
+## 0. History (superseded)
+
+P3-T15 mounted the same bundle through a remote content `<browser>` pointed at
+a `file://` URL plus a `relay-framescript.js` message bridge. That existed only
+because a system-principal document sanitizes `innerHTML`; ASTRA-0006 removes
+the cause, and P3-T21 deleted the workaround (browser, framescript, nonce and
+relay dispatch are gone).
 
 ## 1. What changed and why
 
@@ -15,22 +41,22 @@ page; `<Hello/>` still rendered in the shell's "Shell status" details) and
 mounts the ported product UI (`ui/app/`) as the shell content:
 
 - The app boots in **HOST mode** inside Firefox: the chrome entry
-  (`ui/app/chrome-entry/browser-chrome.ts`) configures the bridge with a
-  relay dispatch that terminates in the shell's Host API modules, instead of
-  the in-memory MOCK host. No host-vs-mock logic was changed — the relay
-  terminates in the existing host transport (`createHostDispatch`).
-- Outside the shell (no relay handshake: `file:`/`http(s):` direct opens)
+  (`ui/app/chrome-entry/browser-chrome.ts`) calls `ensureBridge`, which
+  imports the Host API modules directly (`resource://astra/host/HostAPI.sys.mjs`)
+  and dispatches through the existing host transport
+  (`createHostDispatch`). No relay, no nonce, no message manager.
+- Outside the browser (`file:`/`http(s):`/`about:`/`resource:` direct opens)
   the same bundle falls back to the existing mode detection
-  (`ensureBridge`: MOCK host), so dev previews keep working.
-- If the Host API is unavailable the shell shows
-  `Host API unavailable outside the browser window` in the app region
-  (existing `slot-error` pattern) and the interim P1-T10/P3 bar/split/slot
-  chrome stays visible; the app entry itself renders an
-  `Astra unavailable: …` alert into `#root` (message + trimmed stack, and the
-  document title, which is readable cross-process) if its own boot fails.
-- Boot mode is observable live: `#root[data-bridge-mode="host"]` in the app
-  document, `data-astra-app[data-app-ready="host"]` + relay counters
-  (`data-relay-seen`, `data-relay-hello-error`) on the shell mount.
+  (`ensureBridge`: MOCK host), so dev previews and goldens keep working.
+- The bridge bus is re-dispatched onto the `astra:*` DOM channels the UI
+  subscribes to (`native-events.ts`); in the Tauri build Rust did that, and
+  the chrome entry now does it in-process.
+- If the app fails, the shell reveals its fallback chrome and the entry
+  renders an `Astra unavailable: …` alert into `#root` (message + trimmed
+  stack, mirrored into the document title).
+- Boot state is observable live: `#root[data-bridge-mode="host"]` in the app
+  document, `data-app-booted` (`pending`/`true`/`false`) plus
+  `data-app-ready` on the shell mount.
 
 ## 2. Build path (`ui/app` → overlay)
 
@@ -59,19 +85,15 @@ which runs `vite build --config vite.chrome.ts` and then
   `-` (`messages~AboutPage-HASH.js` → `messages-AboutPage-HASH.js`): `~` is
   illegal in jar.mn and breaks `mach build faster` at jar parsing.
   `stage-chrome.mjs` owns the chrome-specific audits instead.
-- `ui/app/browser-chrome.html` + `ui/app/chrome-entry/browser-chrome.ts`
-  (new, additive): same `#root` document shape as `browser.html`; the entry
-  waits for the shell's `hello` (up to 30 s), then configures host-via-relay
-  and mounts, announcing `ready` with its bridge mode.
-- `ui/app/chrome-entry/relay-framescript.js` (new, plain script — must NOT
-  go through the bundler): loaded per-browser by the shell, forwards the
-  entry's relay frames up via `sendAsyncMessage` and re-posts chrome's
-  replies down into the page.
-- `ui/app/scripts/stage-chrome.mjs` (stdlib only): restores static files
-  (the framescript — wiped by `emptyOutDir`), regenerates the `# BEGIN/END
-  CHROME APP` block in `overlay/astra/jar.mn` (sorted, one line per staged
-  file — no hashed names hardcoded anywhere; the loader resolves the page
-  through the `resource://astra-app/` mapping), then audits chrome-CSP
+- `ui/app/browser-chrome.html` + `ui/app/chrome-entry/browser-chrome.ts`:
+  same `#root` document shape as `browser.html`; the entry boots HOST mode
+  (`ensureBridge` → direct Host API import), re-dispatches bridge events onto
+  the `astra:*` DOM channels, mounts, and posts `{ns:"astra-shell",
+  kind:"ready", mode}` to the embedding shell.
+- `ui/app/scripts/stage-chrome.mjs` (stdlib only): regenerates the
+  `# BEGIN/END CHROME APP` block in `overlay/astra/jar.mn` (sorted, one line
+  per staged file — no hashed names hardcoded anywhere; the document loads
+  through `chrome://astra/content/app/`), then audits chrome-CSP
   safety (U-04): no inline `<script>`, no remote `http(s):` script/link URLs,
   no absolute-path subresources. Output names stay hashed (cache-busting).
 
@@ -89,10 +111,10 @@ which runs `vite build --config vite.chrome.ts` and then
   markers; the script rewrites only the block.
 - `overlay/astra/chrome/shell/shell.mjs` + `shell.css`: rebuilt from
   `ui/shell/src/` (`bun run --filter @astra/shell-hello build`); the loader
-  now mounts `app-frame.js`: resolves the app page to `file://`, creates a
-  remote content `<browser>` in `.astra-app-mount` (`data-astra-app`), loads
-  the relay framescript, and relays envelopes/events with a per-mount nonce.
-  The interim bar/split/slot mounts stay visible and wired as the fallback.
+  (`app-frame.js`) creates a chrome-privileged `<iframe>` in
+  `.astra-app-mount` (`data-astra-app`) pointing at the package document and
+  waits for the app's `ready` handshake. The interim bar/split/slot mounts
+  stay wired but are `display:none` unless boot fails (D-33).
 
 ## 4. Verify
 
@@ -112,15 +134,20 @@ the hello skeleton; toolbox stays hidden (P1-T05 CSS unchanged). Live suites
 (`content_slot.py`, `frame_live.py`) drive the interim slot/tab chrome while
 the app boots concurrently — all green, no interference.
 
-## 5. Why this shape (measured, 2026-11-02)
+## 5. Why the earlier shape was rejected (measured 2026-11-02, superseded 2026-11-03)
+
+> Kept for the record. P3-T21 replaced all of it: the sanitizer is now
+> exempted for `chrome://astra/` (ASTRA-0006), a chrome-privileged iframe
+> loads the package document directly, and the relay below is deleted.
 
 Every simpler mount was probed live (headless engine build, Marionette
 chrome context) and failed for a Firefox-mechanical reason:
 
-- Subframe navigation to `chrome://` or `resource://` fails in this build
-  config (`No chrome package registered` / silent error events) — even for
-  the long-registered `chrome://astra/hello.html`. Only top-level loads
-  work, so an iframe `src` is out.
+- ~~Subframe navigation to `chrome://` fails~~ — re-measured 2026-11-03: a
+  chrome-privileged iframe **does** load
+  `chrome://astra/content/app/browser-chrome.html` (the earlier probe used a
+  URL that was not yet staged in jar.mn). What actually blocked the mount was
+  the sanitizer below.
 - `about:blank` iframe + fetch + `document.write` DOES boot the app, but
   the resulting system/about-principal document **sanitizes innerHTML**
   (drops `button`/`input`/`form`/`script` — see `ShouldSanitize` in

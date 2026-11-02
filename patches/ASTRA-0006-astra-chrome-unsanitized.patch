@@ -1,0 +1,71 @@
+Patch-Id: ASTRA-0006
+Title: Exempt the first-party chrome://astra/ UI package from default innerHTML sanitization
+Tier: P3
+Upstream-Files: dom/base/nsContentUtils.cpp
+Intent: the product UI is a bundled Svelte app served from chrome://astra/ (jar.mn). Svelte builds every component template with template.innerHTML; the default system-principal sanitization strips button/input/form/script and makes a chrome-privileged mount impossible, which forced an out-of-process file:// browser plus a framescript relay. Exempting only documents whose URI begins with chrome://astra/ (first-party, fully bundled, no remote or user-controlled markup) lets the UI run as real chrome. Explicit callers (setHTML/setHTMLUnsafe/ParserUtils) keep their own flags and are unaffected.
+Risk: medium (touches the fragment-parsing security gate). Scope is one package prefix; any other chrome document keeps the default sanitization. Rollback is deleting the two condition clauses.
+Test: tests/contract/shell_app_chrome.py (chrome iframe mounts the app, #root has children, data-bridge-mode=host) + existing live suites
+Verified-On: 153.6.0
+Removal-Plan: drop if Svelte gains a sanitizer-safe template path (or the UI is reimplemented without innerHTML templates)
+---
+diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
+index f127ff4d75..f27f7415a5 100644
+--- a/dom/base/nsContentUtils.cpp
++++ b/dom/base/nsContentUtils.cpp
+@@ -6582,6 +6582,36 @@ void nsContentUtils::SetHTMLUnsafe(
+ // Please note that about:blank and about:srcdoc inherit the security
+ // context from the embedding context and hence are not loaded using
+ // an about: scheme principal.
++//
++// ASTRA: the browser's own UI is a bundled Svelte application served from the
++// `chrome://astra/` package (jar.mn). Svelte builds every component template
++// through `template.innerHTML`, and the default system-principal
++// sanitization below strips exactly the elements a component tree needs
++// (button/input/form/script), which made a chrome-privileged mount
++// impossible and forced an out-of-process `file://` browser plus a message
++// relay. That package is first-party, fully bundled code with no remote or
++// user-controlled markup, so it is exempt from the *default* sanitization;
++// explicit callers (`setHTML`/`setHTMLUnsafe`/ParserUtils) keep their flags
++// and are unaffected.
++static bool IsAstraTrustedChromeDocument(dom::Document* aDocument) {
++  if (!aDocument) {
++    return false;
++  }
++  nsIURI* uri = aDocument->GetDocumentURI();
++  if (!uri) {
++    return false;
++  }
++  bool isChrome = false;
++  if (NS_FAILED(uri->SchemeIs("chrome", &isChrome)) || !isChrome) {
++    return false;
++  }
++  nsAutoCString spec;
++  if (NS_FAILED(uri->GetSpec(spec))) {
++    return false;
++  }
++  return StringBeginsWith(spec, "chrome://astra/"_ns);
++}
++
+ bool ShouldSanitize(nsIPrincipal* aPrincipal, int32_t aFlags) {
+   // We don't need to sanitize for setHTML(), which uses
+   // kParseFragmentNoSanitization.
+@@ -6672,7 +6702,8 @@ nsresult nsContentUtils::ParseFragmentHTML(
+   RefPtr<Document> doc = aTargetNode->OwnerDoc();
+   RefPtr<DocumentFragment> fragment;
+ 
+-  if (ShouldSanitize(nodePrincipal, aFlags)) {
++  if (ShouldSanitize(nodePrincipal, aFlags) &&
++      !IsAstraTrustedChromeDocument(doc)) {
+     if (!doc->IsLoadedAsData()) {
+       doc = nsContentUtils::CreateInertHTMLDocument(doc);
+       if (!doc) {
+@@ -6764,7 +6795,8 @@ nsresult nsContentUtils::ParseFragmentXML(const nsAString& aSourceBuffer,
+   }
+ #endif
+ 
+-  bool shouldSanitize = ShouldSanitize(nodePrincipal, aFlags);
++  bool shouldSanitize = ShouldSanitize(nodePrincipal, aFlags) &&
++                        !IsAstraTrustedChromeDocument(aDocument);
+   if (shouldSanitize && !aDocument->IsLoadedAsData()) {
+     doc = nsContentUtils::CreateInertXMLDocument(aDocument);
+   } else {

@@ -7,9 +7,8 @@
 // `vite build --config vite.chrome.ts` already emits directly into
 // `overlay/astra/chrome/app/` (outDir, wiped first). This script then:
 //   1. restores static (non-bundled) chrome/app files that live in the ui
-//      tree — currently the relay framescript
-//      (`chrome-entry/relay-framescript.js`: plain script for
-//      `messageManager.loadFrameScript`, must NOT go through the bundler),
+//      tree (none today: P3-T21 removed the relay framescript when the app
+//      became a first-party chrome document),
 //   2. regenerates the `# BEGIN/END CHROME APP` block in `overlay/astra/jar.mn`
 //      (sorted file list — deterministic; the shell loader resolves the app
 //      page through the `resource://astra-app/` mapping, so no hashed name
@@ -21,7 +20,7 @@
 // Usage: `bun run --filter @astra/frame build:chrome` (builds, then runs this).
 // Stdlib only.
 
-import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,14 +47,7 @@ if (!files.includes("browser-chrome.html")) {
 }
 
 // --- static files (not bundled; restored after emptyOutDir wipes them) ---
-const STATIC = ["relay-framescript.js"];
-for (const name of STATIC) {
-  await copyFile(
-    fileURLToPath(new URL(`../chrome-entry/${name}`, appRoot)),
-    join(appDir, name),
-  );
-  if (!files.includes(name)) files.push(name);
-}
+// None: the app ships only its bundled document + assets (P3-T21).
 files.sort();
 
 // --- CSP audit (U-04) ---

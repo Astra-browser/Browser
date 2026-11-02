@@ -37,14 +37,18 @@ describe("bridge wiring", () => {
     expect(await invoke("ui_ready")).toBe(true);
   });
 
-  test("resource:/chrome:/about: documents take the mock path (P3-T17)", async () => {
+  test("resource:/about: documents take the mock path (P3-T17)", async () => {
     const holder = globalThis as Record<string, unknown>;
     const prev = holder.window;
     try {
-      for (const protocol of ["http:", "https:", "file:", "resource:", "chrome:", "about:"]) {
+      for (const protocol of ["http:", "https:", "file:", "resource:", "about:"]) {
         holder.window = { location: { protocol } };
         expect(isStandalone("")).toBe(true);
       }
+      // The packaged app is a first-party chrome document (P3-T21): it boots
+      // host mode by importing the Host API, never mock.
+      holder.window = { location: { protocol: "chrome:" } };
+      expect(isStandalone("")).toBe(false);
       // Unknown future schemes stay fail-closed: they try the host import.
       holder.window = { location: { protocol: "moz-nullprincipal:" } };
       expect(isStandalone("")).toBe(false);
