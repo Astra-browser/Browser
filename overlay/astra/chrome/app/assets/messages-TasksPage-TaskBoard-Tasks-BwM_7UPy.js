@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-JfE8-7ou.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1076,n)??`Pinned`)),r=((n,r={})=>(r.locale??e(),t(1288,n)??`Deadline ${n?.date}`));export{n,r as t};
