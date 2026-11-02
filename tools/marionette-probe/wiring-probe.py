@@ -83,7 +83,10 @@ CLOSE_TOOL = "return (() => {" + APP_DOC + """
 TOOL_STATE = "return (() => {" + APP_DOC + """
   if (!d) return JSON.stringify({ tool: null });
   const t = d.querySelector('section.shared-tool');
-  return JSON.stringify({ tool: t ? t.getAttribute('data-tool') : null });
+  return JSON.stringify({
+    tool: t ? t.getAttribute('data-tool') : null,
+    text: t ? (t.textContent || '').replace(/\s+/g, ' ').slice(0, 160) : null,
+  });
 })()"""
 
 
