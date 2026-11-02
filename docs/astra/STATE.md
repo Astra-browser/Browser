@@ -87,17 +87,17 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T08 | Downloads manager + PDF viewer | done | orchestrator | agent/P4-T08-downloads | Merged 2026-11-02; ui 1176/1176 + svelte-check clean; bridge download routes stubbed (follow-up noted) |
 | P4-T09 | Password/autofill decision | done | orchestrator | agent/P4-T09-password | Research merged; recommends extension-only; owner decision pending (OWNER_QUESTIONS #6 expanded) |
 | P4-T10 | Performance baselines | done | orchestrator | agent/P4-T10-perf | Merged 2026-11-02; baselines recorded (startup/RAM/switch/scroll/blocker), scripts validated; confirm re-run after engine rebuild |
-| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | todo | — | — | New: P4-T03 shipped protocol+logic; live injection needs shell+bridge |
+| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | doing | worker-1 | agent/P4-T11-livehide | Locked 2026-11-02; P4-T03 shipped protocol+logic; live injection needs shell+bridge |
 
 ## Phase 5 — Tasks, Notes, Time
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P5-T01 | Tasks domain (lists, priorities, NL parser) | done | orchestrator | agent/P5-T01-tasks | Merged 2026-11-02; tasks 31/31, workspace 284/284, clippy/fmt/brand clean |
-| P5-T02 | Tasks UI + "make task" palette | todo | — | — | After T01 |
+| P5-T02 | Tasks UI + "make task" palette | doing | worker-2 | agent/P5-T02-tasks-ui | Locked 2026-11-02; tasks domain done, golden exists, needs e2e + palette row |
 | P5-T03 | Notes (Markdown files + index + watcher) | done | orchestrator | agent/P5-T03-notes | Merged 2026-11-02; notes 12/12, workspace 253/253, clippy/fmt/brand clean |
 | P5-T04 | Time tracking (per-site, focus mode) | done | orchestrator | agent/P5-T04-time | Merged 2026-11-02; time 12/12, workspace 296/296, clippy/fmt/brand clean; private-aware writes from day one |
-| P5-T05 | Export/import (JSON + Markdown) | todo | — | — | After T01/T03 |
+| P5-T05 | Export/import (JSON + Markdown) | doing | worker-3 | agent/P5-T05-export | Locked 2026-11-02; after T01/T03, needs domain export + import_json + round-trip |
 
 ## Later phases
 
