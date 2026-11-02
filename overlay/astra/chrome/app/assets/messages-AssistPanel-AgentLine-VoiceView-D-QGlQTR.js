@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-kH6qSZK0.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(2531,n)??`Open account`)),r=((n={},r={})=>(r.locale??e(),t(2530,n)??`See plans`));export{n,r as t};

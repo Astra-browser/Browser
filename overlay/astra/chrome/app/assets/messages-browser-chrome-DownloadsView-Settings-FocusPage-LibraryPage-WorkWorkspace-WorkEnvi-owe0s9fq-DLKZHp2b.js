@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-BuSjDLJN.js";var n=((n={},r={})=>(r.locale??t(),e(896,n)??`This view could not be displayed.`));export{n as t};
