@@ -24,6 +24,8 @@ export interface HostModules {
   Boot: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Sidebar: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   WebExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Settings: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Accounts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -31,6 +33,7 @@ export interface HostModules {
 /** Wire command -> `[module, method, argMap]`. Args are camelCase from the UI. */
 const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "eventSeq">, string]> = {
   tabs_open: ["Tabs", "create"],
+  tabs_bootstrap: ["Tabs", "bootstrap"],
   tabs_close: ["Tabs", "close"],
   tabs_activate: ["Tabs", "select"],
   tabs_navigate: ["Navigation", "loadURL"],
@@ -43,6 +46,9 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   sidebar_set_width: ["Sidebar", "setWidth"],
   sidebar_set_hidden: ["Sidebar", "setHidden"],
   web_extension_list: ["WebExtensions", "list"],
+  setting_get: ["Settings", "get"],
+  setting_set: ["Settings", "set"],
+  account_get: ["Accounts", "get"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {
@@ -91,7 +97,7 @@ export function createHostDispatch(
         ...(toSnakeArgs((req.payload ?? {}) as Record<string, unknown>)),
         request_id: req.id,
       });
-      return { v: PROTOCOL_VERSION, id: req.id, kind: "res", name: req.name, payload: data ?? {} };
+      return { v: PROTOCOL_VERSION, id: req.id, kind: "res", name: req.name, payload: data === undefined ? {} : data };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {

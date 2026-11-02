@@ -101,6 +101,7 @@ export function __applyExternalUpdate(id, patch = {}) {
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap });
+  emitItemsChanged();
   return snap;
 }
 
@@ -120,7 +121,101 @@ export function __historyFor(id) {
   return _history.get(id) ?? null;
 }
 
+// --- Projection for the product UI (P3-T20) -------------------------------
+// The ported app renders from `items-changed` snapshots (ItemsState), not
+// from `tab.created`/`tab.updated` deltas. Until astra-core owns this
+// projection, the host derives one from its own tab model so the shell can
+// paint the real sidebar + New Tab instead of an empty stage.
+
+const SPACE_ID = "space-1";
+const PROFILE_ID = "default";
+let _projection = 0;
+
+/** Fixed-width hex so JS string compare orders revisions without BigInt. */
+function nextRevision() {
+  _projection += 1;
+  return _projection.toString(16).padStart(16, "0");
+}
+
+/** A tab with no committed page is a New Tab: `url` is null, not about:blank. */
+function tabView(id) {
+  const tab = _tabs.get(id);
+  if (!tab) {
+    return null;
+  }
+  const h = _history.get(id) ?? { entries: [], index: -1 };
+  const blank = !tab.url || tab.url === "about:blank";
+  return {
+    id,
+    projection_revision: nextRevision(),
+    title: tab.title || (blank ? "New Tab" : ""),
+    url: blank ? null : tab.url,
+    loading: false,
+    can_go_back: h.index > 0,
+    can_go_forward: h.index >= 0 && h.index < h.entries.length - 1,
+    icon: null,
+  };
+}
+
+/** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
+export function __itemsSnapshot() {
+  const tabs = _order.map(tabView).filter(Boolean);
+  const active = _selectedId || _order[0] || null;
+  return {
+    projection_revision: nextRevision(),
+    profile: { id: PROFILE_ID, name: "Personal", kind: "default" },
+    spaces: [
+      {
+        id: SPACE_ID,
+        name: "Space",
+        icon: null,
+        color: 0,
+        theme: null,
+        tabs: tabs.length,
+        previews: [],
+      },
+    ],
+    active_space_id: SPACE_ID,
+    nodes: tabs.map((tab) => ({
+      id: tab.id,
+      parent_id: null,
+      section: "today",
+      kind: { type: "tab", tab_id: tab.id },
+    })),
+    tabs,
+    active,
+    split_group: null,
+  };
+}
+
+/** Announce the full projection; the app replaces its tree with it. */
+export function emitItemsChanged() {
+  emit("items-changed", __itemsSnapshot());
+}
+
 export const Tabs = {
+  // The app calls this on boot (and retries) to receive its first snapshot.
+  // A window always has one tab, so an empty model gets a fresh New Tab.
+  async bootstrap({ request_id = "" } = {}) {
+    if (_order.length === 0) {
+      const astra_tab_id = `tab-${_nextId++}`;
+      _tabs.set(astra_tab_id, {
+        astra_tab_id,
+        url: "",
+        title: "",
+        selected: true,
+        window_id: DEFAULT_WINDOW_ID,
+        pinned: false,
+        discarded: false,
+        muted: false,
+      });
+      _order.push(astra_tab_id);
+      _selectedId = astra_tab_id;
+    }
+    emitItemsChanged();
+    return ok(request_id, { bootstrapped: true, selected_tab_id: _selectedId });
+  },
+
   async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1 } = {}) {
     if (typeof url !== "string" || url === "") {
       return err(request_id, "invalid_url", "url must be a non-empty string");
@@ -146,6 +241,7 @@ export const Tabs = {
     if (!background || _selectedId === "") {
       selectInternal(astra_tab_id);
     }
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id, url, window_id });
   },
 
@@ -154,6 +250,7 @@ export const Tabs = {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
     }
     const snap = selectInternal(astra_tab_id);
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id, url: snap.url, window_id: snap.window_id });
   },
 
@@ -175,6 +272,7 @@ export const Tabs = {
         }
       }
     }
+    emitItemsChanged();
     return ok(request_id, { closed: existed });
   },
 

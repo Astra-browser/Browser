@@ -686,7 +686,10 @@ export function parseEnvelope(raw: unknown): Envelope {
     kind: o["kind"] as EnvelopeKind,
     name: o["name"] as string,
     ...(typeof o["seq"] === "number" ? { seq: o["seq"] as number } : {}),
-    payload: o["payload"] ?? {},
+    // A null payload is meaningful (e.g. `setting_get` for an unset key:
+    // the UI distinguishes null from an object). Only a missing payload
+    // defaults to `{}`.
+    payload: o["payload"] === undefined ? {} : o["payload"],
     ...(typeof o["error"] === "object" && o["error"] !== null
       ? { error: o["error"] as ProtoError } : {}),
   };

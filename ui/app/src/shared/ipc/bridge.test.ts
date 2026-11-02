@@ -112,6 +112,10 @@ describe("bridge wiring", () => {
       Navigation: {},
       Panes: {},
       Boot: {},
+      Sidebar: {},
+      WebExtensions: {},
+      Settings: {},
+      Accounts: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };

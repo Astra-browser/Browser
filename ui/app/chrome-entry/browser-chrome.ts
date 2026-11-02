@@ -186,6 +186,31 @@ try {
   mount(App, { target });
   // The native presentation barrier observes this DOM synchronously.
   flushSync();
+
+  // --- Bridge events → the DOM channels the app listens on (P3-T20) -------
+  // In the Tauri build Rust dispatches `astra:*` CustomEvents into the
+  // webview, so the app's `native-events.ts` subscribes to `window`. The
+  // shell relay feeds the bridge bus instead; re-dispatch here so every
+  // projection reaches the UI exactly like the native path did.
+  const DOM_CHANNELS: Record<string, string> = {
+    "items-changed": "astra:items",
+    "ui-command": "astra:ui-command",
+    "operation-processed": "astra:operation-processed",
+    "runtime-status-changed": "astra:runtime-status",
+    "blocker-status-changed": "astra:blocker-status",
+    "focus-changed": "astra:focus",
+    "downloads-changed": "astra:downloads-changed",
+    "search-changed": "astra:search",
+    "layout-changed": "astra:layout",
+    "profiles-changed": "astra:profiles",
+    "notes-changed": "astra:notes-changed",
+  };
+  for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
+    bridge.listen(wire, (event) => {
+      window.dispatchEvent(new CustomEvent(dom, { detail: event.payload }));
+    });
+  }
+
   // Report to the shell (no-op standalone: no shell is listening, and the
   // request listener above ignores everything but relay res/evt frames).
   announce?.(bridge);

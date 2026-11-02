@@ -29,6 +29,8 @@ import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
 import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
 import { Dialogs, __resetDialogsForTests } from "./Dialogs.sys.mjs";
 import { ContentHide, __resetForTests as __resetContentHideForTests } from "./ContentHide.sys.mjs";
+import { Settings, __resetSettingsForTests } from "./Settings.sys.mjs";
+import { Accounts } from "./Accounts.sys.mjs";
 import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
 import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
@@ -45,6 +47,8 @@ export {
   Containers,
   Dialogs,
   ContentHide,
+  Settings,
+  Accounts,
   Sidebar,
   WebExtensions,
   addEventListener,
@@ -66,6 +70,7 @@ export function __resetForTests() {
   __resetContainersForTests();
   __resetDialogsForTests();
   __resetContentHideForTests();
+  __resetSettingsForTests();
   __resetSidebarForTests();
   __resetWebExtensionsForTests();
   __resetEventsForTests();

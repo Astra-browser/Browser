@@ -36,7 +36,10 @@
         "pane.detached",
         "pane.rect-changed",
         "content.title-changed",
-        "content.location-changed"
+        "content.location-changed",
+        "items-changed",
+        "sidebar.changed",
+        "ui-command"
       ]
     },
     "data": { "type": "object" }

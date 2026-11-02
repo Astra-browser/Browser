@@ -142,6 +142,14 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
     if (data.nonce !== nonce) return;
     if (data.kind === "req" && data.req) {
       const req = data.req;
+      try {
+        // Diagnostics: the last few commands the app asked the host for.
+        const log = (container.dataset.relayLog ?? "").split(",").filter(Boolean);
+        log.push(req.name);
+        container.dataset.relayLog = log.slice(-14).join(",");
+      } catch {
+        // Best-effort diagnostics only.
+      }
       void (async () => {
         let res;
         try {

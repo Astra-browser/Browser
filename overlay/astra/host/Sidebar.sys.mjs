@@ -11,11 +11,13 @@
 //
 // There is no native sidebar to drive from here (the shell sidebar is DOM in
 // the chrome window, not a Host API actor), so this module keeps the last
-// reported state (width/hidden/revision) and echoes it back. State-only: it
-// emits no events, so no new entries in `schemas/events.json` are needed.
+// reported state (width/hidden/revision) and echoes it back. It also emits
+// `sidebar.changed` (P3-T20) so the shell can inset the page surface to the
+// app's own sidebar column instead of covering it.
 // Pure logic, no Firefox internals.
 
 import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+import { emit } from "./Events.sys.mjs";
 
 const _state = { width: null, animate: false, revision: null, hidden: false };
 
@@ -48,6 +50,7 @@ export const Sidebar = {
     _state.width = width;
     _state.animate = animate;
     _state.revision = revision;
+    emit("sidebar.changed", snapshot());
     return ok(request_id, snapshot());
   },
 
@@ -57,6 +60,7 @@ export const Sidebar = {
       return err(request_id, "invalid_hidden", "hidden must be a boolean");
     }
     _state.hidden = hidden;
+    emit("sidebar.changed", snapshot());
     return ok(request_id, snapshot());
   },
 

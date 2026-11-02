@@ -258,10 +258,38 @@
       if (!event || typeof event.type !== "string") {
         return;
       }
+      try {
+        // Diagnostics: which host events actually reach the shell.
+        const log = (appMount.dataset.hostEvents ?? "").split(",").filter(Boolean);
+        log.push(event.type);
+        appMount.dataset.hostEvents = [...new Set(log)].slice(-14).join(",");
+      } catch {
+        // Best-effort diagnostics only.
+      }
       if (event.type === "window.fullscreen-changed") {
         mirrorFullscreen(event.data?.fullscreen === true);
       } else if (event.type.startsWith("tab.")) {
         void refreshTabs();
+      } else if (event.type === "sidebar.changed") {
+        // The app publishes its laid-out sidebar width; inset the page
+        // surface by it so a page never covers the app's own sidebar.
+        const width = event.data?.width;
+        if (typeof width === "number" && Number.isFinite(width)) {
+          frameRoot.style.setProperty("--astra-sidebar-width", `${width}px`);
+        }
+      } else if (event.type === "nav.committed") {
+        // A real page committed: the content slot takes over the stage.
+        const url = event.data?.url;
+        if (typeof url === "string" && url !== "" && url !== "about:blank") {
+          slot.dataset.hasPage = "true";
+        }
+      } else if (event.type === "items-changed") {
+        // Back on a New Tab (no committed URL): give the stage to the app.
+        const active = event.data?.active;
+        const tab = (event.data?.tabs ?? []).find((t) => t.id === active);
+        if (tab && !tab.url) {
+          delete slot.dataset.hasPage;
+        }
       }
     });
 
@@ -294,7 +322,7 @@
   });
 </script>
 
-<div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" bind:this={frameRoot}>
+<div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" data-app-booted={appBooted} bind:this={frameRoot}>
   <div class="astra-titlebar-mount" bind:this={titleMount}></div>
   <div class="astra-toolbar-mount" hidden={appBooted} bind:this={toolMount}></div>
   <div class="astra-frame-body">
@@ -378,7 +406,38 @@
      content slot and titlebar never hide) and imperative hiding in onMount. */
   :global(.astra-split-mount[hidden]),
   :global(.astra-sidebar-col[hidden]),
-  :global(.astra-bar-mount[hidden]) {
+  :global(.astra-bar-mount[hidden]),
+  /* The titlebar/toolbar are built by frame.js, so their author `display`
+     rules defeat the UA `[hidden]` rule exactly like the mounts above. */
+  :global(.astra-titlebar[hidden]),
+  :global(.astra-toolbar[hidden]) {
+    display: none;
+  }
+  /* P3-T20: once the app owns the window it *is* the chrome — the interim
+     titlebar/toolbar/sidebar/split/diagnostic strip must not claim space, or
+     the window shows two nested chromes (and 81px of dead strip). The
+     titlebar/toolbar are built by frame.js and replace their mounts, so the
+     `hidden` bindings no longer reach them: hide by frame state instead. */
+  .astra-frame[data-app-booted="true"] :global(.astra-titlebar),
+  .astra-frame[data-app-booted="true"] :global(.astra-toolbar),
+  .astra-frame[data-app-booted="true"] .astra-about {
+    display: none;
+  }
+  .astra-frame[data-app-booted="true"] .astra-main {
+    position: relative;
+  }
+  /* The app fills the window. The content slot is only a surface for real
+     pages: empty (no committed page) it takes no space at all; with a page it
+     overlays the app's stage, inset by the sidebar width the app publishes
+     (`sidebar_set_width` → `--astra-sidebar-width`). */
+  .astra-frame[data-app-booted="true"] .astra-content {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    inset-inline-start: var(--astra-sidebar-width, 0px);
+    background: transparent;
+  }
+  .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]) {
     display: none;
   }
   /* P3-T17: the native `#browser` box is empty (toolbox, tabbox and sidebars
