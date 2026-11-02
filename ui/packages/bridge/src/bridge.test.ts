@@ -197,6 +197,7 @@ describe("host transport", () => {
       Notes: {},
       Bookmarks: {},
       Time: {},
+      HistoryCall: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -214,6 +215,7 @@ describe("host transport", () => {
       Notes: {},
       Bookmarks: {},
       Time: {},
+      HistoryCall: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };

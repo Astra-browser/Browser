@@ -41,6 +41,7 @@ import { Media } from "./Media.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
 import { Time } from "./Time.sys.mjs";
+import { HistoryCall } from "./HistoryCall.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -67,6 +68,7 @@ export {
   Notes,
   Bookmarks,
   Time,
+  HistoryCall,
   addEventListener,
   emit,
   eventSeq,
