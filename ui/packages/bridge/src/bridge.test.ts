@@ -227,6 +227,36 @@ describe("host transport", () => {
     await expect(b.invoke("blocker_status")).rejects.toMatchObject({ code: "unknown_command" });
   });
 
+  test("tab arguments are mapped onto the Host API's names", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const fake = {
+      Tabs: {
+        close: async (args: Record<string, unknown>) => {
+          seen.push(args);
+          return { closed: true };
+        },
+      },
+      Navigation: {
+        loadURL: async (args: Record<string, unknown>) => {
+          seen.push(args);
+          return { url: args["url"] };
+        },
+      },
+      Panes: {}, Boot: {}, Sidebar: {}, WebExtensions: {}, Settings: {}, Accounts: {},
+      Commands: {}, Keymap: {}, Work: {}, Downloads: {}, Media: {}, Notes: {},
+      Bookmarks: {}, Time: {}, HistoryCall: {}, System: {}, Resources: {},
+      addEventListener: () => () => {},
+      eventSeq: () => 0,
+    };
+    const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never), newId: () => "req-3" });
+    await expect(b.invoke("tabs_close", { id: "tab-7" })).resolves.toEqual({ closed: true });
+    expect(seen[0]).toMatchObject({ astra_tab_id: "tab-7", request_id: "req-3" });
+    expect(seen[0]).not.toHaveProperty("id");
+    await b.invoke("tabs_navigate", { id: "tab-7", input: "https://example.com" });
+    expect(seen[1]).toMatchObject({ astra_tab_id: "tab-7", url: "https://example.com" });
+    expect(seen[1]).not.toHaveProperty("input");
+  });
+
   test("routes sidebar + extension commands to new Host modules", async () => {
     const calls: unknown[] = [];
     const fake = {

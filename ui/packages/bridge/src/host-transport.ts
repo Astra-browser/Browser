@@ -41,16 +41,32 @@ export interface HostModules {
   eventSeq: () => number;
 }
 
-/** Wire command -> `[module, method, argMap]`. Args are camelCase from the UI. */
-const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "eventSeq">, string]> = {
+/**
+ * Wire command -> `[module, method, argMap]`. Args are camelCase from the UI.
+ *
+ * `argMap` renames a wire argument onto the Host API's own name after the
+ * camelCase -> snake_case pass. The UI speaks the product's vocabulary (`id`,
+ * `input`); the Host API speaks the tab's (`astra_tab_id`, `url`). Without the
+ * map the call arrives well-formed but with an empty id, and the host answers
+ * `no_such_tab` for a tab the person is looking at.
+ */
+type Route = [
+  keyof Omit<HostModules, "addEventListener" | "eventSeq">,
+  string,
+  Record<string, string>?,
+];
+
+const TAB_ARG: Record<string, string> = { id: "astra_tab_id" };
+
+const ROUTES: Record<string, Route> = {
   tabs_open: ["Tabs", "create"],
   tabs_bootstrap: ["Tabs", "bootstrap"],
-  tabs_close: ["Tabs", "close"],
-  tabs_activate: ["Tabs", "select"],
-  tabs_navigate: ["Navigation", "loadURL"],
-  tabs_back: ["Navigation", "goBack"],
-  tabs_forward: ["Navigation", "goForward"],
-  tabs_reload: ["Navigation", "reload"],
+  tabs_close: ["Tabs", "close", TAB_ARG],
+  tabs_activate: ["Tabs", "select", TAB_ARG],
+  tabs_navigate: ["Navigation", "loadURL", { ...TAB_ARG, input: "url" }],
+  tabs_back: ["Navigation", "goBack", TAB_ARG],
+  tabs_forward: ["Navigation", "goForward", TAB_ARG],
+  tabs_reload: ["Navigation", "reload", TAB_ARG],
   panel_hide: ["Panes", "hide"],
   panel_ready: ["Panes", "list"],
   ui_ready: ["Boot", "handshake"],
@@ -114,7 +130,7 @@ export function createHostDispatch(
         error: { code: "unknown_command", message: `no host route for ${req.name}` },
       };
     }
-    const [moduleName, method] = route;
+    const [moduleName, method, argMap] = route;
     const fn = host[moduleName][method];
     if (typeof fn !== "function") {
       return {
@@ -127,10 +143,16 @@ export function createHostDispatch(
       };
     }
     try {
-      const data = await fn({
-        ...(toSnakeArgs((req.payload ?? {}) as Record<string, unknown>)),
-        request_id: req.id,
-      });
+      const args = toSnakeArgs((req.payload ?? {}) as Record<string, unknown>);
+      if (argMap) {
+        for (const [from, to] of Object.entries(argMap)) {
+          if (from in args) {
+            args[to] = args[from];
+            delete args[from];
+          }
+        }
+      }
+      const data = await fn({ ...args, request_id: req.id });
       return { v: PROTOCOL_VERSION, id: req.id, kind: "res", name: req.name, payload: data === undefined ? {} : data };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
