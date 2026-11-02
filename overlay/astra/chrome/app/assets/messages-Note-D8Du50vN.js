@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-BmfYdpMW.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(930,n)??`Write something`)),r=((n={},r={})=>(r.locale??e(),t(929,n)??`Note`));export{n,r as t};
