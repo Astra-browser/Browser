@@ -194,6 +194,7 @@ describe("host transport", () => {
       Work: {},
       Downloads: {},
       Media: {},
+      Notes: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -208,6 +209,7 @@ describe("host transport", () => {
     const fake = {
       Tabs: {}, Navigation: {}, Panes: {}, Boot: {}, Sidebar: {}, WebExtensions: {},
       Commands: {}, Keymap: {}, Work: {}, Downloads: {}, Media: {},
+      Notes: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };

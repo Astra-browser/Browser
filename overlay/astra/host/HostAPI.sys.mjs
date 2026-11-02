@@ -38,6 +38,7 @@ import { Keymap } from "./Keymap.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { Notes } from "./Notes.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -61,6 +62,7 @@ export {
   Work,
   Downloads,
   Media,
+  Notes,
   addEventListener,
   emit,
   eventSeq,

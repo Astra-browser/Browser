@@ -125,6 +125,7 @@ describe("bridge wiring", () => {
       Work: {},
       Downloads: {},
       Media: {},
+      Notes: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
