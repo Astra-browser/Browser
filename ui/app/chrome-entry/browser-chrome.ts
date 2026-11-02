@@ -169,6 +169,14 @@ try {
     "layout-changed": "astra:layout",
     "profiles-changed": "astra:profiles",
     "notes-changed": "astra:notes-changed",
+    "keymap-changed": "astra:keymap-changed",
+    "work-changed": "astra:work-changed",
+    "work-environment-changed": "astra:work-environment-changed",
+    "media-player-changed": "astra:media-player",
+    "favicons-changed": "astra:favicons",
+    "note-open-requested": "astra:note-open-requested",
+    "browser-return": "astra:browser-return",
+    "presentation-tab": "astra:presentation-tab",
   };
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {

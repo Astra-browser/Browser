@@ -290,6 +290,24 @@ function platformOf(platform) {
   return platform === "mac" ? "mac" : "other";
 }
 
+/**
+ * The platform the window is running on, read from the chrome global when
+ * there is one (the modules stay importable in Node, where it is absent).
+ * The UI asks for the keymap without naming a platform, so the answer has to
+ * be the machine's own.
+ */
+function currentPlatform() {
+  try {
+    const os = globalThis.Services?.appinfo?.OS;
+    if (typeof os === "string") {
+      return os.toLowerCase().includes("darwin") ? "mac" : "other";
+    }
+  } catch {
+    // No Services in a test/preview: fall through to the non-mac default.
+  }
+  return "other";
+}
+
 // --- Accelerators ---------------------------------------------------------
 //
 // One parser serves the registry defaults, the person's bindings and the
@@ -466,8 +484,8 @@ export const Keymap = {
    * `accelerator` is the person's binding or the platform default;
    * `default_accelerator` is the registry default for that platform.
    */
-  async entries({ platform = "other" } = {}) {
-    const at = platformOf(platform);
+  async entries({ platform = null } = {}) {
+    const at = platformOf(platform ?? currentPlatform());
     return REGISTRY.map((spec) => {
       const fallback = defaultAccelerator(spec, at);
       const accelerator = binding(spec, at);

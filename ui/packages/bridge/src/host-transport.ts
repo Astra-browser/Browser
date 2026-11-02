@@ -27,6 +27,10 @@ export interface HostModules {
   Settings: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Accounts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -51,6 +55,15 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   setting_set: ["Settings", "set"],
   account_get: ["Accounts", "get"],
   run_command: ["Commands", "run"],
+  keymap_entries: ["Keymap", "entries"],
+  keymap_bind: ["Keymap", "bind"],
+  keymap_reset: ["Keymap", "reset"],
+  keymap_record: ["Keymap", "record"],
+  work_running: ["Work", "running"],
+  work_call: ["Work", "call"],
+  download_call: ["Downloads", "call"],
+  download_open_access_settings: ["Downloads", "openAccessSettings"],
+  media_player: ["Media", "player"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {

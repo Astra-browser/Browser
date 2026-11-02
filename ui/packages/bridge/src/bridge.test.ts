@@ -189,6 +189,11 @@ describe("host transport", () => {
       Navigation: {},
       Panes: {},
       Boot: {},
+      Commands: {},
+      Keymap: {},
+      Work: {},
+      Downloads: {},
+      Media: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -202,11 +207,12 @@ describe("host transport", () => {
   test("unrouted commands fail fast with unknown_command", async () => {
     const fake = {
       Tabs: {}, Navigation: {}, Panes: {}, Boot: {}, Sidebar: {}, WebExtensions: {},
+      Commands: {}, Keymap: {}, Work: {}, Downloads: {}, Media: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
     const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never) });
-    await expect(b.invoke("work_call")).rejects.toMatchObject({ code: "unknown_command" });
+    await expect(b.invoke("blocker_status")).rejects.toMatchObject({ code: "unknown_command" });
   });
 
   test("routes sidebar + extension commands to new Host modules", async () => {

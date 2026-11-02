@@ -95,9 +95,53 @@ for (const page of PAGES) {
 }
 
 {
+  const { seen, result } = await capture(() => Commands.run({ id: "tool.notes" }));
+  check("a tool command is admitted", result.accepted === true);
+  check("a tool command announces the tool", seen.length === 1 && seen[0] === "tool.notes");
+}
+
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "tool.nope" }));
+  check("an unknown tool is refused", result.accepted === false);
+  check("an unknown tool announces nothing", seen.length === 0);
+}
+
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "note.new" }));
+  check("note.new is admitted", result.accepted === true);
+  check("note.new announces itself", seen.length === 1 && seen[0] === "note.new");
+}
+
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "settings.ai" }));
+  check("a settings section is admitted", result.accepted === true);
+  check(
+    "a settings section names the section, then the page",
+    seen.length === 2 && seen[0] === "settings.section.ai" && seen[1] === "browser.settings",
+  );
+}
+
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "settings.section.profiles" }));
+  check("an explicit settings.section id is admitted", result.accepted === true);
+  check(
+    "an explicit settings.section id names the page too",
+    seen.length === 2 && seen[0] === "settings.section.profiles" && seen[1] === "browser.settings",
+  );
+}
+
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "settings.nope" }));
+  check("an unknown settings section is refused", result.accepted === false);
+  check("an unknown settings section announces nothing", seen.length === 0);
+}
+
+{
   const supported = await Commands.supported();
-  check("supported() lists every page command", supported.length === PAGES.length + 1);
+  check("supported() lists every page command", PAGES.every((p) => supported.includes(`browser.${p}`)));
   check("supported() includes browser.return", supported.includes("browser.return"));
+  check("supported() lists the tools", supported.includes("tool.notes") && supported.includes("tool.ai"));
+  check("supported() lists the settings sections", supported.includes("settings.ai"));
   assert.ok(supported.includes("browser.work"));
 }
 

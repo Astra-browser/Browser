@@ -31,6 +31,46 @@ const PAGES = new Set([
   "source",
 ]);
 
+/** The side-panel tools; `tool.<kind>` opens one the way its shelf row does. */
+const TOOLS = new Set([
+  "notes",
+  "tasks",
+  "time",
+  "ai",
+  "history",
+  "downloads",
+  "bookmarks",
+]);
+
+/**
+ * Settings destinations. `settings.<section>` is what the product's own
+ * controls ask for (the account menu, a fault's fix, a style block); native
+ * opens Settings and names the section, so the page lands on it rather than
+ * on whatever it showed last.
+ */
+const SECTIONS = new Set([
+  "general",
+  "appearance",
+  "tabs",
+  "newtab",
+  "search",
+  "privacy",
+  "focus",
+  "performance",
+  "profiles",
+  "work",
+  "ai",
+  "skills",
+  "memory",
+  "sites",
+  "mcp",
+  "features",
+  "shortcuts",
+  "about",
+  "account",
+]);
+
+
 /** The chrome's `runCommand` answer: an admission, as `settle()` expects. */
 function admission(accepted) {
   return { operation_id: null, accepted };
@@ -56,11 +96,45 @@ export const Commands = {
       emit("ui-command", id);
       return admission(true);
     }
+    // A tool is a panel beside the page, not a page: the shelf and a shortcut
+    // open the same one.
+    const tool = id.startsWith("tool.") ? id.slice("tool.".length) : "";
+    if (TOOLS.has(tool)) {
+      emit("ui-command", id);
+      return admission(true);
+    }
+    // A note starts where notes already are, which is the app's decision, not
+    // this module's: announce it and let the surface place it.
+    if (id === "note.new") {
+      emit("ui-command", id);
+      return admission(true);
+    }
+    // Settings lands on the section that asked for it: name the section first
+    // so the page is built with it, then give the window the page.
+    if (id.startsWith("settings.section.")) {
+      const section = id.slice("settings.section.".length);
+      if (!SECTIONS.has(section)) return admission(false);
+      emit("ui-command", id);
+      emit("ui-command", "browser.settings");
+      return admission(true);
+    }
+    const section = id.startsWith("settings.") ? id.slice("settings.".length) : "";
+    if (SECTIONS.has(section)) {
+      emit("ui-command", `settings.section.${section}`);
+      emit("ui-command", "browser.settings");
+      return admission(true);
+    }
     return admission(false);
   },
 
   /** Every id this module currently executes (tests and diagnostics). */
   async supported() {
-    return [...PAGES].map((page) => `browser.${page}`).concat("browser.return");
+    return [
+      ...[...PAGES].map((page) => `browser.${page}`),
+      ...[...TOOLS].map((tool) => `tool.${tool}`),
+      ...[...SECTIONS].map((section) => `settings.${section}`),
+      "browser.return",
+      "note.new",
+    ];
   },
 };

@@ -34,6 +34,10 @@ import { Accounts } from "./Accounts.sys.mjs";
 import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
 import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
 import { Commands } from "./Commands.sys.mjs";
+import { Keymap } from "./Keymap.sys.mjs";
+import { Work } from "./Work.sys.mjs";
+import { Downloads } from "./Downloads.sys.mjs";
+import { Media } from "./Media.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -53,6 +57,10 @@ export {
   Sidebar,
   WebExtensions,
   Commands,
+  Keymap,
+  Work,
+  Downloads,
+  Media,
   addEventListener,
   emit,
   eventSeq,

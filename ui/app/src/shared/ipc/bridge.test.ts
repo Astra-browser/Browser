@@ -120,6 +120,11 @@ describe("bridge wiring", () => {
       WebExtensions: {},
       Settings: {},
       Accounts: {},
+      Commands: {},
+      Keymap: {},
+      Work: {},
+      Downloads: {},
+      Media: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -132,6 +137,6 @@ describe("bridge wiring", () => {
       astra_tab_id: "tab-1",
     });
     expect(seen[0]).toMatchObject({ background: true, request_id: "req-1" });
-    await expect(bridge.invoke("work_call")).rejects.toMatchObject({ code: "unknown_command" });
+    await expect(bridge.invoke("blocker_status")).rejects.toMatchObject({ code: "unknown_command" });
   });
 });
