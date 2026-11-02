@@ -9,7 +9,7 @@
   import * as sidebar from "$session/sidebar-mode.svelte";
   import { Dividers } from "$features/split";
   import { commands } from "$shared/ipc/bindings";
-  import { IS_MAC } from "$shared/platform";
+  import { IS_MAC, IS_WINDOWS } from "$shared/platform";
   import { blocker } from "$domain/blocker";
   import { extensions } from "$domain/extensions";
   import { favicons } from "$domain/favicons";
@@ -35,6 +35,7 @@
   import { applySpaceTheme, spaceThemeValues } from "$features/tabs";
   import * as m from "$shared/i18n/messages";
   import Shell from "./Shell.svelte";
+  import { WindowControlsOverlay } from "$shared/ui/WindowControls";
 
   // Follows the stored preference and nothing else. Adopting reads the
   // sidebar's own shape; tracked, that read made every toggle re-adopt the
@@ -250,6 +251,9 @@
   <Shell />
   {#if !IS_MAC}
     <Dividers />
+  {/if}
+  {#if !IS_MAC && !IS_WINDOWS}
+    <WindowControlsOverlay />
   {/if}
 </div>
 {#if webext.review() !== null}

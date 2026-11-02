@@ -20,7 +20,6 @@
   import IconButton from "$shared/ui/IconButton";
   import ModeTabs from "./ModeTabs.svelte";
   import SidebarSearch from "./SidebarSearch.svelte";
-  import WindowControls from "$shared/ui/WindowControls";
 
   let {
     compact,
@@ -102,9 +101,11 @@
 <!--
   macOS keeps AppKit's traffic lights through the overlay title bar, so the
   leading 52px of the top row belongs to the system, except in fullscreen,
-  where AppKit hides them. Windows reveals native
-  controls at the top-right edge. On Linux the controls are ours, and at rail width they move into the collapsed menu
-  because three buttons cannot fit beside anything else.
+  where AppKit hides them. Windows reveals native controls at the top-right
+  edge. Linux's are the product's own, and they are not part of this row: they
+  wait at the window's top-right corner until the pointer reaches it
+  (`WindowControlsOverlay`), so the header holds nothing that acts on the
+  window rather than on the column.
 -->
 {#if compact}
   <!--
@@ -190,9 +191,5 @@
           onclick={tabs.reloadActive}
         />
       </div>{/if}
-
-    {#if !IS_MAC && !IS_WINDOWS}
-      <WindowControls />
-    {/if}
   </header>
 {/if}
