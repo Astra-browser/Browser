@@ -36,3 +36,5 @@ coverage/
 __pycache__/
 *.pyc
 UI_IDEA
+# Playwright MCP scratch dir (tool artifact, not repo content)
+.playwright-mcp/

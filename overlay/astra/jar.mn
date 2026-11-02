@@ -799,5 +799,4 @@ astra.jar:
   content/astra/app/astra-icon@2x.png (chrome/app/astra-icon@2x.png)
   content/astra/app/astra-wordmark.svg (chrome/app/astra-wordmark.svg)
   content/astra/app/browser-chrome.html (chrome/app/browser-chrome.html)
-  content/astra/app/app-manifest.mjs (chrome/app/app-manifest.mjs)
   # END CHROME APP (P3-T15)
