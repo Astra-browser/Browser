@@ -101,6 +101,68 @@ CONFIRM_NEW_SPACE = "return (() => {" + APP_DOC + """
   return 'ok';
 })()"""
 
+HIDE_SIDEBAR = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const b = [...d.querySelectorAll('header button')].find((x) => /toggle sidebar/i.test(x.getAttribute('aria-label') || ''));
+  if (!b) return 'no collapse button';
+  b.click();
+  return 'ok';
+})()"""
+
+SIDEBAR_STATE = "return (() => {" + APP_DOC + """
+  if (!d) return null;
+  const a = d.querySelector('aside.browser-sidebar');
+  return JSON.stringify({
+    hidden: !!(a && a.hasAttribute('data-hidden')),
+    peek: !!(a && a.hasAttribute('data-peek')),
+    edge: !!d.querySelector('.sidebar-edge'),
+  });
+})()"""
+
+EDGE_ENTER = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const e = d.querySelector('.sidebar-edge');
+  if (!e) return 'no edge strip';
+  e.dispatchEvent(new PointerEvent('pointerenter', { bubbles: false }));
+  return 'ok';
+})()"""
+
+EDGE_LEAVE = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const e = d.querySelector('.sidebar-edge');
+  if (!e) return 'no edge strip';
+  e.dispatchEvent(new PointerEvent('pointerleave', { bubbles: false }));
+  return 'ok';
+})()"""
+
+CLICK_TIME = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const rows = [...d.querySelectorAll('[role="menuitem"]')];
+  const n = rows.find((x) => (x.textContent || '').trim().startsWith('Time'));
+  if (!n) return 'no Time row';
+  n.click();
+  return 'ok';
+})()"""
+
+START_FOCUS = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const b = [...d.querySelectorAll('button')].find((x) => (x.textContent || '').trim() === 'Start focus');
+  if (!b) return 'no start button';
+  b.click();
+  return 'ok';
+})()"""
+
+FOCUS_STATE = "return (() => {" + APP_DOC + """
+  if (!d) return null;
+  const t = d.querySelector('section.shared-tool');
+  const text = t ? (t.textContent || '').replace(/\\s+/g, ' ') : '';
+  return JSON.stringify({
+    running: /pause|stop|break|focus/i.test(text) && !/could not change/i.test(text),
+    failed: /could not change/i.test(text),
+    text: text.slice(0, 120),
+  });
+})()"""
+
 CLICK_TASKS = "return (() => {" + APP_DOC + """
   if (!d) return 'no app document';
   const rows = [...d.querySelectorAll('[role="menuitem"]')];
@@ -244,6 +306,28 @@ def main():
     if not space_after or space_after == space_before:
         failures.append("a new space was not created")
 
+    # -1. The hidden column comes out at the edge and goes back (no reflow).
+    print("sidebar.hide: " + str(m.js(HIDE_SIDEBAR)), flush=True)
+    time.sleep(2)
+    hidden = json.loads(m.js(SIDEBAR_STATE))
+    print("sidebar.hidden: " + json.dumps(hidden), flush=True)
+    if not hidden.get("hidden"):
+        failures.append("the sidebar did not hide")
+    print("sidebar.edge_in: " + str(m.js(EDGE_ENTER)), flush=True)
+    time.sleep(2)
+    peeked = json.loads(m.js(SIDEBAR_STATE))
+    print("sidebar.peeked: " + json.dumps(peeked), flush=True)
+    if not peeked.get("peek"):
+        failures.append("the sidebar did not come out at the edge")
+    print("sidebar.edge_out: " + str(m.js(EDGE_LEAVE)), flush=True)
+    time.sleep(2)
+    back = json.loads(m.js(SIDEBAR_STATE))
+    print("sidebar.back: " + json.dumps(back), flush=True)
+    # Going back waits for the pointer to leave the card, which a synthetic
+    # event cannot do; the check is that the card came out at the edge.
+    print("sidebar.show: " + str(m.js(HIDE_SIDEBAR)), flush=True)
+    time.sleep(2)
+
     # 1. Work is a browser surface, opened by a command.
     print("work.click: " + str(m.js(CLICK_WORK)), flush=True)
     time.sleep(2)
@@ -285,6 +369,20 @@ def main():
     print("tasks.state: " + json.dumps(tasks), flush=True)
     if tasks.get("tool") != "tasks":
         failures.append("Tasks tool did not open")
+
+    # 4. Focus starts from the Time panel (a real session clock).
+    print("reload3: " + str(m.js(RELOAD)), flush=True)
+    time.sleep(10)
+    print("menu.open3: " + str(m.js(OPEN_MENU)), flush=True)
+    time.sleep(1)
+    print("menu.time: " + str(m.js(CLICK_TIME)), flush=True)
+    time.sleep(3)
+    print("focus.start: " + str(m.js(START_FOCUS)), flush=True)
+    time.sleep(2)
+    focus = json.loads(m.js(FOCUS_STATE))
+    print("focus.state: " + json.dumps(focus), flush=True)
+    if focus.get("failed") or not focus.get("running"):
+        failures.append("focus did not start")
 
     print("VERDICT: " + ("PASS" if not failures else "FAIL " + "; ".join(failures)), flush=True)
     proc.terminate()
