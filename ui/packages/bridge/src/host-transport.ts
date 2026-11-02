@@ -22,6 +22,8 @@ export interface HostModules {
   Navigation: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Panes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Boot: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Sidebar: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  WebExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -38,6 +40,9 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   panel_hide: ["Panes", "hide"],
   panel_ready: ["Panes", "list"],
   ui_ready: ["Boot", "handshake"],
+  sidebar_set_width: ["Sidebar", "setWidth"],
+  sidebar_set_hidden: ["Sidebar", "setHidden"],
+  web_extension_list: ["WebExtensions", "list"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {

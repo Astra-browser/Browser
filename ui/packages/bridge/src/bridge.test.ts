@@ -201,12 +201,37 @@ describe("host transport", () => {
 
   test("unrouted commands fail fast with unknown_command", async () => {
     const fake = {
-      Tabs: {}, Navigation: {}, Panes: {}, Boot: {},
+      Tabs: {}, Navigation: {}, Panes: {}, Boot: {}, Sidebar: {}, WebExtensions: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
     const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never) });
     await expect(b.invoke("work_call")).rejects.toMatchObject({ code: "unknown_command" });
+  });
+
+  test("routes sidebar + extension commands to new Host modules", async () => {
+    const calls: unknown[] = [];
+    const fake = {
+      Tabs: {}, Navigation: {}, Panes: {}, Boot: {},
+      Sidebar: {
+        setHidden: async (args: Record<string, unknown>) => {
+          calls.push(["setHidden", args]);
+          return { hidden: args["hidden"] };
+        },
+      },
+      WebExtensions: {
+        list: async () => {
+          calls.push(["list"]);
+          return [];
+        },
+      },
+      addEventListener: () => () => {},
+      eventSeq: () => 0,
+    };
+    const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never), newId: () => "req-2" });
+    await expect(b.invoke("sidebar_set_hidden", { hidden: true })).resolves.toEqual({ hidden: true });
+    await expect(b.invoke("web_extension_list")).resolves.toEqual([]);
+    expect(calls[0]).toMatchObject(["setHidden", { hidden: true, request_id: "req-2" }]);
   });
 
   test("host mode without dispatch throws", () => {
