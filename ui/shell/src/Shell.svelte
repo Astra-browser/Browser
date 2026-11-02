@@ -357,6 +357,13 @@
     flex-direction: column;
     min-height: 0;
   }
+  /* Same UA-`[hidden]` defeat as .astra-split-cell (see split.css): without
+     this the mount paints even while blankSplit() keeps a single slot.
+     :global so the compiler keeps it — `hidden` is set imperatively in
+     onMount, which the unused-selector check cannot see. */
+  :global(.astra-split-mount[hidden]) {
+    display: none;
+  }
   .astra-split-mount > :global(.astra-split) {
     max-height: 40vh;
   }

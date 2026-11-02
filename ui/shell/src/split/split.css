@@ -37,6 +37,14 @@
   background: #fff;
 }
 
+/* Author `display: flex` above defeats the UA `[hidden]` rule (author origin
+   wins), so hidden pool cells would still paint — all four slots visible as
+   "Empty pane" in a single-slot layout. Explicit opt-out keeps the model's
+   visibility-only rule truthful in chrome XUL documents. */
+.astra-split-cell[hidden] {
+  display: none;
+}
+
 .astra-split-cell.is-active {
   border-color: #00ddff;
 }
