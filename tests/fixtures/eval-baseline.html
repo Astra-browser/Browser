@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!-- Astra eval fixture (P6-T10, browse-baseline). Served by the eval harness
+   (tests/eval/run.py) over loopback. Static on purpose: the baseline suite
+   asserts a local page loads fast with the expected title, marker, and link
+   set — the deterministic stand-in for the upstream browse-baseline scenarios
+   (cold start / idle tab / multi-tab), which need a named-device run and stay
+   pending per docs/astra/EVAL.md. Marker protocol (same style as the
+   P1-T11 smoke fixture): #astra-eval-ok must contain exactly
+   "ASTRA-EVAL-OK-BASELINE". -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Astra Eval Baseline Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Eval baseline</h1>
+      <p id="astra-eval-ok">ASTRA-EVAL-OK-BASELINE</p>
+      <nav>
+        <a href="/eval-form.html">Form fixture</a>
+        <a href="/eval-article.html">Article fixture</a>
+      </nav>
+    </main>
+  </body>
+</html>

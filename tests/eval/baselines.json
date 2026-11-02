@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-11-02",
+  "note": "Recorded baselines for the deterministic local eval port (P6-T10). Values pin the static fixtures under tests/fixtures/eval-*.html; any fixture edit must update this file in the same commit.",
+  "browse_baseline": [
+    {
+      "path": "eval-baseline.html",
+      "title": "Astra Eval Baseline Fixture",
+      "marker_id": "astra-eval-ok",
+      "marker": "ASTRA-EVAL-OK-BASELINE",
+      "min_links": 2
+    },
+    {
+      "path": "eval-form.html",
+      "title": "Astra Eval Form Fixture",
+      "marker_id": "astra-eval-ok",
+      "marker": "ASTRA-EVAL-OK-FORM",
+      "min_links": 1
+    },
+    {
+      "path": "eval-article.html",
+      "title": "Astra Eval Article Fixture",
+      "marker_id": "astra-eval-ok",
+      "marker": "ASTRA-EVAL-OK-ARTICLE",
+      "min_links": 1
+    }
+  ],
+  "capabilities_dom_read": {
+    "form_page": "eval-form.html",
+    "form_id": "eval-search-form",
+    "required_controls": ["eval-search", "eval-choice", "eval-submit"],
+    "article_page": "eval-article.html",
+    "article_id": "eval-article",
+    "article_heading": "Eval article heading",
+    "min_paragraphs": 3
+  },
+  "budgets": {
+    "site_timeout_s": 10,
+    "max_pages": 16,
+    "max_bytes_per_page": 262144,
+    "per_page_latency_budget_ms": 2000
+  }
+}

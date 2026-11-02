@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!-- Astra eval fixture (P6-T10, capabilities/read-extract subset). Static
+   article for the deterministic read/extract checks: one h1 plus pinned
+   paragraphs the suite counts and excerpts. Marker protocol: #astra-eval-ok
+   must contain exactly "ASTRA-EVAL-OK-ARTICLE". -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Astra Eval Article Fixture</title>
+  </head>
+  <body>
+    <main>
+      <article id="eval-article">
+        <h1>Eval article heading</h1>
+        <p>First paragraph of the eval article fixture.</p>
+        <p>Second paragraph of the eval article fixture.</p>
+        <p>Third paragraph of the eval article fixture.</p>
+      </article>
+      <p id="astra-eval-ok">ASTRA-EVAL-OK-ARTICLE</p>
+      <a href="/eval-baseline.html">Back to baseline</a>
+    </main>
+  </body>
+</html>
