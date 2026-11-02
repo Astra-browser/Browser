@@ -19,6 +19,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCHEMA = os.path.join(ROOT, "schemas", "content-hide.json")
 MODULE = os.path.join(ROOT, "overlay", "astra", "host", "ContentHide.sys.mjs")
+CONTENT = os.path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")
+FACADE = os.path.join(ROOT, "overlay", "astra", "host", "HostAPI.sys.mjs")
+JAR = os.path.join(ROOT, "overlay", "astra", "jar.mn")
+BRIDGE = os.path.join(ROOT, "ui", "packages", "bridge", "src", "content-hide.ts")
 DOC = os.path.join(ROOT, "docs", "astra", "HIDING.md")
 
 failures = []
@@ -70,6 +74,57 @@ check("module traverses shadow roots", "shadowRoot" in source)
 check("module traverses iframes", "contentDocument" in source)
 check("module references blocker_overrides (no reschema)", "blocker_overrides" in source)
 check("module honours host_api_version 1", "HOST_API_VERSION = 1" in source)
+
+# P4-T11 live wiring: content-script driver, provider/store adapters, actor
+# registration, packaging, and bridge surface.
+for symbol in ("installLiveHiding", "injectStylesheet",
+               "createBlockerCosmeticProvider", "createOverrideStoreAdapter",
+               "formatOverrideAction", "parseOverrideAction",
+               "MutationObserver", "cosmetic_selectors", "blocker_override_set"):
+    check(f"live module defines {symbol}", symbol in source)
+check("live module documents the write-only store read gap",
+      "write-only" in source or "no override getter" in source)
+
+try:
+    with open(CONTENT, encoding="utf-8") as f:
+        content = f.read()
+    check("Content.sys.mjs exists", True)
+except OSError as exc:
+    check(f"Content.sys.mjs exists ({exc})", False)
+    content = ""
+check("Content actor exposes ContentHide", "ContentHide" in content)
+check("Content actor wires providers", "wireHiding" in content)
+check("Content actor attaches live hiding", "attachHiding" in content)
+
+try:
+    with open(FACADE, encoding="utf-8") as f:
+        facade = f.read()
+    check("HostAPI.sys.mjs exists", True)
+except OSError as exc:
+    check(f"HostAPI.sys.mjs exists ({exc})", False)
+    facade = ""
+check("HostAPI facade exports ContentHide", "ContentHide" in facade)
+
+try:
+    with open(JAR, encoding="utf-8") as f:
+        jar = f.read()
+    check("jar.mn exists", True)
+except OSError as exc:
+    check(f"jar.mn exists ({exc})", False)
+    jar = ""
+check("jar.mn registers ContentHide.sys.mjs", "ContentHide.sys.mjs" in jar)
+
+try:
+    with open(BRIDGE, encoding="utf-8") as f:
+        bridge = f.read()
+    check("bridge content-hide.ts exists", True)
+except OSError as exc:
+    check(f"bridge content-hide.ts exists ({exc})", False)
+    bridge = ""
+for token in ("hide_for_page", "hide_pick_start", "hide_pick_confirm",
+              "hide_rule_add", "hide_rule_list",
+              "content-hide.picking-started", "content-hide.rule-added"):
+    check(f"bridge declares {token}", token in bridge)
 
 try:
     with open(DOC, encoding="utf-8") as f:

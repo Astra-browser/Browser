@@ -274,4 +274,123 @@ Hide.ContentHide.setCosmeticProvider({
   check("selector: first class next", Hide.selectorForElement(fakeElement("div", { className: "c1 c2" })) === ".c1");
 }
 
+// 9. LIVE wiring (P4-T11): stylesheet injection, MutationObserver re-pass,
+// Blocker provider adapter, override store adapter, Content actor binding.
+{
+  const ContentMod = await import(path.join(HOST, "Content.sys.mjs"));
+  const { Content } = ContentMod;
+  check("live: Content actor exposes ContentHide", Content.ContentHide === Hide.ContentHide);
+  check("live: Content exposes attachHiding", typeof Content.attachHiding === "function");
+  check("live: Content exposes wireHiding", typeof Content.wireHiding === "function");
+  check("live: HostAPI facade exposes ContentHide", "ContentHide" in Hide);
+
+  // Override action convention: one blocker_overrides row per selector.
+  check("live: action formats with prefix", Hide.formatOverrideAction(".ad") === "cosmetic-hide:.ad");
+  check("live: action parses back", Hide.parseOverrideAction("cosmetic-hide:.ad") === ".ad");
+  check("live: foreign action ignored", Hide.parseOverrideAction("block") === null);
+  check("live: markup action rejected", Hide.parseOverrideAction("cosmetic-hide:<img>") === null);
+
+  // Blocker provider adapter: sync native lookup -> async seam.
+  const provider = Hide.createBlockerCosmeticProvider((url, classes) =>
+    classes.includes("sponsored-card") ? [".sponsored-card"] : [],
+  );
+  const via = await provider.cosmeticSelectors("https://x.invalid/", ["sponsored-card"], []);
+  check("live: provider adapts native lookup", via.includes(".sponsored-card"));
+  const failing = Hide.createBlockerCosmeticProvider(() => {
+    throw new Error("engine down");
+  });
+  check("live: provider degrades on native failure", (await failing.cosmeticSelectors("https://x.invalid/", [], [])).length === 0);
+
+  // Override store adapter: writes cosmetic-hide: rows, reads mirror + native rows.
+  const written = [];
+  const store = Hide.createOverrideStoreAdapter({
+    setAction: async (host, action) => {
+      written.push([host, action]);
+    },
+    getActions: async () => ["cosmetic-hide:.native", "block"],
+  });
+  await store.save("news.fixture.invalid", [".a"]);
+  check("live: store writes prefixed rows", written.some(([, a]) => a === "cosmetic-hide:.a"));
+  const loaded = await store.load("news.fixture.invalid");
+  check("live: store merges mirror + native rows", loaded.includes(".a") && loaded.includes(".native"));
+
+  // Stylesheet injection on a style-capable fake document.
+  const liveDoc = fakeDocument();
+  const head = fakeElement("head");
+  liveDoc.appendChild(head);
+  const styleNodes = [];
+  liveDoc.querySelector = (sel) => {
+    if (sel === "head") {
+      return head;
+    }
+    const m = /^#([\w-]+)$/.exec(sel);
+    return m ? (styleNodes.find((n) => n.attrs.get("id") === m[1]) ?? null) : null;
+  };
+  liveDoc.createElement = (tag) => {
+    const el = fakeElement(tag);
+    if (tag === "style") {
+      styleNodes.push(el);
+    }
+    return el;
+  };
+  check("live: inject creates style node", Hide.injectStylesheet(liveDoc, [".sponsored-card"]) === true);
+  check("live: style carries hiding css", (styleNodes[0].textContent ?? "").includes(".sponsored-card{display:none!important;}"));
+  check("live: re-inject refreshes same node", Hide.injectStylesheet(liveDoc, [".other"]) === true && styleNodes.length === 1);
+  check("live: inject fails headless", Hide.injectStylesheet(fakeDocument(), [".x"]) === false);
+
+  // installLiveHiding: initial pass + observer re-pass on late nodes.
+  Hide.__resetForTests();
+  Hide.ContentHide.setCosmeticProvider({
+    cosmeticSelectors: async (_url, classes) =>
+      classes.includes("late-ad") ? [".late-ad"] : [],
+  });
+  const seen = [];
+  liveDoc.defaultView = {
+    MutationObserver: class {
+      constructor(cb) {
+        this.cb = cb;
+      }
+      observe() {
+        seen.push("observe");
+      }
+      disconnect() {
+        seen.push("disconnect");
+      }
+    },
+  };
+  const page = fakeDocument();
+  page.querySelector = liveDoc.querySelector;
+  page.createElement = liveDoc.createElement;
+  page.defaultView = liveDoc.defaultView;
+  const handle = await Hide.installLiveHiding(page, { url: "https://shop.fixture.invalid/item", request_id: "l-1" });
+  check("live: observer attached", seen.includes("observe"));
+  check("live: style injected on install", styleNodes.length >= 1);
+  const late = fakeElement("div", { className: "late-ad" });
+  page.appendChild(late);
+  await handle.run();
+  check("live: re-pass hides late node", late.style.display === "none");
+  handle.detach();
+  check("live: detach disconnects observer", seen.includes("disconnect"));
+
+  // Content.wireHiding routes native lookups into the seams.
+  Hide.__resetForTests();
+  const rows = [];
+  Content.wireHiding({
+    cosmeticSelectors: (url, classes) => (classes.includes("wired-ad") ? [".wired-ad"] : []),
+    overrideSet: async (host, action) => {
+      rows.push([host, action]);
+    },
+  });
+  await Hide.ContentHide.addRule({ request_id: "w-1", host: "wire.fixture.invalid", selector: ".picked" });
+  check("live: wireHiding persists via override writer", rows.some(([, a]) => a === "cosmetic-hide:.picked"));
+  const wdoc = fakeDocument();
+  wdoc.appendChild(fakeElement("div", { className: "wired-ad" }));
+  const wout = await Hide.hideForPage(wdoc, { request_id: "w-2", url: "https://wire.fixture.invalid/p" });
+  check("live: wireHiding resolves blocker selectors", wout.selectors.includes(".wired-ad"));
+  const attached = await Content.attachHiding(fakeDocument(), { url: "https://wire.fixture.invalid/p" });
+  check("live: attachHiding returns a live handle", typeof attached.detach === "function" && typeof attached.run === "function");
+  attached.detach();
+  Hide.__resetForTests();
+}
+
 console.log(`content_hide contract: ${process.exitCode ? "FAIL" : `PASS (${passed} checks)`}`);

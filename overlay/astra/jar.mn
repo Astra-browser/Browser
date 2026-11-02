@@ -32,6 +32,7 @@ astra.jar:
   content/astra/res/host/Navigation.sys.mjs (host/Navigation.sys.mjs)
   content/astra/res/host/Panes.sys.mjs   (host/Panes.sys.mjs)
   content/astra/res/host/Content.sys.mjs (host/Content.sys.mjs)
+  content/astra/res/host/ContentHide.sys.mjs (host/ContentHide.sys.mjs)
   content/astra/res/host/History.sys.mjs (host/History.sys.mjs)
   content/astra/res/host/Containers.sys.mjs (host/Containers.sys.mjs)
   content/astra/res/host/Dialogs.sys.mjs (host/Dialogs.sys.mjs)

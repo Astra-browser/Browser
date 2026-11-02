@@ -65,3 +65,38 @@ module on the `Content` actor at merge. Contract coverage:
 `tests/contract/content_hide.mjs` (fake-DOM fixtures: static, iframe,
 shadow, picking flow, persist round-trip) and
 `tests/contract/content_hide.py` (schema/protocol shape).
+
+## Status: P4-T11 live wiring landed
+
+- Content script driver: `installLiveHiding(doc, { url })` in
+  `overlay/astra/host/ContentHide.sys.mjs` runs the initial `hideForPage`
+  pass, injects one `<style id="astra-hide-style">` via
+  `injectStylesheet` (`buildStylesheet` text), and re-passes on DOM
+  mutations through `MutationObserver` (microtask-debounced; no-op detach
+  where no observer exists). `Content.attachHiding(doc, opts)` exposes it
+  on the actor.
+- Cosmetic provider: `createBlockerCosmeticProvider(nativeCosmetic)`
+  adapts the blocker's `cosmetic_selectors(url, classes, ids)`
+  (`crates/astra-blocker`) to the async seam; native failures degrade to
+  "no filter selectors". There is no pre-existing Rust→JS bridge in the
+  overlay (the P4-T02 engine is reached from C++, not chrome JS), so the
+  live shell injects its privileged lookup via
+  `Content.wireHiding({ cosmeticSelectors })`; until that lands the empty
+  default stands and only stored overrides apply.
+- Store adapter: `createOverrideStoreAdapter({ setAction, getActions })`
+  persists through the write-only `blocker_override_set(host, action)`
+  (`crates/astra-store` has no override getter) with
+  `action = "cosmetic-hide:<selector>"`, keeping an in-memory mirror for
+  `load` that an optional native reader feeds when available.
+- Registration: `Content.ContentHide` on the actor +
+  `Content.wireHiding`/`attachHiding`, `ContentHide` re-exported from the
+  `HostAPI.sys.mjs` facade (reset covered), `jar.mn` registers
+  `ContentHide.sys.mjs`. Protocol unchanged, so `schemas/content-hide.json`
+  is untouched.
+- Bridge: `ui/packages/bridge/src/content-hide.ts` maps the eight methods
+  to `hide_*`/`hide_pick_*`/`hide_rule_*` commands and declares the four
+  `content-hide.*` events, with `registerContentHideMock` for standalone
+  UI tests (covered by `content-hide.test.ts`).
+- Live browser check is skip-gated: no in-tree geckodriver is present in
+  this environment, so no Marionette run was possible; Node/python
+  contract suites stay green (see phase report).
