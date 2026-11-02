@@ -73,7 +73,8 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P3-T13 | Shell assembly (mount frame/tabstrip/split, __astraHost wiring) | done | orchestrator | agent/P3-T13-assembly | Merged 2026-11-02; assembly 57 + all stub suites green, live-vs-current-binary green; TRUE live verify of new bundle needs rebuild (P3-T14) |
 | P3-T14 | Engine rebuild + full live re-verify (new Host/chrome/shell bundle) | done | orchestrator | main | Rebuilt (faster, 8s); all live suites green on new binary; FIXED: localStorage guard (tabstrip/split), Frame URL, XUL dup div; frame_live rewritten to probe real shell; goldens recaptured 18/18 |
 | P3-T15 | Mount full app (ui/app/dist) as the shell, retire hello | done | orchestrator | agent/P3-T15-appshell | Merged 2026-11-02; node green (1 pre-existing FAIL proven on main), py green, lint/brand/CSP clean; file:// + framescript relay (see SHELL_APP.md §5) |
-| P3-T16 | Retire interim chrome when app boots (hide bar/split/sidebar/toolbar, keep titlebar+content) | doing | orchestrator | main | Found live: white ghost was [hidden]-defeated split cell; interim duplicated live app; content slot must stay (only page surface) |
+| P3-T16 | Retire interim chrome when app boots (hide bar/split/sidebar/toolbar, keep titlebar+content) | done | orchestrator | main | Shell hides interim chrome on appReady=host; verified built+staged; live proof pending on deterministic boot (P3-T17) |
+| P3-T17 | Deterministic app boot: fix content crashes + flaky mount, missing host routes | doing | worker-1 | agent/P3-T17-appboot | Locked 2026-11-02; fresh about:blank tabs crash (tabcrashed titles seen); app boots sometimes (host+paint proven once); BridgeErrors: web_extension_list, sidebar_set_width/hidden missing |
 
 ## Phase 4 — Browse core: blocker, extensions, import, privacy
 
