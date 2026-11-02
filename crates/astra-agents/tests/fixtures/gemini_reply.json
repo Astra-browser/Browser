@@ -1,0 +1,1 @@
+{"candidates":[{"content":{"role":"model","parts":[{"text":"Here are your events."},{"functionCall":{"name":"get_events","args":{"date":"2026-11-03"}}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":110,"candidatesTokenCount":22,"totalTokenCount":132}}

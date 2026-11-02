@@ -1,0 +1,13 @@
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":"Here "},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"are your events."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_01","function":{"name":"get_events","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"date\":"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"2026-11-03\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-01","object":"chat.completion.chunk","created":1762041600,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":96,"completion_tokens":18,"total_tokens":114}}
+
+data: [DONE]

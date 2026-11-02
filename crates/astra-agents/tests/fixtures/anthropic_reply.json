@@ -1,0 +1,1 @@
+{"id":"msg_01","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"I checked the calendar for you."},{"type":"tool_use","id":"toolu_01","name":"get_events","input":{"date":"2026-11-03"}}],"stop_reason":"tool_use","stop_sequence":null,"usage":{"input_tokens":128,"output_tokens":42}}
