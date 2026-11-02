@@ -5,6 +5,7 @@ import {
   moveSelection,
   selectedId,
   hostOf,
+  taskCommandRow,
   type OmniboxSources,
   type OmniboxSourceItem,
 } from "../lib/omnibox-model";
@@ -103,6 +104,45 @@ describe("collectOmniboxSuggestions", () => {
     const elapsed = performance.now() - start;
     expect(rows.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(100);
+  });
+});
+
+describe("make-task command row", () => {
+  it("leads with a task row for an explicit make-task command", () => {
+    const rows = collectOmniboxSuggestions("make task Buy milk", sources(), {
+      engineId: "duckduckgo",
+    });
+    expect(rows[0]).toMatchObject({
+      id: "task:buy milk",
+      source: "task",
+      title: "Buy milk",
+      detail: "Make task",
+    });
+    expect(rows.at(-1)?.source).toBe("search");
+  });
+
+  it("accepts create, add, new, and bare task commands", () => {
+    for (const query of [
+      "create task Buy milk",
+      "add task Buy milk",
+      "new task Buy milk",
+      "task Buy milk",
+    ]) {
+      expect(taskCommandRow(query)).toMatchObject({ source: "task", title: "Buy milk" });
+    }
+  });
+
+  it("ignores a bare command with no title and plain text", () => {
+    expect(taskCommandRow("make task")).toBeNull();
+    expect(taskCommandRow("make task   ")).toBeNull();
+    expect(taskCommandRow("rust")).toBeNull();
+    expect(taskCommandRow("tasking along")).toBeNull();
+    const rows = collectOmniboxSuggestions("rust", sources(), { engineId: "duckduckgo" });
+    expect(rows.some((row) => row.source === "task")).toBe(false);
+  });
+
+  it("trims the title and keeps it on one line of the row", () => {
+    expect(taskCommandRow("  make task   Buy milk  ")).toMatchObject({ title: "Buy milk" });
   });
 });
 

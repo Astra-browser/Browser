@@ -70,6 +70,34 @@ test("clicking a row selects it by id", async () => {
   expect(onselect).toHaveBeenCalledWith("history:h1");
 });
 
+test("draws a make-task command row with the Task kind", async () => {
+  const onselect = vi.fn();
+  await render(OmniboxSuggestions, {
+    suggestions: [
+      {
+        id: "task:buy milk",
+        source: "task",
+        title: "Buy milk",
+        detail: "Make task",
+        url: "task:Buy milk",
+        score: Number.MAX_SAFE_INTEGER,
+        engine: null,
+      },
+    ],
+    selection: 0,
+    query: "make task Buy milk",
+    onselect,
+    onhover: vi.fn(),
+  });
+
+  const option = page.getByRole("option");
+  await expect.element(option).toHaveTextContent("Buy milk");
+  await expect.element(option).toHaveTextContent("Task");
+
+  await option.click();
+  expect(onselect).toHaveBeenCalledWith("task:buy milk");
+});
+
 test("renders nothing without suggestions", async () => {
   await render(OmniboxSuggestions, {
     suggestions: [],

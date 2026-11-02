@@ -14,12 +14,14 @@ export {
 } from "./lib/engines";
 export {
   collectOmniboxSuggestions,
+  taskCommandRow,
   completionSuffix,
   moveSelection,
   selectedId,
   hostOf,
   DEFAULT_LIMITS,
   type OmniboxSource,
+  type OmniboxRowSource,
   type OmniboxSourceItem,
   type OmniboxSources,
   type OmniboxSuggestion,

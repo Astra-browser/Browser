@@ -18,6 +18,7 @@
   } = $props();
 
   const kindLabel: Record<OmniboxSuggestion["source"], string> = {
+    task: "Task",
     tabs: "Tab",
     history: "History",
     notes: "Note",

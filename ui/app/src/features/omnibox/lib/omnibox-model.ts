@@ -1,21 +1,25 @@
 /**
- * Omnibox model: suggestions from open tabs, history and notes, plus the
- * search-engine action for what was typed.
+ * Omnibox model: suggestions from open tabs, history and notes, plus an
+ * explicit make-task command row and the search-engine action for what was
+ * typed.
  *
  * Pure functions over plain data so the address bar ranks synchronously
  * (typing budget: suggestions render <100ms on the fixture set). Live
  * fetching — remote suggestions, native history reads — stays behind the
  * bridge; this module only shapes rows the UI already holds.
  *
- * Section order is fixed: tabs, then history, then notes, then the search
- * action. A source never promotes above an earlier one, so a late answer
- * cannot reorder rows the user is already reading.
+ * Section order is fixed: the make-task command, then tabs, history, notes,
+ * then the search action. A source never promotes above an earlier one, so a
+ * late answer cannot reorder rows the user is already reading.
  */
 
 import { rank } from "./ranking";
 import { getEngine, buildSearchUrl, type SearchEngine } from "./engines";
 
 export type OmniboxSource = "tabs" | "history" | "notes";
+
+/** Every row the palette can draw: a section, the task command, or search. */
+export type OmniboxRowSource = OmniboxSource | "task" | "search";
 
 export interface OmniboxSourceItem {
   id: string;
@@ -28,7 +32,7 @@ export interface OmniboxSourceItem {
 
 export interface OmniboxSuggestion {
   id: string;
-  source: OmniboxSource | "search";
+  source: OmniboxRowSource;
   title: string;
   detail: string;
   url: string;
@@ -40,6 +44,26 @@ export interface OmniboxSources {
   tabs: readonly OmniboxSourceItem[];
   history: readonly OmniboxSourceItem[];
   notes: readonly OmniboxSourceItem[];
+}
+
+/** "make task Buy milk", "create task Buy milk", or a bare "task Buy milk":
+ *  the words after the command are the title to capture. Anything else —
+ *  including a bare command with nothing after it — is not a task. */
+const TASK_COMMAND = /^(?:(?:make|create|add|new)\s+task|task)\s+(.+?)$/isu;
+
+/** The explicit command row for `query`, first when it matches. */
+export function taskCommandRow(query: string): OmniboxSuggestion | null {
+  const title = TASK_COMMAND.exec(query.trim())?.[1]?.trim();
+  if (!title) return null;
+  return {
+    id: `task:${title.toLowerCase()}`,
+    source: "task",
+    title,
+    detail: "Make task",
+    url: `task:${title}`,
+    score: Number.MAX_SAFE_INTEGER,
+    engine: null,
+  };
 }
 
 export interface OmniboxLimits {
@@ -88,7 +112,8 @@ function takeSection(
     }));
 }
 
-/** Rows for `query` in section order, ending with the engine search action. */
+/** Rows for `query`: the task command first, then each section in order,
+ *  ending with the engine search action. */
 export function collectOmniboxSuggestions(
   query: string,
   sources: OmniboxSources,
@@ -102,9 +127,13 @@ export function collectOmniboxSuggestions(
   if (!trimmed) return [];
   const limits = { ...DEFAULT_LIMITS, ...options.limits };
   const seen = new Set<string>();
-  const rows = SECTION_ORDER.flatMap((source) =>
-    takeSection(trimmed, source, sources[source], limits[source], seen),
-  );
+  const task = taskCommandRow(trimmed);
+  const rows = [
+    ...(task ? [task] : []),
+    ...SECTION_ORDER.flatMap((source) =>
+      takeSection(trimmed, source, sources[source], limits[source], seen),
+    ),
+  ];
   const engine = getEngine(options.engineId);
   const url = buildSearchUrl(engine, options.customUrl ?? "", trimmed);
   if (url) {
