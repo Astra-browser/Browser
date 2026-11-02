@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-wDzEbHAi.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(976,n)??`Added`)),r=((n,r={})=>(r.locale??e(),t(975,n)??`Line ${n?.line}`)),i=((n={},r={})=>(r.locale??e(),t(977,n)??`Removed`));export{r as n,n as r,i as t};

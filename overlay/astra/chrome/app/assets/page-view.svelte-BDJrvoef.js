@@ -1,1 +1,0 @@
-import{Jt as e,Kt as t,Ot as n,Ut as r}from"./chrome-shared-wDzEbHAi.js";import{n as i}from"./index-client-BRFQHcs-.js";var a=()=>({scope:`today`,trashed:!1,board:!1,list:null}),o=new i,s=`unbound`,c=e(r(a())),l=()=>n(c);function u(e){s!==e&&(o.set(s,n(c)),s=e,t(c,o.get(e)??a(),!0))}function d(e,r){r&&u(r),t(c,{...n(c),...e},!0)}export{u as n,d as r,l as t};
