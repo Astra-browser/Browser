@@ -337,6 +337,27 @@
 .browser-sidebar {
   padding-block-start: 0;
 }
+
+/* The product draws the whole window, so the strip that would have been the
+   titlebar is where the window is moved by. Empty space in it drags; every
+   control opts out, because a press that starts on a button belongs to the
+   button. `-moz-window-dragging` is chrome-only and inert in a preview. */
+[data-drag-region] {
+  /* stylelint-disable-next-line property-no-unknown -- Gecko chrome property. */
+  -moz-window-dragging: drag;
+}
+
+[data-drag-region] button,
+[data-drag-region] input,
+[data-drag-region] textarea,
+[data-drag-region] select,
+[data-drag-region] a,
+[data-drag-region] [role="radio"],
+[data-drag-region] [role="menuitem"] {
+  /* stylelint-disable-next-line property-no-unknown -- Gecko chrome property. */
+  -moz-window-dragging: no-drag;
+}
+
 .sidebar-columns {
   position: relative;
   display: flex;

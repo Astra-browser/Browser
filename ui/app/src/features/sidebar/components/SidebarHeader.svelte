@@ -113,7 +113,11 @@
     act on the column. At 56px two 26px buttons are exactly what fits on one
     line, and the rule below them says where the head ends.
   -->
-  <header class="flex shrink-0 flex-col items-center gap-[3px]" aria-label={m.ui_navigation()}>
+  <header
+    class="flex shrink-0 flex-col items-center gap-[3px]"
+    data-drag-region
+    aria-label={m.ui_navigation()}
+  >
     {#if lights}
       <div style:height="var(--titlebar-height)" aria-hidden="true"></div>
     {:else if IS_MAC}
@@ -137,6 +141,7 @@
 {:else}
   <header
     class="flex shrink-0 items-center gap-px pe-1.5"
+    data-drag-region
     style:height="var(--titlebar-height)"
     style:padding-inline-start={lights
       ? "var(--traffic-light-inset)"
