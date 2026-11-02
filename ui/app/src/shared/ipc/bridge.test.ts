@@ -37,6 +37,28 @@ describe("bridge wiring", () => {
     expect(await invoke("ui_ready")).toBe(true);
   });
 
+  test("resource:/chrome:/about: documents take the mock path (P3-T17)", async () => {
+    const holder = globalThis as Record<string, unknown>;
+    const prev = holder.window;
+    try {
+      for (const protocol of ["http:", "https:", "file:", "resource:", "chrome:", "about:"]) {
+        holder.window = { location: { protocol } };
+        expect(isStandalone("")).toBe(true);
+      }
+      // Unknown future schemes stay fail-closed: they try the host import.
+      holder.window = { location: { protocol: "moz-nullprincipal:" } };
+      expect(isStandalone("")).toBe(false);
+      // The packaged page opened in a plain content tab boots mock instead
+      // of throwing on the `resource://astra/host` import.
+      holder.window = { location: { protocol: "resource:" } };
+      const bridge = await ensureBridge("plain-tab", "");
+      expect(bridge.mode).toBe("mock");
+    } finally {
+      if (prev === undefined) delete holder.window;
+      else holder.window = prev;
+    }
+  });
+
   test("mock invoke answers shaped fixtures", async () => {
     await ensureBridge("main", "?astra-mock=1");
     expect(await invoke("ui_info")).toEqual({ version: "0.1.0-mock", os: "mock", arch: "mock" });

@@ -381,6 +381,15 @@
   :global(.astra-bar-mount[hidden]) {
     display: none;
   }
+  /* P3-T17: the native `#browser` box is empty (toolbox, tabbox and sidebars
+     are all hidden by shell-chrome.css) but its `flex="1"` still claims half
+     the window, leaving gray dead space below the shell. Hide it so
+     `#astra-root` owns the whole window. The titlebar + content slot (P3-T16)
+     live inside `#astra-root` and are unaffected, as is the `__astraHost`
+     seam (the hidden DOM and `gBrowser` object persist). */
+  :global(#astra-root ~ #browser) {
+    display: none;
+  }
   .astra-split-mount > :global(.astra-split) {
     max-height: 40vh;
   }
@@ -413,7 +422,11 @@
   .slot-error {
     font-family: system-ui, sans-serif;
     padding: 1rem;
-    color: #1c1b22;
+    margin: 1rem;
+    color: #ffd9d9;
+    background: #5b1120;
+    border: 1px solid #ff848b;
+    border-radius: 8px;
   }
   .astra-about {
     font-family: system-ui, sans-serif;

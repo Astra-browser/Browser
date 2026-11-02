@@ -5,8 +5,9 @@
 // App wiring for `@astra/bridge` (P2-T08). Owns bridge selection per UI
 // surface: Firefox chrome dispatches Appendix C envelopes to the Host API
 // (`overlay/astra/host/*.sys.mjs`, loaded via `resource://astra/...` like
-// `ui/shell/src/host.js`); standalone (goldens/dev, `http(s)`/`file` or
-// `?astra-mock=1`) uses the in-memory MOCK host. Call `ensureBridge(label)`
+// `ui/shell/src/host.js`); standalone (goldens/dev, `http(s)`/`file`,
+// `resource:` in a plain tab, `chrome:`/`about:`, or `?astra-mock=1`) uses
+// the in-memory MOCK host. Call `ensureBridge(label)`
 // once per entry surface (`browser`/`panel`/`onboarding`); UI code then
 // imports Tauri-shaped `invoke`/`listen` from `@astra/bridge` instead of
 // `@tauri-apps/api/*` (see `bindings.ts`, still generated).
@@ -21,12 +22,28 @@ async function loadHostModules(): Promise<HostModules> {
   )) as unknown as HostModules;
 }
 
+// Schemes that always take the in-memory MOCK host. `http(s)`/`file` cover
+// goldens, `bun run dev` and static previews; `resource:` covers the packaged
+// page opened in a plain content tab (no chrome privilege, so the
+// `resource://astra/host` import above would throw instead of booting
+// cleanly); `chrome:`/`about:` cover chrome/about documents, which never
+// carry the app's host relay (embedded host mode arrives over the shell
+// relay, never through a direct host import here). Anything else tries the
+// host import.
+const STANDALONE_PROTOCOLS = new Set([
+  "http:",
+  "https:",
+  "file:",
+  "resource:",
+  "chrome:",
+  "about:",
+]);
+
 /** True outside Firefox chrome: goldens, `bun run dev`, static previews. */
 export function isStandalone(query = ""): boolean {
   if (query.includes("astra-mock=1")) return true;
   try {
-    const protocol = window.location.protocol;
-    return protocol === "http:" || protocol === "https:" || protocol === "file:";
+    return STANDALONE_PROTOCOLS.has(window.location.protocol);
   } catch {
     return true;
   }
