@@ -1,6 +1,14 @@
 # Frontend implementation rules
 
-Read `docs/frontend.md` from the repository root. Do not infer completion from this tree alone; the Rust side owns durable state.
+> **⚠️ Current phase: UI ONLY (D-36).** Build and verify the interface; host,
+> core, IPC and engine wiring are deferred on purpose. Do not implement backend
+> work to make the UI "work", do not treat empty/mock/`unknown_command` states as
+> bugs, and do not invent wire types or routes. Read `docs/astra/SCOPE.md` first.
+> Report work as "UI complete, wiring deferred".
+
+Read `docs/astra/SCOPE.md` (scope contract) and this app's `README.md` for the
+module layout. Do not infer completion from this tree alone; the Rust side owns
+durable state and is **not** being wired in this phase.
 
 - Features expose a small `index.ts`. Put rendered UI and component composition in
   `components/`, supporting behavior/state/selectors in `lib/`, and verification in

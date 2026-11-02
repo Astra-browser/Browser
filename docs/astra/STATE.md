@@ -3,6 +3,14 @@
 Legend: `todo` · `doing` (locked) · `blocked` · `done`. A `doing` row's Agent+Branch
 lock it: no other agent may touch that task, its files, or its branch.
 
+> **⚠️ CURRENT SCOPE — UI ONLY (D-36, from 2026-11-03).**
+> We are building the interface now; host/core/engine wiring is deferred on
+> purpose and will be connected in a later phase. Do not implement backend
+> work to make the UI "work", and do not treat empty states, mock data,
+> `unknown_command` or unrouted commands as bugs. Read
+> `docs/astra/SCOPE.md` before picking up any task. If a UI change needs a real
+> backend contract, add it to **Deferred wiring** below and stop.
+
 ## Where things stand (2026-11-03 — read this first, next agent)
 
 The browser builds, boots, and **the product UI is the window's chrome** (not a
@@ -77,13 +85,20 @@ python3 tools/state-check.py && bash tools/brand-lint.sh
 (cd forge/astra-forge && cargo run -q -- lint && cargo run -q -- footprint)
 ```
 
-**Known gaps (next real work).** Most of the app's 267 commands are still
-unrouted in host mode: only tabs/settings/accounts/sidebar/webext/nav/panes
-resolve, everything else fails fast with `unknown_command`. The Work canvas,
-tasks/notes/time pages and settings sections therefore render their empty
-states. The host projection is derived in `overlay/astra/host/Tabs.sys.mjs`
-until `astra-core` owns it (plan §5.4). Web pages have not been exercised
-end-to-end through the content slot since the chrome integration.
+### Deferred wiring (do not start — D-36)
+
+This is a backlog for the later wiring phase, **not** current work. Most of the
+app's 267 commands are still unrouted in host mode: only
+tabs/settings/accounts/sidebar/webext/nav/panes resolve, everything else fails
+fast with `unknown_command`. The Work canvas, tasks/notes/time pages and
+settings sections therefore render their empty states — that is the expected
+UI-only state. The host projection is derived in
+`overlay/astra/host/Tabs.sys.mjs` until `astra-core` owns it (plan §5.4). Web
+pages have not been exercised end-to-end through the content slot since the
+chrome integration.
+
+When the owner opens the wiring phase, convert these into tasks with acceptance
+tests; until then, do not implement them and do not report them as UI defects.
 
 
 ## Phase 0 — Discovery, inventory, scaffolding
