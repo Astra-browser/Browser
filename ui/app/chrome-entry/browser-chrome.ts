@@ -28,10 +28,20 @@ import App from "$app/browser/BrowserApp.svelte";
 
 const SURFACE = "browser-chrome";
 const SHELL_NS = "astra-shell";
+/** The shell hands over its mount element and ready hook (P3-T23). */
+const MOUNT_HOOK = "__ASTRA_MOUNT__";
+const READY_HOOK = "__ASTRA_READY__";
 
 /** Announce readiness to the embedding shell (no-op standalone). */
 function announce(bridge: Bridge): void {
   try {
+    // In-tree mount (P3-T23): the shell installs `__ASTRA_READY__` before it
+    // imports this module. Same document, same principal — no relay.
+    const hook = (globalThis as Record<string, unknown>)[READY_HOOK];
+    if (typeof hook === "function") {
+      (hook as (mode: string) => void)(bridge.mode);
+      return;
+    }
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ ns: SHELL_NS, kind: "ready", mode: bridge.mode }, "*");
     }
@@ -100,6 +110,7 @@ try {
     } catch {
       // Diagnostics only.
     }
+    announce(bridge);
   };
   // Everything the person sees in the first frame must already be there and
   // settled: the Space bar (with its label), the tab row (with its title), the
@@ -171,7 +182,8 @@ try {
   mount(App, { target });
   // The presentation barrier observes this DOM synchronously.
   flushSync();
-  announce(bridge);
+  // `announce` is called from `reveal()`: the shell only shows this frame once
+  // the first paint is complete, so a half-built chrome is never displayed.
   // Guarantee the first projection: the app asks for its own snapshot during
   // onMount, but if that request raced the listener wiring the sidebar would
   // paint an empty Space section for a frame. `bootstrap` is idempotent and

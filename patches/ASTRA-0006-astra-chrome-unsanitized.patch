@@ -2,9 +2,9 @@ Patch-Id: ASTRA-0006
 Title: Exempt the first-party chrome://astra/ UI package from default innerHTML sanitization
 Tier: P3
 Upstream-Files: dom/base/nsContentUtils.cpp
-Intent: the product UI is a bundled Svelte app served from chrome://astra/ (jar.mn). Svelte builds every component template with template.innerHTML; the default system-principal sanitization strips button/input/form/script and makes a chrome-privileged mount impossible, which forced an out-of-process file:// browser plus a framescript relay. Exempting only documents whose URI begins with chrome://astra/ (first-party, fully bundled, no remote or user-controlled markup) lets the UI run as real chrome. Explicit callers (setHTML/setHTMLUnsafe/ParserUtils) keep their own flags and are unaffected.
+Intent: the product UI is a bundled Svelte app served from chrome://astra/ (jar.mn) and embedded as a chrome-privileged document. Svelte builds every component template with template.innerHTML; the default system-principal sanitization strips button/input/form/script, which made a chrome-privileged mount impossible and forced an out-of-process file:// browser plus a framescript relay. Exempting only documents whose URI begins chrome://astra/ (first-party, fully bundled, no remote or user-controlled markup) lets the UI run as real chrome. Explicit callers (setHTML/setHTMLUnsafe/ParserUtils) keep their own flags and are unaffected.
 Risk: medium (touches the fragment-parsing security gate). Scope is one package prefix; any other chrome document keeps the default sanitization. Rollback is deleting the two condition clauses.
-Test: tests/contract/shell_app_chrome.py (chrome iframe mounts the app, #root has children, data-bridge-mode=host) + existing live suites
+Test: tests/contract/shell_app_chrome.py (chrome iframe mounts the app, #root has children, data-bridge-mode=host, first frame complete) + existing live suites
 Verified-On: 153.6.0
 Removal-Plan: drop if Svelte gains a sanitizer-safe template path (or the UI is reimplemented without innerHTML templates)
 ---

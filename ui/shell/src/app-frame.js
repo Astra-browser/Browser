@@ -87,6 +87,24 @@ export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
         // Diagnostics only.
       }
       if (mode === "host") {
+        try {
+          frame.style.opacity = "";
+          // Measured: a chrome iframe keeps painting the layer it cached
+          // while transparent, so the first visible frame could be the
+          // half-built one. Invalidate both layers on reveal.
+          frame.style.transform = "translateZ(0)";
+          void frame.offsetHeight;
+          frame.style.transform = "";
+          const child = frame.contentDocument;
+          if (child) {
+            const html = child.documentElement;
+            html.style.opacity = "0.999";
+            void html.offsetHeight;
+            html.style.opacity = "";
+          }
+        } catch {
+          // Frame already torn down; nothing to reveal.
+        }
         settle(onReady, mode);
       } else {
         settle(onFailure, `app booted in ${mode} mode, expected host`);
@@ -107,6 +125,10 @@ export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
     // The embed is first-party chrome, so it may run with the chrome
     // principal it already has; nothing here grants page content anything.
     frame.setAttribute("src", APP_PAGE);
+    // Composited out until the app reports a complete first frame. Opacity
+    // (not display:none) keeps the child document laying out, so it can
+    // measure itself and settle.
+    frame.style.opacity = "0";
     container.appendChild(frame);
   } catch (error) {
     settle(onFailure, `app frame failed to load (${error instanceof Error ? error.message : String(error)})`);
