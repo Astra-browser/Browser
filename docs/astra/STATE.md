@@ -94,10 +94,10 @@ lock it: no other agent may touch that task, its files, or its branch.
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
 | P5-T01 | Tasks domain (lists, priorities, NL parser) | done | orchestrator | agent/P5-T01-tasks | Merged 2026-11-02; tasks 31/31, workspace 284/284, clippy/fmt/brand clean |
-| P5-T02 | Tasks UI + "make task" palette | doing | worker-2 | agent/P5-T02-tasks-ui | Locked 2026-11-02; tasks domain done, golden exists, needs e2e + palette row |
+| P5-T02 | Tasks UI + "make task" palette | done | orchestrator | agent/P5-T02-tasks-ui | Merged 2026-11-02; palette taskCommandRow + unit 83 + component 5/5; 2 pre-existing timing failures unchanged (proven identical stashed); PARITY stays ported-pending (no production caller yet) |
 | P5-T03 | Notes (Markdown files + index + watcher) | done | orchestrator | agent/P5-T03-notes | Merged 2026-11-02; notes 12/12, workspace 253/253, clippy/fmt/brand clean |
 | P5-T04 | Time tracking (per-site, focus mode) | done | orchestrator | agent/P5-T04-time | Merged 2026-11-02; time 12/12, workspace 296/296, clippy/fmt/brand clean; private-aware writes from day one |
-| P5-T05 | Export/import (JSON + Markdown) | doing | worker-3 | agent/P5-T05-export | Locked 2026-11-02; after T01/T03, needs domain export + import_json + round-trip |
+| P5-T05 | Export/import (JSON + Markdown) | done | orchestrator | agent/P5-T05-export | Merged 2026-11-02; tasks/notes/time bundles + store import_json + combined fixture; tasks 15/notes 23/time 34/store 15+2, clippy/fmt/brand clean |
 
 ## Later phases
 
