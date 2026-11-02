@@ -25,6 +25,11 @@ Mozconfig: `out/mozconfig.linux` (unofficial branding) + `--enable-release`,
   when the desktop session is alive (fits in ~26 GB free + 7 GB swap; the
   `libxul` link alone peaks near 10 GB). `forge build` accepts `--jobs N`;
   default to 8 until a dedicated build host exists (P8 CI).
+- 2026-11-02: `-j6` still killed the IDE — single gkrust LTO rustc hit ~11 GB
+  RSS with swap fully exhausted (7/7 GB), VS Code renderers died. Killed build,
+  zeroed sccache (34 MB, 0% hits), restarted `nice -n 10 forge build --jobs 2`.
+  **Rule hardened: daily-driver builds use `--jobs 2` + nice while the desktop
+  session is alive; `-j8` only with the IDE closed or on a headless host.**
 
 ## Fast dev loop (U-02 RESOLVED)
 
