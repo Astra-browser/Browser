@@ -24,3 +24,40 @@
    (do not trust this file's guesses).
 2. `forge fetch` → `forge config` → first full Linux build; record
    time/disk/RAM in `docs/astra/BUILD_TIMES.md`.
+
+## Run the dev build (2026-11-03)
+
+```sh
+cd /home/rem/Projects/Astra
+./tools/run-dev.sh            # reuse out/dev-profile (settings persist)
+./tools/run-dev.sh --fresh    # empty profile
+./tools/run-dev.sh -- --new-window   # extra flags pass to Firefox
+```
+
+It runs `engine/obj-astra-linux/dist/bin/firefox` with `-no-remote` and a
+profile in `out/dev-profile`, and prints the build command if the binary is
+missing.
+
+## Rebuild loop
+
+| Changed | Command | Time |
+|---|---|---|
+| `ui/app/**` | `bun run --filter @astra/frame build:chrome` | ~7 s |
+| `ui/shell/**` | `bun run --filter @astra/shell-hello build` | <1 s |
+| `overlay/astra/**`, `patches/**` | `(cd forge/astra-forge && cargo run -q -- overlay)` | <1 s |
+| any of the above | `(cd forge/astra-forge && cargo run -q -- build --faster)` | ~7 s |
+| `engine/**` (C++/Rust) | `(cd forge/astra-forge && cargo run -q -- build --jobs 2)` | ~20 s+ |
+
+**Never run the engine build without `--jobs 2`**: the gkrust LTO link has
+OOM-killed this machine and taken the editor with it (BUILD_TIMES.md).
+
+## Drive the running browser (Marionette)
+
+Playwright cannot attach to this build (it needs `-juggler-pipe`; our ESR
+build does not speak it). Use the in-tree harnesses:
+
+```sh
+python3 tools/marionette-probe/headed-probe.py /tmp/p out/shot   # launch + state + screenshot
+python3 tools/marionette-probe/framecheck2.py                    # frame-by-frame boot check (PID-matched)
+python3 tests/contract/shell_app_chrome.py                       # 17 live checks
+```

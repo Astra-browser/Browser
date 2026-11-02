@@ -3,6 +3,89 @@
 Legend: `todo` · `doing` (locked) · `blocked` · `done`. A `doing` row's Agent+Branch
 lock it: no other agent may touch that task, its files, or its branch.
 
+## Where things stand (2026-11-03 — read this first, next agent)
+
+The browser builds, boots, and **the product UI is the window's chrome** (not a
+page painted over Firefox). Phases 0–6 are done; Phase 3 (UI port) is the
+active surface.
+
+**Run it**
+
+```sh
+./tools/run-dev.sh            # reuse out/dev-profile
+./tools/run-dev.sh --fresh    # clean profile
+```
+
+**Rebuild after a change**
+
+```sh
+bun run --filter @astra/frame build:chrome     # ui/app changed
+bun run --filter @astra/shell-hello build      # ui/shell changed
+(cd forge/astra-forge && cargo run -q -- overlay && cargo run -q -- build --faster)
+```
+
+`build --faster` repacks in ~7 s. Only an engine change (`engine/**`, C++/Rust)
+needs the full build: `cargo run -q -- build --jobs 2` — **always cap jobs**,
+an uncapped gkrust LTO link has OOM-killed this machine (BUILD_TIMES.md).
+
+**Architecture in one paragraph.** `ui/app` (Svelte 5) is packaged as the
+first-party document `chrome://astra/content/app/browser-chrome.html`
+(jar.mn) and embedded by `ui/shell/src/app-frame.js` in a chrome-privileged
+`<iframe>`. Same principal and process, so the bridge imports the Host API
+directly (`resource://astra/host/HostAPI.sys.mjs`) — no relay, no `file://`,
+no framescript. The app renders from `items-changed` projections and listens
+on `astra:*` DOM channels; the chrome entry re-dispatches bridge events onto
+those channels. Web pages stay content processes in the shell's content slot.
+
+**Traps that cost real time — do not rediscover these**
+
+- **Do not mount the app in-tree** in `browser.xhtml`. It was tried
+  (2026-11-03) and reverted: the app's stylesheets are scoped to its own
+  document (`#root`, `html`, `body`), so the address field went white, tab
+  labels disappeared and the wordmark collapsed. D-35.
+- **Do not remove the first-paint gate.** A chrome iframe caches the layer it
+  painted while transparent; revealing it without invalidating both layers
+  shows a half-built frame (the "appear → vanish → reappear" the owner
+  reported). `app-frame.js` holds the frame at `opacity:0` until the app
+  reports `ready`, then nudges both layers. D-35.
+- **Patch ASTRA-0006 is load-bearing.** Svelte compiles every template through
+  `template.innerHTML`; the default system-principal sanitizer strips
+  `button`/`input`/`form`/`script`. Only `chrome://astra/` documents are
+  exempt. Removing it silently breaks the mount.
+- **`parseEnvelope` must keep a `null` payload.** `setting_get` returns
+  `string | null`; coercing `null` to `{}` made every preference read back as
+  an object, which silently disabled the clock, greeting and due-today pill.
+- **Playwright cannot drive this binary.** It launches Firefox with
+  `-juggler-pipe`, which Playwright's own fork speaks and our ESR build does
+  not. Playwright stays on the standalone-Chromium lane
+  (`ui/app/playwright.config.ts`); the dev build is driven over Marionette
+  (`tools/marionette-probe/`).
+- **Screenshots lie under Hyprland.** `grim` captures the last composited
+  buffer; an unfocused/occluded window shows stale pixels. Match the window by
+  **PID** (`tools/marionette-probe/framecheck2.py`) before believing a frame.
+
+**Verification gates** (all green on `main`)
+
+```sh
+python3 tests/contract/shell_app_chrome.py   # 17 checks: chrome doc, root, host mode, first frame
+node tests/contract/hostapi_v1.mjs           # 289 checks
+node tests/contract/shell_assembly.mjs
+node tests/contract/frame_model.mjs
+(cd ui/packages/bridge && bun test)          # 25
+(cd ui/app && bun run vitest run src/shared/ipc/bridge.test.ts)
+python3 tools/state-check.py && bash tools/brand-lint.sh
+(cd forge/astra-forge && cargo run -q -- lint && cargo run -q -- footprint)
+```
+
+**Known gaps (next real work).** Most of the app's 267 commands are still
+unrouted in host mode: only tabs/settings/accounts/sidebar/webext/nav/panes
+resolve, everything else fails fast with `unknown_command`. The Work canvas,
+tasks/notes/time pages and settings sections therefore render their empty
+states. The host projection is derived in `overlay/astra/host/Tabs.sys.mjs`
+until `astra-core` owns it (plan §5.4). Web pages have not been exercised
+end-to-end through the content slot since the chrome integration.
+
+
 ## Phase 0 — Discovery, inventory, scaffolding
 
 | ID | Task | Status | Agent | Branch | Notes |

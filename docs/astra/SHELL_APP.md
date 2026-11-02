@@ -1,12 +1,13 @@
 # Full-app shell (P3-T15 → P3-T21)
 
-> Status (P3-T21): the product UI **is** the browser chrome. `ui/app` ships as
-> the first-party package document
+> Status (P3-T21, first paint P3-T23): the product UI **is** the browser
+> chrome. `ui/app` ships as the first-party package document
 > `chrome://astra/content/app/browser-chrome.html` and the main window embeds
 > it in a chrome-privileged `<iframe>` (`ui/shell/src/app-frame.js`). Same
 > principal, same process: the app imports the Host API directly
 > (`resource://astra/host/HostAPI.sys.mjs`). There is no `file://` page, no
 > out-of-process content browser, no framescript and no message relay.
+> The first visible frame is guaranteed complete (§0b).
 >
 > The one engine change this needs is patch **ASTRA-0006**: documents whose
 > URI begins `chrome://astra/` are exempt from the *default* system-principal
@@ -31,6 +32,29 @@ a `file://` URL plus a `relay-framescript.js` message bridge. That existed only
 because a system-principal document sanitizes `innerHTML`; ASTRA-0006 removes
 the cause, and P3-T21 deleted the workaround (browser, framescript, nonce and
 relay dispatch are gone).
+
+## 0b. First paint (P3-T23, 2026-11-03)
+
+The app stays in its **own chrome document** (iframe). An in-tree mount into
+`browser.xhtml` was implemented and reverted the same day: the app's
+stylesheets are scoped to its own document (`#root`, `html`, `body`), so the
+address field, tab labels and wordmark broke. D-35.
+
+What looked like "sections loading late" (and later "UI appears, vanishes,
+reappears") was a compositor detail: a chrome iframe caches the layer it
+painted **while transparent**, and revealing it showed the half-built frame.
+The loader therefore:
+
+1. keeps the frame at `opacity: 0` from creation (layout stays live, so the
+   app can measure itself and settle),
+2. waits for the app's `ready` — the entry only announces after the Space bar,
+   tab row, essentials drop target and account foot have been present for
+   three consecutive frames (cap 1200 ms),
+3. reveals and invalidates **both** layers (element `transform` nudge + child
+   `documentElement` opacity toggle) so the cached half-frame cannot survive.
+
+Proof: `out/headed-frames2/f00.png` — the first captured frame of the window —
+is already the complete UI. `tests/contract/shell_app_chrome.py` asserts it.
 
 ## 1. What changed and why
 
