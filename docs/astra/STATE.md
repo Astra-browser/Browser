@@ -108,7 +108,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P6-T03 | Tool layer (browser/FS/command/MCP/gh) | todo | — | — | After T01 |
 | P6-T04 | Approval gate engine + injection suite | todo | — | — | After T01 |
 | P6-T05 | Helpers (parallel sub-agents, containers, Panes) | todo | — | — | After T01+T03 |
-| P6-T06 | Canvas UI (tables/charts/plans/code/docs) | doing | worker-2 | agent/P6-T06-canvas | Locked 2026-11-02; ui/app/src/features/work/canvas/** + goldens; memory UI excluded (T08) |
+| P6-T06 | Canvas UI (tables/charts/plans/code/docs) | done | orchestrator | agent/P6-T06-canvas | Merged 2026-11-02; unit 9/9 + component 3/3; goldens deferred (harness hardcodes 8 screens, see CANVAS.md); bundle-budget entry follow-up |
 | P6-T07 | Skills: port 25 bundled (rebranded) + loader | done | orchestrator | agent/P6-T07-skills | Merged 2026-11-02; 25 full ports + skill-lint clean + SKILLS.md loader contract; runtime loader rides P6-T01 |
 | P6-T08 | Memory + history recall (view/edit/delete) | done | orchestrator | agent/P6-T08-memory | Merged 2026-11-02; agents 32/core 96/store 29; hard-delete proven (raw SQL 0 + freelist 0); private-scope respected |
 | P6-T09 | Hand-off to Claude Code / Codex | todo | — | — | After T01+T03 |
