@@ -33,6 +33,7 @@ import { Settings, __resetSettingsForTests } from "./Settings.sys.mjs";
 import { Accounts } from "./Accounts.sys.mjs";
 import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
 import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
+import { Commands } from "./Commands.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -51,6 +52,7 @@ export {
   Accounts,
   Sidebar,
   WebExtensions,
+  Commands,
   addEventListener,
   emit,
   eventSeq,

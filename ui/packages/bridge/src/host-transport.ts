@@ -26,6 +26,7 @@ export interface HostModules {
   WebExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Settings: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Accounts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -49,6 +50,7 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   setting_get: ["Settings", "get"],
   setting_set: ["Settings", "set"],
   account_get: ["Accounts", "get"],
+  run_command: ["Commands", "run"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {
