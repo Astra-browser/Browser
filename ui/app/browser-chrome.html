@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!-- Astra chrome app page (P3-T15). Boots the real product UI inside the
+   Firefox chrome window (chrome://astra/app/browser-chrome.html, iframed by
+   the shell loader). Same document as the golden browser page, but the entry
+   (chrome-entry/browser-chrome.ts) configures the bridge in HOST mode and
+   the build (vite.chrome.ts) uses relative asset URLs + the bridge shim for
+   @tauri-apps/api/*. No inline scripts (chrome CSP, U-04). -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astra</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="./chrome-entry/browser-chrome.ts" type="module"></script>
+  </body>
+</html>

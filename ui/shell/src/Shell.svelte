@@ -6,6 +6,7 @@
   import { createTitlebar, createSidebar, createToolbar } from "./frame/frame.js";
   import { mountTabStrip } from "./tabs/tab-strip.js";
   import { mountSplit } from "./split/split.js";
+  import { mountAppFrame } from "./app-frame.js";
   import "./urlbar.css";
   import "./frame/frame.css";
   import "./tabs/tab-strip.css";
@@ -25,6 +26,13 @@
   let splitMount;
   let slot;
   let slotError = $state("");
+  // P3-T15 full-app shell: the packaged app mounts into appMount (remote
+  // content browser + host relay); the interim bar/split/slot mounts stay
+  // visible and wired as the fallback (shown with appError when the Host
+  // API — and therefore the app — is unavailable).
+  let appMount;
+  let appError = $state("");
+  let appApi = null;
 
   const SIDEBAR_ITEMS = [
     { id: "tabs", label: "Tabs" },
@@ -45,8 +53,25 @@
     const host = await loadHost();
     if (!host) {
       slotError = "Host API unavailable outside the browser window";
+      // Same pattern for the app region: without the Host API the packaged
+      // app cannot boot in host mode, so the interim chrome stays visible.
+      appError = "Host API unavailable outside the browser window";
       return;
     }
+    // P3-T15: mount the full app into the main column. The relay terminates
+    // in this window's host modules, so the app boots in host mode. The
+    // interim bar/split/slot mounts stay visible and wired (live contract
+    // tests drive them; they are the fallback if the app is unavailable).
+    appApi = mountAppFrame(appMount, host, {
+      // Records the mode the app actually booted in (P3-T15 contract seam:
+      // live suites assert `host` here). Failure leaves appError set below.
+      onReady: (mode) => {
+        appMount.dataset.appReady = mode;
+      },
+      onFailure: (message) => {
+        appError = message;
+      },
+    });
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
 
@@ -249,6 +274,7 @@
       toolbar.destroy();
       mounted?.detach();
       bar.destroy();
+      appApi?.destroy();
     };
   });
 </script>
@@ -262,6 +288,11 @@
       <div class="astra-tabs-mount" bind:this={tabsMount}></div>
     </div>
     <div class="astra-main">
+      <div class="astra-app-mount" data-astra-app="" bind:this={appMount}>
+        {#if appError}
+          <p class="slot-error" role="alert">{appError}</p>
+        {/if}
+      </div>
       <div class="astra-bar-mount" role="banner" bind:this={barMount}></div>
       <div class="astra-split-mount" bind:this={splitMount}></div>
       <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
@@ -340,6 +371,20 @@
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
+  }
+  .astra-app-mount {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #1c1b22;
+  }
+  .astra-app-mount > :global(.astra-app-frame) {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    border: 0;
   }
   .slot-error {
     font-family: system-ui, sans-serif;

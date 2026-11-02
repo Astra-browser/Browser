@@ -1,0 +1,1 @@
+var e={width:3344,height:1882,horizon:.69};function t(t,n,r=e){if(t<=0||n<=0)return{x:0,y:0,w:0,h:0};let i=Math.max(t/r.width,n/(r.horizon*r.height)),a=r.width*i,o=r.height*i;return{x:(t-a)/2,y:n-r.horizon*o,w:a,h:o}}export{t};

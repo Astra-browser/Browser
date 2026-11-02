@@ -1,0 +1,1 @@
+var e=null;function t(t){e=t}function n(t,n){let r=e?.[t];if(r!=null)return r.replace(/\{(\w+)\}/gu,(e,t)=>String(n?.[t]??``))}export{n,t};

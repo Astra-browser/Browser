@@ -5,7 +5,10 @@
 # Excludes: .git, folder_context (reference snapshot), LICENSE, NOTICE,
 # docs/astra/PROVENANCE.md, target/, node_modules/, engine/ (upstream),
 # build outputs (dist/, reports/ — scanned post-build by the packaging gate
-# instead), and the generated IPC bindings (Tauri Specta output, regenerated
+# instead), the staged chrome app bundle (overlay/astra/chrome/app/: generated
+# by `bun run --filter @astra/frame build:chrome`, audited in
+# docs/astra/SHELL_APP.md §5 — same rationale as dist/), and the generated IPC
+# bindings (Tauri Specta output, regenerated
 # from astra-proto in P2-T02 which mints the new channel names; tracked in
 # docs/astra/REBRAND-ui.md).
 # Generated-file exception: ui/app/src/shared/ipc/bindings.ts (expires P2-T02).
@@ -27,6 +30,8 @@ FOUND="$(grep -rIl --exclude-dir=.git --exclude-dir=folder_context \
 for f in $FOUND; do
   case "$f" in
     ./LICENSE|./NOTICE|./docs/astra/PROVENANCE.md|LICENSE|NOTICE|docs/astra/PROVENANCE.md|./ui/app/src/shared/ipc/bindings.ts|ui/app/src/shared/ipc/bindings.ts)
+      continue ;;
+    ./overlay/astra/chrome/app/*|overlay/astra/chrome/app/*)
       continue ;;
     *)
       echo "brand-lint: forbidden match in $f" >&2
