@@ -350,12 +350,239 @@ export async function clearSite({ request_id = "hide-rule", host = "", url = "" 
   return envelope(request_id, { host: site, selectors: [] });
 }
 
+// --- Live wiring (P4-T11) -------------------------------------------------
+// The content script injected by the live shell is a thin driver around
+// this module: it calls `installLiveHiding(doc, { url })`, which performs
+// the initial `hideForPage` pass, injects the shared stylesheet, and
+// re-runs the pass on DOM mutations (new ads arriving late, lazy iframes).
+// All DOM access stays duck-typed so Node contract tests drive it with
+// fake documents.
+//
+// Rust call path (verified 2026-11-02, no invented APIs):
+//   - Cosmetic lookup lives in `crates/astra-blocker`
+//     (`Blocker::cosmetic_selectors(url, classes, ids) -> Vec<String>`).
+//     There is NO existing Rust→JS bridge in the overlay: the P4-T02
+//     in-tree engine is reached from C++ (`AstraBlocker::ShouldBlockChannel`),
+//     not from chrome JS. So the live shell passes its own native lookup
+//     (whatever privileged path it owns, e.g. a frame-script call into the
+//     blocker service) as `nativeCosmetic(url, classes, ids)` to
+//     `createBlockerCosmeticProvider`, which adapts it to the async
+//     `{ cosmeticSelectors }` seam. Until that path lands, the default
+//     empty provider stays and only stored per-site overrides apply.
+//   - Override persistence reuses the `blocker_overrides` table (P2-T04,
+//     `crates/astra-store`). That crate exposes exactly one override API:
+//     `blocker_override_set(host, action)` (write-only; there is no
+//     override getter/list). So `createOverrideStoreAdapter` persists via
+//     the injected `setAction(host, action)` writer with
+//     `action = "cosmetic-hide:<selector>"` (see `formatOverrideAction`),
+//     and keeps an in-memory mirror for `load` until a native read lands;
+//     an optional injected `getActions(host)` (substring-matched against
+//     the `cosmetic-hide:` prefix) feeds the mirror when available.
+
+export const HIDE_STYLE_ID = "astra-hide-style";
+export const OVERRIDE_ACTION_PREFIX = "cosmetic-hide:";
+
+export function formatOverrideAction(selector) {
+  return `${OVERRIDE_ACTION_PREFIX}${String(selector).trim()}`;
+}
+
+export function parseOverrideAction(action) {
+  const text = String(action ?? "");
+  if (!text.startsWith(OVERRIDE_ACTION_PREFIX)) {
+    return null;
+  }
+  const selector = text.slice(OVERRIDE_ACTION_PREFIX.length).trim();
+  return isValidSelector(selector) ? selector : null;
+}
+
+// Adapt a sync native cosmetic lookup
+// (`(url, classes, ids) -> string[]`, e.g. the blocker's
+// `cosmetic_selectors`) to the async provider seam. Never throws: a
+// failing native lookup degrades to "no filter selectors".
+export function createBlockerCosmeticProvider(nativeCosmetic) {
+  const fn = typeof nativeCosmetic === "function" ? nativeCosmetic : () => [];
+  return {
+    async cosmeticSelectors(url, classes, ids) {
+      try {
+        const out = await fn(url, classes ?? [], ids ?? []);
+        return Array.isArray(out) ? out.filter(isValidSelector) : [];
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
+// Adapt the override writer (`blocker_override_set`-shaped:
+// `(host, action) -> void`) to the `{ load, save }` store seam. `save`
+// writes one `cosmetic-hide:<selector>` row per selector plus a single
+// empty-selector sentinel row on clear so the host key survives; `load`
+// merges the in-memory mirror with any rows returned by the optional
+// `getActions(host)` reader (absent today — write-only store API).
+export function createOverrideStoreAdapter({ setAction, getActions = null } = {}) {
+  const write = typeof setAction === "function" ? setAction : () => {};
+  const mirror = new Map();
+  return {
+    async load(host) {
+      const site = normalizeHost(host);
+      const merged = new Set(mirror.get(site) ?? []);
+      if (typeof getActions === "function") {
+        try {
+          const rows = (await getActions(site)) ?? [];
+          for (const row of Array.isArray(rows) ? rows : [rows]) {
+            const sel = parseOverrideAction(row);
+            if (sel) {
+              merged.add(sel);
+            }
+          }
+        } catch {
+          // Native read failures degrade to the mirror.
+        }
+      }
+      return [...merged].sort();
+    },
+    async save(host, selectors) {
+      const site = normalizeHost(host);
+      const list = [...new Set((selectors ?? []).filter(isValidSelector))].sort();
+      mirror.set(site, list);
+      const rows = list.length > 0 ? list : [""];
+      for (const sel of rows) {
+        await write(site, formatOverrideAction(sel));
+      }
+    },
+  };
+}
+
+// Ensure `doc` carries one `<style id="astra-hide-style">` with the
+// compiled hiding CSS. Creates the element (appended to `<head>` when
+// present, else the document root), or refreshes its text on re-passes.
+// Returns true when a style node is in place, false for headless fakes.
+export function injectStylesheet(doc, selectors) {
+  if (!doc || typeof doc.querySelector !== "function") {
+    return false;
+  }
+  const css = buildStylesheet(selectors);
+  try {
+    let node = doc.querySelector(`#${HIDE_STYLE_ID}`);
+    if (!node) {
+      if (typeof doc.createElement !== "function") {
+        return false;
+      }
+      node = doc.createElement("style");
+      if (node.setAttribute) {
+        node.setAttribute("id", HIDE_STYLE_ID);
+      } else {
+        node.id = HIDE_STYLE_ID;
+      }
+      const head =
+        typeof doc.querySelector === "function" ? doc.querySelector("head") : null;
+      const parent = head ?? doc;
+      if (typeof parent.appendChild !== "function") {
+        return false;
+      }
+      parent.appendChild(node);
+    }
+    if ("textContent" in node) {
+      node.textContent = css;
+    } else if (node.style) {
+      node.style.cssText = css;
+    }
+    // Fakes without a textContent slot (and real <style> alike) accept a
+    // direct assignment; keep the compiled CSS readable either way.
+    try {
+      node.textContent = css;
+    } catch {
+      // Setter-less nodes already handled above.
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Live content-script driver: initial `hideForPage` pass + stylesheet
+// injection + a `MutationObserver` re-pass (debounced via microtask) so
+// late-arriving nodes are hidden without polling. `doc.defaultView` (or
+// the `MutationObserver` global) supplies the observer; when neither
+// exists (Node fakes) the pass still runs once and `detach` is a no-op.
+// Resolves `{ selectors, hidden, detach, run }`; `run` forces a re-pass.
+export async function installLiveHiding(doc, { url = "", request_id = "hide-live" } = {}) {
+  const first = await hideForPage(doc, { request_id, url });
+  const selectors = Array.isArray(first.selectors) ? first.selectors : [];
+  injectStylesheet(doc, selectors);
+
+  let alive = true;
+  let scheduled = false;
+  const run = async () => {
+    if (!alive) {
+      return { hidden: 0, selectors };
+    }
+    const out = await hideForPage(doc, { request_id, url });
+    injectStylesheet(doc, Array.isArray(out.selectors) ? out.selectors : selectors);
+    return out;
+  };
+  const schedule = () => {
+    if (scheduled) {
+      return;
+    }
+    scheduled = true;
+    const flush = () => {
+      scheduled = false;
+      if (alive) {
+        run();
+      }
+    };
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(flush);
+    } else if (typeof Promise === "function") {
+      Promise.resolve().then(flush);
+    } else {
+      flush();
+    }
+  };
+
+  let observer = null;
+  let detach = () => {
+    alive = false;
+  };
+  try {
+    const view = doc?.defaultView ?? null;
+    const Ctor =
+      (view && view.MutationObserver) ??
+      (typeof MutationObserver === "function" ? MutationObserver : null);
+    if (Ctor && doc && typeof doc.querySelectorAll === "function") {
+      observer = new Ctor(schedule);
+      const target = doc.documentElement ?? doc;
+      if (observer && typeof observer.observe === "function") {
+        observer.observe(target, { childList: true, subtree: true, attributes: true });
+        detach = () => {
+          alive = false;
+          try {
+            observer.disconnect();
+          } catch {
+            // Teardown is best-effort.
+          }
+        };
+      }
+    }
+  } catch {
+    observer = null;
+  }
+  return { selectors, hidden: first.hidden ?? 0, detach, run };
+}
+
 export const ContentHide = {
   hideForPage,
   applySelectors,
   collectObserved,
   selectorForElement,
   buildStylesheet,
+  injectStylesheet,
+  installLiveHiding,
+  createBlockerCosmeticProvider,
+  createOverrideStoreAdapter,
+  formatOverrideAction,
+  parseOverrideAction,
   startPicking,
   cancelPicking,
   confirmPick,

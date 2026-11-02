@@ -25,6 +25,7 @@ import { History, __resetHistoryForTests } from "./History.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
 import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
 import { Dialogs, __resetDialogsForTests } from "./Dialogs.sys.mjs";
+import { ContentHide, __resetForTests as __resetContentHideForTests } from "./ContentHide.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -38,6 +39,7 @@ export {
   Panes,
   Containers,
   Dialogs,
+  ContentHide,
   addEventListener,
   emit,
   eventSeq,
@@ -56,5 +58,6 @@ export function __resetForTests() {
   __resetPanesForTests();
   __resetContainersForTests();
   __resetDialogsForTests();
+  __resetContentHideForTests();
   __resetEventsForTests();
 }

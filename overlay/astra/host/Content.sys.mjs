@@ -17,6 +17,14 @@
 import { addEventListener } from "./Events.sys.mjs";
 import { Tabs, __applyExternalUpdate } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
+import {
+  ContentHide,
+  createBlockerCosmeticProvider,
+  createOverrideStoreAdapter,
+  installLiveHiding,
+  setCosmeticProvider,
+  setStoreAdapter,
+} from "./ContentHide.sys.mjs";
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
@@ -199,6 +207,39 @@ export const Content = {
     } catch {
       return false;
     }
+  },
+
+  // Element hiding (P4-T11 live wiring). The Content actor owns the
+  // ContentHide protocol module: rule state and the picking flow live
+  // here; the content script (frame script / process script in the live
+  // shell) is a thin `installLiveHiding` driver over the page document.
+  ContentHide,
+
+  // Wire the real providers into ContentHide's injectable seams. Pass the
+  // shell's privileged native lookups; both are optional and degrade to
+  // the in-memory defaults when absent (contract tests, standalone):
+  //   - `cosmeticSelectors(url, classes, ids)`: sync array return, e.g.
+  //     the `astra-blocker` `cosmetic_selectors` engine call.
+  //   - `overrideSet(host, action)` / `overrideGet(host)`: the
+  //     `blocker_override_set`-shaped store writer (plus an optional
+  //     reader for when a native read path lands).
+  wireHiding({ cosmeticSelectors = null, overrideSet = null, overrideGet = null } = {}) {
+    if (typeof cosmeticSelectors === "function") {
+      setCosmeticProvider(createBlockerCosmeticProvider(cosmeticSelectors));
+    }
+    if (typeof overrideSet === "function" || typeof overrideGet === "function") {
+      setStoreAdapter(
+        createOverrideStoreAdapter({ setAction: overrideSet, getActions: overrideGet }),
+      );
+    }
+    return true;
+  },
+
+  // Attach live hiding to a page document: initial pass + stylesheet +
+  // MutationObserver re-pass. Returns the `installLiveHiding` handle
+  // (`{ selectors, hidden, detach, run }`).
+  attachHiding(doc, opts = {}) {
+    return installLiveHiding(doc, opts);
   },
 };
 
