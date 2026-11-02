@@ -87,7 +87,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P4-T08 | Downloads manager + PDF viewer | done | orchestrator | agent/P4-T08-downloads | Merged 2026-11-02; ui 1176/1176 + svelte-check clean; bridge download routes stubbed (follow-up noted) |
 | P4-T09 | Password/autofill decision | done | orchestrator | agent/P4-T09-password | Research merged; recommends extension-only; owner decision pending (OWNER_QUESTIONS #6 expanded) |
 | P4-T10 | Performance baselines | done | orchestrator | agent/P4-T10-perf | Merged 2026-11-02; baselines recorded (startup/RAM/switch/scroll/blocker), scripts validated; confirm re-run after engine rebuild |
-| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | doing | worker-1 | agent/P4-T11-livehide | Locked 2026-11-02; P4-T03 shipped protocol+logic; live injection needs shell+bridge |
+| P4-T11 | Element-hiding live wiring (content script, provider, store adapter, actor reg) | done | orchestrator | agent/P4-T11-livehide | Merged 2026-11-02; content_hide 59+py PASS, hostapi 262 no-regress, blocker 22, bridge 24, fmt/brand clean; live Marionette skip-gated (no geckodriver) |
 
 ## Phase 5 — Tasks, Notes, Time
 
