@@ -112,7 +112,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P6-T07 | Skills: port 25 bundled (rebranded) + loader | done | orchestrator | agent/P6-T07-skills | Merged 2026-11-02; 25 full ports + skill-lint clean + SKILLS.md loader contract; runtime loader rides P6-T01 |
 | P6-T08 | Memory + history recall (view/edit/delete) | todo | — | — | After T01 |
 | P6-T09 | Hand-off to Claude Code / Codex | todo | — | — | After T01+T03 |
-| P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | doing | worker-2 | agent/P6-T10-eval | Locked 2026-11-02; INVENTORY.md:73-81 harness shape; local fixtures + baselines |
+| P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | done | orchestrator | agent/P6-T10-eval | Merged 2026-11-02; 21/21 + smoke 5/5 + cap-negative; note: contract-runner has same log_message flaw, left untouched (follow-up) |
 
 ## Later phases
 
