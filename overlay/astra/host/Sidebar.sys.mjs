@@ -19,7 +19,15 @@
 import { HOST_API_VERSION } from "./Tabs.sys.mjs";
 import { emit } from "./Events.sys.mjs";
 
-const _state = { width: null, animate: false, revision: null, hidden: false };
+const _state = {
+  width: null,
+  animate: false,
+  revision: null,
+  hidden: false,
+  peeking: false,
+  lights: false,
+  slide: true,
+};
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -64,6 +72,22 @@ export const Sidebar = {
     return ok(request_id, snapshot());
   },
 
+  // Bring the hidden column out over the page, or let it go. `lights` says
+  // whether the column's controls travel with it, `slide` whether it moves at
+  // all (a reduced-motion preference asks for none). Nothing is laid out
+  // again: the card is out of the row while hidden, so peeking never moves
+  // the page.
+  async peek({ request_id = "", peek = false, lights = false, slide = true } = {}) {
+    if (typeof peek !== "boolean" || typeof lights !== "boolean" || typeof slide !== "boolean") {
+      return err(request_id, "invalid_peek", "peek, lights and slide must be booleans");
+    }
+    _state.peeking = peek;
+    _state.lights = lights;
+    _state.slide = slide;
+    emit("sidebar.changed", snapshot());
+    return ok(request_id, snapshot());
+  },
+
   // Last reported state (diagnostics; the shell layout owns the truth).
   async get({ request_id = "" } = {}) {
     return ok(request_id, snapshot());
@@ -76,4 +100,7 @@ export function __resetSidebarForTests() {
   _state.animate = false;
   _state.revision = null;
   _state.hidden = false;
+  _state.peeking = false;
+  _state.lights = false;
+  _state.slide = true;
 }

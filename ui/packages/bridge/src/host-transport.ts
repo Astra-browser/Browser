@@ -72,6 +72,7 @@ const ROUTES: Record<string, Route> = {
   ui_ready: ["Boot", "handshake"],
   sidebar_set_width: ["Sidebar", "setWidth"],
   sidebar_set_hidden: ["Sidebar", "setHidden"],
+  sidebar_peek: ["Sidebar", "peek"],
   web_extension_list: ["WebExtensions", "list"],
   setting_get: ["Settings", "get"],
   setting_set: ["Settings", "set"],

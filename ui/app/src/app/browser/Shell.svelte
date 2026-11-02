@@ -34,7 +34,10 @@
   import { selectionGlide } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
   import { requestTab } from "$session/work-tab.svelte";
-  import { expanded as sidebarWidth } from "$session/sidebar-mode.svelte";
+  import {
+    expanded as sidebarWidth,
+    isHidden as sidebarHidden,
+  } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack, type Component, type Snippet } from "svelte";
   import { clearRequest } from "$domain/site-data";
@@ -322,6 +325,11 @@
     if (inWork) requestTab(id);
     else tabs.activate(id);
   }
+
+  /** The edge strip asks for the card; the column's own listener answers. */
+  function dispatchSidebarEdge(near: boolean) {
+    window.dispatchEvent(new CustomEvent("astra:sidebar-edge", { detail: { near } }));
+  }
 </script>
 
 <!-- The player of a tab playing behind the page in front; its code loads the
@@ -344,6 +352,24 @@
   data-private={incognito || undefined}
 >
   <a href="#astra-stage" class="skip-link">{m.ui_skip_to_content()}</a>
+  <!--
+    The window's left edge while the column is away. It lives here, beside the
+    column, because a fixed child of the card would be positioned by the card's
+    own transform and travel off screen with it. Reaching it asks the card out;
+    leaving lets it go. Nothing is laid out again: the card is out of the row
+    while hidden, so the page never moves.
+  -->
+  {#if sidebarHidden()}
+    <div
+      class="sidebar-edge"
+      role="presentation"
+      aria-hidden="true"
+      onpointerenter={() => dispatchSidebarEdge(true)}
+      onpointerover={() => dispatchSidebarEdge(true)}
+      onpointerleave={() => dispatchSidebarEdge(false)}
+      onpointerout={() => dispatchSidebarEdge(false)}
+    ></div>
+  {/if}
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
   <Sidebar
     >{#snippet browserBody(compact)}
@@ -662,6 +688,31 @@
 {#if ClearSiteData}<ClearSiteData />{/if}
 
 <style>
+  /* The reach: a strip at the window's left edge while the column is away.
+     Out of the row, above the page and under the card, so asking for the card
+     never lays anything out again. Wide enough to find, narrow enough that a
+     page's own left edge is still usable. */
+  .sidebar-edge {
+    position: fixed;
+    inset-block: 8px;
+    inset-inline-start: 0;
+    z-index: 29;
+    inline-size: 10px;
+    border-start-end-radius: var(--radius-capsule);
+    border-end-end-radius: var(--radius-capsule);
+    transition: background-color var(--motion-base) var(--ease-out);
+  }
+
+  .sidebar-edge:hover {
+    background: var(--row-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-edge {
+      transition: none;
+    }
+  }
+
   /* Keyboard-only way past the chrome: hidden until it takes focus, then a
      chip over the column. Fixed so it never disturbs the shell's layout. */
   .skip-link {
