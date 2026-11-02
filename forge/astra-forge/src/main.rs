@@ -779,6 +779,9 @@ fn cmd_export(root: &Path) -> Result<(), String> {
             // Vendored Rust sources are reproducible derived artifacts
             // (`mach vendor rust` in import regenerates them; see §6.4).
             && !f.starts_with("third_party/rust/")
+            // Overlay output (engine/astra/) is applied by `forge overlay`
+            // from overlay/ (source of truth), never patch content.
+            && !f.starts_with("astra/")
         })
         .collect();
     if !uncovered.is_empty() {
