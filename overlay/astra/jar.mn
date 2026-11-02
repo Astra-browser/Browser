@@ -41,6 +41,7 @@ astra.jar:
   content/astra/res/host/schemas/panes.json (host/schemas/panes.json)
   content/astra/res/host/schemas/events.json (host/schemas/events.json)
   content/astra/res/host/schemas/boot.json (host/schemas/boot.json)
+  content/astra/res/host/ContentTools.sys.mjs (host/ContentTools.sys.mjs)
   content/astra/res/host/schemas/windows.json (host/schemas/windows.json)
   content/astra/res/host/schemas/session.json (host/schemas/session.json)
   content/astra/res/host/schemas/history.json (host/schemas/history.json)

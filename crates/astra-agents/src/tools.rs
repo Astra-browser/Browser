@@ -2,17 +2,29 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Tool layer stubs (full schemas and implementations in P6-T03).
+//! Tool layer (P6-T03).
 //!
 //! Tools are how the agent touches the world: browser tools (open, read,
-//! click, type, scroll, screenshot) through the Host API, the scoped
-//! filesystem, the command runner, the MCP client, and CLI wrappers.
+//! click, type, scroll, screenshot) through the Host API (`ContentTools`),
+//! the scoped filesystem (root-jailed), the command runner (allow-listed),
+//! the MCP client (JSON-RPC over stdio), and CLI wrappers (`gh`).
 //! This module owns the interface — [`AgentTool`] plus versioned
-//! [`ToolCall`]/[`ToolResult`] — so the loop and the approval gate can
-//! build on stable shapes before any tool is implemented.
+//! [`ToolCall`]/[`ToolResult`] — the [`ToolRegistry`] dispatch point, and
+//! the local-only [`ToolCallLedger`] (the provider `UsageLedger` pattern
+//! reused for tool-call accounting). Each tool family lives in `tools/`:
+//! [`browser`], [`fs`], [`command`], [`mcp`], [`cli`].
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
+
+use crate::approvals::{classify, ActionClass};
+
+pub mod browser;
+pub mod cli;
+pub mod command;
+pub mod fs;
+pub mod mcp;
 
 /// Tool-call format version. Bump on any breaking shape change and keep
 /// [`ToolError::VersionMismatch`] so old payloads fail loudly.
@@ -129,10 +141,23 @@ pub enum ToolError {
     Json(String),
     #[error("unknown tool: {0}")]
     UnknownTool(String),
+    /// The tool ran and failed (command exit, driver fault, MCP error).
+    /// Carries the tool-visible message; never secrets or page text.
+    #[error("tool execution failed: {0}")]
+    Failed(String),
+    /// The tool exceeded its time budget and was stopped.
+    #[error("tool timed out after {0}ms")]
+    Timeout(u64),
+    /// The call was refused by policy (allow-list, permissions, root-jail).
+    #[error("tool denied by policy: {0}")]
+    Denied(String),
 }
 
-/// Tool interface stub. P6-T03 adds JSON-Schema descriptors plus the real
-/// browser, filesystem, command, MCP, and CLI tools behind this trait.
+/// Tool interface. Every tool exposes a JSON-Schema descriptor for its
+/// arguments ([`AgentTool::schema`]) so the planner and provider layer can
+/// offer it to the model, and an approval hook ([`AgentTool::action_class`])
+/// that delegates to [`classify`](crate::approvals::classify) — tools never
+/// reimplement the read/side-effect/high-risk taxonomy.
 pub trait AgentTool {
     /// Stable tool name referenced by [`ToolCall::tool`].
     fn name(&self) -> &str;
@@ -140,8 +165,119 @@ pub trait AgentTool {
     /// One-line description for the planner and the approval prompt.
     fn description(&self) -> &str;
 
+    /// JSON Schema (draft-07 object schema) for this tool's `args_json`.
+    /// Defaults to "no arguments"; every real tool overrides it.
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({ "type": "object", "additionalProperties": false })
+    }
+
+    /// Approval class for this tool. Default — and required — behaviour is
+    /// to call into `approvals::classify` so the P6-T04 gate stays the
+    /// single owner of the taxonomy.
+    fn action_class(&self) -> ActionClass {
+        classify(self.name())
+    }
+
     /// Execute one validated call.
     fn execute(&self, call: &ToolCall) -> Result<ToolResult, ToolError>;
+}
+
+/// Decode `call.args_json` into `T`, mapping failures to [`ToolError`].
+/// Every tool routes argument parsing through here so malformed-argument
+/// errors are uniform.
+pub fn parse_args<'a, T: serde::de::Deserialize<'a>>(call: &'a ToolCall) -> Result<T, ToolError> {
+    call.validate()?;
+    serde_json::from_str::<T>(&call.args_json)
+        .map_err(|e| ToolError::Invalid(format!("arguments do not match schema: {e}")))
+}
+
+/// Local-only tool-call accounting. Mirrors the provider [`UsageLedger`]
+/// pattern (`record` / `get` / `total`): per-tool invocation counts kept
+/// on-device, never sent anywhere.
+#[derive(Clone, Debug, Default)]
+pub struct ToolCallLedger {
+    counts: HashMap<String, u64>,
+}
+
+impl ToolCallLedger {
+    /// Empty ledger.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record one executed call of `tool`.
+    pub fn record(&mut self, tool: &str) {
+        *self.counts.entry(tool.to_owned()).or_default() = self
+            .counts
+            .get(tool)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+    }
+
+    /// Calls recorded for `tool`, if any.
+    pub fn get(&self, tool: &str) -> Option<u64> {
+        self.counts.get(tool).copied()
+    }
+
+    /// Calls recorded across all tools.
+    pub fn total(&self) -> u64 {
+        self.counts.values().copied().sum()
+    }
+}
+
+/// The P6-T03 tool registry: every shipped tool behind one dispatch point.
+/// The loop validates the call, routes by `call.tool`, and accounts the
+/// dispatch in an optional [`ToolCallLedger`].
+#[derive(Default)]
+pub struct ToolRegistry {
+    tools: HashMap<String, Box<dyn AgentTool>>,
+}
+
+impl ToolRegistry {
+    /// Empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register one tool under its [`AgentTool::name`].
+    pub fn register(&mut self, tool: Box<dyn AgentTool>) {
+        self.tools.insert(tool.name().to_owned(), tool);
+    }
+
+    /// Registered tool names, sorted.
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.tools.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    /// Provider-layer definitions (`name` / `description` / JSON-Schema
+    /// parameters) for every registered tool.
+    pub fn definitions(&self) -> Vec<crate::providers::ToolDefinition> {
+        let mut defs: Vec<crate::providers::ToolDefinition> = self
+            .tools
+            .values()
+            .map(|tool| {
+                crate::providers::ToolDefinition::new(
+                    tool.name(),
+                    tool.description(),
+                    tool.schema(),
+                )
+            })
+            .collect();
+        defs.sort_by(|a, b| a.name.cmp(&b.name));
+        defs
+    }
+
+    /// Validate `call` and run it against the named tool.
+    pub fn execute(&self, call: &ToolCall) -> Result<ToolResult, ToolError> {
+        call.validate()?;
+        match self.tools.get(&call.tool) {
+            Some(tool) => tool.execute(call),
+            None => Err(ToolError::UnknownTool(call.tool.clone())),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -199,5 +335,40 @@ mod tests {
         assert!(ok.is_ok());
         let err = ToolResult::err("c1", "boom");
         assert!(!err.is_ok());
+    }
+
+    #[test]
+    fn registry_dispatches_and_accounts() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(NoopTool));
+        assert_eq!(registry.names(), vec!["noop".to_owned()]);
+        let defs = registry.definitions();
+        assert_eq!(defs.len(), 1);
+        assert_eq!(defs[0].name, "noop");
+
+        let ok = registry
+            .execute(&ToolCall::new("noop", "c1", "{}"))
+            .unwrap();
+        assert!(ok.is_ok());
+        let unknown = registry.execute(&ToolCall::new("missing", "c2", "{}"));
+        assert_eq!(unknown, Err(ToolError::UnknownTool("missing".to_owned())));
+
+        let mut ledger = ToolCallLedger::new();
+        ledger.record("noop");
+        ledger.record("noop");
+        ledger.record("fs_read");
+        assert_eq!(ledger.get("noop"), Some(2));
+        assert_eq!(ledger.get("nothing"), None);
+        assert_eq!(ledger.total(), 3);
+    }
+
+    #[test]
+    fn default_hooks_call_into_approvals_classify() {
+        use crate::approvals::classify;
+        let tool = NoopTool;
+        assert_eq!(tool.action_class(), classify(tool.name()));
+        // No-arg default schema is a closed object schema.
+        let schema = tool.schema();
+        assert_eq!(schema["type"], serde_json::json!("object"));
     }
 }
