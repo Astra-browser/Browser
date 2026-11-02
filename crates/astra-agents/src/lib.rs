@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 pub mod approvals;
+pub mod audit;
 pub mod memory;
 pub mod planner;
 pub mod providers;

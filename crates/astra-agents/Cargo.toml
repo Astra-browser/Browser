@@ -8,6 +8,7 @@ license = "MPL-2.0"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 thiserror = "2"
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 keyring = "4"
