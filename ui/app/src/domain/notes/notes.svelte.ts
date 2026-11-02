@@ -382,6 +382,12 @@ export class NoteSession {
   }
 
   /** Leaves the open note: saves it, and puts away a note left empty. */
+  /** Lets a note that was never saved go, text and all. Only a draft can be
+   *  discarded this way: a note the host holds is deleted, not dropped. */
+  discardDraft(): void {
+    if (this.note && this.note.id === null) this.#release();
+  }
+
   async close(): Promise<boolean> {
     const note = this.note;
     if (!note) return true;

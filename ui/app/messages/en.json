@@ -3880,5 +3880,10 @@
   "privacy_windows_diagnostics_failed": "Could not open Windows Settings. Open Windows Settings and search for Diagnostics & feedback.",
   "privacy_microsoft_statement": "Microsoft privacy statement",
   "privacy_microsoft_statement_help": "Read how Microsoft handles SmartScreen and WebView2 data.",
-  "privacy_microsoft_statement_open": "Read privacy statement"
+  "privacy_microsoft_statement_open": "Read privacy statement",
+  "note_leave_title": "Save this note?",
+  "note_leave_body": "It has changes that are not saved yet. Save them, delete the note, or stay here.",
+  "note_leave_save": "Save",
+  "note_leave_discard": "Delete",
+  "note_leave_cancel": "Stay"
 }

@@ -23,6 +23,7 @@
   import NoteList from "./NoteList.svelte";
   import NoteView from "./NoteView.svelte";
   import NoteNotice from "./NoteNotice.svelte";
+  import NoteLeavePrompt from "./NoteLeavePrompt.svelte";
   import { edited, noteCount, untilEditedChanges } from "../lib/format";
   import { enter } from "../lib/enter";
   import { revealLabel } from "../lib/platform";
@@ -132,9 +133,38 @@
     stage?.querySelector<HTMLElement>(".note-document")?.focus();
   }
 
-  async function leave() {
+  /** Text the host has not taken yet, or a brand-new note that already has
+   *  words in it. Leaving with either asks first. */
+  const unsaved = () => {
+    if (!session?.note) return false;
+    if (session.saveState !== "saved") return true;
+    return !session.note.id && session.markdown.trim() !== "";
+  };
+
+  let asking = $state(false);
+
+  async function leave(force = false) {
+    if (!force && unsaved()) {
+      asking = true;
+      return;
+    }
+    asking = false;
     if (session && !(await session.close())) return;
     onclose();
+  }
+
+  async function saveThenLeave() {
+    asking = false;
+    await session?.settle();
+    await leave(true);
+  }
+
+  async function deleteThenLeave() {
+    asking = false;
+    const id = session?.note?.id;
+    if (session && id) await session.moveToTrash(id);
+    else session?.discardDraft();
+    await leave(true);
   }
 
   function keydown(event: KeyboardEvent) {
@@ -142,8 +172,15 @@
     const target = event.target as HTMLElement;
     const typing = target.closest("input, textarea, [contenteditable='true']");
     if (event.key === "Escape" && typing?.closest(".note-document")) {
-      // Out of the text, back to the note's row, as Tab-less as a list allows.
       event.preventDefault();
+      // Words the host has not taken yet are worth a question before the
+      // caret leaves them.
+      if (unsaved()) {
+        asking = true;
+        return;
+      }
+      // Otherwise out of the text, back to the note's row, as Tab-less as a
+      // list allows.
       (
         document.querySelector(`[data-note-id="${note?.id}"] .note-row-open`) as HTMLElement | null
       )?.focus();
@@ -159,6 +196,14 @@
     }
   }
 </script>
+
+{#if session && asking}
+  <NoteLeavePrompt
+    onsave={() => void saveThenLeave()}
+    ondelete={() => void deleteThenLeave()}
+    oncancel={() => (asking = false)}
+  />
+{/if}
 
 {#if session}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
