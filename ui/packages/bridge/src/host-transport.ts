@@ -32,6 +32,7 @@ export interface HostModules {
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Notes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -66,6 +67,7 @@ const ROUTES: Record<string, [keyof Omit<HostModules, "addEventListener" | "even
   download_open_access_settings: ["Downloads", "openAccessSettings"],
   media_player: ["Media", "player"],
   note_call: ["Notes", "call"],
+  bookmark_call: ["Bookmarks", "call"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {
