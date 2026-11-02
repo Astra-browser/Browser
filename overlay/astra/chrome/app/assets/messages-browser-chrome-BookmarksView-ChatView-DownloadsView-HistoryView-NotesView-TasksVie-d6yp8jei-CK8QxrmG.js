@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-5kjHEXbq.js";var n=((n={},r={})=>(r.locale??t(),e(2974,n)??`Bookmarks`));export{n as t};

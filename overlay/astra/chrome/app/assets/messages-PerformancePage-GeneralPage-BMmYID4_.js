@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-BLlmPNMY.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(583,n)??`Enter a valid website or URL.`)),r=((n={},r={})=>(r.locale??e(),t(581,n)??`Website or URL`));export{n,r as t};
