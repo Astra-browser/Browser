@@ -55,6 +55,15 @@ OPEN_MENU = "return (() => {" + APP_DOC + """
   return 'ok';
 })()"""
 
+CLICK_TASKS = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const rows = [...d.querySelectorAll('[role="menuitem"]')];
+  const n = rows.find((x) => (x.textContent || '').trim().startsWith('Tasks'));
+  if (!n) return 'no Tasks row';
+  n.click();
+  return 'ok';
+})()"""
+
 CLICK_NOTES = "return (() => {" + APP_DOC + """
   if (!d) return 'no app document';
   const rows = [...d.querySelectorAll('[role="menuitem"]')];
@@ -190,6 +199,18 @@ def main():
         print("screenshot ok", flush=True)
     except Exception as e:
         print(f"screenshot-ERR {e}", flush=True)
+
+    # 3. Tasks takes its empty state too (resource_call).
+    print("reload2: " + str(m.js(RELOAD)), flush=True)
+    time.sleep(10)
+    print("menu.open2: " + str(m.js(OPEN_MENU)), flush=True)
+    time.sleep(1)
+    print("menu.tasks: " + str(m.js(CLICK_TASKS)), flush=True)
+    time.sleep(3)
+    tasks = json.loads(m.js(TOOL_STATE))
+    print("tasks.state: " + json.dumps(tasks), flush=True)
+    if tasks.get("tool") != "tasks":
+        failures.append("Tasks tool did not open")
 
     print("VERDICT: " + ("PASS" if not failures else "FAIL " + "; ".join(failures)), flush=True)
     proc.terminate()
