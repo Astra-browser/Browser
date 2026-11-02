@@ -22,6 +22,7 @@
 
 pub mod approvals;
 pub mod audit;
+pub mod handoff;
 pub mod helpers;
 pub mod memory;
 pub mod planner;
