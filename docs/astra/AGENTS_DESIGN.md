@@ -146,3 +146,52 @@ side effect without an approval event) — is P6-T04.
 | P6-T08 | Memory/history store wiring + deletion | `memory.rs` hooks |
 | P6-T09 | Hand-off to external coding agents | process spawn, scoped dirs |
 | P6-T10 | Eval port onto local fixture sites | `tests/eval/` |
+
+## 10. Provider layer (P6-T02)
+
+Seven backends behind one `ModelProvider` trait
+(`crates/astra-agents/src/providers.rs` + `src/providers/`):
+
+| Backend | `ProviderKind` | Endpoint | Key | Wire format |
+|---|---|---|---|---|
+| Anthropic | `Anthropic` | `api.anthropic.com/v1/messages` | keychain → `x-api-key` + `anthropic-version: 2023-06-01` | messages API; SSE `message_start` / `content_block_delta` (`text_delta`, `input_json_delta`) / `message_delta` |
+| OpenAI | `OpenAI` | `api.openai.com/v1/chat/completions` | keychain → `Authorization: Bearer` | chat completions; SSE `choices[0].delta` + `data: [DONE]`, `stream_options.include_usage` |
+| Gemini | `Gemini` | `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` (`:streamGenerateContent?alt=sse`) | keychain → `?key=` query (API contract) | `contents[{role, parts}]`, `functionCall{name, args}`; one response JSON per SSE event |
+| DeepSeek | `DeepSeek` | `api.deepseek.com/chat/completions` | keychain → Bearer | OpenAI-compatible (shared parser in `providers/openai.rs`) |
+| OpenRouter | `OpenRouter` | `openrouter.ai/api/v1/chat/completions` | keychain → Bearer + static `HTTP-Referer`/`X-Title` | OpenAI-compatible (shared parser) |
+| Ollama | `Local` | `http://localhost:11434/api/chat` | none (keyless) | `{message: {content, tool_calls?}}`; streaming is NDJSON, one object per line |
+| LM Studio | `Local` | `http://localhost:1234/v1/chat/completions` (configurable) | none by default (optional gateway key) | OpenAI-compatible (shared parser) |
+
+Shared machinery (all in `providers.rs`):
+
+- **Transport seam** (`HttpTransport`): live code uses `UreqTransport`
+  (blocking `ureq`, `http_status_as_error(false)` so 401/403/429 map to
+  typed errors instead of transport faults); tests inject
+  `recording::RecordingTransport` with scripted responses/faults. No
+  network in tests.
+- **Streaming**: `SseAssembler` (incremental, `\n\n`-framed, skips
+  comments), `stream_sse_reader` (feeds any `BufRead` — live socket or
+  fixture bytes), `ToolCallAssembler` (folds OpenAI `tool_calls` index
+  deltas into whole `ToolCall`s). Unary `complete_request` retries;
+  `complete_stream` is single-attempt (retrying a half-emitted chunk
+  sequence would double-emit) — documented in code.
+- **Retries**: `send_with_retry` + `RetryPolicy` (default 3 retries,
+  200 ms base, 5 s cap, exponential). Retried: transport faults, 429,
+  5xx. Never retried: 401/403 (`Auth`), 400s, parse errors, missing
+  keys. Sleep is injected so tests assert exact backoff delays.
+- **Usage**: `UsageLedger` (per-provider totals, `record`/`get`/`total`);
+  local-only by construction — nothing is ever sent. Local backends
+  report zero token counts and take no auth header (asserted).
+- **Catalogue**: `catalog()` advisory model ids per backend.
+
+Keychain choice: **`keyring` v4** (docs.rs-verified: maintained
+`open-source-cooperative/keyring-rs`, cross-platform — macOS Keychain,
+Windows Credential Manager, Linux Secret Service via default `v1`
+feature; `keyring-core` + per-store crates would be more code for this
+phase's single `Entry(service, account)` use). Only `OsKeychainStore`
+touches it; `MemoryKeyStore` is tests-only. Every provider config
+redacts its key in `Debug` (`ApiKey(REDACTED)`); request builders are
+asserted key-free in bodies; `ApiKey::expose` exists solely to build
+one auth header. Opt-in live smokes (`ASTRA_LIVE_SMOKE=1`,
+`tests/providers_conformance.rs`) read real keys from the OS keychain
+and SKIP when unset or when an entry/daemon is absent.

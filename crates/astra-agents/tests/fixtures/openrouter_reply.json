@@ -1,0 +1,1 @@
+{"id":"gen-or1","object":"chat.completion","created":1762041600,"model":"openrouter/auto","choices":[{"index":0,"message":{"role":"assistant","content":"On it.","tool_calls":[{"id":"call_or1","type":"function","function":{"name":"summarize","arguments":"{\"max_points\":3}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":80,"completion_tokens":12,"total_tokens":92}}

@@ -1,0 +1,5 @@
+data: {"id":"chatcmpl-lm1","object":"chat.completion.chunk","created":1762041600,"model":"local-model","choices":[{"index":0,"delta":{"role":"assistant","content":"Local reply."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-lm1","object":"chat.completion.chunk","created":1762041600,"model":"local-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":4,"total_tokens":16}}
+
+data: [DONE]
