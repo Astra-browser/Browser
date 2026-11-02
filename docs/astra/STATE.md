@@ -99,6 +99,21 @@ lock it: no other agent may touch that task, its files, or its branch.
 | P5-T04 | Time tracking (per-site, focus mode) | done | orchestrator | agent/P5-T04-time | Merged 2026-11-02; time 12/12, workspace 296/296, clippy/fmt/brand clean; private-aware writes from day one |
 | P5-T05 | Export/import (JSON + Markdown) | done | orchestrator | agent/P5-T05-export | Merged 2026-11-02; tasks/notes/time bundles + store import_json + combined fixture; tasks 15/notes 23/time 34/store 15+2, clippy/fmt/brand clean |
 
+## Phase 6 — Work: agents, canvas, skills, MCP
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P6-T01 | Agent design doc + `astra-agents` skeleton | doing | worker-1 | agent/P6-T01-agentcore | Locked 2026-11-02; from INVENTORY agent crates + plan §8; doc + compiling skeleton |
+| P6-T02 | Provider layer (BYO + local, keychain keys) | todo | — | — | After T01 |
+| P6-T03 | Tool layer (browser/FS/command/MCP/gh) | todo | — | — | After T01 |
+| P6-T04 | Approval gate engine + injection suite | todo | — | — | After T01 |
+| P6-T05 | Helpers (parallel sub-agents, containers, Panes) | todo | — | — | After T01+T03 |
+| P6-T06 | Canvas UI (tables/charts/plans/code/docs) | todo | — | — | After T01 |
+| P6-T07 | Skills: port 25 bundled (rebranded) + loader | doing | worker-3 | agent/P6-T07-skills | Locked 2026-11-02; INVENTORY.md:63-71 source list; data + validation, loader later |
+| P6-T08 | Memory + history recall (view/edit/delete) | todo | — | — | After T01 |
+| P6-T09 | Hand-off to Claude Code / Codex | todo | — | — | After T01+T03 |
+| P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | doing | worker-2 | agent/P6-T10-eval | Locked 2026-11-02; INVENTORY.md:73-81 harness shape; local fixtures + baselines |
+
 ## Later phases
 
-All `todo` — see `plan.md` §§8–11.
+P7–P11 all `todo` — see `plan.md` §§8–11.
