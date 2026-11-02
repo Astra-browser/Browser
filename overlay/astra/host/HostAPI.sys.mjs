@@ -11,7 +11,10 @@
 // (move/duplicate/pin/discard), Navigation (stop/zoom/find/print/reader),
 // Panes (slots/rects/generation guards), gap-resync events (`eventsSince`),
 // and the Content feedback path (progress listeners feed external loads
-// back into the model). All modules are pure logic with no Firefox
+// back into the model). P3-T17 adds Sidebar (last-reported app sidebar
+// state) and WebExtensions (`web_extension_list` stub) so the app's boot
+// calls resolve instead of failing with `no host route`. All modules are
+// pure logic with no Firefox
 // internals (Content.sys.mjs is the single exception and is loaded
 // separately by the shell), so Node contract tests import them by path.
 
@@ -26,6 +29,8 @@ import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
 import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
 import { Dialogs, __resetDialogsForTests } from "./Dialogs.sys.mjs";
 import { ContentHide, __resetForTests as __resetContentHideForTests } from "./ContentHide.sys.mjs";
+import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
+import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -40,6 +45,8 @@ export {
   Containers,
   Dialogs,
   ContentHide,
+  Sidebar,
+  WebExtensions,
   addEventListener,
   emit,
   eventSeq,
@@ -59,5 +66,7 @@ export function __resetForTests() {
   __resetContainersForTests();
   __resetDialogsForTests();
   __resetContentHideForTests();
+  __resetSidebarForTests();
+  __resetWebExtensionsForTests();
   __resetEventsForTests();
 }

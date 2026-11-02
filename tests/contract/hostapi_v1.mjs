@@ -22,7 +22,7 @@ const ROOT = path.dirname(
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
 const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
-const { Boot, Windows, Tabs, Navigation, Panes } = HostAPI;
+const { Boot, Windows, Tabs, Navigation, Panes, Sidebar, WebExtensions } = HostAPI;
 const { addEventListener, eventSeq, eventsSince, emit } = HostAPI;
 const ContentMod = await import(path.join(HOST, "Content.sys.mjs"));
 const { Content, makeProgressListener } = ContentMod;
@@ -342,6 +342,46 @@ let tA, tB, tC;
   check("list carries pane records", l.panes.some((x) => x.pane_id === "assistant" && x.generation === 2));
 }
 
+// === Sidebar v1 (P3-T17: app boot calls resolve, no `no host route`) ===
+{
+  const g0 = await Sidebar.get({ request_id: "s-0" });
+  checkEnv("sidebar.get", g0, "s-0");
+  check("defaults hidden false + width null",
+    g0.hidden === false && g0.width === null && g0.revision === null);
+
+  const w = await Sidebar.setWidth({ request_id: "s-1", width: 240, animate: true, revision: 7 });
+  checkEnv("sidebar.setWidth", w, "s-1");
+  check("width/animate/revision kept",
+    w.width === 240 && w.animate === true && w.revision === 7);
+
+  const h = await Sidebar.setHidden({ request_id: "s-2", hidden: true });
+  checkEnv("sidebar.setHidden", h, "s-2");
+  check("hidden kept + width survives", h.hidden === true && h.width === 240);
+
+  const g1 = await Sidebar.get({ request_id: "s-3" });
+  check("get reflects last report", g1.hidden === true && g1.width === 240 && g1.revision === 7);
+
+  const clr = await Sidebar.setWidth({ request_id: "s-4", width: null, animate: false, revision: null });
+  check("null width clears override", clr.width === null && clr.animate === false);
+
+  checkErr("sidebar.setWidth bad width",
+    await Sidebar.setWidth({ request_id: "s-5", width: "wide" }), "s-5", "invalid_width");
+  checkErr("sidebar.setWidth bad animate",
+    await Sidebar.setWidth({ request_id: "s-6", width: 240, animate: "yes" }), "s-6", "invalid_animate");
+  checkErr("sidebar.setWidth bad revision",
+    await Sidebar.setWidth({ request_id: "s-7", width: 240, revision: NaN }), "s-7", "invalid_revision");
+  checkErr("sidebar.setHidden bad type",
+    await Sidebar.setHidden({ request_id: "s-8", hidden: 1 }), "s-8", "invalid_hidden");
+}
+
+// === WebExtensions v1 (P3-T17: `web_extension_list` stub) ===
+{
+  // Native payload shape (bare array — the generated UI binding consumes the
+  // bridge payload as the list itself), so no request_id echo here by design.
+  const list = await WebExtensions.list({ request_id: "x-1" });
+  check("webext.list answers an empty array", Array.isArray(list) && list.length === 0);
+}
+
 // === Content progress-listener feedback (fakes, no Firefox needed) ===
 {
   const tabId = (await Tabs.create({ request_id: "c-0", url: "https://start.example/", background: true })).astra_tab_id;
@@ -444,11 +484,13 @@ off();
 // === Facade ===
 {
   check("HOST_API_VERSION stays 1", HostAPI.HOST_API_VERSION === 1);
-  for (const k of ["Boot", "Windows", "Tabs", "Navigation", "Panes", "eventsSince"]) {
+  for (const k of ["Boot", "Windows", "Tabs", "Navigation", "Panes", "Sidebar", "WebExtensions", "eventsSince"]) {
     check(`facade exports ${k}`, HostAPI[k] !== undefined);
   }
   HostAPI.__resetForTests();
   check("reset clears tabs", (await Tabs.list({ request_id: "r-1" })).tabs.length === 0);
+  check("reset clears sidebar", (await Sidebar.get({ request_id: "r-2" })).hidden === false
+    && (await Sidebar.get({ request_id: "r-2" })).width === null);
   check("reset clears seq", eventSeq() === 0);
 }
 
