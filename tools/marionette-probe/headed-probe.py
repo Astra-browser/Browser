@@ -111,7 +111,7 @@ def main():
     errlog = open(os.path.join(outdir, "stderr.log"), "wb")
     proc = subprocess.Popen(
         [os.path.abspath(FIREFOX), "-profile", os.path.abspath(profile),
-         "-no-remote", "--marionette", "-marionette-port", str(PORT), "about:blank"],
+         "-no-remote", "-remote-allow-system-access", "--marionette", "about:blank"],
         cwd=os.path.join(os.getcwd(), "engine/obj-astra-linux/dist/bin"),
         stdout=errlog, stderr=subprocess.STDOUT)
     print(f"launched pid={proc.pid}", flush=True)
@@ -127,6 +127,20 @@ def main():
         proc.terminate()
         return
     print("marionette connected", flush=True)
+    try:
+        sess = m.cmd("WebDriver:NewSession", {"capabilities": {}})
+        print("session: " + json.dumps(sess)[:200], flush=True)
+    except Exception as e:
+        print(f"SESSION-ERR {e}", flush=True)
+        proc.terminate()
+        return
+    try:
+        m.cmd("Marionette:SetContext", {"value": "chrome"})
+        print("chrome context ok", flush=True)
+    except Exception as e:
+        print(f"CONTEXT-ERR {e}", flush=True)
+        proc.terminate()
+        return
     time.sleep(20)  # let the shell + app boot
     try:
         snap = json.loads(m.cmd("WebDriver:ExecuteScript", {"script": SNAP_JS, "args": []})["value"])
@@ -141,10 +155,10 @@ def main():
         with open(os.path.join(outdir, "shot.png"), "wb") as f:
             f.write(base64.b64decode(shot["value"]))
         print("screenshot ok", flush=True)
-    print("GRIM: " + grim_shot(os.path.join(outdir, "grim.png")), flush=True)
     except Exception as e:
         print(f"screenshot-ERR {e}", flush=True)
-    proc.terminate()
+    print("GRIM: " + grim_shot(os.path.join(outdir, "grim.png")), flush=True)
+    print("LEAVING BROWSER OPEN for visual inspection (close the Astra Nightly window yourself)", flush=True)
     print("done", flush=True)
 
 
