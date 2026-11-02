@@ -14,6 +14,7 @@ pub mod keymap;
 pub mod keymap_ext;
 pub mod layout;
 pub mod logging;
+pub mod memory_ext;
 pub mod policy;
 pub mod private;
 pub mod search;

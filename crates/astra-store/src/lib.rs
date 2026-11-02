@@ -17,6 +17,13 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
+pub mod memory;
+
+pub use memory::{
+    MemoryHit, MemoryRecord, RankedHistory, MAX_MEMORY_CONTENT_CHARS, MEMORY_SCHEMA_KEY,
+    MEMORY_SCHEMA_VERSION, MEMORY_SCOPES,
+};
+
 /// Current schema version (number of migrations in [`MIGRATIONS`]).
 pub const SCHEMA_VERSION: u32 = 4;
 
