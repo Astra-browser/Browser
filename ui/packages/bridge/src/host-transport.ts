@@ -99,6 +99,13 @@ const ROUTES: Record<string, Route> = {
   login_item_status: ["System", "loginItemStatus"],
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
+  spaces_create: ["Tabs", "createSpace"],
+  spaces_update: ["Tabs", "updateSpace"],
+  spaces_delete: ["Tabs", "deleteSpace"],
+  spaces_reorder: ["Tabs", "reorderSpace"],
+  spaces_switch: ["Tabs", "switchSpace"],
+  spaces_step: ["Tabs", "stepSpace"],
+  spaces_move_tab: ["Tabs", "moveTabToSpace"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {

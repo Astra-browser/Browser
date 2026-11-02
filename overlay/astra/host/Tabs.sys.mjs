@@ -127,8 +127,36 @@ export function __historyFor(id) {
 // projection, the host derives one from its own tab model so the shell can
 // paint the real sidebar + New Tab instead of an empty stage.
 
-const SPACE_ID = "space-1";
 const PROFILE_ID = "default";
+
+// --- Spaces ---------------------------------------------------------------
+// A space is an ordered group of tabs inside one profile. Native owns the
+// list and each tab's membership; the projection carries both, so switching
+// a space never has to re-open anything.
+const DEFAULT_SPACE_ID = "space-1";
+let _spaces = [
+  { id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null },
+];
+let _activeSpaceId = DEFAULT_SPACE_ID;
+let _nextSpaceId = 2;
+
+function spaceOf(space_id) {
+  return _spaces.find((space) => space.id === space_id) ?? null;
+}
+
+/** The active space's tabs, in display order. */
+function activeOrder() {
+  return _order.filter((id) => _tabs.get(id)?.space_id === _activeSpaceId);
+}
+
+/** A new space takes the first unused "Space N". */
+function nextSpaceName() {
+  for (let n = 2; n < 1000; n += 1) {
+    const name = `Space ${n}`;
+    if (!_spaces.some((space) => space.name === name)) return name;
+  }
+  return "Space";
+}
 let _projection = 0;
 
 /** Fixed-width hex so JS string compare orders revisions without BigInt. */
@@ -159,23 +187,18 @@ function tabView(id) {
 
 /** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
 export function __itemsSnapshot() {
-  const tabs = _order.map(tabView).filter(Boolean);
-  const active = _selectedId || _order[0] || null;
+  const order = activeOrder();
+  const tabs = order.map(tabView).filter(Boolean);
+  const active = _selectedId && order.includes(_selectedId) ? _selectedId : (order[0] ?? null);
   return {
     projection_revision: nextRevision(),
     profile: { id: PROFILE_ID, name: "Personal", kind: "default" },
-    spaces: [
-      {
-        id: SPACE_ID,
-        name: "Space",
-        icon: null,
-        color: 0,
-        theme: null,
-        tabs: tabs.length,
-        previews: [],
-      },
-    ],
-    active_space_id: SPACE_ID,
+    spaces: _spaces.map((space) => ({
+      ...space,
+      tabs: _order.filter((id) => _tabs.get(id)?.space_id === space.id).length,
+      previews: [],
+    })),
+    active_space_id: _activeSpaceId,
     nodes: tabs.map((tab) => ({
       id: tab.id,
       parent_id: null,
@@ -205,6 +228,7 @@ export const Tabs = {
         title: "",
         selected: true,
         window_id: DEFAULT_WINDOW_ID,
+        space_id: _activeSpaceId,
         pinned: false,
         discarded: false,
         muted: false,
@@ -227,6 +251,7 @@ export const Tabs = {
       title: "",
       selected: false,
       window_id,
+      space_id: _activeSpaceId,
       pinned: false,
       discarded: false,
       muted: false,
@@ -274,6 +299,107 @@ export const Tabs = {
     }
     emitItemsChanged();
     return ok(request_id, { closed: existed });
+  },
+
+  // --- Spaces -------------------------------------------------------------
+  // Each answers an OperationAdmission: the projection that follows is the
+  // result, so the UI never guesses what native did.
+
+  async createSpace({ request_id = "", name = "", look = null } = {}) {
+    const id = `space-${_nextSpaceId++}`;
+    _spaces.push({
+      id,
+      name: typeof name === "string" && name.trim() !== "" ? name.trim() : nextSpaceName(),
+      icon: look?.icon ?? null,
+      color: Number.isInteger(look?.color) ? look.color : 0,
+      theme: look?.theme ?? null,
+    });
+    _activeSpaceId = id;
+    _selectedId = "";
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
+  },
+
+  async updateSpace({ request_id = "", space = "", name = "", look = null } = {}) {
+    const target = spaceOf(space);
+    if (!target) return { operation_id: null, accepted: false };
+    if (typeof name === "string" && name.trim() !== "") target.name = name.trim();
+    if (look) {
+      target.icon = look.icon ?? null;
+      target.color = Number.isInteger(look.color) ? look.color : target.color;
+      target.theme = look.theme ?? null;
+    }
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
+  },
+
+  async deleteSpace({ request_id = "", space = "" } = {}) {
+    if (_spaces.length <= 1) return { operation_id: null, accepted: false };
+    const at = _spaces.findIndex((entry) => entry.id === space);
+    if (at < 0) return { operation_id: null, accepted: false };
+    // Its tabs close with it: a tab cannot outlive the space that held it.
+    for (const id of [..._order].filter((id) => _tabs.get(id)?.space_id === space)) {
+      _tabs.delete(id);
+      _history.delete(id);
+      const i = _order.indexOf(id);
+      if (i >= 0) _order.splice(i, 1);
+      emit("tab.closed", { astra_tab_id: id, window_id: DEFAULT_WINDOW_ID });
+    }
+    _spaces.splice(at, 1);
+    if (_activeSpaceId === space) {
+      _activeSpaceId = _spaces[Math.min(at, _spaces.length - 1)].id;
+      _selectedId = "";
+      const first = activeOrder()[0];
+      if (first !== undefined) selectInternal(first);
+    }
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
+  },
+
+  async reorderSpace({ request_id = "", space = "", before = null } = {}) {
+    const at = _spaces.findIndex((entry) => entry.id === space);
+    if (at < 0) return { operation_id: null, accepted: false };
+    const [moved] = _spaces.splice(at, 1);
+    const to = before === null ? _spaces.length : _spaces.findIndex((entry) => entry.id === before);
+    _spaces.splice(to < 0 ? _spaces.length : to, 0, moved);
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
+  },
+
+  async switchSpace({ request_id = "", space = "" } = {}) {
+    if (!spaceOf(space)) return { operation_id: null, accepted: false };
+    _activeSpaceId = space;
+    const first = activeOrder()[0];
+    _selectedId = "";
+    if (first !== undefined) selectInternal(first);
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
+  },
+
+  async stepSpace({ request_id = "", step = 1 } = {}) {
+    if (!Number.isInteger(step) || step === 0) return { operation_id: null, accepted: false };
+    const at = _spaces.findIndex((entry) => entry.id === _activeSpaceId);
+    if (at < 0) return { operation_id: null, accepted: false };
+    const next = (at + (step > 0 ? 1 : -1) + _spaces.length) % _spaces.length;
+    return Tabs.switchSpace({ request_id, space: _spaces[next].id });
+  },
+
+  async moveTabToSpace({ request_id = "", tab = "", space = "" } = {}) {
+    const target = _tabs.get(tab);
+    if (!target || !spaceOf(space)) return { operation_id: null, accepted: false };
+    target.space_id = space;
+    if (space !== _activeSpaceId) {
+      const i = _order.indexOf(tab);
+      if (i >= 0) _order.splice(i, 1);
+      _order.push(tab);
+      if (_selectedId === tab) {
+        _selectedId = "";
+        const first = activeOrder()[0];
+        if (first !== undefined) selectInternal(first);
+      }
+    }
+    emitItemsChanged();
+    return { operation_id: null, accepted: true };
   },
 
   async list({ request_id = "", window_id = "" } = {}) {

@@ -55,6 +55,52 @@ OPEN_MENU = "return (() => {" + APP_DOC + """
   return 'ok';
 })()"""
 
+TAB_COUNT = "return (() => {" + APP_DOC + """
+  if (!d) return -1;
+  return d.querySelectorAll('[data-astra-tab-id]').length;
+})()"""
+
+NEW_TAB = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const b = d.querySelector('button.new-tab') || d.querySelector('button.space-new-tab');
+  if (!b) return 'no new-tab button';
+  b.click();
+  return 'ok';
+})()"""
+
+CLOSE_LAST_TAB = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const rows = [...d.querySelectorAll('[data-astra-tab-id]')];
+  const row = rows[rows.length - 1];
+  if (!row) return 'no tab rows';
+  const x = row.querySelector('button.tab-close');
+  if (!x) return 'no close button';
+  x.click();
+  return 'ok';
+})()"""
+
+SPACE_NAME = "return (() => {" + APP_DOC + """
+  if (!d) return null;
+  const el = d.querySelector('.space-bar .space-name');
+  return el ? (el.textContent || '').trim() : null;
+})()"""
+
+NEW_SPACE = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const chip = d.querySelector('.space-bar .space-chip');
+  if (!chip) return 'no space chip';
+  chip.click();
+  return 'ok';
+})()"""
+
+CONFIRM_NEW_SPACE = "return (() => {" + APP_DOC + """
+  if (!d) return 'no app document';
+  const b = d.querySelector('.switch-new');
+  if (!b) return 'no new-space row';
+  b.click();
+  return 'ok';
+})()"""
+
 CLICK_TASKS = "return (() => {" + APP_DOC + """
   if (!d) return 'no app document';
   const rows = [...d.querySelectorAll('[role="menuitem"]')];
@@ -169,6 +215,34 @@ def main():
 
     initial = json.loads(m.js(SURFACE))
     print("initial.state: " + json.dumps(initial), flush=True)
+
+    # 0. A new tab can be made and closed again (wire arg names line up).
+    before = m.js(TAB_COUNT)
+    print("tabs.before: " + str(before), flush=True)
+    print("tabs.new: " + str(m.js(NEW_TAB)), flush=True)
+    time.sleep(2)
+    opened = m.js(TAB_COUNT)
+    print("tabs.after_new: " + str(opened), flush=True)
+    print("tabs.close: " + str(m.js(CLOSE_LAST_TAB)), flush=True)
+    time.sleep(2)
+    closed = m.js(TAB_COUNT)
+    print("tabs.after_close: " + str(closed), flush=True)
+    if opened != before + 1:
+        failures.append("new tab was not created")
+    if closed != before:
+        failures.append("tab was not closed")
+
+    # -1. A space can be made (spaces_create is a native model change).
+    space_before = m.js(SPACE_NAME)
+    print("space.before: " + str(space_before), flush=True)
+    print("space.open: " + str(m.js(NEW_SPACE)), flush=True)
+    time.sleep(1)
+    print("space.new: " + str(m.js(CONFIRM_NEW_SPACE)), flush=True)
+    time.sleep(2)
+    space_after = m.js(SPACE_NAME)
+    print("space.after: " + str(space_after), flush=True)
+    if not space_after or space_after == space_before:
+        failures.append("a new space was not created")
 
     # 1. Work is a browser surface, opened by a command.
     print("work.click: " + str(m.js(CLICK_WORK)), flush=True)
