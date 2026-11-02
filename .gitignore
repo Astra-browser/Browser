@@ -35,3 +35,4 @@ coverage/
 .idea/
 __pycache__/
 *.pyc
+UI_IDEA
