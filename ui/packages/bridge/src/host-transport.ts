@@ -37,6 +37,7 @@ export interface HostModules {
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -100,6 +101,13 @@ const ROUTES: Record<string, Route> = {
   login_item_status: ["System", "loginItemStatus"],
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
+  browser_open_url: ["Search", "openUrl"],
+  newtab_search_context: ["Search", "newtabContext"],
+  newtab_search: ["Search", "newtabSearch"],
+  newtab_run: ["Search", "newtabRun"],
+  newtab_cancel: ["Search", "newtabCancel"],
+  launcher_search: ["Search", "launcherSearch"],
+  launcher_run: ["Search", "launcherRun"],
   spaces_create: ["Tabs", "createSpace"],
   spaces_update: ["Tabs", "updateSpace"],
   spaces_delete: ["Tabs", "deleteSpace"],

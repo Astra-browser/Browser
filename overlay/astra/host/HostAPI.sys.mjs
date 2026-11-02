@@ -44,6 +44,7 @@ import { Time } from "./Time.sys.mjs";
 import { HistoryCall } from "./HistoryCall.sys.mjs";
 import { System } from "./System.sys.mjs";
 import { Resources } from "./Resources.sys.mjs";
+import { Search } from "./Search.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -73,6 +74,7 @@ export {
   HistoryCall,
   System,
   Resources,
+  Search,
   addEventListener,
   emit,
   eventSeq,

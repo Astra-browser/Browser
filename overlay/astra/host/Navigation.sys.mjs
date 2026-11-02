@@ -14,6 +14,8 @@
 // and the live binding applies via `ZoomManager`/`FullZoom`.
 
 import { emit } from "./Events.sys.mjs";
+import { emitItemsChanged } from "./Tabs.sys.mjs";
+import { resolve as resolveInput } from "./Search.sys.mjs";
 import { HOST_API_VERSION, __historyFor, __pushHistory, __tabsState } from "./Tabs.sys.mjs";
 
 export const MIN_ZOOM = 0.3;
@@ -52,21 +54,34 @@ function commit(id, url, extra = {}) {
     canGoBack: h ? h.index > 0 : false,
     canGoForward: h ? h.index < h.entries.length - 1 : false,
   });
+  // The product UI renders from the items projection, so a committed address
+  // has to reach it or the field would keep showing the old one.
+  emitItemsChanged();
 }
 
 export const Navigation = {
   async loadURL({ request_id = "", astra_tab_id = "", url = "" } = {}) {
     const { id, tab } = tabOf(astra_tab_id);
     if (!tab) {
-      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`);
+      return {
+        ...err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`),
+        accepted: false,
+      };
     }
     if (!url) {
       return err(request_id, "invalid_url", "url must be a non-empty string");
     }
+    // Words typed into an address field are a search, not a broken address;
+    // Search owns that decision, so every box agrees.
+    const target = resolveInput(url);
+    if (!target) {
+      return { ...err(request_id, "invalid_url", "nothing to navigate to"), accepted: false };
+    }
+    url = target.url;
     emit("nav.started", { astra_tab_id: id, url });
     __pushHistory(id, url);
     commit(id, url);
-    return ok(request_id, { astra_tab_id: id, url });
+    return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };
   },
 
   async goBack({ request_id = "", astra_tab_id = "" } = {}) {

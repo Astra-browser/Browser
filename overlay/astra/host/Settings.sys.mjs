@@ -45,6 +45,12 @@ export const Settings = {
     return admission(true);
   },
 
+  /** The stored value, read synchronously. Modules that decide what a typed
+   *  field means (Search) cannot await a promise mid-parse. */
+  current(key) {
+    return typeof key === "string" && _values.has(key) ? _values.get(key) : null;
+  },
+
   // Diagnostics/tests: the whole session map.
   async all() {
     return Object.fromEntries(_values);

@@ -200,6 +200,7 @@ describe("host transport", () => {
       HistoryCall: {},
       System: {},
       Resources: {},
+      Search: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -220,6 +221,7 @@ describe("host transport", () => {
       HistoryCall: {},
       System: {},
       Resources: {},
+      Search: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
@@ -245,6 +247,7 @@ describe("host transport", () => {
       Panes: {}, Boot: {}, Sidebar: {}, WebExtensions: {}, Settings: {}, Accounts: {},
       Commands: {}, Keymap: {}, Work: {}, Downloads: {}, Media: {}, Notes: {},
       Bookmarks: {}, Time: {}, HistoryCall: {}, System: {}, Resources: {},
+      Search: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };
