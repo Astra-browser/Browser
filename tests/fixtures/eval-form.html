@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!-- Astra eval fixture (P6-T10, capabilities/form-locate subset). Static
+   form controls for the deterministic DOM-locate checks: every control the
+   suite looks up is pinned below by id. Marker protocol: #astra-eval-ok must
+   contain exactly "ASTRA-EVAL-OK-FORM". -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Astra Eval Form Fixture</title>
+  </head>
+  <body>
+    <main>
+      <h1>Eval form</h1>
+      <p id="astra-eval-ok">ASTRA-EVAL-OK-FORM</p>
+      <form id="eval-search-form" action="/eval-article.html" method="get">
+        <label for="eval-search">Search</label>
+        <input id="eval-search" name="q" type="search" value="" />
+        <label for="eval-choice">Section</label>
+        <select id="eval-choice" name="section">
+          <option value="news">News</option>
+          <option value="docs">Docs</option>
+        </select>
+        <button id="eval-submit" type="submit">Go</button>
+      </form>
+      <a href="/eval-baseline.html">Back to baseline</a>
+    </main>
+  </body>
+</html>
