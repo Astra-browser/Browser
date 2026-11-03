@@ -19,6 +19,28 @@ export const HOST_API_VERSION = 1;
 
 export const DEFAULT_WINDOW_ID = "win-1";
 
+// Schemes a tab may carry. The content binding loads under the system
+// principal and refuses everything but http(s), so an address the stage can
+// never show (data:, file:, javascript:, blob:, chrome:, resource:, and any
+// about: page other than blank) becomes a New Tab here rather than travelling
+// into the model and the projection.
+const TAB_SCHEMES = new Set(["http:", "https:"]);
+
+/** The address a tab stores: a loadable web address, or a New Tab. */
+export function safeTabUrl(url) {
+  if (typeof url !== "string" || url === "") {
+    return "about:blank";
+  }
+  if (url === "about:blank") {
+    return url;
+  }
+  try {
+    return TAB_SCHEMES.has(new URL(url).protocol) ? url : "about:blank";
+  } catch {
+    return "about:blank";
+  }
+}
+
 const _tabs = new Map(); // astra_tab_id -> tab record
 const _order = []; // astra_tab_id in display order
 const _history = new Map(); // astra_tab_id -> { entries: [url], index: n }
@@ -75,7 +97,9 @@ export function __closeTabsInWindow(window_id) {
   }
   if (_selectedId && !_tabs.has(_selectedId)) {
     _selectedId = "";
-    const first = _order[0];
+    // Never fall back to a tab from another space: the page in front would
+    // belong to a space the person is not looking at.
+    const first = activeOrder()[0];
     if (first !== undefined) {
       selectInternal(first);
     }
@@ -150,6 +174,18 @@ function spaceOf(space_id) {
 /** The active space's tabs, in display order. */
 function activeOrder() {
   return _order.filter((id) => _tabs.get(id)?.space_id === _activeSpaceId);
+}
+
+/** The space in front always has somewhere to go: a window whose active space
+ *  holds no tab has nothing to put on the stage, and every caller downstream
+ *  (address bar, navigation, content) resolves a selected tab first. A space
+ *  keeps its own New Tab, created on demand, in its own display order. */
+async function ensureTabInActiveSpace(request_id = "") {
+  if (activeOrder().length > 0) {
+    return false;
+  }
+  await Tabs.create({ request_id, url: "about:blank" });
+  return true;
 }
 
 /** A new space takes the first unused "Space N". */
@@ -247,6 +283,7 @@ export const Tabs = {
     if (typeof url !== "string" || url === "") {
       return err(request_id, "invalid_url", "url must be a non-empty string");
     }
+    url = safeTabUrl(url);
     const astra_tab_id = `tab-${_nextId++}`;
     _tabs.set(astra_tab_id, {
       astra_tab_id,
@@ -274,8 +311,15 @@ export const Tabs = {
   },
 
   async select({ request_id = "", astra_tab_id = "" } = {}) {
-    if (!_tabs.has(astra_tab_id)) {
+    const target = _tabs.get(astra_tab_id);
+    if (!target) {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    // Selecting a tab from another space brings that space forward: a
+    // selection outside the active space would leave the stage, the sidebar
+    // and the address bar naming different tabs.
+    if (target.space_id !== _activeSpaceId) {
+      _activeSpaceId = target.space_id;
     }
     const snap = selectInternal(astra_tab_id);
     emitItemsChanged();
@@ -294,9 +338,14 @@ export const Tabs = {
       emit("tab.closed", { astra_tab_id, window_id: tab.window_id });
       if (_selectedId === astra_tab_id) {
         _selectedId = "";
-        const first = _order[0];
+        // The next tab in the space being looked at, not the next tab in the
+        // window: selecting across spaces would put another space's page on
+        // the stage while its space is not the active one.
+        const first = activeOrder()[0];
         if (first !== undefined) {
           selectInternal(first);
+        } else {
+          await ensureTabInActiveSpace(request_id);
         }
       }
     }
@@ -319,6 +368,9 @@ export const Tabs = {
     });
     _activeSpaceId = id;
     _selectedId = "";
+    // The new space is in front, so it needs its own New Tab rather than an
+    // empty stage. `create` announces it; the snapshot below is the result.
+    await ensureTabInActiveSpace(request_id);
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
@@ -353,7 +405,12 @@ export const Tabs = {
       _activeSpaceId = _spaces[Math.min(at, _spaces.length - 1)].id;
       _selectedId = "";
       const first = activeOrder()[0];
-      if (first !== undefined) selectInternal(first);
+      if (first !== undefined) {
+        selectInternal(first);
+      } else {
+        // The space that takes over may hold none of the closed space's tabs.
+        await ensureTabInActiveSpace(request_id);
+      }
     }
     emitItemsChanged();
     return { operation_id: null, accepted: true };
@@ -374,7 +431,13 @@ export const Tabs = {
     _activeSpaceId = space;
     const first = activeOrder()[0];
     _selectedId = "";
-    if (first !== undefined) selectInternal(first);
+    if (first !== undefined) {
+      selectInternal(first);
+    } else {
+      // Coming back to a space that was left without tabs lands on its own
+      // New Tab instead of a stage nothing owns.
+      await ensureTabInActiveSpace(request_id);
+    }
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
@@ -398,7 +461,13 @@ export const Tabs = {
       if (_selectedId === tab) {
         _selectedId = "";
         const first = activeOrder()[0];
-        if (first !== undefined) selectInternal(first);
+        if (first !== undefined) {
+          selectInternal(first);
+        } else {
+          // The moved tab was the space's last one; the space that stays in
+          // front gets its own New Tab rather than an empty stage.
+          await ensureTabInActiveSpace(request_id);
+        }
       }
     }
     emitItemsChanged();
@@ -433,10 +502,14 @@ export const Tabs = {
       return err(request_id, "invalid_index", "index must be a non-negative integer");
     }
     const from = _order.indexOf(astra_tab_id);
-    _order.splice(from, 1);
+    if (from >= 0) {
+      _order.splice(from, 1);
+    }
     const clamped = Math.min(index, _order.length);
     _order.splice(clamped, 0, astra_tab_id);
     emit("tab.moved", { astra_tab_id, from_index: from, to_index: clamped });
+    // The projection owns sidebar order, so a moved row has to reach it.
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id, index: clamped });
   },
 
@@ -448,7 +521,9 @@ export const Tabs = {
     }
     const created = await Tabs.create({
       request_id,
-      url: src.url,
+      // A New Tab has no committed address; its copy is another New Tab, not
+      // an `invalid_url` refusal.
+      url: src.url || "about:blank",
       background: true,
       window_id: src.window_id,
       index: _order.indexOf(astra_tab_id) + 1,
@@ -467,6 +542,9 @@ export const Tabs = {
     if (!background) {
       selectInternal(dupId);
     }
+    // `create` announced the fork before the title/history were copied; the
+    // sidebar would otherwise show the new row as an untitled blank.
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id: dupId, url: src.url, source_tab_id: astra_tab_id });
   },
 
@@ -525,6 +603,10 @@ export const Tabs = {
     tab.title = title;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
+    // Live progress listeners land here. The sidebar and the window title are
+    // painted from the projection, so a title the page reports has to reach
+    // it or the row keeps saying "New Tab" for the life of the tab.
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id, title });
   },
 
@@ -547,4 +629,10 @@ export function __resetTabsForTests() {
   _history.clear();
   _nextId = 1;
   _selectedId = "";
+  // Spaces are part of the same model: leaving them behind made a suite's
+  // spaces visible to the next one in the same process.
+  _spaces = [{ id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null }];
+  _activeSpaceId = DEFAULT_SPACE_ID;
+  _nextSpaceId = 2;
+  _projection = 0;
 }
