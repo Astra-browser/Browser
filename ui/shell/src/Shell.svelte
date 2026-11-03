@@ -7,6 +7,8 @@
   import { mountTabStrip } from "./tabs/tab-strip.js";
   import { mountSplit } from "./split/split.js";
   import { mountAppFrame } from "./app-frame.js";
+  import { installContentMenu, runChromeAction } from "./content-menu.js";
+  import { installThemeBridge } from "./theme-bridge.js";
   import { slotStateFor } from "./content/slot-state.js";
   import "./urlbar.css";
   import "./frame/frame.css";
@@ -27,6 +29,9 @@
   let splitMount;
   let slot;
   let slotError = $state("");
+  /** Host of the page still arriving, so the stage says what it is waiting
+   *  for instead of showing an unexplained dark rectangle. */
+  let loadingHost = $state("");
   // P3-T15 full-app shell: the packaged app mounts into appMount (remote
   // content browser + host relay). The interim mounts stay wired as the
   // fallback: hidden once the app boots in host mode (P3-T16), shown with
@@ -64,6 +69,32 @@
     "toggle-fullscreen": "Toggle fullscreen",
   };
 
+  /** Commands the chrome window performs itself (real windows, DevTools, the
+   *  page's save/print dialogs). The app's keyboard path emits them. */
+  const SHELL_COMMANDS = new Set([
+    "bookmark.add",
+    "page.copy",
+    "page.devtools",
+    "page.devtools.alt",
+    "page.print",
+    "page.save",
+    "page.selectAll",
+    "page.viewSource",
+    "window.showPrivate",
+    "window.showRegular",
+    "window.fullscreen",
+  ]);
+
+  /** What the stage names while a page is on its way. */
+  function labelFor(url) {
+    if (typeof url !== "string" || url === "" || url === "about:blank") return "Loading…";
+    try {
+      return `Loading ${new URL(url).host}…`;
+    } catch {
+      return "Loading…";
+    }
+  }
+
   onMount(async () => {
     const host = await loadHost();
     if (!host) {
@@ -86,6 +117,22 @@
     } catch {
       // No Services in a preview DOM: the app falls back to its own import.
     }
+    const doc = frameRoot.ownerDocument;
+    const win = doc.defaultView ?? null;
+    // A private window keeps nothing. Its tabs inherit the window's private
+    // browsing context, so Places never records them; the projection also
+    // has to say so or the app would paint a normal window's chrome and offer
+    // history/bookmarks the window cannot keep.
+    let privateWindow = false;
+    try {
+      const { PrivateBrowsingUtils } = await import(
+        /* @vite-ignore */ "resource://gre/modules/PrivateBrowsingUtils.sys.mjs"
+      );
+      privateWindow = PrivateBrowsingUtils.isWindowPrivate(win);
+    } catch {
+      // Older/odd build: the window is treated as normal.
+    }
+    privateWindow = privateWindow === true;
     // P3-T15: mount the full app into the main column. The relay terminates
     // in this window's host modules, so the app boots in host mode. The
     // interim mounts stay wired (live contract tests drive them); they hide
@@ -105,9 +152,58 @@
         appBooted = false;
         appError = message;
       },
+      // The app renders from the projection, and a private window's profile
+      // is the one thing the host model does not carry yet. Rewrite only that
+      // field; every tab, space and active id stays the model's own.
+      transformEvent: (event) => {
+        if (!privateWindow || event?.type !== "items-changed" || !event.data) return event;
+        return {
+          ...event,
+          data: {
+            ...event.data,
+            profile: { id: "incognito", name: "Private", kind: "incognito" },
+          },
+        };
+      },
+      // A private window has no history and no bookmarks to show or write.
+      // Answer in the caller's own shape so the surface renders its private
+      // state instead of an error (and never reads the normal profile).
+      guardCall: async (moduleName, methodName, args) => {
+        // The app's Source page asks for the text of the page in front. The
+        // host model keeps no document, so read the address it names with the
+        // chrome's own privileged fetch (no page's script runs here).
+        if (moduleName === "Resources" && methodName === "pageSource") {
+          const tabId = typeof args?.tab_id === "string" ? args.tab_id : "";
+          try {
+            const list = await host.Tabs.list({ request_id: newRequestId() });
+            const tabs = list.tabs ?? [];
+            const tab = tabs.find((t) => t.astra_tab_id === tabId) ?? tabs.find((t) => t.selected);
+            const url = typeof tab?.url === "string" ? tab.url : "";
+            if (!/^https?:/i.test(url)) return { payload: { url, text: "", truncated: false } };
+            const response = await fetch(url, { credentials: "include" });
+            const text = await response.text();
+            const cap = 2_000_000;
+            return {
+              payload: { url, text: text.slice(0, cap), truncated: text.length > cap },
+            };
+          } catch {
+            return { payload: { url: "", text: "", truncated: false } };
+          }
+        }
+        if (!privateWindow) return null;
+        if (moduleName === "Bookmarks" && methodName === "call") {
+          return { payload: { kind: "error", error: "unavailable", profile: "incognito" } };
+        }
+        if (moduleName === "HistoryCall" && methodName === "call") {
+          return { payload: { kind: "page", visits: [], next: null, profile: "incognito" } };
+        }
+        if (moduleName === "History" && methodName === "visit") {
+          return { payload: { mirrored: false, private: true } };
+        }
+        return null;
+      },
     });
-    const doc = frameRoot.ownerDocument;
-    const win = doc.defaultView ?? null;
+    const themeBridge = installThemeBridge(appApi?.element ?? null, host);
 
     // Frame.sys.mjs rides the same resource:// mapping as the Host API
     // (jar.mn: content/astra/res/frame/Frame.sys.mjs). Degrades to null
@@ -318,6 +414,9 @@
         // real page surface must get out of their way, and come back on
         // `browser.return` (the app's own surface event does the rest).
         const command = typeof event.data === "string" ? event.data : "";
+        if (SHELL_COMMANDS.has(command)) {
+          void runChromeAction(win, host, command, { browser: mounted?.browser ?? null });
+        }
         if (command === "browser.return") {
           delete slot.dataset.internal;
         } else if (command.startsWith("browser.") && command !== "browser.return-failed") {
@@ -341,8 +440,16 @@
           }
           if (next.loading) {
             slot.dataset.loading = "true";
+            const url =
+              event.type === "nav.started"
+                ? event.data?.url
+                : event.type === "items-changed"
+                  ? (event.data?.tabs ?? []).find((t) => t.id === event.data?.active)?.url
+                  : "";
+            loadingHost = labelFor(url);
           } else {
             delete slot.dataset.loading;
+            loadingHost = "";
           }
         }
       }
@@ -359,12 +466,71 @@
       }
     }
     void refreshTabs();
+    // A window opened "in new window" carries its address on the window
+    // object, so the engine's hidden tabbox never fetched the page first. The
+    // address goes into this window's own tab model, which owns the browser.
+    const pending = win?.__astraPendingUrl;
+    if (pending) {
+      try {
+        delete win.__astraPendingUrl;
+      } catch {
+        // A frozen window object: the address still loads below.
+      }
+      try {
+        await host.Content?.navigate?.(pending, { request_id: newRequestId() });
+      } catch {
+        // The page refuses to load; the New Tab stays, as any failed open does.
+      }
+    }
+    // The page's context menu belongs to the product too. Intercept the
+    // engine's menu for Astra content, send the rows to the app, and run the
+    // chosen row here, where the chrome window's own objects live. Only this
+    // window's app frame may answer: a web page is a descendant of the chrome
+    // document and could otherwise post a menu action to it.
+    const fromApp = (event) => {
+      try {
+        return !appApi?.element || event.source == null || event.source === appApi.element.contentWindow;
+      } catch {
+        return false;
+      }
+    };
+    const postToApp = (message) => {
+      try {
+        appApi?.element?.contentWindow?.postMessage(message, "*");
+      } catch {
+        // The frame went away; the menu has no reader.
+      }
+    };
+    const tabIdOf = (browser) => {
+      for (const [id, entry] of mounted?.browsers ?? []) {
+        if (entry.browser === browser) return id;
+      }
+      return null;
+    };
+    const contentMenu = installContentMenu(win, {
+      host,
+      postToApp,
+      isFromApp: fromApp,
+      tabIdOf,
+    });
+    const onWindowMenu = (event) => {
+      const data = event?.data;
+      if (!data || data.ns !== "astra-shell" || data.kind !== "menu-run" || !fromApp(event)) return;
+      if (typeof data.id !== "string") return;
+      if (data.id.startsWith("window.") || data.id === "bookmark.current") {
+        void runChromeAction(win, host, data.id);
+      }
+    };
+    win.addEventListener("message", onWindowMenu);
     return () => {
       try {
         off();
       } catch {
         // Already torn down with the window.
       }
+      win.removeEventListener("message", onWindowMenu);
+      contentMenu.destroy();
+      themeBridge();
       tabstrip.destroy();
       splitApi.destroy();
       titlebar.destroy();
@@ -396,6 +562,12 @@
       <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
         {#if slotError}
           <p class="slot-error" role="alert">{slotError}</p>
+        {/if}
+        {#if loadingHost}
+          <div class="loading-stage" role="status" aria-live="polite">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span>{loadingHost}</span>
+          </div>
         {/if}
       </div>
     </div>
@@ -555,22 +727,36 @@
     background: var(--color-chrome, #1c1b22);
   }
 
-  /* A page still arriving says so, quietly, in the middle of the stage. */
-  :global(.astra-content[data-loading="true"])::after {
-    content: "";
+  /* A page still arriving says what it is waiting for, quietly, in the middle
+     of the stage. The spinner and the label are one layer above the content
+     browser, which is a sibling layer of its own. */
+  .loading-stage {
     position: absolute;
     inset-block-start: 50%;
     inset-inline-start: 50%;
-    inline-size: 22px;
-    block-size: 22px;
-    margin: -11px 0 0 -11px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    translate: -50% -50%;
+    padding: 10px 16px;
+    border: 1px solid var(--color-border, rgb(255 255 255 / 12%));
+    border-radius: 999px;
+    background: var(--color-raised, rgb(43 42 51 / 92%));
+    color: var(--color-text, #f4f4f6);
+    font: 500 13px/1.2 system-ui, sans-serif;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  }
+
+  .loading-spinner {
+    inline-size: 14px;
+    block-size: 14px;
     border: 2px solid var(--color-border-strong, rgb(255 255 255 / 18%));
     border-block-start-color: var(--color-text, #f4f4f6);
     border-radius: 50%;
-    /* Above the content browser, which is a sibling layer of its own. */
-    z-index: 3;
     animation: content-loading 720ms linear infinite;
-    pointer-events: none;
   }
 
   @keyframes content-loading {
@@ -580,9 +766,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(.astra-content[data-loading="true"])::after {
+    .loading-spinner {
       animation: none;
-      border-block-start-color: var(--color-text, #f4f4f6);
     }
   }
   .astra-content > :global([data-astra-browser]) {

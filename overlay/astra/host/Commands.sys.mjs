@@ -14,9 +14,18 @@
 // `crates/astra-core/src/commands.rs`, ported in slices — an id that is not
 // ported yet is refused instead of silently doing nothing.
 //
+// The second group below is the keyboard path: ids the keymap already binds
+// (Back, Reload, Bookmark This Page, Developer Tools, …). The ones that move
+// a tab are executed here; the ones that need the chrome window's own objects
+// (a real window, DevTools, Save Page) are announced on `ui-command` and the
+// shell performs them against the page in front. Refusing them, as this
+// module did before, is what made every shortcut look dead.
+//
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
+import { Tabs, __itemsSnapshot, __tabsState } from "./Tabs.sys.mjs";
+import { Navigation } from "./Navigation.sys.mjs";
 
 /** Browser surfaces a command can stand over the active tab. */
 const PAGES = new Set([
@@ -70,10 +79,93 @@ const SECTIONS = new Set([
   "account",
 ]);
 
+/** Commands the chrome window must perform against the page in front. */
+const SHELL_ACTIONS = new Set([
+  "bookmark.add",
+  "page.copy",
+  "page.copyLink",
+  "page.devtools",
+  "page.devtools.alt",
+  "page.print",
+  "page.save",
+  "page.selectAll",
+  "page.viewSource",
+  "window.closePrivate",
+  "window.fullscreen",
+  "window.showPrivate",
+  "window.showRegular",
+]);
+
+/** Commands the app's own surfaces answer from `ui-command`. */
+const APP_ACTIONS = new Set([
+  "find.next",
+  "find.previous",
+  "find.show",
+  "split.choose",
+  "theme.dark",
+  "theme.light",
+  "theme.system",
+  "url.focus",
+  "work.dictate",
+  "work.pane.close",
+]);
 
 /** The chrome's `runCommand` answer: an admission, as `settle()` expects. */
 function admission(accepted) {
   return { operation_id: null, accepted };
+}
+
+function selectedId() {
+  return __tabsState().selectedId;
+}
+
+async function tabIndexInSpace() {
+  const list = await Tabs.list({});
+  const tabs = list.tabs ?? [];
+  const current = tabs.find((tab) => tab.astra_tab_id === selectedId());
+  if (!current) return null;
+  const order = tabs.filter((tab) => tab.space_id === current.space_id);
+  return { order, at: order.findIndex((tab) => tab.astra_tab_id === selectedId()) };
+}
+
+async function stepTab(direction) {
+  const pos = await tabIndexInSpace();
+  if (!pos || pos.at < 0) return admission(false);
+  const next = pos.order[(pos.at + direction + pos.order.length) % pos.order.length];
+  if (!next) return admission(false);
+  await Tabs.select({ astra_tab_id: next.astra_tab_id });
+  return admission(true);
+}
+
+async function selectTabAt(index) {
+  const pos = await tabIndexInSpace();
+  if (!pos) return admission(false);
+  const target = index === -1 ? pos.order[pos.order.length - 1] : pos.order[index];
+  if (!target) return admission(false);
+  await Tabs.select({ astra_tab_id: target.astra_tab_id });
+  return admission(true);
+}
+
+async function stepSpace(direction) {
+  const result = await Tabs.stepSpace({ step: direction });
+  return admission(result.accepted === true);
+}
+
+async function tabNavigation(method) {
+  const id = selectedId();
+  if (!id) return admission(false);
+  const result = await Navigation[method]({ astra_tab_id: id });
+  return admission(!result?.error);
+}
+
+async function zoomBy(delta) {
+  const id = selectedId();
+  if (!id) return admission(false);
+  const current = await Navigation.getZoom({ astra_tab_id: id });
+  const from = typeof current.zoom === "number" ? current.zoom : 1;
+  const next = delta === 0 ? 1 : Math.round((from + delta) * 100) / 100;
+  const result = await Navigation.setZoom({ astra_tab_id: id, zoom: next });
+  return admission(!result?.error);
 }
 
 export const Commands = {
@@ -124,6 +216,63 @@ export const Commands = {
       emit("ui-command", "browser.settings");
       return admission(true);
     }
+
+    // --- The keyboard's own commands -------------------------------------
+    if (SHELL_ACTIONS.has(id) || APP_ACTIONS.has(id)) {
+      emit("ui-command", id);
+      return admission(true);
+    }
+    switch (id) {
+      case "tab.new":
+        await Tabs.create({ url: "about:blank" });
+        return admission(true);
+      case "tab.close": {
+        const current = selectedId();
+        if (!current) return admission(false);
+        const out = await Tabs.close({ astra_tab_id: current });
+        return admission(out.closed !== false);
+      }
+      case "tab.next":
+        return stepTab(1);
+      case "tab.previous":
+        return stepTab(-1);
+      case "tab.above":
+        return stepTab(-1);
+      case "tab.below":
+        return stepTab(1);
+      case "tab.select.last":
+        return selectTabAt(-1);
+      case "nav.back":
+        return tabNavigation("goBack");
+      case "nav.forward":
+        return tabNavigation("goForward");
+      case "nav.reload":
+      case "nav.hardReload":
+        return tabNavigation("reload");
+      case "nav.stop":
+        return tabNavigation("stop");
+      case "zoom.in":
+        return zoomBy(0.1);
+      case "zoom.out":
+        return zoomBy(-0.1);
+      case "zoom.reset":
+        return zoomBy(0);
+      case "space.next":
+        return stepSpace(1);
+      case "space.previous":
+        return stepSpace(-1);
+      default:
+        break;
+    }
+    const tabMatch = /^tab\.select\.(\d+)$/u.exec(id);
+    if (tabMatch) return selectTabAt(Number(tabMatch[1]) - 1);
+    const spaceMatch = /^space\.select\.(\d+)$/u.exec(id);
+    if (spaceMatch) {
+      const space = __itemsSnapshot().spaces[Number(spaceMatch[1]) - 1];
+      if (!space) return admission(false);
+      const out = await Tabs.switchSpace({ space: space.id });
+      return admission(out.accepted === true);
+    }
     return admission(false);
   },
 
@@ -133,8 +282,27 @@ export const Commands = {
       ...[...PAGES].map((page) => `browser.${page}`),
       ...[...TOOLS].map((tool) => `tool.${tool}`),
       ...[...SECTIONS].map((section) => `settings.${section}`),
+      ...SHELL_ACTIONS,
+      ...APP_ACTIONS,
       "browser.return",
       "note.new",
+      "tab.new",
+      "tab.close",
+      "tab.next",
+      "tab.previous",
+      "tab.above",
+      "tab.below",
+      "tab.select.last",
+      "nav.back",
+      "nav.forward",
+      "nav.reload",
+      "nav.hardReload",
+      "nav.stop",
+      "zoom.in",
+      "zoom.out",
+      "zoom.reset",
+      "space.next",
+      "space.previous",
     ];
   },
 };

@@ -29,9 +29,9 @@ describe("engine table", () => {
     }
   });
 
-  it("defaults to DuckDuckGo like the search.engine preference", () => {
-    expect(DEFAULT_ENGINE_ID).toBe("duckduckgo");
-    expect(getEngine(DEFAULT_ENGINE_ID)?.name).toBe("DuckDuckGo");
+  it("defaults to Google like the search.engine preference", () => {
+    expect(DEFAULT_ENGINE_ID).toBe("google");
+    expect(getEngine(DEFAULT_ENGINE_ID)?.name).toBe("Google");
   });
 
   it("returns null for unknown engines", () => {

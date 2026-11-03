@@ -72,6 +72,7 @@
   } from "$features/sidebar";
   import { IS_WINDOWS } from "$shared/platform";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
+  import { ContextMenu, install as installShellMenu, openAt } from "$features/menus";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
   /** New Note, from the menu or its shortcut: a note starts where notes are open. */
@@ -97,18 +98,89 @@
     handleNativeSection("settings.section.about");
     void browserPage.open("settings");
   }
-  // The sidebar's own menu stands where the engine would offer Reload.
-  onMount(() =>
-    installChromeMenu((event) => {
+  // The sidebar's own menu stands where the engine would offer Reload. The
+  // page's menu arrives from the shell (see `installShellMenu`), so both are
+  // drawn by the app and neither is a Firefox menu.
+  onMount(() => {
+    const stopShellMenu = installShellMenu();
+    const stopChromeMenu = installChromeMenu((event) => {
       if (!(event.target instanceof Element) || !event.target.closest(".browser-sidebar")) return;
-      const active = tabs.activeTab();
-      const page =
-        browserPage.currentPage() === null &&
-        (active?.content ?? "web") === "web" &&
-        (active?.url ?? null) !== null;
-      tabs.openChromeMenu(event.clientX, event.clientY, page);
-    }),
-  );
+      openChromeContextMenu(event);
+    });
+    return () => {
+      stopChromeMenu();
+      stopShellMenu();
+    };
+  });
+
+  /** The browser's own menu: no page to act on, only the window and the app. */
+  function openChromeContextMenu(event: MouseEvent) {
+    const active = tabs.activeTab();
+    const page =
+      browserPage.currentPage() === null &&
+      (active?.content ?? "web") === "web" &&
+      (active?.url ?? null) !== null;
+    const items = [
+      { kind: "item" as const, id: "tab.new", label: "New Tab", hint: "Ctrl+T" },
+      { kind: "item" as const, id: "window.new", label: "New Window", hint: "Ctrl+N" },
+      {
+        kind: "item" as const,
+        id: "window.newPrivate",
+        label: "New Private Window",
+        hint: "Ctrl+Shift+P",
+      },
+      { kind: "separator" as const },
+      ...(page
+        ? [
+            { kind: "item" as const, id: "page.reload", label: "Reload Page", hint: "Ctrl+R" },
+            {
+              kind: "item" as const,
+              id: "page.bookmark",
+              label: "Bookmark This Page",
+              hint: "Ctrl+D",
+            },
+            { kind: "item" as const, id: "page.viewSource", label: "View Page Source" },
+            { kind: "separator" as const },
+          ]
+        : []),
+      { kind: "item" as const, id: "history.open", label: "History" },
+      { kind: "item" as const, id: "bookmarks.open", label: "Bookmarks" },
+      { kind: "item" as const, id: "settings.open", label: "Settings" },
+    ];
+    openAt({ x: event.clientX, y: event.clientY, items }, (id) => {
+      if (id === "tab.new") {
+        tabs.open();
+        return;
+      }
+      if (id === "page.reload") {
+        tabs.reloadActive();
+        return;
+      }
+      if (id === "page.viewSource") {
+        void browserPage.open("source");
+        return;
+      }
+      if (id === "history.open") {
+        void browserPage.open("history");
+        return;
+      }
+      if (id === "bookmarks.open") {
+        toolHost.open("bookmarks");
+        return;
+      }
+      if (id === "settings.open") {
+        void browserPage.open("settings");
+        return;
+      }
+      // Window and bookmark actions belong to the chrome window; it owns the
+      // real window and the Places store.
+      try {
+        window.parent.postMessage({ ns: "astra-shell", kind: "menu-run", id }, "*");
+      } catch {
+        // No shell: the row has nowhere to run.
+      }
+    });
+  }
   onMount(() => {
     let disposed = false;
     let stop: (() => void) | undefined;
@@ -686,6 +758,7 @@
   </div>
 </div>
 {#if ClearSiteData}<ClearSiteData />{/if}
+<ContextMenu />
 
 <style>
   /* The reach: a strip at the window's left edge while the column is away.
