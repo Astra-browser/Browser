@@ -89,6 +89,41 @@ describe("slotStateFor", () => {
     );
   });
 
+  it("ignores navigation in a tab that is not in front", () => {
+    const activeId = "tab-2";
+    // A restoring background tab must not hide the page being read.
+    assert.equal(
+      slotStateFor(
+        { type: "nav.started", data: { astra_tab_id: "tab-1", url: "https://a.example/" } },
+        { activeId },
+      ),
+      null,
+    );
+    assert.equal(
+      slotStateFor(
+        { type: "nav.committed", data: { astra_tab_id: "tab-1", url: "https://a.example/" } },
+        { activeId },
+      ),
+      null,
+    );
+    // The tab in front still reports.
+    assert.deepEqual(
+      slotStateFor(
+        { type: "nav.started", data: { astra_tab_id: "tab-2", url: "https://a.example/" } },
+        { activeId },
+      ),
+      { hasPage: true, loading: true },
+    );
+    // Without a known active tab (before the first projection) it reports.
+    assert.deepEqual(
+      slotStateFor(
+        { type: "nav.started", data: { astra_tab_id: "tab-1", url: "https://a.example/" } },
+        { activeId: "" },
+      ),
+      { hasPage: true, loading: true },
+    );
+  });
+
   it("says nothing about other events", () => {
     assert.equal(slotStateFor({ type: "tab.updated", data: { url: "https://a.example/" } }), null);
     assert.equal(slotStateFor({ type: "sidebar.changed", data: { width: 240 } }), null);

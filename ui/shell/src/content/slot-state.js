@@ -23,14 +23,26 @@ const SHOWING = Object.freeze({ hasPage: true, loading: false });
 /**
  * Slot flags for one Host API event.
  *
+ * `options.activeId` is the tab the stage currently shows. Navigation events
+ * for any other tab (a background tab restoring, a second tab loading) say
+ * nothing about what is in front, so they are ignored rather than flipping the
+ * stage to "arriving" over the page the person is reading.
+ *
  * @param {{type?: string, data?: object} | null | undefined} event
+ * @param {{activeId?: string | null}} [options]
  * @returns {{hasPage: boolean, loading: boolean} | null}
  */
-export function slotStateFor(event) {
+export function slotStateFor(event, { activeId = null } = {}) {
   const type = event?.type;
   const data = event?.data;
   if (typeof type !== "string" || !data) {
     return null;
+  }
+  if (type === "nav.started" || type === "nav.committed") {
+    const id = data.astra_tab_id;
+    if (typeof id === "string" && typeof activeId === "string" && activeId !== "" && id !== activeId) {
+      return null;
+    }
   }
   if (type === "nav.started") {
     return isPageUrl(data.url) ? ARRIVING : NO_PAGE;

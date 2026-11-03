@@ -46,6 +46,8 @@
   // person sees is the product UI, never the fallback chrome (P3-T21).
   let appBooted = $state(null);
   let appApi = null;
+  /** The tab the stage shows, as the last projection named it. */
+  let activeTabId = "";
 
   const SIDEBAR_ITEMS = [
     { id: "tabs", label: "Tabs" },
@@ -303,7 +305,12 @@
         // The stage's two flags (a real page in front, and whether it is still
         // arriving) are derived in `content/slot-state.js` so every path —
         // nav.started, nav.committed, a projection with no active tab — agrees.
-        const next = slotStateFor(event);
+        // The projection names the tab in front, so a background tab's
+        // navigation cannot take the stage over.
+        if (event.type === "items-changed") {
+          activeTabId = typeof event.data?.active === "string" ? event.data.active : "";
+        }
+        const next = slotStateFor(event, { activeId: activeTabId });
         if (next !== null) {
           if (next.hasPage) {
             slot.dataset.hasPage = "true";
