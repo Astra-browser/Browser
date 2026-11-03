@@ -8,8 +8,10 @@ Marionette chrome context, and asserts (docs/astra/FRAME.md):
     `.astra-titlebar` declares `-moz-window-dragging: drag`, window
     controls/buttons declare `no-drag`
   - the frame stylesheet applies live as an agent sheet: co-located
-    regular properties from the same rule blocks compute on injected
-    frame DOM (titlebar display:flex + background, controls display:flex)
+    regular properties from the same rule blocks compute on the injected
+    frame DOM (titlebar display:flex + background, controls display:flex) —
+    measured with the P3-T20 app-booted retirement attribute off and restored,
+    plus an assertion that the retirement itself is in effect
   - Frame.sys.mjs reportDragRegions runs live against the injected DOM
     (roles + control buttons + rects; see FRAME.md for why the engine
     hides this chrome-only property from CSSOM readback)
@@ -110,10 +112,23 @@ const [overlayAstraDir, cssPath] = arguments;
     // Co-located regular properties from the same rule blocks compute,
     // proving the drag rules match these live elements.
     const cs = (e) => win.getComputedStyle(e);
+    // P3-T20: once the app frame announces itself the shell retires the
+    // fallback titlebar/toolbar (`Shell.svelte` — .astra-frame
+    // [data-app-booted="true"] .astra-titlebar { display: none }), because
+    // the app *is* the chrome. Measure the live state, then re-measure with
+    // the retirement attribute off to prove frame.css still styles the
+    // fallback frame (the state that rule exists for).
+    const frameEl = d.querySelector("[data-astra-frame]");
+    out.appBooted = frameEl?.getAttribute("data-app-booted") ?? "";
     out.barDisplay = cs(bar).getPropertyValue("display");
     out.barBg = cs(bar).getPropertyValue("background-color");
+    const booted = frameEl?.getAttribute("data-app-booted") ?? null;
+    if (frameEl) frameEl.setAttribute("data-app-booted", "false");
+    out.fallbackBarDisplay = cs(bar).getPropertyValue("display");
+    out.fallbackBarBg = cs(bar).getPropertyValue("background-color");
     out.controlsDisplay = cs(controls).getPropertyValue("display");
     out.btnCursor = cs(controls.querySelector("button")).getPropertyValue("cursor");
+    if (frameEl && booted !== null) frameEl.setAttribute("data-app-booted", booted);
 
     // Drag-region reporting runs live (getComputedStyle-backed; the
     // engine hides this chrome-only property from CSSOM readback, so
@@ -249,9 +264,17 @@ def main():
                 ("frame.css: controls/buttons declare no-drag",
                  src_checks["controls no-drag"] is True),
                 ("agent sheet registers", res.get("sheetRegistered") is True),
+                # P3-T20: the app owns the window, so the fallback titlebar is
+                # retired (display none) — the old "always flex" check was
+                # asserting a state the product no longer ships.
+                ("app owns window: fallback titlebar retired",
+                 res.get("appBooted") == "true"
+                 and res.get("barDisplay") == "none"),
+                # ...and frame.css still styles that fallback frame when it is
+                # the active chrome (measured with data-app-booted off/restored).
                 ("titlebar rule applies live (flex + #2b2a33)",
-                 res.get("barDisplay") == "flex"
-                 and res.get("barBg") == "rgb(43, 42, 51)"),
+                 res.get("fallbackBarDisplay") == "flex"
+                 and res.get("fallbackBarBg") == "rgb(43, 42, 51)"),
                 ("controls rule applies live",
                  res.get("controlsDisplay") == "flex"
                  and res.get("btnCursor") == "pointer"),
