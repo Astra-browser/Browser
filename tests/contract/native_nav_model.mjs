@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 // Native navigation wiring (P2): the model emits the intents the content
 // binding performs on the live browser.
 //
@@ -52,6 +55,8 @@ const stop = await capture(() => Navigation.stop({ request_id: "nav-stop", astra
 check("stop is accepted", !stop.result.error);
 check("stop emits nav.stopped", stop.seen.some((e) => e.type === "nav.stopped"));
 check("stop names the tab", stop.seen.find((e) => e.type === "nav.stopped")?.data.astra_tab_id === id);
+const afterStop = (await Tabs.get({ request_id: "nav-get", astra_tab_id: id })).tab;
+check("stop clears the loading state", afterStop.loading === false);
 
 const zoom = await capture(() =>
   Navigation.setZoom({ request_id: "nav-zoom", astra_tab_id: id, zoom: 9 }),
@@ -77,6 +82,13 @@ check("hard reload marks loading", after.loading === true);
 const cmd = await capture(() => Commands.run({ id: "nav.hardReload" }));
 check("Commands routes nav.hardReload", cmd.result.accepted === true);
 check("Commands hard reload emits the native intent", cmd.seen.some((e) => e.type === "nav.hard-reload"));
+
+const altHard = await capture(() => Commands.run({ id: "nav.hardReload.alt2" }));
+check("Ctrl/Shift hard-reload alias runs", altHard.result.accepted === true);
+check("hard-reload alias emits the native intent", altHard.seen.some((e) => e.type === "nav.hard-reload"));
+const altReload = await capture(() => Commands.run({ id: "nav.reload.alt" }));
+check("reload alias runs", altReload.result.accepted === true);
+check("reload alias emits a commit", altReload.seen.some((e) => e.type === "nav.committed"));
 
 assert.equal(failed, 0, `${failed} native navigation checks failed`);
 console.log(`\nnative_nav_model: ${passed} passed, ${failed} failed`);

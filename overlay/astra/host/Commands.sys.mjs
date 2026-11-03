@@ -178,6 +178,13 @@ export const Commands = {
     if (typeof id !== "string" || id === "") {
       return admission(false);
     }
+    // Keymap alternates share one command: `.alt`, `.alt2`, … are the same
+    // action as the base id. The shell remaps a few of these; normalising
+    // here covers all of them (Ctrl+F5, Shift+F5, F5, ...).
+    id = id.replace(/\.alt\d*$/u, "");
+    if (id === "") {
+      return admission(false);
+    }
     // Leaving a browser surface returns the window to the tab it was over.
     if (id === "browser.return") {
       emit("ui-command", "browser.return");

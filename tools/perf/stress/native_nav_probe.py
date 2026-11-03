@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Live probe: native stop and zoom reach the real content browser.
 
 Runs headed on the private Weston display:
@@ -19,8 +22,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-BIN = os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+BIN = os.environ.get("ASTRA_BINARY", os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox"))
 PORT = int(os.environ.get("ASTRA_NATIVE_NAV_PORT", "2850"))
 sys.path.insert(0, os.path.join(ROOT, "tests", "contract"))
 import load_state as L  # noqa: E402
@@ -31,13 +34,20 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        self.server.hits = getattr(self.server, "hits", 0) + 1
         if self.path.startswith("/slow"):
             time.sleep(4.0)
             body = b"<html><head><title>SLOW PAGE</title></head><body>slow</body></html>"
+        elif self.path.startswith("/cached"):
+            body = (
+                f"<html><head><title>CACHED PAGE</title></head>"
+                f"<body>hit {self.server.hits}</body></html>"
+            ).encode()
         else:
             body = b"<html><head><title>FAST PAGE</title></head><body>fast</body></html>"
         self.send_response(200)
         self.send_header("content-type", "text/html; charset=utf-8")
+        self.send_header("cache-control", "max-age=3600")
         self.send_header("content-length", str(len(body)))
         self.end_headers()
         try:
@@ -63,6 +73,11 @@ catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 NAV = """const url = arguments[0], id = arguments[1];
 const done = arguments[arguments.length - 1];
 (async () => { try { done(JSON.stringify(await window.__astraHost.Navigation.loadURL({request_id:'p', astra_tab_id:id, url}))); }
+catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
+
+HARD = """const id = arguments[0];
+const done = arguments[arguments.length - 1];
+(async () => { try { done(JSON.stringify(await window.__astraHost.Navigation.hardReload({request_id:'p', astra_tab_id:id}))); }
 catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 
 STOP = """const id = arguments[0];
@@ -135,6 +150,12 @@ def main():
         time.sleep(5.0)
         out["after_stop"] = json.loads(m.execute(STATE))
         out["stop_worked"] = out["after_stop"].get("title") != "SLOW PAGE"
+        listed = json.loads(m.execute_async(LIST)).get("tabs") or []
+        out["stop_model_loading"] = next(
+            (t.get("loading") for t in listed if t.get("astra_tab_id") == tab["astra_tab_id"]),
+            None,
+        )
+        out["stop_model_cleared"] = out["stop_model_loading"] is False
 
         # --- zoom the live browser ---------------------------------------
         m.execute_async(NAV, [base + "/fast", tab["astra_tab_id"]])
@@ -150,6 +171,28 @@ def main():
         out["after_zoom"] = json.loads(m.execute(STATE))
         z = out["after_zoom"].get("zoom")
         out["zoom_worked"] = z is not None and float(z) > 1.0
+
+        # --- hard reload bypasses the cache ------------------------------
+        before_hits = server.hits
+        m.execute_async(NAV, [base + "/cached.html", tab["astra_tab_id"]])
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            st = json.loads(m.execute(STATE))
+            if st.get("title") == "CACHED PAGE" and st.get("loading") is False:
+                break
+            time.sleep(0.1)
+        first_hits = server.hits - before_hits
+        before_hits = server.hits
+        m.execute_async(HARD, [tab["astra_tab_id"]])
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            st = json.loads(m.execute(STATE))
+            if st.get("title") == "CACHED PAGE" and st.get("loading") is False:
+                break
+            time.sleep(0.1)
+        second_hits = server.hits - before_hits
+        out["reload_hits"] = {"first": first_hits, "hard": second_hits}
+        out["hard_reload_worked"] = second_hits >= 1
     finally:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
@@ -163,7 +206,13 @@ def main():
         log.close()
         shutil.rmtree(profile, ignore_errors=True)
     print(json.dumps(out, indent=2))
-    return 0 if (out.get("stop_worked") and out.get("zoom_worked")) else 1
+    ok = (
+        out.get("stop_worked")
+        and out.get("stop_model_cleared")
+        and out.get("zoom_worked")
+        and out.get("hard_reload_worked")
+    )
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

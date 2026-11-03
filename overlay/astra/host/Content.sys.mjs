@@ -269,16 +269,20 @@ export function stopBrowser(browser) {
   return false;
 }
 
-/** Reload one browser, bypassing the HTTP cache. */
+/** Reload one browser, bypassing both the HTTP cache and any proxy cache. */
 export function hardReloadBrowser(browser) {
   try {
     const win = browserWindow(browser);
-    const Ci = win?.Ci;
-    const flags = Ci?.nsIWebNavigation?.LOAD_FLAGS_BYPASS_CACHE ?? 0;
-    if (browser && typeof browser.reloadWithFlags === "function") {
-      browser.reloadWithFlags(flags);
-      return true;
+    const nav = win?.Ci?.nsIWebNavigation;
+    if (!browser || typeof browser.reloadWithFlags !== "function" || !nav) {
+      return false;
     }
+    const flags = nav.LOAD_FLAGS_BYPASS_PROXY | nav.LOAD_FLAGS_BYPASS_CACHE;
+    if (!flags) {
+      return false;
+    }
+    browser.reloadWithFlags(flags);
+    return true;
   } catch {
     // Browser torn down mid-reload.
   }
@@ -319,6 +323,15 @@ export const Content = {
     let activeId = "";
 
     const activeBrowser = () => browsers.get(activeId)?.browser ?? null;
+    /** astra_tab_id -> last requested zoom, so a remounted browser keeps it. */
+    const zoomLevels = new Map();
+    const noteFailure = (id, what, error) => {
+      try {
+        doc.defaultView.__astraLastRelayError = `content ${what} failed for ${id}: ${String(error)}`;
+      } catch {
+        // Diagnostics only.
+      }
+    };
 
     /**
      * Mirror one browser's foreground state into Gecko. Runs for every entry
@@ -616,8 +629,10 @@ export const Content = {
         abort: null,
         crashed: false,
         iconKey: "",
+        zoom: zoomLevels.get(id) ?? 1,
       };
       browsers.set(id, entry);
+      applyZoomToBrowser(browser, entry.zoom);
       // Starts parked: the browser is created for a page that is about to be
       // shown (or warmed on about:blank), and `setActive` turns it on.
       applyActivation(entry, false);
@@ -662,6 +677,7 @@ export const Content = {
       const target = url;
       const entry = browsers.get(id) ?? createBrowser(id);
       setActive(id);
+      applyZoomToBrowser(entry.browser, entry.zoom ?? 1);
       const settled =
         !entry.crashed && (entry.requested === target || safeSpec(entry.browser) === target);
       if (settled && (!force || stillLoading(entry.browser))) {
@@ -743,27 +759,48 @@ export const Content = {
         show(selectedId, event.data.url, intent);
       }
       if (event.type === "nav.stopped") {
-        const entry = browsers.get(event.data?.astra_tab_id);
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
         if (entry) {
-          stopBrowser(entry.browser);
+          stopWatching(entry);
+          if (!stopBrowser(entry.browser)) {
+            noteFailure(id, "stop", "browser.stop unavailable");
+          }
         }
       }
       if (event.type === "nav.zoom-changed") {
-        const entry = browsers.get(event.data?.astra_tab_id);
+        const id = event.data?.astra_tab_id;
+        const zoom = event.data?.zoom;
+        if (typeof zoom === "number" && Number.isFinite(zoom)) {
+          zoomLevels.set(id, zoom);
+        }
+        const entry = browsers.get(id);
         if (entry) {
-          applyZoomToBrowser(entry.browser, event.data?.zoom);
+          entry.zoom = zoom;
+          if (!applyZoomToBrowser(entry.browser, zoom)) {
+            noteFailure(id, "zoom", "ZoomManager unavailable");
+          }
         }
       }
       if (event.type === "nav.print-requested") {
-        const entry = browsers.get(event.data?.astra_tab_id);
-        if (entry) {
-          printBrowser(entry.browser);
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
+        if (entry && !printBrowser(entry.browser)) {
+          noteFailure(id, "print", "PrintUtils unavailable");
         }
       }
       if (event.type === "nav.hard-reload") {
-        const entry = browsers.get(event.data?.astra_tab_id);
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
         if (entry) {
-          hardReloadBrowser(entry.browser);
+          entry.requested = event.data?.url || entry.requested;
+          markLoading(id);
+          watch(id, entry);
+          if (!hardReloadBrowser(entry.browser)) {
+            stopWatching(entry);
+            __applyExternalUpdate(id, { loading: false });
+            noteFailure(id, "hard-reload", "reloadWithFlags unavailable");
+          }
         }
       }
       if (event.type === "tab.closed") {

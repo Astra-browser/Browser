@@ -193,27 +193,40 @@ export const Navigation = {
     }
     tab.loading = true;
     emit("nav.hard-reload", { astra_tab_id: id, url: tab.url });
+    const h = __historyFor(id);
     emit("tab.updated", {
       astra_tab_id: id,
       url: tab.url,
       title: tab.title,
       selected: tab.selected,
       loading: true,
-      canGoBack: (__historyFor(id)?.index ?? 0) > 0,
-      canGoForward: false,
+      canGoBack: h ? h.index > 0 : false,
+      canGoForward: h ? h.index < h.entries.length - 1 : false,
     });
     emitItemsChanged();
     return ok(request_id, { astra_tab_id: id, reloaded: true, hard: true, url: tab.url });
   },
 
-  // Stop an in-flight load. The model records the intent; the live
-  // binding calls `browser.stop()` when a real browser is attached.
+  // Stop an in-flight load. The model clears the loading state; the live
+  // binding calls `browser.stop()` and ends its load watcher.
   async stop({ request_id = "", astra_tab_id = "" } = {}) {
     const { id, tab } = tabOf(astra_tab_id);
     if (!tab) {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`);
     }
+    tab.loading = false;
+    const h = __historyFor(id);
     emit("nav.stopped", { astra_tab_id: id, url: tab.url });
+    emit("tab.updated", {
+      astra_tab_id: id,
+      url: tab.url,
+      title: tab.title,
+      selected: tab.selected,
+      loading: false,
+      canGoBack: h ? h.index > 0 : false,
+      canGoForward: h ? h.index < h.entries.length - 1 : false,
+    });
+    emitItemsChanged();
     return ok(request_id, { astra_tab_id: id, stopped: true, url: tab.url });
   },
 
