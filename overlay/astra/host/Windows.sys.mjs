@@ -52,6 +52,36 @@ function currentChromeWindow() {
   }
 }
 
+function isPrivateWindow(win) {
+  try {
+    if (win?.PrivateBrowsingUtils?.isWindowPrivate?.(win) === true) {
+      return true;
+    }
+  } catch {
+    // Fall through to the module/document marker.
+  }
+  try {
+    const CU = globalThis.ChromeUtils;
+    if (CU) {
+      const { PrivateBrowsingUtils } = CU.importESModule(
+        "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+      );
+      if (PrivateBrowsingUtils.isWindowPrivate(win) === true) {
+        return true;
+      }
+    }
+  } catch {
+    // A chrome that refuses the module keeps the document marker.
+  }
+  try {
+    return (
+      win?.document?.documentElement?.getAttribute("privatebrowsingmode") === "temporary"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function nativeOf(id) {
   const win = _native.get(id) ?? null;
   if (win && win.closed === true) {
@@ -86,6 +116,10 @@ function bindNative(id, win, { replace = false } = {}) {
     return;
   }
   _native.set(id, win);
+  const model = _windows.get(id);
+  if (model) {
+    model.private = isPrivateWindow(win);
+  }
   try {
     _nativeIds.set(win, id);
   } catch {
@@ -145,6 +179,7 @@ function syncNative(id) {
   }
   const model = _windows.get(id);
   if (model) {
+    model.private = isPrivateWindow(win);
     try {
       model.fullscreen = win.fullScreen === true;
     } catch {

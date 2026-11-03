@@ -122,9 +122,18 @@ def main():
         nid = made.get("window_id")
 
         if nid:
+            out["focus_old"] = json.loads(m.execute_async(FOCUS, ["win-1"]))
+            time.sleep(0.4)
+            out["native_after_focus_old"] = json.loads(m.execute(NATIVE))
             out["focus"] = json.loads(m.execute_async(FOCUS, [nid]))
             time.sleep(0.4)
             out["native_after_focus"] = json.loads(m.execute(NATIVE))
+            out["direct_full"] = json.loads(m.execute_async(FULL, [nid, True]))
+            time.sleep(0.4)
+            out["after_direct_full"] = json.loads(m.execute_async(LIST))
+            out["native_after_direct_full"] = json.loads(m.execute(NATIVE))
+            out["direct_restore"] = json.loads(m.execute_async(FULL, [nid, False]))
+            time.sleep(0.3)
             out["close"] = json.loads(m.execute_async(CLOSE, [nid]))
             time.sleep(1.0)
             out["after_close"] = json.loads(m.execute_async(LIST))
@@ -152,8 +161,14 @@ def main():
         len(out.get("initial", {}).get("windows") or []) == 1
         and len(out.get("after_create", {}).get("windows") or []) == 2
         and len(out.get("native_after_create") or []) == 2
+        and out.get("focus_old", {}).get("focused") is True
         and out.get("focus", {}).get("focused") is True
-        and any(w.get("focused") for w in out.get("native_after_focus") or [])
+        and sum(1 for w in out.get("native_after_focus") or [] if w.get("focused")) == 1
+        and out.get("direct_full", {}).get("fullscreen") is True
+        and next(
+            (w.get("fullscreen") for w in (out.get("after_direct_full", {}).get("windows") or []) if w.get("window_id") == "win-2"),
+            None,
+        ) is True
         and any(w.get("fullscreen") for w in out.get("native_frame_full") or [])
         and not any(w.get("fullscreen") for w in out.get("native_frame_restore") or [])
         and out.get("close", {}).get("closed") is True

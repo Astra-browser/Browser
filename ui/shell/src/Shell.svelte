@@ -737,6 +737,8 @@
       }
     };
     win.addEventListener("message", onWindowMenu);
+    const onSizeMode = () => mirrorFullscreen(win.fullScreen === true);
+    win.addEventListener("sizemodechange", onSizeMode);
     teardown = () => {
       try {
         off();
@@ -745,6 +747,7 @@
       }
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
+      win.removeEventListener("sizemodechange", onSizeMode);
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
       } catch {

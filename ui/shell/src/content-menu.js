@@ -476,13 +476,23 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
       });
       return { accepted: !created.error };
     }
-    case "window.fullscreen":
+    case "window.fullscreen": {
+      const id = host.__bindCurrentWindow?.(win) || "win-1";
       try {
-        win.fullScreen = !win.fullScreen;
-        return { accepted: true };
+        const cur = await host.Windows.get({ request_id: `win-${Date.now()}`, window_id: id });
+        if (cur?.error) {
+          return { accepted: false };
+        }
+        const out = await host.Windows.setFullscreen({
+          request_id: `win-${Date.now()}`,
+          window_id: id,
+          fullscreen: !(cur.window?.fullscreen === true),
+        });
+        return { accepted: !out.error };
       } catch {
         return { accepted: false };
       }
+    }
     case "page.devtools":
     case "page.devtools.alt":
       return showDevTools(win, browser, undefined);
