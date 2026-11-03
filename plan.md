@@ -17,15 +17,16 @@
 6. **Tooling:** Rust everywhere possible; **Bun** = package manager, workspace runner, test runner and any JS servers; **rusqlite** for SQLite.
 7. **Order of work:** Phase 0 inventory → 1 forge+skeleton (Linux) → 2 core+bridge → 3 UI port → 4 blocker/extensions/privacy → 5 tasks/notes/time → 6 Work (agents) → *Linux parity beta* → 7 accounts+sync → 8 Linux GA → 9 Windows → 10 macOS → 11 Astra-exclusive AI features.
 
-> **⚠️ CURRENT EXECUTION SCOPE — UI ONLY (D-36, 2026-11-03).** The active work
-> is the interface, not the stack. Build and verify `ui/app` (and the shell
-> pieces it needs); **host/core/engine wiring is deferred on purpose and will
-> be connected later.** Do not implement backend work to make the UI "work",
-> and do not treat empty states, mock data, `unknown_command` or unrouted
-> commands as defects. The authoritative contract is `docs/astra/SCOPE.md`;
-> the deferred backlog lives in `docs/astra/STATE.md` → "Deferred wiring".
-> This section describes the full project for context — it does not authorize
-> starting backend phases while the UI phase is active.
+> **⚠️ CURRENT EXECUTION SCOPE — UI + WIRING (D-38, 2026-11-03).** The active
+> work is the interface **and the host/engine path each surface needs**. Build
+> and verify `ui/app`, `ui/shell`, the bridge route table, the overlay Host API
+> and the engine hooks required to remove a Firefox-native surface. A surface
+> is done when it works in the packaged dev build, not when it renders. Do not
+> leave a Firefox menu, dialog or window answering an action. The authoritative
+> contract is `docs/astra/SCOPE.md`; the remaining backlog lives in
+> `docs/astra/STATE.md` → "Remaining wiring". Later phases (accounts, sync,
+> packaging, Windows/macOS) are still context only and do not authorize work
+> outside the current surface.
 
 ---
 

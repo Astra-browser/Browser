@@ -3,19 +3,20 @@
 Legend: `todo` · `doing` (locked) · `blocked` · `done`. A `doing` row's Agent+Branch
 lock it: no other agent may touch that task, its files, or its branch.
 
-> **⚠️ CURRENT SCOPE — UI ONLY (D-36, from 2026-11-03).**
-> We are building the interface now; host/core/engine wiring is deferred on
-> purpose and will be connected in a later phase. Do not implement backend
-> work to make the UI "work", and do not treat empty states, mock data,
-> `unknown_command` or unrouted commands as bugs. Read
-> `docs/astra/SCOPE.md` before picking up any task. If a UI change needs a real
-> backend contract, add it to **Deferred wiring** below and stop.
+> **⚠️ CURRENT SCOPE — UI + WIRING (D-38, from 2026-11-03).**
+> We build the interface and the route → host module → engine path it needs.
+> A surface is done when it works in the packaged dev build, not when it
+> renders. Empty, mock, disabled and `unknown_command` states are bugs when a
+> real backend exists. Read `docs/astra/SCOPE.md` before picking up any task;
+> pick from **Remaining wiring** below and close a row only when the live
+> Marionette probe passes.
 
 ## Where things stand (2026-11-03 — read this first, next agent)
 
 The browser builds, boots, and **the product UI is the window's chrome** (not a
-page painted over Firefox). Phases 0–6 are done; Phase 3 (UI port) is the
-active surface.
+page painted over Firefox). Phases 0–6 are done; the active lane is the
+connected product surface: `ui/app` + `ui/shell` + the Host API and engine
+hooks each one needs (D-38).
 
 **Run it**
 
@@ -85,20 +86,31 @@ python3 tools/state-check.py && bash tools/brand-lint.sh
 (cd forge/astra-forge && cargo run -q -- lint && cargo run -q -- footprint)
 ```
 
-### Deferred wiring (do not start — D-36)
+### Remaining wiring (active backlog — D-38)
 
-This is a backlog for the later wiring phase, **not** current work. Most of the
-app's 267 commands are still unrouted in host mode: only
-tabs/settings/accounts/sidebar/webext/nav/panes resolve, everything else fails
-fast with `unknown_command`. The Work canvas, tasks/notes/time pages and
-settings sections therefore render their empty states — that is the expected
-UI-only state. The host projection is derived in
-`overlay/astra/host/Tabs.sys.mjs` until `astra-core` owns it (plan §5.4). Web
-pages have not been exercised end-to-end through the content slot since the
-chrome integration.
+These are current work, not a parking lot. Each row needs a live probe before
+it can be called done. The browser-core batch (history, bookmarks, favicons,
+page menu, private/new windows, theme, loading, keyboard ids) is closed and
+recorded below; this list is what is still genuinely unwired.
 
-When the owner opens the wiring phase, convert these into tasks with acceptance
-tests; until then, do not implement them and do not report them as UI defects.
+- **Split-pane content.** The app renders a split layout, but the content
+  stage still shows one page. Needs one live `<browser>` per visible pane and
+  a shell-side rect/visibility protocol.
+- **Container-scoped opening.** The context menu can open a link in a new tab,
+  window or private window, but not in a chosen Firefox container; there is no
+  container picker in the Astra UI yet.
+- **Guaranteed DevTools.** The shell asks `gDevTools.showToolboxForTab` for a
+  synthetic tab. When the engine refuses a standalone browser, the action
+  reports refusal and opens **no** Firefox window. Making this unconditional
+  likely needs the content stage to be tabbrowser-backed, or an engine hook.
+- **The remaining unrouted command ids.** Most of the 267 commands still have
+  no Host route. Add them only with a UI caller, a route-table entry, a
+  contract test and a live probe.
+- **Host projection ownership.** `overlay/astra/host/Tabs.sys.mjs` still derives
+  the projection; `astra-core` ownership is plan §5.4 work.
+- **Real page surface under split/work panes.** The content stage has only
+  been exercised with one page; multi-pane and Work pane relayout remain
+  unverified.
 
 
 ## Phase 0 — Discovery, inventory, scaffolding

@@ -1,101 +1,91 @@
-# Current scope — UI ONLY (read before any task)
+# Current scope — UI + wiring (read before any task)
 
-> **Status:** active, from 2026-11-03 until the owner says otherwise.
-> **Decision:** D-36 in `docs/astra/DECISIONS.md`.
+> **Status:** active, from 2026-11-03 (owner direction).
+> **Decision:** D-38 in `docs/astra/DECISIONS.md`; supersedes D-36.
 > **Applies to:** every agent, every lane, every task. If another document
 > contradicts this one, this one wins.
 
 ## The rule in one sentence
 
-**We are building the UI now. Wiring the UI to the host, the core, the engine
-and real data is a separate later phase — it is not missing, it is deferred on
-purpose.**
+**Build the interface and the wiring it needs until the surface actually works
+in the running browser — the UI is the source of truth, and Firefox's own UI is
+never the one that answers.**
 
-## Owner bugfix exception (2026-11-03)
+The interface phase and the wiring phase are now one phase. A surface is not
+"UI complete, wiring deferred" any more: it is done when the person can use it
+in the dev build.
 
-The owner reported a list of everyday browser failures and asked for them to
-be fixed end to end. Those named surfaces — the page context menu, history,
-Back/Forward, bookmarks, favicons, private and new windows, the search default,
-the content colour scheme, the loading state and the keyboard command ids — are
-an explicit exception to the UI-only rule above. Everything else is still
-deferred, and the backlog in `STATE.md` remains a backlog. See D-37.
+## What is in scope
 
-## What "UI only" means
+- `ui/app` — components, routes, layout, styling, tokens, motion, states,
+  accessibility, responsive behaviour.
+- `ui/shell` — the chrome frame, the content stage, menu/theme/window bridges,
+  the content `<browser>` lifecycle.
+- `ui/packages/bridge` — host-mode dispatch, route tables, event pump.
+- `overlay/astra/host/**` — Host API modules, Places/Session integration,
+  private-window rules, projections.
+- `overlay/astra/chrome/**` and `overlay/astra/jar.mn` — packaged chrome and
+  resource entry points.
+- IPC commands/events and their schemas in `schemas/`, `ui/app/src/shared/ipc`,
+  and the Rust registries where a UI call needs them.
+- Engine overlay and patches when the only way to remove a Firefox-native
+  surface (menu, dialog, window, tabbox) is an engine hook.
+- Tests: contract (`tests/contract`), unit/component (`ui/app`), shell/bridge,
+  and live Marionette probes against the packaged dev build.
 
-In scope:
+## What is not in scope
 
-- `ui/app` — Svelte components, routes, layout, styling, tokens, motion,
-  responsive behaviour, empty/loading/error states, accessibility, copy.
-- `ui/shell` — only the presentation/frame pieces the UI needs to render.
-- `ui/packages/bridge` — only its **mock mode** and fixtures, as the data
-  source for UI work.
-- Tests, goldens, screenshots and checks that verify the interface itself.
-
-Out of scope for this phase (deferred, do **not** start):
-
-- Rust crates, `astra-core`, sidecar transport, SQLite schema.
-- Host API routes, IPC commands/events, real `astra-core` connections.
-- Firefox engine patches or overlay changes whose only purpose is wiring.
-- Network calls, accounts, sync, telemetry, real search providers.
-- Making an unwired button perform a real action.
-
-The backend pieces that already exist stay as they are. The UI simply does not
-depend on them yet.
-
-## How to tell a UI bug from deferred wiring
-
-| Symptom | Verdict |
-|---|---|
-| Wrong spacing, colour, typography, alignment, overflow | **UI bug — fix it.** |
-| Broken interaction, focus, keyboard path, animation, state transition | **UI bug — fix it.** |
-| Empty list, placeholder text, "no data", mock rows, disabled action | **Expected — the UI is rendering its unwired state.** |
-| Button does nothing because the command is not routed | **Expected — wiring is deferred.** |
-| `unknown_command`, missing host route, null projection | **Expected — do not "fix" by adding backend code.** |
-| Page looks right but the data is fake | **Correct for this phase.** |
-
-If the UI shows the right thing for missing data, that is a pass, not a defect.
+- New product surfaces with no UI caller.
+- Accounts, sync, telemetry, billing, update servers and other network work
+  that no current surface uses.
+- Packaging/release work (P8+) and the Windows/macOS ports.
+- Rewriting the engine for its own sake. An engine patch is accepted only when
+  it removes a native UI surface or provides a capability the UI is already
+  using.
 
 ## Hard rules for agents
 
-1. **Do not implement backend work to make the UI "work".** No new crates,
-   routes, IPC commands, database tables, sidecars or engine patches.
-2. **Do not invent contracts.** No new wire types, event names, command names,
-   payload shapes or host methods. If a contract seems necessary, record it and
-   stop.
-3. **Do not treat deferred wiring as a failure.** Do not mark a UI task
-   `blocked` or "incomplete" because it is not connected to real data.
-4. **Do not claim end-to-end success.** Report UI work as *"UI complete,
-   wiring deferred"*. Never describe the product as fully working.
-5. **Do not expand scope quietly.** If a task needs backend work, write it in
-   `docs/astra/STATE.md` under "Deferred wiring" (or `OWNER_QUESTIONS.md` if it
-   needs an owner decision) and continue with the UI part.
-6. **Verify the UI, not the stack.** Acceptance for this phase is visual,
-   behavioural and accessibility evidence (screenshots, component tests,
-   goldens), not a live backend round-trip.
-7. **Mock data is legitimate.** `@astra/bridge` mock mode, fixtures and local
-   static data are the supported inputs. Use them.
+1. **Wire only what a surface uses.** No speculative Host API routes, events or
+   types "for later". Every route must have a caller in `ui/**`.
+2. **The Astra UI is the only UI.** Never leave a Firefox menu, dialog, window,
+   tabbox or context menu answering a person's action. Suppress it and render
+   the Astra surface. If an engine path can only answer natively, replace the
+   path or record the blocker; do not ship both UIs.
+3. **One source of truth.** The running host/engine state is the truth. Mock
+   data and fixtures are for tests and standalone previews only; they must never
+   stand in for a reachable backend in the dev build.
+4. **Empty, mock or disabled states are bugs now** when a real backend exists
+   for that surface. `unknown_command` and unrouted commands are defects to fix,
+   not expected states.
+5. **Do not invent wire shapes.** Extend the existing generated bindings, route
+   table, schemas and contract tests. If a new shape is unavoidable, record it
+   in `docs/astra/STATE.md` with the reason before using it.
+6. **Contexts stay isolated.** A private window records no history, bookmarks,
+   time or favicons; a second window gets its own model and its own listeners.
+   Normal and private state must never be readable across the boundary.
+7. **Everything you open, you close.** Every listener, observer, timer, worker
+   and retained page reference has an owner and a teardown path. Menus and
+   context state are bounded; nothing grows per navigation.
+8. **Verify on the real build.** Unit and contract tests are necessary but not
+   enough. Drive the packaged dev build over Marionette (`tools/marionette-probe`)
+   for anything visual, interactive, multi-window or engine-backed, and keep the
+   probe as evidence.
+9. **Report honestly.** Say what works, what was verified and how, and what is
+   still deferred. Never call a surface finished because its UI renders.
 
-## What "later" looks like
-
-When the owner opens the wiring phase, the work will be:
-
-1. Route the remaining commands in the host transport.
-2. Replace mock projections with real host/core data, one surface at a time.
-3. Turn the deferred-wiring list in `STATE.md` into tasks with acceptance tests.
-4. Only then re-open end-to-end verification.
-
-Until that happens, the deferred list is a backlog, not a work queue.
-
-## Reporting template
-
-When finishing UI work, say:
+## Definition of done
 
 ```
-Scope: UI only (D-36).
-Done: <what the interface now does>.
-Verified: <tests/screenshots/goldens>.
-Deferred wiring: <what still needs a real backend, or "none">.
+Surface: <what the person can now do>
+UI: <files/components>
+Wiring: <route → host module → engine API>
+Verified: <contract/unit counts + live Marionette result>
+Teardown: <what is released, and when>
+Deferred: <what still needs real work, or "none">
 ```
 
-This makes the phase explicit so the next agent cannot mistake deferred wiring
-for unfinished UI.
+## Remaining backlog
+
+`docs/astra/STATE.md` → "Remaining wiring" is the live backlog, not a parking
+lot. Pick from it when a surface is in front of you; close a row only when the
+live probe passes.
