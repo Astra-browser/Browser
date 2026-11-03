@@ -17,6 +17,11 @@ and appends the same run to ../../observations.md (repo root).
 Usage:
   python3 run_matrix.py --browser astra --scenario baseline-1tab
   python3 run_matrix.py --browser both --scenario all --repeat 2
+
+Test harness isolation (no product effect):
+  ASTRA_STRESS_MONITOR=HEADLESS-1  park the window on another output
+  ASTRA_STRESS_KEEP_FOCUS=eDP-1    monitor to give keyboard focus back to
+  ASTRA_STRESS_FRAME_RATE=144      pin layout.frame_rate for cross-version runs
 """
 import argparse
 import base64
@@ -48,6 +53,55 @@ STOCK_BIN = os.environ.get("STOCK_FIREFOX", "/usr/bin/firefox")
 FIXTURES = os.path.join(HERE, "fixtures")
 OBSERVATIONS = os.path.join(ROOT, "observations.md")
 PORTS = [8111, 8112, 8113, 8114]
+# Test-harness-only: place every measured window on this Hyprland output and
+# give keyboard focus back to the owner's monitor as soon as the window maps.
+# Empty = original in-place behaviour.
+TEST_MONITOR = os.environ.get("ASTRA_STRESS_MONITOR", "").strip()
+TEST_KEEP_FOCUS = os.environ.get("ASTRA_STRESS_KEEP_FOCUS", "").strip()
+
+
+def _hypr_focus_monitor(name):
+    """Move compositor focus to `name` without touching any window."""
+    if not name or not shutil.which("hyprctl"):
+        return False
+    code = f"hl.dispatch(hl.dsp.focus({{monitor='{name}'}})); return 'ok'"
+    try:
+        r = subprocess.run(["hyprctl", "eval", code], capture_output=True, text=True, timeout=5)
+        return "ok" in (r.stdout or "")
+    except Exception:
+        return False
+
+
+def _hypr_focused_monitor():
+    try:
+        out = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True, timeout=5).stdout
+        for m in json.loads(out):
+            if m.get("focused"):
+                return m.get("name") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _hypr_wait_window(pid, timeout=6.0):
+    """Wait until the compositor has mapped a window for `pid`."""
+    if not shutil.which("hyprctl"):
+        return False
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=5).stdout
+            if any(c.get("pid") == pid for c in json.loads(out)):
+                return True
+        except Exception:
+            pass
+        time.sleep(0.05)
+    return False
+
+
+# Capture the owner's monitor once, before any test window exists.
+if TEST_MONITOR and not TEST_KEEP_FOCUS:
+    TEST_KEEP_FOCUS = _hypr_focused_monitor()
 
 
 # --------------------------------------------------------------------------
@@ -336,6 +390,8 @@ class BrowserRun:
             "browser.newtabpage.enabled": False,
             "datareporting.policy.dataSubmissionEnabled": False,
             "toolkit.telemetry.enabled": False,
+            **({"layout.frame_rate": int(os.environ["ASTRA_STRESS_FRAME_RATE"])}
+               if os.environ.get("ASTRA_STRESS_FRAME_RATE", "").strip() else {}),
             "toolkit.telemetry.reportingpolicy.firstRun": False,
             "app.update.enabled": False,
             "app.update.auto": False,
@@ -385,6 +441,10 @@ class BrowserRun:
         env.setdefault("XDG_SESSION_TYPE", "wayland")
         log = open(os.path.join(self.outdir, "browser.log"), "wb")
         sampler.mark("spawn")
+        if TEST_MONITOR:
+            # Spawn on the hidden output so the window never flashes on the
+            # owner's display; focus returns to them after geometry is set.
+            _hypr_focus_monitor(TEST_MONITOR)
         t0 = time.monotonic()
         self.proc = subprocess.Popen(
             args,
@@ -397,6 +457,11 @@ class BrowserRun:
         sampler.root_pid = self.proc.pid
         self.events["spawn_mono"] = t0
         sampler.start()
+        if TEST_MONITOR:
+            # Give back the owner's focus as soon as the hidden window is
+            # mapped; geometry is applied later without needing focus.
+            _hypr_wait_window(self.proc.pid)
+            _hypr_focus_monitor(TEST_KEEP_FOCUS)
 
     def connect(self, sampler):
         t0 = time.monotonic()
@@ -452,6 +517,8 @@ class BrowserRun:
         except Exception:
             geo = None
         self.timings["window"] = geo
+        if TEST_MONITOR:
+            self.timings["test_monitor"] = TEST_MONITOR
         self.start_focus_watchdog()
         try:
             self.timings["graphics"] = json.loads(self.m.execute("""return JSON.stringify((() => {
@@ -467,6 +534,9 @@ class BrowserRun:
                   device: String(info.deviceID || ''),
                   webrender_all: Services.prefs.getBoolPref('gfx.webrender.all', false),
                   webrender_software: Services.prefs.getBoolPref('gfx.webrender.software', false),
+                  frame_rate: Services.prefs.getIntPref('layout.frame_rate', -999),
+                  throttled_frame_rate: Services.prefs.getIntPref('layout.throttled_frame_rate', -999),
+                  max_frame_rate: Services.prefs.getIntPref('gfx.display.max-frame-rate', -999),
                   layer_manager: layerManager,
                   vsync_hz: vsync,
                 };
@@ -482,15 +552,33 @@ class BrowserRun:
         # Hyprland 0.57 uses Lua dispatchers; `hyprctl dispatch` parses its
         # argument as Lua. Normalise the test window to a fixed float size so
         # Astra and stock render the same number of pixels.
-        code = (
-            f"local w=hl.get_window('pid:{self.proc.pid}'); "
-            "if not w then return 'no-window' end; "
-            "hl.dispatch(hl.dsp.window.float({action='enable', window=w})); "
-            "hl.dispatch(hl.dsp.window.resize({x=1600,y=1000,exact=true,window=w})); "
-            "hl.dispatch(hl.dsp.window.move({x=100,y=40,window=w})); "
-            "hl.dispatch(hl.dsp.focus({window=w})); "
-            "return 'ok'"
-        )
+        #
+        # ASTRA_STRESS_MONITOR (test harness only) parks the window on another
+        # output and returns keyboard focus to the owner. A headless Hyprland
+        # output shares the real GPU; ASTRA_STRESS_FRAME_RATE pins the refresh
+        # rate because ESR 153 falls back to 60 Hz on that output while stock
+        # Firefox follows it.
+        if TEST_MONITOR:
+            code = (
+                f"local w=hl.get_window('pid:{self.proc.pid}'); "
+                "if not w then return 'no-window' end; "
+                "hl.dispatch(hl.dsp.window.float({action='enable', window=w})); "
+                "hl.dispatch(hl.dsp.window.resize({x=1600,y=1000,exact=true,window=w})); "
+                f"hl.dispatch(hl.dsp.window.move({{monitor='{TEST_MONITOR}', window=w}})); "
+                + (f"hl.dispatch(hl.dsp.focus({{monitor='{TEST_KEEP_FOCUS}'}})); "
+                   if TEST_KEEP_FOCUS and TEST_KEEP_FOCUS != TEST_MONITOR else "")
+                + "return 'ok'"
+            )
+        else:
+            code = (
+                f"local w=hl.get_window('pid:{self.proc.pid}'); "
+                "if not w then return 'no-window' end; "
+                "hl.dispatch(hl.dsp.window.float({action='enable', window=w})); "
+                "hl.dispatch(hl.dsp.window.resize({x=1600,y=1000,exact=true,window=w})); "
+                "hl.dispatch(hl.dsp.window.move({x=100,y=40,window=w})); "
+                "hl.dispatch(hl.dsp.focus({window=w})); "
+                "return 'ok'"
+            )
         try:
             subprocess.run(["hyprctl", "eval", code], capture_output=True, timeout=5)
         except Exception:
