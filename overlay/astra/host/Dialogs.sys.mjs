@@ -80,6 +80,39 @@ const PERMISSIONS = new Set([
 
 const AUTH_SCHEMES = new Set(["basic", "digest", "ntlm", "negotiate"]);
 
+/** Astra permission -> Firefox `Services.perms` permission name. */
+const ENGINE_PERMISSIONS = {
+  geolocation: "geo",
+  camera: "camera",
+  microphone: "microphone",
+  notifications: "desktop-notification",
+  "persistent-storage": "persistent-storage",
+  midi: "midi",
+  "pointer-lock": "pointerLock",
+  fullscreen: "fullscreen",
+};
+
+/** Write one permission decision into the engine store. */
+function storePermission(record, decision) {
+  try {
+    const services = globalThis.Services;
+    const perms = services?.perms;
+    const sm = services?.scriptSecurityManager;
+    const io = services?.io;
+    if (!perms || !sm || !io) return false;
+    const name = ENGINE_PERMISSIONS[record.permission];
+    if (!name) return false;
+    const uri = io.newURI(record.url);
+    const principal = sm.createContentPrincipal(uri, {});
+    const action =
+      decision === "grant" ? perms.ALLOW_ACTION : perms.DENY_ACTION;
+    perms.addFromPrincipal(principal, name, action, perms.EXPIRE_NEVER);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const _pending = new Map(); // dialog_id -> record
 let _nextDialog = 1;
 
@@ -161,11 +194,11 @@ export const Dialogs = {
     if (error) {
       return error;
     }
-    // Live: Services.perms.addFromPrincipal(uri, permission, ALLOW/DENY_ACTION).
+    const stored = storePermission(record, decision);
     record.status = "resolved";
     record.decision = decision;
-    emit("permission.resolved", { dialog_id, decision });
-    return ok(request_id, { dialog_id, decision });
+    emit("permission.resolved", { dialog_id, decision, stored });
+    return ok(request_id, { dialog_id, decision, stored });
   },
 
   // --- Downloads UI ---
