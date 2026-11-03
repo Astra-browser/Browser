@@ -19,7 +19,7 @@
 // separately by the shell), so Node contract tests import them by path.
 
 import { addEventListener, bufferedCount, emit, eventSeq, eventsSince } from "./Events.sys.mjs";
-import { Boot } from "./Boot.sys.mjs";
+import { Boot, __resetBootForTests } from "./Boot.sys.mjs";
 import { HOST_API_VERSION, Tabs, __resetTabsForTests } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
 import { Windows, __resetWindowsForTests } from "./Windows.sys.mjs";
@@ -87,6 +87,7 @@ export {
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.
 export function __resetForTests() {
+  __resetBootForTests();
   __resetTabsForTests();
   __resetNavigationForTests();
   __resetWindowsForTests();
