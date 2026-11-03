@@ -27,3 +27,24 @@
   flex-direction: column;
   background: #1c1b22;
 }
+
+/* A page's own fullscreen request (video players, presentations) makes the
+ * engine set `inDOMFullscreen` on the window root. The Astra chrome is not
+ * the native chrome those upstream rules hide, so hide it here and give the
+ * page the whole window; `astra-content` is the stage that holds the page. */
+:root[inDOMFullscreen] .astra-app-mount,
+:root[inDOMFullscreen] .astra-titlebar,
+:root[inDOMFullscreen] .astra-toolbar,
+:root[inDOMFullscreen] .astra-sidebar-col,
+:root[inDOMFullscreen] .astra-bar-mount,
+:root[inDOMFullscreen] .astra-split-mount,
+:root[inDOMFullscreen] .astra-about {
+  display: none !important;
+}
+
+:root[inDOMFullscreen] #astra-root .astra-content {
+  inset: 0 !important;
+  inset-inline-start: 0 !important;
+  border-radius: 0 !important;
+  z-index: 10;
+}

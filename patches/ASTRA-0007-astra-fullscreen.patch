@@ -1,0 +1,36 @@
+Patch-Id: ASTRA-0007
+Title: Let the Astra content stage enter DOM fullscreen
+Tier: P2
+Upstream-Files: browser/base/content/browser-fullScreenAndPointerLock.js
+Intent: allow a page loaded in an Astra standalone <browser> (the content stage) to enter DOM fullscreen, e.g. YouTube's player; the engine otherwise aborts because that browser is never gBrowser's selected one
+Risk: low (one condition, marker attribute already owned by the Astra overlay; tabbrowser tabs behave unchanged)
+Test: forge lint; open a page in the dev build, requestFullscreen on the Astra browser, verify inDOMFullscreen + window fullscreen, then exit and confirm the chrome returns
+Verified-On: 153.6.0
+Removal-Plan: none anticipated; drop when the content stage is tabbrowser-backed
+---
+diff --git a/browser/base/content/browser-fullScreenAndPointerLock.js b/browser/base/content/browser-fullScreenAndPointerLock.js
+index d0d3b6fc57..eea6ab678c 100644
+--- a/browser/base/content/browser-fullScreenAndPointerLock.js
++++ b/browser/base/content/browser-fullScreenAndPointerLock.js
+@@ -621,12 +621,17 @@ var FullScreen = {
+     }
+ 
+     // If we've received a fullscreen notification, we have to ensure that the
+-    // element that's requesting fullscreen belongs to the browser that's currently
+-    // active. If not, we exit fullscreen since the "full-screen document" isn't
+-    // actually visible now.
++    // element that's requesting fullscreen belongs to the browser that's
++    // currently active. If not, we exit fullscreen since the "full-screen
++    // document" isn't actually visible now. The Astra content stage owns
++    // standalone <browser> elements, so its page is never gBrowser's selected
++    // one; those browsers carry their own stage markers.
++    const astraContent =
++      aBrowser?.hasAttribute?.("data-astra-browser") ||
++      aBrowser?.hasAttribute?.("data-astra-browser-parked");
+     if (
+       !aBrowser ||
+-      gBrowser.selectedBrowser != aBrowser ||
++      (!astraContent && gBrowser.selectedBrowser != aBrowser) ||
+       // The top-level window has lost focus since the request to enter
+       // full-screen was made. Cancel full-screen.
+       Services.focus.activeWindow != window
