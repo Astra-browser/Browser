@@ -46,6 +46,8 @@ import { Favicons, __resetFaviconsForTests } from "./Favicons.sys.mjs";
 import { System } from "./System.sys.mjs";
 import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
+import { Permissions } from "./Permissions.sys.mjs";
+import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
 export {
@@ -78,6 +80,8 @@ export {
   System,
   Resources,
   Search,
+  Permissions,
+  Operations,
   addEventListener,
   emit,
   eventSeq,
@@ -102,5 +106,7 @@ export function __resetForTests() {
   __resetSidebarForTests();
   __resetWebExtensionsForTests();
   __resetFaviconsForTests();
+  __resetOperationsForTests();
+  Permissions.__resetForTests();
   __resetEventsForTests();
 }

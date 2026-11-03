@@ -38,6 +38,8 @@ export interface HostModules {
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
 }
@@ -116,6 +118,13 @@ const ROUTES: Record<string, Route> = {
   spaces_switch: ["Tabs", "switchSpace"],
   spaces_step: ["Tabs", "stepSpace"],
   spaces_move_tab: ["Tabs", "moveTabToSpace"],
+  // The app's prompt token is the capability, so it travels as `prompt_id`;
+  // the envelope `request_id` is the command correlation id, not the fence.
+  page_permission_respond: ["Permissions", "respond", { request_id: "prompt_id" }],
+  page_permission_card_host: ["Permissions", "cardHost"],
+  operation_status: ["Operations", "status"],
+  operations_reconcile: ["Operations", "reconcile"],
+  operation_acknowledge: ["Operations", "acknowledge"],
 };
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {

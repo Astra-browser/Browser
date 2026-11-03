@@ -71,10 +71,18 @@ empty by default, so the browser runs without a core and answers
 restart. The `out/sidecar-stub` harness is the current test double; there is
 no packaged core binary yet.
 
-## P4 stage dock (spike)
+## P4 stage dock
 
-native tabs (always on) docks the native
-`#tabbrowser-tabbox` over the Astra content slot. `Content.mountNative` marks `data-astra-native-mounted`; set the pref to
-false only to exercise the legacy standalone mount. The geometry probe is
+Native tabs (always on) dock `#tabbrowser-tabbox` over the Astra content slot.
+`Content.mountNative` marks `data-astra-native-mounted`; there is no switch and
+no standalone fallback. The geometry probe is
 `tools/perf/stress/gbrowser_stage_probe.py`; the native tab mapping probe is
 `tools/perf/stress/gbrowser_tabs_probe.py`.
+
+## P6b permission prompt
+
+A page geolocation request shows the app's own `PagePermissionPrompt`. The live
+proof is `tools/perf/stress/permission_prompt_probe.py`: it serves two loopback
+origins, waits for the rendered prompt, clicks the real button, and asserts
+`Services.perms` plus the page's own `permissions.query` state. Camera and
+microphone still use Firefox's WebRTC prompt.
