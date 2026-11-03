@@ -99,25 +99,21 @@ export default defineConfig({
                 "../crates/astra-engine/src/platform/form_submit_observer.js",
                 import.meta.url,
               ),
-
             ),
             formActionRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-engine/src/platform/macos/agentic_form_diagnostic_probe.js",
                 import.meta.url,
               ),
-
             ),
             formOracleRuntime: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/work_form_oracle.js", import.meta.url),
-
             ),
             pixelPrivacyRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-agentic/assets/semantic-pixel-privacy-v1.js",
                 import.meta.url,
               ),
-
             ),
             semanticMediaRuntime:
               readNativeArtifact(
@@ -125,19 +121,15 @@ export default defineConfig({
                   "../crates/astra-agentic/assets/semantic-record-media-v1.js",
                   import.meta.url,
                 ),
-
               ) +
               readNativeArtifact(
                 new URL("../crates/astra-agentic/assets/semantic-runtime-v1.js", import.meta.url),
-
               ),
             humanWallSurvey: readNativeArtifact(
               new URL("../crates/astra-agentic/assets/work-human-wall-v1.js", import.meta.url),
-
             ),
             contentStyleSource: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/content_style.js", import.meta.url),
-
             ),
             packagedStylePolicy: {
               styleSource: (() => {

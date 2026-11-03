@@ -14,12 +14,15 @@ const skill = (name: string) =>
   skills[`../../../../../../crates/astra-app/skills/${name}/SKILL.md`] ?? "";
 
 describe("workflows", () => {
-  test.skipIf(Object.keys(skills).length === 0)("each is a built-in skill, and every role has at least two", () => {
-    for (const flow of WORKFLOWS) expect(skill(flow.skill)).toContain(`name: ${flow.skill}\n`);
-    for (const persona of PERSONAS)
-      expect(WORKFLOWS.filter((flow) => flow.persona === persona.id).length).toBeGreaterThan(1);
-    expect(new Set(WORKFLOWS.map((flow) => flow.skill)).size).toBe(WORKFLOWS.length);
-  });
+  test.skipIf(Object.keys(skills).length === 0)(
+    "each is a built-in skill, and every role has at least two",
+    () => {
+      for (const flow of WORKFLOWS) expect(skill(flow.skill)).toContain(`name: ${flow.skill}\n`);
+      for (const persona of PERSONAS)
+        expect(WORKFLOWS.filter((flow) => flow.persona === persona.id).length).toBeGreaterThan(1);
+      expect(new Set(WORKFLOWS.map((flow) => flow.skill)).size).toBe(WORKFLOWS.length);
+    },
+  );
 
   test("a workflow that needs an input asks one question, and one that needs none asks nothing", () => {
     for (const flow of WORKFLOWS) {

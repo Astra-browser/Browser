@@ -35,8 +35,7 @@ function updateRecommendation(target: RuntimeSecurityUpdateTarget): RuntimeNotif
       return {
         id: "update_astra",
         title: "Astra update recommended",
-        detail:
-          "Install the latest Astra release to refresh its reviewed browser-runtime policy.",
+        detail: "Install the latest Astra release to refresh its reviewed browser-runtime policy.",
         tone: "warning",
       };
   }
