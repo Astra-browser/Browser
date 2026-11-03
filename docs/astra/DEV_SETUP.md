@@ -73,9 +73,8 @@ no packaged core binary yet.
 
 ## P4 stage dock (spike)
 
-`astra.gbrowser.enabled` (default false) docks the native
-`#tabbrowser-tabbox` over the Astra content slot. It is inert until
-`Content.mountNative` marks `data-astra-native-mounted`; flipping the pref
-alone must not cover a working page. The geometry probe is
+`astra.gbrowser.enabled` (default true) docks the native
+`#tabbrowser-tabbox` over the Astra content slot. `Content.mountNative` marks `data-astra-native-mounted`; set the pref to
+false only to exercise the legacy standalone mount. The geometry probe is
 `tools/perf/stress/gbrowser_stage_probe.py`; the native tab mapping probe is
 `tools/perf/stress/gbrowser_tabs_probe.py`.

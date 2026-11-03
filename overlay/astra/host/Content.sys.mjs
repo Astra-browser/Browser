@@ -880,25 +880,6 @@ export const Content = {
     if (!gb || typeof gb.addTab !== "function") {
       throw new Error("mountNative: gBrowser unavailable");
     }
-    // P4.2 is single-window: per-window Host API instances still use the
-    // local `win-1` id, so a second window would need the P5 global id map.
-    // Refuse instead of silently mirroring tabs across windows.
-    try {
-      const wm = win.Services?.wm;
-      let count = 0;
-      if (wm) {
-        const e = wm.getEnumerator("navigator:browser");
-        while (e.hasMoreElements()) {
-          if (!e.getNext().closed) count += 1;
-        }
-      }
-      console.error("MN guard count", count);
-      if (count > 1) {
-        throw new Error("mountNative: multi-window is P5");
-      }
-    } catch (e) {
-      if (String(e?.message ?? e).includes("multi-window")) throw e;
-    }
     const doc = container.ownerDocument;
     const principal = systemPrincipalOf(container);
     const tabOf = new Map(); // astra_tab_id -> native tab
@@ -979,7 +960,9 @@ export const Content = {
           try {
             const spec = candidate.linkedBrowser?.currentURI?.spec;
             const context = Number(candidate.getAttribute("usercontextid") || 0);
-            return (!spec || spec === "about:blank") && context === wanted;
+            const blank = !spec || spec === "about:blank" ||
+              spec.startsWith("chrome://browser/content/blanktab");
+            return blank && context === wanted;
           } catch {
             return false;
           }
