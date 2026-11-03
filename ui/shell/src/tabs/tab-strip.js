@@ -62,6 +62,8 @@ export function mountTabStrip(container, host, options = {}) {
   let tabs = [];
   let disposed = false;
   let activeMenu = null;
+  /** The one document listener an open menu owns; null when none is open. */
+  let dismissMenu = null;
   let dragId = null;
 
   const persist = () => saveFolderState(storage, folders);
@@ -72,9 +74,17 @@ export function mountTabStrip(container, host, options = {}) {
   root.setAttribute("aria-label", "Tabs");
   container.append(root);
 
+  // Every menu owns exactly one document listener, and closing the menu is
+  // what releases it. Leaving the listener behind (the old behaviour) leaked
+  // one per keyboard-opened menu and outlived `destroy`.
   function closeMenu() {
     activeMenu?.remove();
     activeMenu = null;
+    if (dismissMenu) {
+      doc.removeEventListener("pointerdown", dismissMenu, true);
+      doc.removeEventListener("keydown", dismissMenu, true);
+      dismissMenu = null;
+    }
   }
 
   function requestId() {
@@ -195,6 +205,28 @@ export function mountTabStrip(container, host, options = {}) {
     item.addEventListener("click", () => {
       void host.Tabs.select({ request_id: requestId(), astra_tab_id: tab.id }).then(() => refresh());
     });
+    // Rows are role=button, so they owe keyboard activation. The context menu
+    // key (and Shift+F10) opens the same menu the pointer does.
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        void host.Tabs.select({ request_id: requestId(), astra_tab_id: tab.id }).then(() => refresh());
+      } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+        event.preventDefault();
+        let x = 0;
+        let y = 0;
+        try {
+          const box = item.getBoundingClientRect?.();
+          if (box) {
+            x = box.left + 8;
+            y = box.bottom;
+          }
+        } catch {
+          // No layout here: the menu still opens at the origin.
+        }
+        openMenu(tab, x, y);
+      }
+    });
     item.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       openMenu(tab, event.clientX, event.clientY);
@@ -281,13 +313,39 @@ export function mountTabStrip(container, host, options = {}) {
     popup.style.top = `${y}px`;
     doc.body.append(popup);
     activeMenu = popup;
+    try {
+      // Keep the menu inside the window: a row near the bottom edge would
+      // otherwise open a menu that runs off it.
+      const view = doc.defaultView ?? null;
+      const box = popup.getBoundingClientRect?.();
+      const maxX = (view?.innerWidth ?? 0) - (box?.width ?? 0) - 4;
+      const maxY = (view?.innerHeight ?? 0) - (box?.height ?? 0) - 4;
+      if (box && maxX > 0 && x > maxX) popup.style.left = `${maxX}px`;
+      if (box && maxY > 0 && y > maxY) popup.style.top = `${maxY}px`;
+    } catch {
+      // Not measurable here; the requested corner still places it.
+    }
     const dismiss = (event) => {
+      if (event.type === "keydown") {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        closeMenu();
+        return;
+      }
       if (!popup.contains(event.target)) {
         closeMenu();
-        doc.removeEventListener("pointerdown", dismiss, true);
       }
     };
+    dismissMenu = dismiss;
     doc.addEventListener("pointerdown", dismiss, true);
+    doc.addEventListener("keydown", dismiss, true);
+    try {
+      popup
+        .querySelector?.("[role='menuitem']:not([disabled])")
+        ?.focus?.();
+    } catch {
+      // Focus is an enhancement; the pointer path still works.
+    }
     return popup;
   }
 
@@ -363,7 +421,12 @@ export function mountTabStrip(container, host, options = {}) {
     head.replaceWith(input);
     input.focus();
     input.select();
+    // Enter commits and `paint()` removes the field, which fires `blur`; the
+    // second commit must not repaint and re-persist the same rename.
+    let done = false;
     const commit = (save) => {
+      if (done) return;
+      done = true;
       if (save && input.value.trim()) {
         folders = renameFolder(folders, folder.id, input.value.trim());
         persist();

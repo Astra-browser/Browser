@@ -42,6 +42,9 @@
 
   let input: HTMLInputElement;
   let findInput: HTMLInputElement | undefined = $state();
+  /** An IME owns the find field's text until it commits it; searching what it
+   *  is still composing highlights and scrolls the page for half a word. */
+  let findComposing = false;
   let finding = $derived(find.isOpen());
   let findCount = $derived.by(() => {
     const matches = find.count();
@@ -108,6 +111,13 @@
   let standardZoom = $derived(Number(preferences.value("zoom.default")));
   let authoritativeValue = $derived(restingAddress(activeUrl));
   let value = $derived(editing ? draft : authoritativeValue);
+  // A refusal describes the page that was asked for, so the ring goes when a
+  // different page is in front; left alone it would mark a page that loaded
+  // fine, or the next tab the user switched to, as the one that failed.
+  $effect(() => {
+    void activeUrl;
+    failed = false;
+  });
   let security = $derived(
     addressSecurity(activeUrl, tabs.activeTab()?.certificate_exception === true),
   );
@@ -138,9 +148,11 @@
   function editInLauncher(): boolean {
     const tab = tabs.activeTab();
     if (!tab?.url || (tab.content ?? "web") !== "web") return false;
-    // Work has no page in front, so there the launcher opens empty.
-    if (surface.currentPage() === "work") void commands.runCommand("launcher.toggle");
-    else void commands.launcherEdit(tab.id, tab.url);
+    // Work has no page in front, so there the launcher opens empty. A hand-off
+    // the host refuses is not the field's to report: it stays where it is.
+    if (surface.currentPage() === "work")
+      void commands.runCommand("launcher.toggle").catch(() => {});
+    else void commands.launcherEdit(tab.id, tab.url).catch(() => {});
     return true;
   }
 
@@ -360,7 +372,14 @@
           spellcheck="false"
           enterkeyhint="search"
           value={find.text()}
-          oninput={(event) => find.setText(event.currentTarget.value)}
+          oncompositionstart={() => (findComposing = true)}
+          oncompositionend={(event) => {
+            findComposing = false;
+            find.setText(event.currentTarget.value);
+          }}
+          oninput={(event) => {
+            if (!findComposing) find.setText(event.currentTarget.value);
+          }}
           onkeydown={(event) => {
             if (event.isComposing) return;
             if (event.key === "Enter") {

@@ -104,7 +104,7 @@
     min-block-size: 0;
     overflow: hidden;
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: var(--radius-inset);
   }
 
   .pane.active {

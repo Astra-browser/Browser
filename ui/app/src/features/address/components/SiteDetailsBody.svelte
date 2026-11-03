@@ -23,7 +23,7 @@
     else if (zoomed) stayed = true;
   });
 
-  const step = (command: string) => void commands.runCommand(command);
+  const step = (command: string) => void commands.runCommand(command).catch(() => {});
 </script>
 
 <div class="details">

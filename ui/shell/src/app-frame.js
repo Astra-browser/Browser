@@ -56,8 +56,23 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
   }
 
   let settled = false;
+  let destroyed = false;
   let timer = 0;
   let frame = null;
+
+  /** True when a message really came from our embed. Chrome documents report
+   *  `null` as `source` (measured), so a named sender that is not the frame
+   *  is refused; the namespace still has to match. */
+  const fromOurFrame = (event) => {
+    try {
+      if (!frame) return true;
+      if (event.source === null || event.source === undefined) return true;
+      return event.source === frame.contentWindow;
+    } catch {
+      // Frame torn down between the post and the dispatch.
+      return false;
+    }
+  };
 
   const settle = (fn, value) => {
     if (settled) {
@@ -73,7 +88,10 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const onMessage = (event) => {
     const data = event.data;
-    if (!data || data.ns !== SHELL_NS) {
+    if (!data || typeof data !== "object" || data.ns !== SHELL_NS) {
+      return;
+    }
+    if (!fromOurFrame(event)) {
       return;
     }
     // Chrome-privileged documents share one principal, so `event.source` is
@@ -132,8 +150,14 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
     }
   };
   const relay = async (event) => {
+    if (destroyed) {
+      return;
+    }
     const data = event.data;
-    if (!data || data.ns !== SHELL_NS) {
+    if (!data || typeof data !== "object" || data.ns !== SHELL_NS) {
+      return;
+    }
+    if (!fromOurFrame(event)) {
       return;
     }
     if (data.kind === "req") {
@@ -146,8 +170,22 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
       let payload = null;
       let error = null;
       try {
-        const module = host?.[data.module];
-        const fn = module?.[data.method];
+        // Only the host's own module objects and their own public methods are
+        // reachable. A name like `constructor` or `call` must not resolve
+        // through a prototype into a Function, and internals (`_`/`__`) stay
+        // private to the window.
+        const moduleName = typeof data.module === "string" ? data.module : "";
+        const methodName = typeof data.method === "string" ? data.method : "";
+        const module = host?.[moduleName];
+        const reachable =
+          moduleName !== "" &&
+          methodName !== "" &&
+          !moduleName.startsWith("_") &&
+          !methodName.startsWith("_") &&
+          module !== null &&
+          typeof module === "object" &&
+          Object.prototype.hasOwnProperty.call(module, methodName);
+        const fn = reachable ? module[methodName] : null;
         if (typeof fn !== "function") {
           error = {
             code: "unknown_command",
@@ -159,10 +197,12 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
       } catch (e) {
         error = { code: "host_error", message: String(e?.message ?? e) };
       }
+      if (destroyed) {
+        return;
+      }
       try {
-        if (error) win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;
-        if (data.module === "Search") {
-          win.__astraLastSearch = JSON.stringify({ method: data.method, args: data.args, payload });
+        if (error) {
+          win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;
         }
       } catch {
         // Diagnostics only.
@@ -192,13 +232,6 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const relayEvents = host?.addEventListener
     ? host.addEventListener((event) => {
-        try {
-          if (event.type === "search-changed") {
-            win.__astraLastSearchEvent = JSON.stringify(event.data);
-          }
-        } catch {
-          // Diagnostics only.
-        }
         post({ kind: "evt", type: event.type, data: event.data, seq: event.event_seq });
       })
     : null;
@@ -207,7 +240,6 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
     frame = doc.createElementNS(XHTML_NS, "iframe");
     frame.setAttribute("class", "astra-app-frame");
     frame.setAttribute("data-astra-app-frame", "");
-    frame.setAttribute("allow", "clipboard-read; clipboard-write");
     // The embed is first-party chrome, so it may run with the chrome
     // principal it already has; nothing here grants page content anything.
     frame.setAttribute("src", APP_PAGE);

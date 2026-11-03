@@ -279,4 +279,64 @@ describe("search request lifecycle", () => {
     });
     controller.dispose();
   });
+
+  it("accepts exactly 2048 bytes and refuses the byte past it", async () => {
+    const send = vi.fn(async () => true);
+    const controller = createSearchController({
+      owner,
+      send,
+      update: () => {},
+      id: () => "request",
+    });
+    controller.change("a".repeat(2048));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(send).toHaveBeenCalledExactlyOnceWith("a".repeat(2048), "request");
+
+    const second = createSearchController({
+      owner,
+      send,
+      update: () => {},
+      id: () => "request",
+    });
+    second.change("a".repeat(2049));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    second.dispose();
+    controller.dispose();
+  });
+
+  it("asks the empty question for a field holding only spaces", async () => {
+    const send = vi.fn(async () => true);
+    const controller = createSearchController({
+      owner,
+      send,
+      update: () => {},
+      id: () => "request",
+    });
+    // Leading, inner and trailing whitespace is the host's to trim; a field
+    // with no words in it is an empty field, and asking it as spaces made the
+    // host answer a different question than the one the home list comes from.
+    controller.change("   ");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(send).toHaveBeenCalledExactlyOnceWith("", "request");
+
+    controller.change(" \t\n".repeat(800));
+    await vi.advanceTimersByTimeAsync(60);
+    expect(send).toHaveBeenLastCalledWith("", "request");
+    controller.dispose();
+  });
+
+  it("keeps the spelling typed when the field has words in it", async () => {
+    const send = vi.fn(async () => true);
+    const controller = createSearchController({
+      owner,
+      send,
+      update: () => {},
+      id: () => "request",
+    });
+    controller.change("  rust  lifetimes ");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(send).toHaveBeenCalledExactlyOnceWith("  rust  lifetimes ", "request");
+    controller.dispose();
+  });
 });

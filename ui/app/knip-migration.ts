@@ -14,6 +14,9 @@ const config = {
     "src/domain/appearance/theme.ts": ["types"],
     "src/features/tabs/lib/sidebar-model.ts": ["types"],
     "src/features/settings/lib/catalog.ts": ["types"],
+    // Public facade: Svelte consumers import these note types through
+    // `$domain/notes`; the custom svelte compiler does not resolve aliases.
+    "src/domain/notes/index.ts": ["types"],
   },
 } satisfies KnipConfig;
 export const migrationIssues = config.ignoreIssues;

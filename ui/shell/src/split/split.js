@@ -129,12 +129,28 @@ export function mountSplit(container, host, options = {}) {
         if (!rect || rect.width <= 0) return;
         void api.resize(id, startRatio + (moveEvent.clientX - startX) / rect.width);
       };
-      const up = () => {
+      // One release path for every way a drag can end: the pointer lifting,
+      // the pointer being cancelled (a system gesture), or the capture being
+      // lost (the window losing focus). A drag that ends without `pointerup`
+      // would otherwise leave its move listener on the divider for the life
+      // of the window.
+      const stop = () => {
         divider.removeEventListener?.("pointermove", move);
-        divider.removeEventListener?.("pointerup", up);
+        divider.removeEventListener?.("pointerup", stop);
+        divider.removeEventListener?.("pointercancel", stop);
+        divider.removeEventListener?.("lostpointercapture", stop);
+        try {
+          if (divider.hasPointerCapture?.(event.pointerId)) {
+            divider.releasePointerCapture?.(event.pointerId);
+          }
+        } catch {
+          // Capture was never taken (fake DOMs) or is already gone.
+        }
       };
       divider.addEventListener?.("pointermove", move);
-      divider.addEventListener?.("pointerup", up);
+      divider.addEventListener?.("pointerup", stop);
+      divider.addEventListener?.("pointercancel", stop);
+      divider.addEventListener?.("lostpointercapture", stop);
     });
     divider.addEventListener("keydown", (event) => {
       const current = state.slots.find((s) => s.id === id)?.ratio ?? 0.5;

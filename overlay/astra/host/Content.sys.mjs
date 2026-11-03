@@ -28,6 +28,26 @@ import {
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
+// Schemes the content stage will load. A tab's address can come from a
+// caller (`Tabs.create`), a restored session or the page itself, so the
+// decision to hand an address to the browser belongs here, not in whoever
+// asked: `data:`, `file:`, `javascript:`, `blob:`, `chrome:` and
+// `resource:` would otherwise run in the page that this binding loads with
+// the system principal.
+const LOADABLE_SCHEMES = new Set(["http:", "https:"]);
+
+/** True when `url` is an address the content browser may be pointed at. */
+export function isLoadableUrl(url) {
+  if (typeof url !== "string" || url === "") {
+    return false;
+  }
+  try {
+    return LOADABLE_SCHEMES.has(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
 // ESR 153 removed resource://gre/modules/Services.sys.mjs; chrome windows
 // still expose the `Services` lazy global, so reach it through the owning
 // window instead of importing a module that no longer exists.
@@ -99,8 +119,12 @@ export const Content = {
 
     const doc = container.ownerDocument;
     const principal = systemPrincipalOf(container);
-    /** astra_tab_id -> { browser, requested }; one page per tab, kept alive. */
+    /** astra_tab_id -> { browser, requested, poll, abort }; one page per tab,
+     *  kept alive. `poll` is the load watcher and `abort` owns the element's
+     *  listeners, so every browser releases everything it started. */
     const browsers = new Map();
+    /** Every timer this mount owns, so teardown leaves none behind. */
+    const timers = new Set();
     /** The tab whose browser is in front ("" when a New Tab owns the stage). */
     let activeId = "";
 
@@ -152,11 +176,24 @@ export const Content = {
       }
     };
 
+    /** Drop everything an entry owns. Called on tab close and on detach. */
+    const release = (entry) => {
+      stopWatching(entry);
+      try {
+        entry.abort?.abort();
+      } catch {
+        // Listeners already gone with the element.
+      }
+      entry.abort = null;
+    };
+
     /** Announce load state off the current event dispatch (see `show`). */
     const markLoading = (id, loading) => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
         if (browsers.has(id)) __applyExternalUpdate(id, { loading });
       }, 0);
+      timers.add(timer);
     };
 
     /**
@@ -198,7 +235,25 @@ export const Content = {
       }, 200);
     };
 
+    /**
+     * A content process crash leaves the `<browser>` element alive but inert:
+     * its load flag never clears on its own, and because `requested` still
+     * names the page the next visit would be considered "already there" and
+     * skip the reload. Clear the request so the next visit loads again.
+     */
+    const crashed = (id, entry) => {
+      stopWatching(entry);
+      entry.requested = "";
+      // A crashed browser still reports the address it died on, so the flag —
+      // not `currentURI` — is what tells `show` this page is not "already
+      // there" and has to be loaded again.
+      entry.crashed = true;
+      if (browsers.has(id)) __applyExternalUpdate(id, { loading: false });
+    };
+
     const createBrowser = (id) => {
+      const existing = browsers.get(id);
+      if (existing) return existing;
       const browser = doc.createElementNS(XUL_NS, "browser");
       // Remote content browser: on ESR 153 a non-remote `type="content"`
       // browser created outside the tabbrowser has an inert docshell (loads
@@ -211,28 +266,58 @@ export const Content = {
       // Parked until a page is in front of it.
       browser.setAttribute("data-astra-browser-parked", "");
       container.append(browser);
-      const entry = { browser, requested: "", poll: 0 };
+      const entry = { browser, requested: "", poll: 0, abort: null, crashed: false };
       browsers.set(id, entry);
+      try {
+        // `oop-browser-crashed` is the content-process crash signal a
+        // `<browser>` element dispatches (SessionStore relies on the same
+        // one); `abort` gives it back when the tab or the window goes.
+        const abort = new AbortController();
+        entry.abort = abort;
+        browser.addEventListener("oop-browser-crashed", () => crashed(id, entry), {
+          signal: abort.signal,
+        });
+      } catch {
+        // Without AbortController the load watcher still ends the spinner.
+      }
       return entry;
     };
 
     /** Show the selected tab's page; a tab with no page shows the New Tab, so
      *  nothing of the previous tab is left on the stage. */
     const show = (id, url, force = false) => {
-      const target = typeof url === "string" && url !== "" && url !== "about:blank" ? url : "";
-      if (!id || !target) {
+      // Only a web address reaches the browser. A New Tab (empty/about:blank)
+      // parks, and so does anything else: this is the one gate between the
+      // model's URL and `fixupAndLoadURIString`, which loads under the system
+      // principal and must never be pointed at data:/file:/javascript:.
+      if (!id || !isLoadableUrl(url)) {
+        if (id && typeof url === "string" && url !== "" && url !== "about:blank") {
+          try {
+            // Diagnostics only (no event): a refused address is worth seeing
+            // in the window the same way a refused host command is.
+            const win = doc.defaultView;
+            if (win) {
+              win.__astraLastRelayError = `content refused ${url.slice(0, 140)}`;
+            }
+          } catch {
+            // A window without expandos: the refusal itself still stands.
+          }
+        }
         park();
         return;
       }
+      const target = url;
       const entry = browsers.get(id) ?? createBrowser(id);
       setActive(id);
-      const settled = entry.requested === target || safeSpec(entry.browser) === target;
+      const settled =
+        !entry.crashed && (entry.requested === target || safeSpec(entry.browser) === target);
       if (settled && (!force || stillLoading(entry.browser))) {
         // Already loading it, or already showing it: a switch must not restart
         // a load the person is waiting on, and a commit for a load that is
         // still in flight is the same load, not a second one.
         return;
       }
+      entry.crashed = false;
       entry.requested = target;
       // The tab row and the stage say "arriving" from the first moment, and
       // clear only when the browser's own document load ends. Deferred: this
@@ -253,7 +338,7 @@ export const Content = {
     const forget = (id) => {
       const entry = browsers.get(id);
       if (!entry) return;
-      stopWatching(entry);
+      release(entry);
       browsers.delete(id);
       try {
         entry.browser.remove();
@@ -292,8 +377,16 @@ export const Content = {
         // `tab.closed` (above), never because they are out of view here.
         const tabs = event.data?.tabs ?? [];
         const active = tabs.find((entry) => entry.id === event.data?.active);
-        if (event.data?.active) selectedId = event.data.active;
-        if (active) show(active.id, active.url);
+        if (active) {
+          selectedId = active.id;
+          show(active.id, active.url);
+        } else {
+          // Nothing to put in front: an empty space, or the last tab closed.
+          // The stage belongs to the app's New Tab, so the page kept for the
+          // space we came from must not stay visible underneath it.
+          selectedId = "";
+          park();
+        }
       }
     });
 
@@ -304,8 +397,12 @@ export const Content = {
       browsers,
       detach() {
         off();
+        for (const timer of timers) {
+          clearTimeout(timer);
+        }
+        timers.clear();
         for (const entry of browsers.values()) {
-          stopWatching(entry);
+          release(entry);
           try {
             entry.browser.remove();
           } catch {
@@ -314,6 +411,7 @@ export const Content = {
         }
         browsers.clear();
         activeId = "";
+        selectedId = "";
       },
     };
   },

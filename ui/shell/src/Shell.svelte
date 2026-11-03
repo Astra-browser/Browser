@@ -7,6 +7,7 @@
   import { mountTabStrip } from "./tabs/tab-strip.js";
   import { mountSplit } from "./split/split.js";
   import { mountAppFrame } from "./app-frame.js";
+  import { slotStateFor } from "./content/slot-state.js";
   import "./urlbar.css";
   import "./frame/frame.css";
   import "./tabs/tab-strip.css";
@@ -45,6 +46,8 @@
   // person sees is the product UI, never the fallback chrome (P3-T21).
   let appBooted = $state(null);
   let appApi = null;
+  /** The tab the stage shows, as the last projection named it. */
+  let activeTabId = "";
 
   const SIDEBAR_ITEMS = [
     { id: "tabs", label: "Tabs" },
@@ -293,39 +296,42 @@
         const width = event.data?.width;
         const hidden = event.data?.hidden === true;
         const column = hidden || typeof width !== "number" || !Number.isFinite(width) ? 0 : width;
-        frameRoot.style.setProperty("--astra-sidebar-width", `${column}px`);
-      } else if (event.type === "nav.started") {
-        // Show the slot from the first moment of a load, with the loading
-        // state on, so a slow page is a page arriving rather than a black
-        // window.
-        const url = event.data?.url;
-        if (typeof url === "string" && url !== "" && url !== "about:blank") {
-          slot.dataset.hasPage = "true";
-          slot.dataset.loading = "true";
+        frameRoot.style.setProperty("--astra-sidebar-width", `${Math.max(0, column)}px`);
+        // `animate` marks a deliberate change of shape (the app's `travel`):
+        // the page travels with the column. A drag reports false and the page
+        // tracks the pointer without a transition lagging behind it.
+        frameRoot.dataset.astraSidebarAnimate = event.data?.animate === true ? "true" : "false";
+      } else if (event.type === "ui-command") {
+        // Work, Settings, Tasks, Notes and Time are the app's own pages: the
+        // real page surface must get out of their way, and come back on
+        // `browser.return` (the app's own surface event does the rest).
+        const command = typeof event.data === "string" ? event.data : "";
+        if (command === "browser.return") {
+          delete slot.dataset.internal;
+        } else if (command.startsWith("browser.") && command !== "browser.return-failed") {
+          slot.dataset.internal = "true";
         }
-      } else if (event.type === "nav.committed") {
-        // A real page committed: the content slot takes over the stage.
-        const url = event.data?.url;
-        if (typeof url === "string" && url !== "" && url !== "about:blank") {
-          slot.dataset.hasPage = "true";
-          delete slot.dataset.loading;
-        } else {
-          delete slot.dataset.hasPage;
-          delete slot.dataset.loading;
+      } else {
+        // The stage's two flags (a real page in front, and whether it is still
+        // arriving) are derived in `content/slot-state.js` so every path —
+        // nav.started, nav.committed, a projection with no active tab — agrees.
+        // The projection names the tab in front, so a background tab's
+        // navigation cannot take the stage over.
+        if (event.type === "items-changed") {
+          activeTabId = typeof event.data?.active === "string" ? event.data.active : "";
         }
-      } else if (event.type === "items-changed") {
-        // Back on a New Tab (no URL): give the stage to the app.
-        const active = event.data?.active;
-        const tab = (event.data?.tabs ?? []).find((t) => t.id === active);
-        if (tab && !tab.url) {
-          delete slot.dataset.hasPage;
-          delete slot.dataset.loading;
-        } else if (tab?.loading) {
-          slot.dataset.hasPage = "true";
-          slot.dataset.loading = "true";
-        } else if (tab?.url) {
-          slot.dataset.hasPage = "true";
-          delete slot.dataset.loading;
+        const next = slotStateFor(event, { activeId: activeTabId });
+        if (next !== null) {
+          if (next.hasPage) {
+            slot.dataset.hasPage = "true";
+          } else {
+            delete slot.dataset.hasPage;
+          }
+          if (next.loading) {
+            slot.dataset.loading = "true";
+          } else {
+            delete slot.dataset.loading;
+          }
         }
       }
     });
@@ -493,8 +499,26 @@
     overflow: hidden;
     background: transparent;
   }
+  /* A deliberate change of shape travels on the app's own curve
+     (`--motion-page` 400ms, `--ease-emphasized`); those tokens live in the
+     app document, not this one, so the values are mirrored here. A drag
+     reports animate=false: the page must track the pointer, not chase it. */
+  :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {
+    transition: inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {
+      transition: none;
+    }
+  }
   .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]),
   .astra-frame[data-app-booted="pending"] .astra-content:not([data-has-page="true"]) {
+    display: none;
+  }
+  /* An app page (Work, Settings, Tasks, Notes, Time) owns the window: the
+     real page surface keeps its browser alive but is not painted. Three
+     classes beat the scoped base `.astra-content` display without !important. */
+  :global(.astra-frame .astra-content[data-internal="true"]) {
     display: none;
   }
   /* P3-T17: the native `#browser` box is empty (toolbox, tabbox and sidebars

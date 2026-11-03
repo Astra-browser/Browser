@@ -22,8 +22,9 @@ type HostFrame = {
   dispatchWindowControl?: (opts: { action: string }) => Promise<unknown>;
 };
 
-/** Firefox's `windowState` for a maximized window. */
-const MAXIMIZED = 2;
+/** Firefox's `nsIDOMWindow.windowState`: 0 normal, 1 maximized, 2 minimized,
+ *  3 fullscreen. (A minimized window is not a maximized one.) */
+const MAXIMIZED = 1;
 
 function hostFrame(): HostFrame | null {
   try {
@@ -50,6 +51,20 @@ export function maximized(): boolean {
 }
 
 export function windowAction(action: WindowAction): void {
+  // Closing the product's own window is a chrome-window op, not a Host API
+  // model op: `Windows.close` refuses the last window on purpose, so routing
+  // close through it made the close control dead in the only window there is.
+  if (action === "close") {
+    try {
+      const parent = window.parent as Window;
+      if (parent !== window && typeof parent?.close === "function") {
+        parent.close();
+        return;
+      }
+    } catch {
+      // No chrome parent: fall through to the standalone path.
+    }
+  }
   const frame = hostFrame();
   if (frame?.dispatchWindowControl) {
     void frame.dispatchWindowControl({ action }).catch(() => {});

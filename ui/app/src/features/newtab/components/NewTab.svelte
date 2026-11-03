@@ -8,6 +8,7 @@
     Shield01Icon,
   } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
+  import { getLocale } from "$shared/i18n/runtime";
   import { commands } from "$shared/ipc/bindings";
   import { events } from "$shared/ipc/native-events";
   import { preferences } from "$domain/preferences";
@@ -99,7 +100,10 @@
     return named ? m.ntp_greeting_named({ greeting: words, name: firstName }) : words;
   });
   let clockSetting = $derived(clockFormat(preferences.value("ui.newtab-clock-format")));
-  let face = $derived(clockFace(now, clockSetting, undefined, systemHour24()));
+  // The time and the date are set in the interface's own language, as the
+  // rest of the chrome is: a device set to another locale does not make one
+  // half of the page read differently from the other.
+  let face = $derived(clockFace(now, clockSetting, getLocale(), systemHour24()));
   // The system's own setting is read when the page opens and when the window
   // comes back, which is where a change made in System Settings arrives.
   $effect(() => {
@@ -110,7 +114,7 @@
     return () => window.removeEventListener("focus", reread);
   });
   let date = $derived(
-    new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(
+    new Intl.DateTimeFormat(getLocale(), { weekday: "long", month: "long", day: "numeric" }).format(
       now,
     ),
   );
@@ -380,8 +384,7 @@
           font-weight="500"
           letter-spacing={WORDMARK.height * 0.26}
           textLength={WORDMARK.width}
-          lengthAdjust="spacing"
-          >ASTRA</text
+          lengthAdjust="spacing">ASTRA</text
         >
         {#if glint && useSky}<linearGradient
             id={`${id}-glint`}
