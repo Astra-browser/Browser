@@ -46,7 +46,8 @@ test.describe("settings", () => {
     await expect(page.getByRole("button", { name: "Back to browsing" })).toBeVisible();
   });
 
-  test("every section opens with its own heading", async ({ page }) => {
+  test("every section opens with its own heading and throws nothing", async ({ page }) => {
+    const runtime = trackRuntime(page);
     await openScreen(page, "settings");
     const nav = settingsNav(page);
     const heading = settingsPane(page).getByRole("heading", { level: 1 });
@@ -55,6 +56,9 @@ test.describe("settings", () => {
       await nav.getByRole("button", { name: section, exact: true }).click();
       await expect(heading, `section ${section} shows its own heading`).toHaveText(section);
     }
+    // An unrouted projection must fail closed into a card, never throw while
+    // the section mounts (the null-answer guards in zoom/work/notes).
+    expect(runtime.pageErrors).toEqual([]);
   });
 
   test("in-page search answers, empties, and clears", async ({ page }) => {
@@ -101,23 +105,21 @@ test.describe("settings", () => {
     await expect(pane.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
-  test.fail(
-    "known product bug: Appearance throws when zoom_call answers null",
+  test(
+    "Appearance tolerates a null zoom_call in the unwired state",
     async ({ page }) => {
-      // Repro: Settings → Appearance. `zoom_call` is answered with null (an
-      // unrouted/unavailable command is the expected unwired state per D-36),
-      // and src/domain/zoom/levels.svelte.ts:45 dereferences
-      // `answer.value.kind` without a null guard, so the view throws instead
-      // of rendering "zoom levels unavailable". Remove `test.fail` when the
-      // null answer is tolerated.
+      // `zoom_call` is answered with null (an unrouted/unavailable command is
+      // the expected unwired state per D-36). The view renders its zoom card
+      // and its unavailable state instead of dereferencing the null answer.
       const runtime = trackRuntime(page);
       await openScreen(page, "settings");
       await settingsNav(page).getByRole("button", { name: "Appearance", exact: true }).click();
       const pane = settingsPane(page);
       await expect(pane.getByRole("heading", { level: 1 })).toHaveText("Appearance");
-      // The card mounts after the heading; wait for its row so the async
-      // `zoom_call` settlement has a chance to run before asserting.
-      await expect(pane.getByText("Zoom levels", { exact: false })).toBeVisible();
+      // The card fails closed: the heading stays, and the null answer becomes
+      // a readable unavailable row rather than a thrown view.
+      await expect(pane.getByRole("heading", { name: "Zoom levels" })).toBeVisible();
+      await expect(pane.getByRole("alert")).toContainText("Zoom levels could not be loaded");
       expect(runtime.pageErrors).toEqual([]);
     },
   );
