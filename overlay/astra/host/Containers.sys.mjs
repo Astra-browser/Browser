@@ -34,14 +34,10 @@
 //   this model accepts any non-empty strings and lets the live service
 //   reject unknown values.
 //
-// Live binding (shell, not this file): replace the in-memory `_identities`
-// map with `ContextualIdentityService` calls, `cookieStoreId` parsing with
-// `getContainerForCookieStoreId`, and `_jars` with the real partitioned
-// storage (no code change on the consumer side — same method names and
-// envelope). The stub `_jars` exist so the contract test can prove the
-// isolation property (cookies/localStorage not shared across spaces) without
-// a built binary; live, the engine enforces the same property through
-// originAttributes.
+// Live binding: in chrome, `ContextualIdentityService` is the source for
+// create/get/list/update/remove and `space.deleted` removes the space's
+// identity (clearData). The in-memory `_identities`/`_jars` remain the Node
+// fallback, so the isolation contract still runs without a binary.
 //
 // Mapping (S-02 decision):
 // - one Astra space ↔ one contextual identity; `container_ref` on the space
@@ -65,6 +61,85 @@ const _identities = new Map(); // cookieStoreId -> record
 const _tabBindings = new Map(); // astra_tab_id -> cookieStoreId
 const _jars = new Map(); // userContextId -> { cookies: Map, local: Map }
 let _nextUserContextId = 1;
+const _spaceContexts = new Map(); // space_id -> userContextId
+
+function liveIdentityService() {
+  try {
+    const CU = globalThis.ChromeUtils;
+    if (!CU) return null;
+    return CU.importESModule(
+      "resource://gre/modules/ContextualIdentityService.sys.mjs",
+    ).ContextualIdentityService;
+  } catch {
+    return null;
+  }
+}
+
+function liveRecord(identity, ephemeral = false) {
+  if (!identity) return null;
+  return {
+    cookieStoreId: `firefox-container-${identity.userContextId}`,
+    userContextId: identity.userContextId,
+    name: identity.name,
+    color: identity.color,
+    icon: identity.icon,
+    ephemeral: ephemeral === true,
+  };
+}
+
+function spaceNumber(space) {
+  const m = /^space-(\d+)$/u.exec(String(space ?? ""));
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n > 1 ? n - 1 : 0;
+}
+
+/**
+ * The native container for one Astra space. Space 1 is the default (no
+ * container). Live identities are created once and remembered; Node tests
+ * fall back to the deterministic `space-N -> N-1` mapping.
+ */
+export function userContextForSpace(space) {
+  if (!space || space === "space-1") return 0;
+  if (_spaceContexts.has(space)) return _spaceContexts.get(space);
+  const svc = liveIdentityService();
+  if (!svc) {
+    const fallback = spaceNumber(space);
+    _spaceContexts.set(space, fallback);
+    return fallback;
+  }
+  try {
+    const name = `Astra ${space}`;
+    const existing = svc
+      .getPublicIdentities()
+      .find((identity) => identity.name === name);
+    const identity = existing ?? svc.create(name, "circle", "blue");
+    const context = Number(identity.userContextId) || 0;
+    _spaceContexts.set(space, context);
+    return context;
+  } catch {
+    const fallback = spaceNumber(space);
+    _spaceContexts.set(space, fallback);
+    return fallback;
+  }
+}
+
+/** Remove a space's identity and its site data when the space is deleted. */
+export function releaseSpaceContext(space) {
+  const context = _spaceContexts.get(space);
+  _spaceContexts.delete(space);
+  if (!context) return false;
+  const svc = liveIdentityService();
+  if (svc) {
+    try {
+      return svc.remove(context) === true;
+    } catch {
+      return false;
+    }
+  }
+  _jars.delete(context);
+  return true;
+}
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -105,16 +180,27 @@ export const Containers = {
     if (typeof icon !== "string" || icon.trim() === "") {
       return err(request_id, "invalid_icon", "icon must be a non-empty string");
     }
-    const userContextId = _nextUserContextId++;
-    const cookieStoreId = `firefox-container-${userContextId}`;
-    const rec = {
-      cookieStoreId,
-      userContextId,
-      name,
-      color,
-      icon,
-      ephemeral: ephemeral === true,
-    };
+    const svc = liveIdentityService();
+    let rec = null;
+    if (svc) {
+      try {
+        rec = liveRecord(svc.create(name, icon, color), ephemeral);
+      } catch (e) {
+        return err(request_id, "container_create_failed", String(e));
+      }
+    }
+    if (!rec) {
+      const userContextId = _nextUserContextId++;
+      rec = {
+        cookieStoreId: `firefox-container-${userContextId}`,
+        userContextId,
+        name,
+        color,
+        icon,
+        ephemeral: ephemeral === true,
+      };
+    }
+    const { cookieStoreId, userContextId } = rec;
     _identities.set(cookieStoreId, rec);
     jarFor(userContextId);
     emit("container.created", { cookieStoreId, name, ephemeral: rec.ephemeral });
@@ -122,7 +208,19 @@ export const Containers = {
   },
 
   async get({ request_id = "", cookieStoreId = "" } = {}) {
-    const rec = _identities.get(cookieStoreId);
+    let rec = _identities.get(cookieStoreId);
+    if (!rec) {
+      const svc = liveIdentityService();
+      const id = userContextIdOf(cookieStoreId);
+      if (svc && id) {
+        try {
+          rec = liveRecord(svc.getPublicIdentityFromId(id));
+          if (rec) _identities.set(cookieStoreId, rec);
+        } catch {
+          rec = null;
+        }
+      }
+    }
     if (!rec) {
       return err(request_id, "no_such_container", `unknown container ${cookieStoreId}`);
     }
@@ -130,6 +228,16 @@ export const Containers = {
   },
 
   async list({ request_id = "" } = {}) {
+    const svc = liveIdentityService();
+    if (svc) {
+      try {
+        return ok(request_id, {
+          containers: svc.getPublicIdentities().map((identity) => liveRecord(identity)),
+        });
+      } catch {
+        // Fall through to the model.
+      }
+    }
     return ok(request_id, {
       containers: [..._identities.values()].map(snapshot),
     });
@@ -141,6 +249,17 @@ export const Containers = {
     const rec = _identities.get(cookieStoreId);
     if (!rec) {
       return err(request_id, "no_such_container", `unknown container ${cookieStoreId}`);
+    }
+    const svc = liveIdentityService();
+    if (svc) {
+      try {
+        const nextName = typeof name === "string" && name.trim() !== "" ? name : rec.name;
+        const nextColor = typeof color === "string" && color.trim() !== "" ? color : rec.color;
+        const nextIcon = typeof icon === "string" && icon.trim() !== "" ? icon : rec.icon;
+        svc.update(rec.userContextId, nextName, nextIcon, nextColor);
+      } catch (e) {
+        return err(request_id, "container_update_failed", String(e));
+      }
     }
     for (const [key, value] of [["name", name], ["color", color], ["icon", icon]]) {
       if (value === undefined) {
@@ -164,6 +283,14 @@ export const Containers = {
       return err(request_id, "no_such_container", `unknown container ${cookieStoreId}`);
     }
     _identities.delete(cookieStoreId);
+    const svc = liveIdentityService();
+    if (svc) {
+      try {
+        svc.remove(rec.userContextId);
+      } catch {
+        // The model still drops the identity.
+      }
+    }
     if (forgetData !== false) {
       _jars.delete(rec.userContextId);
     }
@@ -204,6 +331,14 @@ export const Containers = {
     const rec = _identities.get(cookieStoreId);
     if (!rec) {
       return err(request_id, "no_such_container", `unknown container ${cookieStoreId}`);
+    }
+    const svc = liveIdentityService();
+    try {
+      globalThis.Services?.clearData?.deleteDataFromOriginAttributesPattern?.({
+        userContextId: rec.userContextId,
+      });
+    } catch {
+      // Fall back to the model jars.
     }
     _jars.set(rec.userContextId, { cookies: new Map(), local: new Map() });
     emit("container.data_cleared", { cookieStoreId });

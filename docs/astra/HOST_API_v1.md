@@ -17,6 +17,7 @@ binding allowed to touch live browser elements.
 
 | File | Owns |
 |---|---|
+| `Containers.sys.mjs` | native `ContextualIdentityService` identities; one per Astra space (`space-1` = default), `space.deleted` removes the identity and clears its data. Node keeps the in-memory fallback. |
 | `Events.sys.mjs` | event pump; every event carries monotonic `event_seq` (§5.4); `eventsSince(seq)` replays the ring buffer (cap 500) for gap resync, flagging `gap: true` when eviction forces a full snapshot |
 | `Boot.sys.mjs` | one startup owner for the Rust core: `handshake` (version negotiation via `min_host_api_version`, default-window setup, opening `event_seq`), `launchCore` (native `Subprocess` stdio supervisor; `unavailable` when no core command is configured), `status`, `shutdown` (also stops the core). `BootSidecar.sys.mjs` is a compatibility re-export, not packaged. |
 | `Windows.sys.mjs` | native chrome windows with a projection: `create` (incl. `private`) opens through `BrowserWindowTracker`; `close` closes the native window after its tabs; `focus`/`setFullscreen`/`setTitle`; `get`/`list` sync native focus/fullscreen. Node keeps the model-only path; the shell binds its own window to `win-1` (`__bindCurrentWindow`) so a second window cannot steal it. |
