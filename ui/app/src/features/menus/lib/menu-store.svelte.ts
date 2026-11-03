@@ -37,6 +37,7 @@ export function openAt(next: ShellMenu, onChoose: MenuHandler) {
   while (items.length > 0 && items[items.length - 1]?.kind === "separator") items.pop();
   if (items.length === 0) return;
   handler = onChoose;
+  menuEpoch += 1;
   menu = { items, x: next.x, y: next.y };
   // The menu is drawn in the app frame, which sits under the page surface.
   // Mark the document and tell the shell to raise the frame while it is open;
@@ -50,16 +51,30 @@ export function openAt(next: ShellMenu, onChoose: MenuHandler) {
   postShell({ kind: "menu-open" });
 }
 
+let menuEpoch = 0;
+
 export function close() {
   const wasOpen = menu !== null;
+  const epoch = menuEpoch;
   menu = null;
   handler = null;
-  try {
-    delete document.documentElement.dataset.astraMenu;
-  } catch {
-    // Diagnostics only.
-  }
   if (wasOpen) postShell({ kind: "menu-close" });
+  // The shell lowers the raised frame on `menu-close`. Restoring the frame's
+  // opaque ground in the same turn would let it cover the page for one frame
+  // before it is lowered — the black flash on dismissal. Keep the ground
+  // transparent until the frame is back under the page.
+  try {
+    requestAnimationFrame(() => {
+      if (menuEpoch !== epoch) return;
+      delete document.documentElement.dataset.astraMenu;
+    });
+  } catch {
+    try {
+      delete document.documentElement.dataset.astraMenu;
+    } catch {
+      // Diagnostics only.
+    }
+  }
 }
 
 /** One-way note to the shell that owns the frame stacking/clip. */
