@@ -67,6 +67,57 @@ async function selectedTab(request_id) {
   return (list.tabs || []).find((t) => t.selected) ?? list.tabs[0] ?? null;
 }
 
+/**
+ * True for a private browsing window. The browser chrome marks its root
+ * element when it is private; `PrivateBrowsingUtils` is the module API, but a
+ * lazily-imported module cannot answer synchronously from `createBrowser`.
+ * Reading the attribute is what tabbrowser itself does
+ * (`docElement.getAttribute("privatebrowsingmode") == "temporary"`).
+ */
+export function isPrivateWindow(win) {
+  try {
+    if (win && win.PrivateBrowsingUtils?.isWindowPrivate?.(win)) {
+      return true;
+    }
+  } catch {
+    // Fall through to the document marker.
+  }
+  try {
+    return (
+      win?.document?.documentElement?.getAttribute("privatebrowsingmode") ===
+      "temporary"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Let Places record visits for this content browser. A remote `<browser>`
+ * inherits `useGlobalHistory` from the chrome window's browsing context, which
+ * is false here, so every page load was silently dropped from history. The
+ * content browsing context owns the visits, so the flag belongs on it — and
+ * only for non-private windows: a private window's parent context already
+ * suppresses history, and forcing the flag on would record what must not be
+ * recorded.
+ */
+export function allowGlobalHistory(browser) {
+  try {
+    const win = browser?.ownerDocument?.defaultView;
+    if (isPrivateWindow(win)) {
+      return false;
+    }
+    const context = browser.browsingContext;
+    if (context) {
+      context.useGlobalHistory = true;
+    }
+    return true;
+  } catch {
+    // A browser torn down mid-switch: the next one will take the flag.
+    return false;
+  }
+}
+
 // Progress-listener factory: pure over (tabIdOf, commit, setTitle) so Node
 // contract tests can drive it with fakes and the live binding passes the
 // real tabbrowser mapping. `tabIdOf(browser)` maps a `<browser>` element
@@ -266,6 +317,9 @@ export const Content = {
       // Parked until a page is in front of it.
       browser.setAttribute("data-astra-browser-parked", "");
       container.append(browser);
+      // Remote browsers otherwise inherit the chrome window's
+      // `useGlobalHistory = false`, which drops every visit from Places.
+      allowGlobalHistory(browser);
       const entry = { browser, requested: "", poll: 0, abort: null, crashed: false };
       browsers.set(id, entry);
       try {
@@ -319,6 +373,9 @@ export const Content = {
       }
       entry.crashed = false;
       entry.requested = target;
+      // The browsing context can be replaced when remoteness changes, so the
+      // history flag is set on the context that is about to load.
+      allowGlobalHistory(entry.browser);
       // The tab row and the stage say "arriving" from the first moment, and
       // clear only when the browser's own document load ends. Deferred: this
       // call often runs inside another event's listener, and emitting there
