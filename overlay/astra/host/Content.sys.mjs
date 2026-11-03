@@ -25,6 +25,7 @@ import {
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
+import { releaseSpaceContext, userContextForSpace } from "./Containers.sys.mjs";
 import {
   ContentHide,
   createBlockerCosmeticProvider,
@@ -618,7 +619,7 @@ export const Content = {
         if (tab && !isPrivateWindow(doc.defaultView)) {
           browser.setAttribute(
             "usercontextid",
-            String(__spaceUserContextId(tab.space_id)),
+            String(userContextForSpace(tab.space_id)),
           );
         }
       } catch {
@@ -953,7 +954,7 @@ export const Content = {
       try {
         const tab = __tabsState().tabs.get(id);
         if (tab && !isPrivateWindow(win)) {
-          return __spaceUserContextId(tab.space_id);
+          return userContextForSpace(tab.space_id);
         }
       } catch {
         // A tab without a record keeps the default context.
@@ -1199,6 +1200,10 @@ export const Content = {
             loadIn(id, url, true);
           }
         }
+        return;
+      }
+      if (event.type === "space.deleted" && event.data?.space) {
+        releaseSpaceContext(event.data.space);
         return;
       }
       if (event.type === "tab.space-changed" && id) {

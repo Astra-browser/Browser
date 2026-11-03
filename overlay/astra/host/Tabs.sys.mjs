@@ -487,6 +487,7 @@ export const Tabs = {
       emit("tab.closed", { astra_tab_id: id, window_id: DEFAULT_WINDOW_ID });
     }
     _spaces.splice(at, 1);
+    emit("space.deleted", { space });
     if (_activeSpaceId === space) {
       _activeSpaceId = _spaces[Math.min(at, _spaces.length - 1)].id;
       _selectedId = "";
