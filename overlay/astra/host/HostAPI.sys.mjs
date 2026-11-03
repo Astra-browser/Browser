@@ -22,7 +22,7 @@ import { addEventListener, bufferedCount, emit, eventSeq, eventsSince } from "./
 import { Boot, __resetBootForTests } from "./Boot.sys.mjs";
 import { HOST_API_VERSION, Tabs, __resetTabsForTests } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
-import { Windows, __resetWindowsForTests } from "./Windows.sys.mjs";
+import { Windows, __bindCurrentWindow, __resetWindowsForTests } from "./Windows.sys.mjs";
 import { Session, __resetSessionForTests } from "./Session.sys.mjs";
 import { History, __resetHistoryForTests } from "./History.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
@@ -52,6 +52,7 @@ export {
   HOST_API_VERSION,
   Boot,
   Windows,
+  __bindCurrentWindow,
   Session,
   History,
   Tabs,

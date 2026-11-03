@@ -445,25 +445,54 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
   };
   switch (id) {
     case "window.new": {
-      const newWin = openWindow({ private: false });
-      return { accepted: !!newWin };
+      const created = await host.Windows.create({
+        request_id: `win-${Date.now()}`,
+        private: false,
+      });
+      return { accepted: !created.error };
     }
-    case "window.newPrivate":
-    case "window.showPrivate": {
-      const newWin = openWindow({ private: true });
-      return { accepted: !!newWin };
+    case "window.newPrivate": {
+      const created = await host.Windows.create({
+        request_id: `win-${Date.now()}`,
+        private: true,
+      });
+      return { accepted: !created.error };
     }
+    case "window.showPrivate":
     case "window.showRegular": {
-      const newWin = openWindow({ private: false });
-      return { accepted: !!newWin };
+      const wantPrivate = id === "window.showPrivate";
+      const list = await host.Windows.list({ request_id: `win-${Date.now()}` });
+      const found = (list.windows ?? []).find((w) => w.private === wantPrivate);
+      if (found) {
+        const focused = await host.Windows.focus({
+          request_id: `win-${Date.now()}`,
+          window_id: found.window_id,
+        });
+        return { accepted: !focused.error };
+      }
+      const created = await host.Windows.create({
+        request_id: `win-${Date.now()}`,
+        private: wantPrivate,
+      });
+      return { accepted: !created.error };
     }
-    case "window.fullscreen":
+    case "window.fullscreen": {
+      const id = host.__bindCurrentWindow?.(win) || "win-1";
       try {
-        win.fullScreen = !win.fullScreen;
-        return { accepted: true };
+        const cur = await host.Windows.get({ request_id: `win-${Date.now()}`, window_id: id });
+        if (cur?.error) {
+          return { accepted: false };
+        }
+        const out = await host.Windows.setFullscreen({
+          request_id: `win-${Date.now()}`,
+          window_id: id,
+          fullscreen: !(cur.window?.fullscreen === true),
+        });
+        return { accepted: !out.error };
       } catch {
         return { accepted: false };
       }
+    }
     case "page.devtools":
     case "page.devtools.alt":
       return showDevTools(win, browser, undefined);

@@ -139,6 +139,15 @@
     }
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
+    // Bind this exact chrome window to win-1 before any Host API call. A
+    // lazy Services/getMostRecentWindow can otherwise bind win-1 to a newly
+    // opened window and make fullscreen/close hit the wrong one.
+    let ownWindowId = "win-1";
+    try {
+      ownWindowId = host.__bindCurrentWindow?.(win) || "win-1";
+    } catch {
+      // Preview DOM without a chrome window.
+    }
     // The Rust core is per-process: stop it on application quit, not on a
     // single window close. Multiple windows may hold this observer; Boot
     // shutdown is idempotent.
@@ -428,23 +437,11 @@
     }
 
     async function currentWindowId() {
-      try {
-        const list = await host.Windows.list({ request_id: newRequestId() });
-        return list.focused_window_id ?? "win-1";
-      } catch {
-        return "win-1";
-      }
+      return ownWindowId || "win-1";
     }
 
     function mirrorFullscreen(fullscreen) {
       frameRoot.setAttribute("data-astra-fullscreen", fullscreen ? "true" : "false");
-      try {
-        if (win && typeof win.fullScreen === "boolean") {
-          win.fullScreen = fullscreen === true;
-        }
-      } catch {
-        // Preview DOM or restricted context: attribute still mirrors state.
-      }
     }
 
     async function handleControl(action) {
@@ -553,7 +550,7 @@
               actions: Frame.WINDOW_ACTIONS,
               dispatchWindowControl: (opts = {}) =>
                 (async () => {
-                  const window_id = opts.window_id ?? (await currentWindowId());
+                  const window_id = opts.window_id ?? ownWindowId;
                   return Frame.dispatchWindowControl(host, chromeAdapter, {
                     request_id: newRequestId(),
                     ...opts,
@@ -579,7 +576,9 @@
         // Best-effort diagnostics only.
       }
       if (event.type === "window.fullscreen-changed") {
-        mirrorFullscreen(event.data?.fullscreen === true);
+        if (event.data?.window_id === ownWindowId) {
+          mirrorFullscreen(event.data?.fullscreen === true);
+        }
       } else if (event.type.startsWith("tab.")) {
         void refreshTabs();
       } else if (event.type === "sidebar.changed") {
@@ -738,6 +737,8 @@
       }
     };
     win.addEventListener("message", onWindowMenu);
+    const onSizeMode = () => mirrorFullscreen(win.fullScreen === true);
+    win.addEventListener("sizemodechange", onSizeMode);
     teardown = () => {
       try {
         off();
@@ -746,6 +747,7 @@
       }
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
+      win.removeEventListener("sizemodechange", onSizeMode);
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
       } catch {

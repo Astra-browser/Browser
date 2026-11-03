@@ -294,8 +294,9 @@ check("shell builds DOM-window chrome adapter",
   && shell.includes('"maximize"') && shell.includes('"restore"'));
 check("shell routes oncontrol to dispatchWindowControl",
   shell.includes("onControl") && shell.includes("Frame.dispatchWindowControl"));
-check("shell mirrors fullscreen to frame attribute",
+check("shell applies its own fullscreen event",
   shell.includes("window.fullscreen-changed")
+  && shell.includes("ownWindowId")
   && shell.includes("data-astra-fullscreen"));
 check("shell fullscreen toolbar action dispatches toggle-fullscreen",
   shell.includes("toggle-fullscreen"));
