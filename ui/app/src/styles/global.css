@@ -101,6 +101,17 @@ button {
   background: var(--color-chrome);
 }
 
+/* A hidden column peeking over a live page is chrome above the page: the
+   frame's own ground — html canvas, body, root and caption material — steps
+   aside so only the card paints and the page stays visible around it. */
+:root[data-astra-peek="true"],
+:root[data-astra-peek="true"] body,
+:root[data-astra-peek="true"] #root,
+:root[data-astra-peek="true"] .shell,
+:root[data-astra-peek="true"] .shell[data-caption] {
+  background: transparent !important;
+}
+
 /* Stands in for the content WebView when a tab has no page yet, so switching
    between a live page and the new tab never changes the window's shape.
    Solid, and deliberately: a live page is opaque, so a translucent new tab or

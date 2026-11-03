@@ -211,6 +211,12 @@
   });
   let aside = $state<HTMLElement>();
   let peeking = $state(false);
+  /** True while the card is chrome over a live page: the frame's ground must
+   *  go transparent so only the card paints above the page. */
+  const chromeOverPage = (on: boolean) => {
+    if (on) document.documentElement.dataset.astraPeek = "true";
+    else delete document.documentElement.dataset.astraPeek;
+  };
   let atEdge = false;
   /** Windows cannot blend the chrome over a page, so it cuts the chrome to
    *  the card, and the cut follows the card as it slides: a little behind it
@@ -233,6 +239,7 @@
     clearTimeout(linger);
     clearTimeout(lowered);
     lowered = undefined;
+    if (away) chromeOverPage(true);
     if (!peeking) opened = performance.now();
     if (peeking) {
       void commands.sidebarPeek(true, true, slides());
@@ -275,6 +282,7 @@
           void commands.sidebarPeek(false, false, slides());
           lowered = setTimeout(() => {
             peeking = false;
+            chromeOverPage(false);
             lowered = setTimeout(() => (lowered = undefined), duration("page"));
           }, CUT_LEAD_MS);
           return;
@@ -286,6 +294,7 @@
         lowered = setTimeout(() => {
           lowered = undefined;
           void commands.sidebarPeek(false, false, false);
+          chromeOverPage(false);
         }, duration("page"));
       },
       Math.max(LINGER_MS, settling),
@@ -317,11 +326,13 @@
     untrack(() => {
       if (peeking) void commands.sidebarPeek(false, false, false);
       peeking = false;
+      chromeOverPage(false);
     });
   });
   $effect(() => () => {
     clearTimeout(linger);
     clearTimeout(lowered);
+    chromeOverPage(false);
   });
 
   // A change of shape is one continuous change: every mark travels from the

@@ -295,8 +295,14 @@
         // column's width. The CSS adds the 8px gutter + 8px content gap.
         const width = event.data?.width;
         const hidden = event.data?.hidden === true;
+        const peeking = event.data?.peeking === true;
         const column = hidden || typeof width !== "number" || !Number.isFinite(width) ? 0 : width;
         frameRoot.style.setProperty("--astra-sidebar-width", `${Math.max(0, column)}px`);
+        // A hidden column peeks as a card over the page. The app frame holds
+        // the card, so it has to come above the page surface and let the page
+        // show through around it; the app clears its own ground for the same
+        // window (`data-astra-peek`).
+        frameRoot.dataset.astraSidebarPeek = hidden && peeking ? "true" : "false";
         // `animate` marks a deliberate change of shape (the app's `travel`):
         // the page travels with the column. A drag reports false and the page
         // tracks the pointer without a transition lagging behind it.
@@ -597,6 +603,13 @@
     display: flex;
     flex-direction: column;
     background: #1c1b22;
+  }
+  /* The hidden column's card is inside the app frame; over a live page the
+     frame comes above the page surface with only the card painted. */
+  :global(.astra-frame[data-astra-sidebar-peek="true"] .astra-app-mount) {
+    position: relative;
+    z-index: 3;
+    background: transparent;
   }
   .astra-app-mount > :global(.astra-app-frame) {
     flex: 1 1 auto;
