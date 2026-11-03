@@ -8,7 +8,6 @@
   import { mountSplit } from "./split/split.js";
   import { mountAppFrame } from "./app-frame.js";
   import { installContentMenu, runChromeAction } from "./content-menu.js";
-  import { installThemeBridge } from "./theme-bridge.js";
   import { slotStateFor } from "./content/slot-state.js";
   import "./urlbar.css";
   import "./frame/frame.css";
@@ -152,6 +151,10 @@
         appBooted = false;
         appError = message;
       },
+      // The app chooses light or dark; web pages follow the same choice.
+      onTheme: (theme) => {
+        void host.System?.setContentColorScheme?.({ light: theme === "light" });
+      },
       // The app renders from the projection, and a private window's profile
       // is the one thing the host model does not carry yet. Rewrite only that
       // field; every tab, space and active id stays the model's own.
@@ -203,7 +206,6 @@
         return null;
       },
     });
-    const themeBridge = installThemeBridge(appApi?.element ?? null, host);
 
     // Frame.sys.mjs rides the same resource:// mapping as the Host API
     // (jar.mn: content/astra/res/frame/Frame.sys.mjs). Degrades to null
@@ -530,7 +532,6 @@
       }
       win.removeEventListener("message", onWindowMenu);
       contentMenu.destroy();
-      themeBridge();
       tabstrip.destroy();
       splitApi.destroy();
       titlebar.destroy();

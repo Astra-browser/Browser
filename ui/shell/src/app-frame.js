@@ -45,7 +45,7 @@ export const APP_BOOT_TIMEOUT_MS = 60000;
  *   the content browser
  * @param {{onReady?: (mode: string) => void, onFailure?: (message: string) => void}} hooks
  */
-export function mountAppFrame(container, host, { onReady, onFailure, transformEvent, guardCall } = {}) {
+export function mountAppFrame(container, host, { onReady, onFailure, onTheme, transformEvent, guardCall } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView ?? null;
   if (!win) {
@@ -132,6 +132,17 @@ export function mountAppFrame(container, host, { onReady, onFailure, transformEv
     } else if (data.kind === "error") {
       const message = typeof data.message === "string" ? data.message : "app reported an error";
       settle(onFailure, message);
+    } else if (data.kind === "theme") {
+      // The app owns the theme; the shell mirrors it so web pages see the
+      // colour scheme of the chrome around them.
+      const theme = data.theme === "light" ? "light" : "dark";
+      if (typeof onTheme === "function") {
+        try {
+          onTheme(theme);
+        } catch {
+          // A preference write must not break the frame.
+        }
+      }
     }
   };
 
