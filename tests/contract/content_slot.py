@@ -8,7 +8,7 @@ Marionette chrome context, and asserts (docs/astra/HOST_API_v1_T10.md):
   - URL bar present ([data-astra-urlbar] + back/forward/reload buttons)
   - content slot present ([data-astra-content] with a live [data-astra-browser]
     of non-zero size)
-  - typing a local fixture URL into the URL bar and submitting navigates the
+  - typing a loopback fixture URL into the URL bar and submitting navigates the
     content browser (Host API stub -> nav.committed -> Content binding)
   - back/forward buttons move through the stub history stack
   - events carry a monotonic event_seq and calls echo request_id
@@ -16,11 +16,13 @@ Marionette chrome context, and asserts (docs/astra/HOST_API_v1_T10.md):
 Usage: python3 tests/contract/content_slot.py
 Exit 0 on PASS, 1 on FAIL. Stdlib only.
 """
+import http.server
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -32,11 +34,43 @@ GECKODRIVER = os.path.join(ENGINE, "obj-astra-linux", "dist", "host", "bin", "ge
 PORT = 44451
 
 FIXTURES = {
-    "a": "<html><head><title>Fixture A</title></head>"
-         "<body><h1 id='m'>alpha-marker</h1></body></html>",
-    "b": "<html><head><title>Fixture B</title></head>"
-         "<body><h1 id='m'>beta-marker</h1></body></html>",
+    "a.html": "<html><head><title>Fixture A</title></head>"
+              "<body><h1 id='m'>alpha-marker</h1></body></html>",
+    "b.html": "<html><head><title>Fixture B</title></head>"
+              "<body><h1 id='m'>beta-marker</h1></body></html>",
 }
+
+
+def serve_fixtures():
+    """Serve FIXTURES on a loopback ephemeral port.
+
+    The pages must be reachable, so they cannot be file: URLs: since the
+    address-box policy (Search.sys.mjs NAVIGABLE = http/https/about) a typed
+    file:/javascript:/data:/chrome: URL is searched for, never loaded. A real
+    http origin keeps the navigation path under test intact.
+    """
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            name = self.path.lstrip("/").split("?")[0] or "a.html"
+            body = FIXTURES.get(name)
+            if body is None:
+                self.send_error(404, "no such fixture")
+                return
+            payload = body.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, server.server_address[1]
+
 
 
 def wd(method, path, body=None):
@@ -152,13 +186,11 @@ def main():
         if not os.path.exists(f):
             print(f"SKIP: missing {f} (run a full build first)")
             return 1
-    tmp = tempfile.mkdtemp(prefix="astra-p1t10-")
-    fa = os.path.join(tmp, "a.html")
-    fb = os.path.join(tmp, "b.html")
-    open(fa, "w").write(FIXTURES["a"])
-    open(fb, "w").write(FIXTURES["b"])
-    url_a = "file://" + fa
-    url_b = "file://" + fb
+    server, port = serve_fixtures()
+    base = f"http://127.0.0.1:{port}"
+    url_a = f"{base}/a.html"
+    url_b = f"{base}/b.html"
+    print(f"fixtures: {url_a} -> {url_b}")
     profile = tempfile.mkdtemp(prefix="astra-p1t10-prof-")
     gd = subprocess.Popen(
         [GECKODRIVER, "--port", str(PORT)],
@@ -228,6 +260,8 @@ def main():
             wd("DELETE", f"/session/{session}")
     finally:
         gd.terminate()
+        server.shutdown()
+        server.server_close()
 
 
 if __name__ == "__main__":
