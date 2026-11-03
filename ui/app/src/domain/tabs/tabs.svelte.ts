@@ -229,10 +229,34 @@ function copyLink(url: string | null | undefined): Promise<boolean> {
 /** Space intents settle on native's answer; the projection carries the result. */
 export const switchSpace = (id: string) => settle(commands.spacesSwitch(id));
 export const stepSpace = (step: 1 | -1) => settle(commands.spacesStep(step));
+/** The look a host call can carry. Svelte's `$state` wraps `icon` and `theme`
+ *  in proxies, and `postMessage` refuses to structured-clone a Proxy, so the
+ *  relay call never leaves and the editor reports a save failure. Send plain
+ *  objects with exactly the fields the wire type declares. */
+function plainLook(look: SpaceLookInputV1): SpaceLookInputV1 {
+  const icon = look?.icon ?? null;
+  const theme = look?.theme ?? null;
+  return {
+    icon:
+      icon === null
+        ? null
+        : icon.kind === "emoji"
+          ? { kind: "emoji", text: icon.text }
+          : { kind: "symbol", index: icon.index },
+    color: Number.isInteger(look?.color) ? look.color : 0,
+    theme:
+      theme === null
+        ? null
+        : theme.kind === "preset"
+          ? { kind: "preset", id: theme.id }
+          : { kind: "custom", seeds: theme.seeds },
+  };
+}
+
 export const createSpace = (name: string, look: SpaceLookInputV1) =>
-  settle(commands.spacesCreate(name, look));
+  settle(commands.spacesCreate(name, plainLook(look)));
 export const updateSpace = (id: string, name: string, look: SpaceLookInputV1) =>
-  settle(commands.spacesUpdate(id, name, look));
+  settle(commands.spacesUpdate(id, name, plainLook(look)));
 export async function deleteSpace(id: string) {
   const owner = state.profile?.id;
   const result = await settle(commands.spacesDelete(id));
