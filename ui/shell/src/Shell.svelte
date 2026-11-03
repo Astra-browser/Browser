@@ -514,7 +514,7 @@
   }
 
   /* A page still arriving says so, quietly, in the middle of the stage. */
-  .astra-content[data-loading="true"]::after {
+  :global(.astra-content[data-loading="true"])::after {
     content: "";
     position: absolute;
     inset-block-start: 50%;
@@ -525,6 +525,8 @@
     border: 2px solid var(--color-border-strong, rgb(255 255 255 / 18%));
     border-block-start-color: var(--color-text, #f4f4f6);
     border-radius: 50%;
+    /* Above the content browser, which is a sibling layer of its own. */
+    z-index: 3;
     animation: content-loading 720ms linear infinite;
     pointer-events: none;
   }
@@ -536,7 +538,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .astra-content[data-loading="true"]::after {
+    :global(.astra-content[data-loading="true"])::after {
       animation: none;
       border-block-start-color: var(--color-text, #f4f4f6);
     }
@@ -545,6 +547,19 @@
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
+  }
+  /* While the page is still arriving the browser has nothing to show (a
+     blank surface reads as a dead black window). Hide its layer so the
+     stage's own ground and the spinner are what the person sees; the load
+     keeps running underneath. */
+  :global(.astra-content[data-loading="true"] > [data-astra-browser]) {
+    opacity: 0;
+  }
+  /* Every page tab keeps its own browser; only the one in front claims the
+     stage. The rest stay loaded (that is what makes a switch instant) but
+     must not take space or paint. */
+  .astra-content > :global(browser[data-astra-browser-parked]) {
+    display: none;
   }
   .astra-app-mount {
     flex: 1 1 auto;

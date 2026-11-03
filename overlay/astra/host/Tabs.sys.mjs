@@ -96,6 +96,9 @@ export function __applyExternalUpdate(id, patch = {}) {
   if (typeof patch.url === "string" && patch.url !== "") {
     tab.url = patch.url;
   }
+  if (typeof patch.loading === "boolean") {
+    tab.loading = patch.loading;
+  }
   if (typeof patch.discarded === "boolean") {
     tab.discarded = patch.discarded;
   }

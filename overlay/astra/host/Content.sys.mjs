@@ -82,9 +82,12 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
 }
 
 export const Content = {
-  // Mounts one content browser into `container` (an element in the chrome
-  // document) and ensures exactly one live tab exists. Returns
-  // `{ browser, detach }`. Safe to call once per window.
+  // Mounts the content browsers into `container` (an element in the chrome
+  // document) and ensures exactly one live tab exists. One `<browser>` is
+  // kept per page tab: switching tabs then shows the page that was already
+  // there instead of reloading it from the network, which is what made a
+  // switch back look like a dead black stage for the length of a page load.
+  // Returns `{ browser, browsers, detach }`. Safe to call once per window.
   async mount(container, { request_id = "content-mount" } = {}) {
     let list = await Tabs.list({ request_id });
     let tab = (list.tabs || []).find((t) => t.selected) ?? list.tabs[0];
@@ -96,57 +99,221 @@ export const Content = {
 
     const doc = container.ownerDocument;
     const principal = systemPrincipalOf(container);
-    const browser = doc.createElementNS(XUL_NS, "browser");
-    // Remote content browser: on ESR 153 a non-remote `type="content"`
-    // browser created outside the tabbrowser has an inert docshell (loads
-    // never commit, measured 2026-11-02). Remote is the only live path.
-    browser.setAttribute("type", "content");
-    browser.setAttribute("remote", "true");
-    browser.setAttribute("remoteType", "web");
-    browser.setAttribute("maychangeremoteness", "true");
-    browser.setAttribute("flex", "1");
-    browser.setAttribute("data-astra-browser", "content");
-    container.append(browser);
-    browser.fixupAndLoadURIString(tab.url, { triggeringPrincipal: principal });
+    /** astra_tab_id -> { browser, requested }; one page per tab, kept alive. */
+    const browsers = new Map();
+    /** The tab whose browser is in front ("" when a New Tab owns the stage). */
+    let activeId = "";
 
-    const selected = { id: tab.astra_tab_id };
+    const activeBrowser = () => browsers.get(activeId)?.browser ?? null;
+
+    const setActive = (id) => {
+      activeId = id;
+      for (const [key, entry] of browsers) {
+        try {
+          if (key === id) {
+            entry.browser.setAttribute("data-astra-browser", "content");
+            entry.browser.removeAttribute("data-astra-browser-parked");
+          } else {
+            entry.browser.removeAttribute("data-astra-browser");
+            entry.browser.setAttribute("data-astra-browser-parked", "");
+          }
+        } catch {
+          // A browser torn down mid-switch: the next one will show.
+        }
+      }
+    };
+
+    // No page in front (a New Tab): every browser stays loaded but parked, so
+    // coming back is instant rather than a fresh network load.
+    const park = () => {
+      activeId = "";
+      for (const entry of browsers.values()) {
+        try {
+          entry.browser.removeAttribute("data-astra-browser");
+          entry.browser.setAttribute("data-astra-browser-parked", "");
+        } catch {
+          // Torn down with the window.
+        }
+      }
+    };
+
+    const safeTitle = (browser) => {
+      try {
+        return typeof browser.contentTitle === "string" ? browser.contentTitle : "";
+      } catch {
+        return "";
+      }
+    };
+
+    const stopWatching = (entry) => {
+      if (entry.poll) {
+        clearInterval(entry.poll);
+        entry.poll = 0;
+      }
+    };
+
+    /** Announce load state off the current event dispatch (see `show`). */
+    const markLoading = (id, loading) => {
+      setTimeout(() => {
+        if (browsers.has(id)) __applyExternalUpdate(id, { loading });
+      }, 0);
+    };
+
+    /**
+     * Watch a real document load to its end. The model commits the address
+     * instantly, so without this the stage is a black pane with no sign of
+     * progress for as long as the network takes — the "no way to know what is
+     * happening" the owner reported. A cheap poll of the browser's own load
+     * flag is enough and survives remoteness changes, where an XPCOM progress
+     * listener attached to the element can be dropped.
+     */
+    const watch = (id, entry) => {
+      stopWatching(entry);
+      const deadline = Date.now() + 60_000;
+      let idle = 0;
+      entry.poll = setInterval(() => {
+        let loading = true;
+        try {
+          loading = entry.browser.webProgress?.isLoadingDocument === true;
+        } catch {
+          loading = false;
+        }
+        // A redirect can dip the flag for a moment between documents; two
+        // quiet polls mean the load is really over.
+        if (loading) {
+          idle = 0;
+        } else {
+          idle += 1;
+        }
+        if (Date.now() < deadline && (loading || idle < 2)) return;
+        stopWatching(entry);
+        if (!browsers.has(id)) return;
+        // `requested` is what this browser was asked to load, not where the
+        // page itself ended up: a page that rewrites its own address must not
+        // make the projection ask for the old address again, or the two fight
+        // and the page reloads forever.
+        __applyExternalUpdate(id, { loading: false });
+        const title = safeTitle(entry.browser);
+        if (title) __applyExternalUpdate(id, { title });
+      }, 200);
+    };
+
+    const createBrowser = (id) => {
+      const browser = doc.createElementNS(XUL_NS, "browser");
+      // Remote content browser: on ESR 153 a non-remote `type="content"`
+      // browser created outside the tabbrowser has an inert docshell (loads
+      // never commit, measured 2026-11-02). Remote is the only live path.
+      browser.setAttribute("type", "content");
+      browser.setAttribute("remote", "true");
+      browser.setAttribute("remoteType", "web");
+      browser.setAttribute("maychangeremoteness", "true");
+      browser.setAttribute("flex", "1");
+      // Parked until a page is in front of it.
+      browser.setAttribute("data-astra-browser-parked", "");
+      container.append(browser);
+      const entry = { browser, requested: "", poll: 0 };
+      browsers.set(id, entry);
+      return entry;
+    };
+
     /** Show the selected tab's page; a tab with no page shows the New Tab, so
-     *  the previous tab's page is cleared rather than left underneath. */
-    const show = (url) => {
-      const target = typeof url === "string" && url !== "" ? url : "about:blank";
-      if (safeSpec(browser) === target) {
+     *  nothing of the previous tab is left on the stage. */
+    const show = (id, url, force = false) => {
+      const target = typeof url === "string" && url !== "" && url !== "about:blank" ? url : "";
+      if (!id || !target) {
+        park();
         return;
       }
+      const entry = browsers.get(id) ?? createBrowser(id);
+      setActive(id);
+      const settled = entry.requested === target || safeSpec(entry.browser) === target;
+      if (settled && (!force || stillLoading(entry.browser))) {
+        // Already loading it, or already showing it: a switch must not restart
+        // a load the person is waiting on, and a commit for a load that is
+        // still in flight is the same load, not a second one.
+        return;
+      }
+      entry.requested = target;
+      // The tab row and the stage say "arriving" from the first moment, and
+      // clear only when the browser's own document load ends. Deferred: this
+      // call often runs inside another event's listener, and emitting there
+      // would hand later listeners a lower sequence than the nested event.
+      markLoading(id);
+      watch(id, entry);
       try {
-        browser.fixupAndLoadURIString(target, { triggeringPrincipal: principal });
+        entry.browser.fixupAndLoadURIString(target, { triggeringPrincipal: principal });
       } catch {
+        entry.requested = "";
+        stopWatching(entry);
+        markLoading(id, false);
         // A tab torn down mid-switch: the next one will load.
       }
     };
+
+    const forget = (id) => {
+      const entry = browsers.get(id);
+      if (!entry) return;
+      stopWatching(entry);
+      browsers.delete(id);
+      try {
+        entry.browser.remove();
+      } catch {
+        // Already gone with the window.
+      }
+      if (activeId === id) activeId = "";
+    };
+
+    let selectedId = tab.astra_tab_id;
+    // The window always starts with one tab. A New Tab has no page to load,
+    // so no browser is created for it; the app's New Tab fills the stage.
+    show(selectedId, tab.url);
+
     const off = addEventListener((event) => {
       if (event.type === "tab.updated" && event.data.selected) {
-        selected.id = event.data.astra_tab_id;
-        // Switching tabs is a load, not a no-op: the browser has to follow
-        // the tab the person is looking at.
-        show(event.data.url);
+        selectedId = event.data.astra_tab_id;
+        show(selectedId, event.data.url);
       }
-      if (event.type === "nav.committed" && event.data.astra_tab_id === selected.id) {
-        show(event.data.url);
+      if (event.type === "nav.committed" && event.data.astra_tab_id === selectedId) {
+        // A commit is an explicit navigation intent (typed address, back,
+        // forward, reload), so it loads even when the browser is already on
+        // that address. An external commit (the page itself landing on it)
+        // is not an intent and must not cause another load.
+        const intent = event.data.external !== true;
+        show(selectedId, event.data.url, intent);
+      }
+      if (event.type === "tab.closed") {
+        forget(event.data.astra_tab_id);
       }
       // The projection is the authority on what is in front: a tab switch, a
-      // closed tab or a New Tab all land here, and the browser follows.
+      // closed tab or a New Tab all land here, and the right page comes up.
       if (event.type === "items-changed") {
-        const active = (event.data?.tabs ?? []).find((entry) => entry.id === event.data?.active);
-        if (event.data?.active) selected.id = event.data.active;
-        if (active) show(active.url);
+        // Only the active space's tabs are in this projection; a page kept
+        // for another space is still live, so pages are forgotten on
+        // `tab.closed` (above), never because they are out of view here.
+        const tabs = event.data?.tabs ?? [];
+        const active = tabs.find((entry) => entry.id === event.data?.active);
+        if (event.data?.active) selectedId = event.data.active;
+        if (active) show(active.id, active.url);
       }
     });
 
     return {
-      browser,
+      get browser() {
+        return activeBrowser();
+      },
+      browsers,
       detach() {
         off();
-        browser.remove();
+        for (const entry of browsers.values()) {
+          stopWatching(entry);
+          try {
+            entry.browser.remove();
+          } catch {
+            // Window teardown: already gone.
+          }
+        }
+        browsers.clear();
+        activeId = "";
       },
     };
   },
@@ -270,5 +437,14 @@ function safeSpec(browser) {
     return "";
   }
 }
+
+function stillLoading(browser) {
+  try {
+    return browser.webProgress ? browser.webProgress.isLoadingDocument === true : false;
+  } catch {
+    return false;
+  }
+}
+
 
 export { __applyExternalUpdate };

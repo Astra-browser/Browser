@@ -48,7 +48,7 @@ SELECT_TAB = lambda n: js(f"""
   const rows = [...d.querySelectorAll('[data-astra-tab-id]')];
   const row = rows[{n}];
   if (!row) return 'no row';
-  row.click();
+  (row.querySelector('button.tab-open') || row).click();
   return 'ok';
 """)
 
@@ -172,33 +172,50 @@ def main():
 
     failures = []
 
+    def state():
+        return json.loads(m.js(BROWSER))
+
+    def wait_for(predicate, seconds):
+        """Network speed varies here, so wait for the real load to settle
+        instead of sleeping a guessed amount. Loading is cleared from the
+        content browser's own document load, not the model's instant commit."""
+        for _ in range(seconds * 4):
+            now = state()
+            if predicate(now):
+                return now
+            time.sleep(0.25)
+        return state()
+
     print("search address:", m.js(SEARCH_ADDRESS))
-    time.sleep(8)
-    first = json.loads(m.js(BROWSER))
+    first = wait_for(
+        lambda s: s.get("loading") is None and "duckduckgo" in (s.get("uri") or ""), 30)
     print("tab1:", json.dumps(first))
     if "duckduckgo" not in (first.get("uri") or ""):
         failures.append("the address search did not load")
+    if first.get("loading") is not None:
+        failures.append("the search page never finished loading")
 
     print("new tab:", m.js(NEW_TAB))
-    time.sleep(2)
-    fresh = json.loads(m.js(BROWSER))
+    fresh = wait_for(lambda s: s.get("hasPage") != "true", 10)
     print("tab2:", json.dumps(fresh))
     if fresh.get("hasPage") == "true":
         failures.append("a new tab kept the previous page on screen")
 
-    print("tab2 address:", m.js(SET_ADDRESS("example.com")))
-    time.sleep(6)
-    moved = json.loads(m.js(BROWSER))
+    print("tab2 address:", m.js(SET_ADDRESS("google.com")))
+    moved = wait_for(
+        lambda s: s.get("loading") is None and "google.com" in (s.get("uri") or ""), 30)
     print("tab2 moved:", json.dumps(moved))
-    if "example.com" not in (moved.get("uri") or ""):
+    if "google.com" not in (moved.get("uri") or ""):
         failures.append("the second tab did not take its own address")
 
     rows = json.loads(m.js(TAB_ROWS) or "[]")
     print("rows:", rows)
     if len(rows) >= 1:
         print("switch back:", m.js(SELECT_TAB(0)))
-        time.sleep(3)
-        back = json.loads(m.js(BROWSER))
+        # The first tab kept its own browser, so its page is already there:
+        # switching back must not reload it or show a blank stage.
+        back = wait_for(
+            lambda s: "duckduckgo" in (s.get("uri") or ""), 10)
         print("tab1 again:", json.dumps(back))
         if "duckduckgo" not in (back.get("uri") or ""):
             failures.append("switching back did not restore the first tab's page")
