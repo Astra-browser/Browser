@@ -218,6 +218,73 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
   };
 }
 
+function browserWindow(browser) {
+  try {
+    return browser?.ownerDocument?.defaultView ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Live zoom for one browser. Returns false when no ZoomManager is reachable. */
+export function applyZoomToBrowser(browser, zoom) {
+  try {
+    const win = browserWindow(browser);
+    const ZoomManager = win?.ZoomManager;
+    if (!ZoomManager || typeof zoom !== "number" || !Number.isFinite(zoom)) {
+      return false;
+    }
+    ZoomManager.setZoomForBrowser(browser, zoom);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Live print for one browser. Returns false when PrintUtils is unreachable. */
+export function printBrowser(browser) {
+  try {
+    const win = browserWindow(browser);
+    const PrintUtils = win?.PrintUtils;
+    if (!PrintUtils || typeof PrintUtils.startPrintWindow !== "function") {
+      return false;
+    }
+    PrintUtils.startPrintWindow(browser.browsingContext, { printToFile: false });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Stop one browser's in-flight load. */
+export function stopBrowser(browser) {
+  try {
+    if (browser && typeof browser.stop === "function") {
+      browser.stop();
+      return true;
+    }
+  } catch {
+    // Browser torn down mid-load.
+  }
+  return false;
+}
+
+/** Reload one browser, bypassing the HTTP cache. */
+export function hardReloadBrowser(browser) {
+  try {
+    const win = browserWindow(browser);
+    const Ci = win?.Ci;
+    const flags = Ci?.nsIWebNavigation?.LOAD_FLAGS_BYPASS_CACHE ?? 0;
+    if (browser && typeof browser.reloadWithFlags === "function") {
+      browser.reloadWithFlags(flags);
+      return true;
+    }
+  } catch {
+    // Browser torn down mid-reload.
+  }
+  return false;
+}
+
 export const Content = {
   // Mounts the content browsers into `container` (an element in the chrome
   // document) and ensures exactly one live tab exists. One `<browser>` is
@@ -675,6 +742,30 @@ export const Content = {
         const intent = event.data.external !== true;
         show(selectedId, event.data.url, intent);
       }
+      if (event.type === "nav.stopped") {
+        const entry = browsers.get(event.data?.astra_tab_id);
+        if (entry) {
+          stopBrowser(entry.browser);
+        }
+      }
+      if (event.type === "nav.zoom-changed") {
+        const entry = browsers.get(event.data?.astra_tab_id);
+        if (entry) {
+          applyZoomToBrowser(entry.browser, event.data?.zoom);
+        }
+      }
+      if (event.type === "nav.print-requested") {
+        const entry = browsers.get(event.data?.astra_tab_id);
+        if (entry) {
+          printBrowser(entry.browser);
+        }
+      }
+      if (event.type === "nav.hard-reload") {
+        const entry = browsers.get(event.data?.astra_tab_id);
+        if (entry) {
+          hardReloadBrowser(entry.browser);
+        }
+      }
       if (event.type === "tab.closed") {
         forget(event.data.astra_tab_id);
       }
@@ -781,33 +872,13 @@ export const Content = {
   // mirrors it into a real browser element when available. Best-effort:
   // resolves false when no zoom manager is reachable.
   applyZoom(browser, zoom) {
-    try {
-      const win = browser?.ownerDocument?.defaultView;
-      const ZoomManager = win?.ZoomManager;
-      if (!ZoomManager || typeof zoom !== "number" || !Number.isFinite(zoom)) {
-        return false;
-      }
-      ZoomManager.setZoomForBrowser(browser, zoom);
-      return true;
-    } catch {
-      return false;
-    }
+    return applyZoomToBrowser(browser, zoom);
   },
 
   // Live print dispatch for Navigation.print intent. Best-effort: resolves
   // false when PrintUtils is unreachable (model event already emitted).
   printPage(browser) {
-    try {
-      const win = browser?.ownerDocument?.defaultView;
-      const PrintUtils = win?.PrintUtils;
-      if (!PrintUtils || typeof PrintUtils.startPrintWindow !== "function") {
-        return false;
-      }
-      PrintUtils.startPrintWindow(browser.browsingContext, { printToFile: false });
-      return true;
-    } catch {
-      return false;
-    }
+    return printBrowser(browser);
   },
 
   // Element hiding (P4-T11 live wiring). The Content actor owns the

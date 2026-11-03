@@ -183,6 +183,29 @@ export const Navigation = {
     return ok(request_id, { astra_tab_id: id, reloaded: true, url: tab.url });
   },
 
+  // Reload with the HTTP cache bypassed. The model marks the tab loading;
+  // the content binding performs `reloadWithFlags(BYPASS_CACHE)` so a stale
+  // cache entry cannot answer the same URL.
+  async hardReload({ request_id = "", astra_tab_id = "" } = {}) {
+    const { id, tab } = tabOf(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`);
+    }
+    tab.loading = true;
+    emit("nav.hard-reload", { astra_tab_id: id, url: tab.url });
+    emit("tab.updated", {
+      astra_tab_id: id,
+      url: tab.url,
+      title: tab.title,
+      selected: tab.selected,
+      loading: true,
+      canGoBack: (__historyFor(id)?.index ?? 0) > 0,
+      canGoForward: false,
+    });
+    emitItemsChanged();
+    return ok(request_id, { astra_tab_id: id, reloaded: true, hard: true, url: tab.url });
+  },
+
   // Stop an in-flight load. The model records the intent; the live
   // binding calls `browser.stop()` when a real browser is attached.
   async stop({ request_id = "", astra_tab_id = "" } = {}) {

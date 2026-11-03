@@ -26,6 +26,7 @@
         "nav.started",
         "nav.committed",
         "nav.stopped",
+        "nav.hard-reload",
         "nav.zoom-changed",
         "nav.find-result",
         "nav.print-requested",

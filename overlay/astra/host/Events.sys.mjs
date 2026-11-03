@@ -13,7 +13,8 @@
 //   window.created, window.focused, window.closed, window.fullscreen-changed
 //   tab.created, tab.updated, tab.moved, tab.closed,
 //   tab.pinned, tab.unpinned, tab.discarded, tab.restored
-//   nav.committed, nav.started, nav.stopped, nav.zoom-changed,
+//   nav.committed, nav.started, nav.stopped, nav.hard-reload,
+//   nav.zoom-changed,
 //   nav.find-result, nav.print-requested, nav.reader-changed
 //   pane.shown, pane.hidden, pane.attached, pane.detached, pane.rect-changed
 //   content.title-changed, content.location-changed

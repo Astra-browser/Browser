@@ -247,8 +247,9 @@ export const Commands = {
       case "nav.forward":
         return tabNavigation("goForward");
       case "nav.reload":
-      case "nav.hardReload":
         return tabNavigation("reload");
+      case "nav.hardReload":
+        return tabNavigation("hardReload");
       case "nav.stop":
         return tabNavigation("stop");
       case "zoom.in":
