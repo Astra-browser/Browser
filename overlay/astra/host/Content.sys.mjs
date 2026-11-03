@@ -14,9 +14,10 @@
 // silently diverging. Firefox internals are allowed here: everything under
 // host/ is the versioned seam (§6.4).
 
-import { addEventListener } from "./Events.sys.mjs";
+import { addEventListener, emit } from "./Events.sys.mjs";
 import { Tabs, __applyExternalUpdate } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
+import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import {
   ContentHide,
   createBlockerCosmeticProvider,
@@ -65,6 +66,57 @@ function systemPrincipalOf(container) {
 async function selectedTab(request_id) {
   const list = await Tabs.list({ request_id });
   return (list.tabs || []).find((t) => t.selected) ?? list.tabs[0] ?? null;
+}
+
+/**
+ * True for a private browsing window. The browser chrome marks its root
+ * element when it is private; `PrivateBrowsingUtils` is the module API, but a
+ * lazily-imported module cannot answer synchronously from `createBrowser`.
+ * Reading the attribute is what tabbrowser itself does
+ * (`docElement.getAttribute("privatebrowsingmode") == "temporary"`).
+ */
+export function isPrivateWindow(win) {
+  try {
+    if (win && win.PrivateBrowsingUtils?.isWindowPrivate?.(win)) {
+      return true;
+    }
+  } catch {
+    // Fall through to the document marker.
+  }
+  try {
+    return (
+      win?.document?.documentElement?.getAttribute("privatebrowsingmode") ===
+      "temporary"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Let Places record visits for this content browser. A remote `<browser>`
+ * inherits `useGlobalHistory` from the chrome window's browsing context, which
+ * is false here, so every page load was silently dropped from history. The
+ * content browsing context owns the visits, so the flag belongs on it — and
+ * only for non-private windows: a private window's parent context already
+ * suppresses history, and forcing the flag on would record what must not be
+ * recorded.
+ */
+export function allowGlobalHistory(browser) {
+  try {
+    const win = browser?.ownerDocument?.defaultView;
+    if (isPrivateWindow(win)) {
+      return false;
+    }
+    const context = browser.browsingContext;
+    if (context) {
+      context.useGlobalHistory = true;
+    }
+    return true;
+  } catch {
+    // A browser torn down mid-switch: the next one will take the flag.
+    return false;
+  }
 }
 
 // Progress-listener factory: pure over (tabIdOf, commit, setTitle) so Node
@@ -119,6 +171,12 @@ export const Content = {
 
     const doc = container.ownerDocument;
     const principal = systemPrincipalOf(container);
+    // `favicons-changed` is a wire event the app already listens for
+    // (DOM_CHANNELS in ui/app/chrome-entry/browser-chrome.ts); the shell
+    // relays every Events-pump event to the app frame, so the sink is the
+    // pump. Nodes outside chrome never resolve an icon, so no event is ever
+    // invented there.
+    __setFaviconEventSink((view) => emit("favicons-changed", view));
     /** astra_tab_id -> { browser, requested, poll, abort }; one page per tab,
      *  kept alive. `poll` is the load watcher and `abort` owns the element's
      *  listeners, so every browser releases everything it started. */
@@ -232,7 +290,77 @@ export const Content = {
         __applyExternalUpdate(id, { loading: false });
         const title = safeTitle(entry.browser);
         if (title) __applyExternalUpdate(id, { title });
+        // The document has landed, which is when Places holds the icon
+        // `LinkHandlerParent` stored. A missing one is retried.
+        scheduleIcon(id, entry);
       }, 200);
+    };
+
+    /**
+     * Read the site icon Places stored for the page this browser landed on and
+     * push the reference into the tab model. The page's own icon notification
+     * is not a reliable trigger (`LinkHandlerParent` stores the icon either
+     * way), and a just-finished load may not have stored it yet, so a missing
+     * icon is retried a couple of times before the tab keeps its letter tile.
+     * Answers true once nothing more needs doing, false when no icon was
+     * found yet.
+     */
+    const refreshIcon = async (id, entry) => {
+      try {
+        if (!browsers.has(id) || entry.crashed) {
+          return true;
+        }
+        const ownerDoc = entry.browser.ownerDocument;
+        const win = ownerDoc?.defaultView;
+        // Private windows read no global favicon: what is browsed there must
+        // not appear anywhere else either.
+        if (!ownerDoc || !win || isPrivateWindow(win)) {
+          return true;
+        }
+        const url = safeSpec(entry.browser);
+        if (!isLoadableUrl(url)) {
+          return true;
+        }
+        const resolved = await Favicons.resolve({ url, doc: ownerDoc });
+        if (!resolved) {
+          return false;
+        }
+        if (!browsers.has(id)) {
+          return true;
+        }
+        const key = `${resolved.entry.origin}\u0000${resolved.entry.revision}`;
+        if (entry.iconKey === key) {
+          // Same pixels the projection already carries: repaint nothing.
+          return true;
+        }
+        entry.iconKey = key;
+        Favicons.publish(resolved);
+        __applyExternalUpdate(id, {
+          icon: {
+            origin: resolved.entry.origin,
+            revision: resolved.entry.revision,
+          },
+        });
+        return true;
+      } catch {
+        // A broken icon must never keep a page from working; it is not
+        // retried because the failure is not "not stored yet".
+        return true;
+      }
+    };
+
+    /** Resolve now, then twice more while the tab has no icon yet. */
+    const scheduleIcon = (id, entry, attempt = 0) => {
+      const delay = attempt === 0 ? 0 : attempt === 1 ? 1200 : 3500;
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        void refreshIcon(id, entry).then((settled) => {
+          if (!settled && attempt < 2 && browsers.has(id)) {
+            scheduleIcon(id, entry, attempt + 1);
+          }
+        });
+      }, delay);
+      timers.add(timer);
     };
 
     /**
@@ -266,7 +394,17 @@ export const Content = {
       // Parked until a page is in front of it.
       browser.setAttribute("data-astra-browser-parked", "");
       container.append(browser);
-      const entry = { browser, requested: "", poll: 0, abort: null, crashed: false };
+      // Remote browsers otherwise inherit the chrome window's
+      // `useGlobalHistory = false`, which drops every visit from Places.
+      allowGlobalHistory(browser);
+      const entry = {
+        browser,
+        requested: "",
+        poll: 0,
+        abort: null,
+        crashed: false,
+        iconKey: "",
+      };
       browsers.set(id, entry);
       try {
         // `oop-browser-crashed` is the content-process crash signal a
@@ -315,10 +453,18 @@ export const Content = {
         // Already loading it, or already showing it: a switch must not restart
         // a load the person is waiting on, and a commit for a load that is
         // still in flight is the same load, not a second one.
+        if (!entry.iconKey) {
+          // Coming back to a page loaded before its icon was read (or one
+          // restored by a session): fill the mark without reloading.
+          scheduleIcon(id, entry);
+        }
         return;
       }
       entry.crashed = false;
       entry.requested = target;
+      // The browsing context can be replaced when remoteness changes, so the
+      // history flag is set on the context that is about to load.
+      allowGlobalHistory(entry.browser);
       // The tab row and the stage say "arriving" from the first moment, and
       // clear only when the browser's own document load ends. Deferred: this
       // call often runs inside another event's listener, and emitting there

@@ -42,6 +42,7 @@ import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
 import { Time } from "./Time.sys.mjs";
 import { HistoryCall } from "./HistoryCall.sys.mjs";
+import { Favicons, __resetFaviconsForTests } from "./Favicons.sys.mjs";
 import { System } from "./System.sys.mjs";
 import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
@@ -72,6 +73,7 @@ export {
   Bookmarks,
   Time,
   HistoryCall,
+  Favicons,
   System,
   Resources,
   Search,
@@ -97,5 +99,6 @@ export function __resetForTests() {
   __resetSettingsForTests();
   __resetSidebarForTests();
   __resetWebExtensionsForTests();
+  __resetFaviconsForTests();
   __resetEventsForTests();
 }

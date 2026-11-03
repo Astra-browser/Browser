@@ -65,6 +65,10 @@ function snapshot(id) {
   const h = _history.get(id) ?? { entries: [], index: -1 };
   return {
     ...tab,
+    // A mark belongs to the site that produced it: a navigation that lands on
+    // another origin (typed address, `Navigation.commit`) must never keep the
+    // old site's reference in a projection.
+    icon: tab.icon && originOf(tab.url) === tab.icon.origin ? tab.icon : null,
     index: _order.indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
@@ -113,6 +117,36 @@ export function __closeTabsInWindow(window_id) {
   return ids;
 }
 
+/** The origin a tab's icon is keyed under, or "" when the URL has none. */
+function originOf(url) {
+  try {
+    const origin = new URL(url).origin;
+    return origin && origin !== "null" ? origin : "";
+  } catch {
+    return "";
+  }
+}
+
+/** `IconRef` validation: only `{ origin, revision }` reaches the projection. */
+function asIconRef(value) {
+  if (value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const { origin, revision } = value;
+  if (
+    typeof origin !== "string" ||
+    origin === "" ||
+    typeof revision !== "string" ||
+    revision === ""
+  ) {
+    return undefined;
+  }
+  return { origin, revision };
+}
+
 // Live-binding ingress (Content.sys.mjs progress listeners): patch a tab's
 // externally-observed fields and announce it. Never throws.
 export function __applyExternalUpdate(id, patch = {}) {
@@ -124,7 +158,20 @@ export function __applyExternalUpdate(id, patch = {}) {
     tab.title = patch.title;
   }
   if (typeof patch.url === "string" && patch.url !== "") {
+    // An icon belongs to the site that produced it. Landing on another origin
+    // (typed address, link, redirect) must clear it at once, or the old site's
+    // mark stays on the new page until its own icon arrives.
+    const origin = originOf(patch.url);
+    if (tab.icon && origin && tab.icon.origin !== origin) {
+      tab.icon = null;
+    }
     tab.url = patch.url;
+  }
+  if ("icon" in patch) {
+    const icon = asIconRef(patch.icon);
+    if (icon !== undefined) {
+      tab.icon = icon;
+    }
   }
   if (typeof patch.loading === "boolean") {
     tab.loading = patch.loading;
@@ -226,7 +273,11 @@ function tabView(id) {
     loading: tab.loading === true,
     can_go_back: h.index > 0,
     can_go_forward: h.index >= 0 && h.index < h.entries.length - 1,
-    icon: null,
+    // The reference, never the pixels: chrome keeps rasters from
+    // `favicons-changed` and repaints only when the revision changes. A ref
+    // from another origin is a stale mark and is not projected.
+    icon:
+      tab.icon && originOf(tab.url) === tab.icon.origin ? tab.icon : null,
   };
 }
 
@@ -557,6 +608,9 @@ export const Tabs = {
     const dup = _tabs.get(dupId);
     dup.title = src.title;
     dup.pinned = src.pinned;
+    // A fork of a loaded page usually lands on the same origin while it
+    // reloads, so it may keep the source's mark until its own arrives.
+    dup.icon = src.icon ?? null;
     if (!background) {
       selectInternal(dupId);
     }
