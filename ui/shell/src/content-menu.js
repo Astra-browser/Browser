@@ -110,12 +110,7 @@ function buildItems(menu, browser) {
 
   if (menu.isContentSelected && menu.selectedText) {
     add(item("page.copy", "Copy"));
-    add(item("page.search", "Search Google for “…”", { hint: hostOf(menu.finalURI?.spec ?? "") || undefined }));
-    gap();
-  }
-
-  if (menu.onEditable) {
-    add(item("page.selectAll", "Select All"));
+    add(item("page.search", "Search Google for “…”", { hint: "Google" }));
     gap();
   }
 
@@ -125,7 +120,7 @@ function buildItems(menu, browser) {
     item("page.viewSource", "View Page Source"),
     SEP,
     item("page.devtools", "Inspect"),
-    item("page.selectAll", menu.onEditable ? "Select All" : "Select All"),
+    item("page.selectAll", "Select All"),
   );
 
   // A trailing separator would be drawn as a line against the window edge.
@@ -147,6 +142,19 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
     typeof isFromApp === "function" ? isFromApp : () => false;
   /** The one engine menu the open Astra menu is acting on. */
   let current = null;
+  /** A menu the person walks away from must not keep the page's state alive:
+   *  the reference is dropped on its own if no row ever comes back. */
+  let expiry = 0;
+  const arm = () => {
+    clearTimeout(expiry);
+    expiry = setTimeout(() => {
+      current = null;
+    }, 15000);
+  };
+  const release = () => {
+    clearTimeout(expiry);
+    current = null;
+  };
   let destroyed = false;
 
   const services = () => win.Services;
@@ -329,7 +337,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
       }
     } finally {
       // The engine menu is done once a row runs; keep nothing alive.
-      current = null;
+      release();
     }
   }
 
@@ -343,6 +351,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
     event.preventDefault();
     const { x, y } = screenPoint(win, menu.contentData?.context);
     current = { menu, browser };
+    arm();
     postToApp({
       ns: SHELL_NS,
       kind: "menu",
@@ -352,7 +361,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
 
   // A dismissed/refused engine menu must not leave its state behind either.
   function onPopupHidden() {
-    current = null;
+    release();
   }
 
   const onMessage = (event) => {
@@ -371,7 +380,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
     run,
     destroy() {
       destroyed = true;
-      current = null;
+      release();
       popup?.removeEventListener("popupshowing", onPopupShowing);
       popup?.removeEventListener("popuphidden", onPopupHidden);
       win.removeEventListener("message", onMessage);
