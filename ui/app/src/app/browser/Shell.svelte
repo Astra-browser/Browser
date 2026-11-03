@@ -6,6 +6,10 @@
     return import("$features/account").then((account) => account.loadAccountButton());
   }
   const loadAccountButton = () => (accountButton ??= importAccountButton());
+  // The settings rail stands only beside the settings page, whose own code is
+  // lazy too; loaded once and kept, like the account foot.
+  let settingsNavigation: ReturnType<typeof loadSettingsNavigation> | null = null;
+  const importSettingsNavigation = () => (settingsNavigation ??= loadSettingsNavigation());
   // Dynamic like the panel's own path to Notes, so the feature's entry is
   // never a startup request.
   const loadNotesPage = () => import("$features/notes").then((notes) => notes.loadNotesPage());
@@ -51,7 +55,7 @@
   import { loadToolSlot } from "$features/tools";
   import * as toolHost from "$session/tools.svelte";
   import * as notices from "$session/notice.svelte";
-  import { SettingsNavigation } from "$features/settings";
+  import { loadSettingsNavigation } from "$features/settings";
   import { loadLibraryPage } from "$features/library";
   import { loadHistoryPage } from "$features/history";
   import { loadSourcePage } from "$features/source";
@@ -573,8 +577,8 @@
                 {m.essential_move_failed()}
               </p>{/if}
           {/snippet}
-        </Dock>{/if}{/snippet}{#snippet settingsNavigation()}<SettingsNavigation
-      />{/snippet}{#snippet toolPanel(kind)}<LazyView
+        </Dock>{/if}{/snippet}{#snippet settingsNavigation()}{#await importSettingsNavigation() then { default: Navigation }}<Navigation
+        />{/await}{/snippet}{#snippet toolPanel(kind)}<LazyView
         loader={loadToolSlot}
         loadingLabel={m.surface_loading()}
         failureLabel={m.surface_render_failed()}
