@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stress video</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font:14px system-ui;overflow:hidden}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hud{position:absolute;left:12px;bottom:12px;padding:6px 10px;border-radius:8px;background:#000a;z-index:2}
+</style>
+</head>
+<body>
+<video id="v" autoplay muted loop playsinline preload="auto" disablepictureinpicture
+       src="/media/clip-1080p.mp4"></video>
+<div class="hud" id="hud">video</div>
+<script>
+  const v = document.getElementById('v');
+  const hud = document.getElementById('hud');
+  const params = new URLSearchParams(location.search);
+  // Half the tabs use the VP9/WebM stream so the run covers two decode paths.
+  if (params.get('codec') === 'vp9') v.src = '/media/clip-1080p.webm';
+  v.addEventListener('loadeddata', () => { v.play().catch(() => {}); });
+  setInterval(() => {
+    hud.textContent = `${v.currentSrc.split('/').pop()} ${v.videoWidth}x${v.videoHeight} ` +
+      `${v.paused ? 'PAUSED' : 'playing'} t=${v.currentTime.toFixed(1)}s`;
+  }, 500);
+</script>
+<script src="/common.js"></script>
+</body>
+</html>
