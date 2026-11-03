@@ -15,7 +15,12 @@
 // host/ is the versioned seam (§6.4).
 
 import { addEventListener, emit } from "./Events.sys.mjs";
-import { Tabs, __applyExternalUpdate } from "./Tabs.sys.mjs";
+import {
+  Tabs,
+  __applyExternalUpdate,
+  __spaceUserContextId,
+  __tabsState,
+} from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import {
@@ -411,6 +416,19 @@ export const Content = {
       browser.setAttribute("flex", "1");
       // Parked until a page is in front of it.
       browser.setAttribute("data-astra-browser-parked", "");
+      // Every space is a container: a login or cookie set in one is not
+      // visible in another. Private windows stay on the window's own context.
+      try {
+        const tab = __tabsState().tabs.get(id);
+        if (tab && !isPrivateWindow(doc.defaultView)) {
+          browser.setAttribute(
+            "usercontextid",
+            String(__spaceUserContextId(tab.space_id)),
+          );
+        }
+      } catch {
+        // A browser without a tab record keeps the default context.
+      }
       container.append(browser);
       // Remote browsers otherwise inherit the chrome window's
       // `useGlobalHistory = false`, which drops every visit from Places.

@@ -224,6 +224,15 @@ let _activeSpaceId = DEFAULT_SPACE_ID;
 export function __activeSpaceId() {
   return _activeSpaceId;
 }
+
+/** Each space is its own Firefox container: cookies, logins and site storage
+ *  are visible only inside it. Space 1 is the default (no container). */
+export function __spaceUserContextId(space) {
+  const match = /^space-(\d+)$/u.exec(String(space ?? ""));
+  if (!match) return 0;
+  const n = Number(match[1]);
+  return Number.isSafeInteger(n) && n > 1 ? n - 1 : 0;
+}
 let _nextSpaceId = 2;
 
 function spaceOf(space_id) {

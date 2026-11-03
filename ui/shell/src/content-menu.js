@@ -169,15 +169,7 @@ function devTabFor(win, browser) {
  *  of its own because the native tabbox that hosts a bottom toolbox is hidden
  *  in this shell. */
 async function showDevTools(win, browser, toolId) {
-  try {
-    win.__astraDevtools = { browser: !!browser, toolId: toolId ?? null };
-  } catch {
-    // Diagnostics only.
-  }
   if (!browser) {
-    try {
-      win.__astraDevtoolsError = "no_browser";
-    } catch {}
     return { accepted: false };
   }
   try {
@@ -193,10 +185,7 @@ async function showDevTools(win, browser, toolId) {
       reason: "contextmenu",
     });
     return { accepted: true };
-  } catch (error) {
-    try {
-      win.__astraDevtoolsError = String(error?.message ?? error);
-    } catch {}
+  } catch {
     return { accepted: false };
   }
 }
@@ -447,11 +436,6 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
 
 /** Actions the app's own chrome menu asks for; the shell owns the chrome. */
 export async function runChromeAction(win, host, id, { browser = null } = {}) {
-  try {
-    win.__astraLastChromeAction = id;
-  } catch {
-    // Diagnostics only.
-  }
   const openWindow = (options) => {
     if (typeof win.OpenBrowserWindow === "function") return win.OpenBrowserWindow(options);
     const { BrowserWindowTracker } = win.ChromeUtils.importESModule(
