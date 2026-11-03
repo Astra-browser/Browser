@@ -42,11 +42,12 @@ check("create adds a space", next.spaces.length === 2);
 check("create names it in order", next.spaces[1].name === "Space 2");
 check("create makes it active", next.active_space_id === next.spaces[1].id);
 check("create keeps its look", next.spaces[1].color === 3);
-// Every active space keeps one New Tab, so the stage always has an owner.
-check(
-  "a new space starts with its own New Tab",
-  next.tabs.length === 1 && next.tabs[0].url === null,
-);
+// The space in front always has somewhere to go: a new space opens with its
+// own New Tab instead of an empty stage (Tabs.ensureTabInActiveSpace), and
+// that tab is the one selected. `url: null` is the model's New Tab marker.
+check("a new space opens with its own New Tab",
+  next.tabs.length === 1 && next.tabs[0].url === null && next.tabs[0].title === "New Tab");
+check("that New Tab is selected", next.active === next.tabs[0].id);
 
 const second = next.spaces[1].id;
 const switched = await Tabs.switchSpace({ space: first });

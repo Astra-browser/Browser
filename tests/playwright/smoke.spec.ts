@@ -1,47 +1,39 @@
-// NOTE: bare `playwright/test` does not resolve from tests/ (repo root has
-// no package.json; the runner lives in ui/app/node_modules), so the spec
-// imports the runner relatively. Keep in sync with ui/app's playwright dep.
+// Standalone smoke (P3-T18): the frame's real UI graph, booted from the
+// golden entry (`golden.html?screen=shell`) which aliases `@tauri-apps/api/*`
+// to deterministic mocks. It never launches the native app binary or the
+// engine (see ui/app/playwright.config.ts and docs/astra/PLAYWRIGHT.md).
+//
+// This is deliberately the smallest check in the lane: it proves the document
+// boots, the shell mounts, and nothing throws the bridge's own error class.
+// The behaviour lives in the per-surface specs beside it.
 import { expect, test } from "../../ui/app/node_modules/playwright/test.mjs";
+import { newTabField, openScreen, sidebar, trackRuntime } from "./support.ts";
 
-// Standalone smoke (P3-T18). Loads the frame's static browser page over the
-// Vite dev server (see ui/app/playwright.config.ts webServer) — never the
-// native app binary or engine. Screenshots land in out/playwright-smoke/
-// (the config's outputDir).
-test("browser titlebar renders with no BridgeError", async ({ page }, testInfo) => {
+test("the shell boots with no BridgeError and no uncaught exception", async ({ page }, testInfo) => {
+  // "trusted browser initialization failed" from entries/browser.ts is
+  // EXPECTED on the plain dev pages (no Tauri host); the golden entry mounts
+  // with mocks and must not produce it, nor any @astra/bridge BridgeError.
   const bridgeErrors: string[] = [];
-  // NOTE: "trusted browser initialization failed" from entries/browser.ts is
-  // EXPECTED in standalone Chromium (no Tauri host) — it is not a BridgeError
-  // (the @astra/bridge error class, name === "BridgeError") and is excluded.
-  page.on("console", (msg) => {
-    if (msg.type() === "error" && /BridgeError/.test(msg.text())) {
-      bridgeErrors.push(msg.text());
+  const runtime = trackRuntime(page);
+  page.on("console", (message) => {
+    if (message.type() === "error" && /BridgeError/.test(message.text())) {
+      bridgeErrors.push(message.text());
     }
   });
-  page.on("pageerror", (err) => {
-    if (/BridgeError/i.test(String(err))) bridgeErrors.push(String(err));
+  page.on("pageerror", (error) => {
+    if (/BridgeError/i.test(String(error))) bridgeErrors.push(String(error));
   });
 
-  await page.goto("/browser.html");
+  await openScreen(page, "shell");
+
   await expect(page).toHaveTitle(/Astra/);
+  await expect(sidebar(page)).toBeVisible();
+  await expect(newTabField(page)).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Address and search" })).toBeVisible();
 
-  // The browser entry mounts into #root; without native Tauri APIs it logs
-  // "trusted browser initialization failed" instead of mounting, so only
-  // assert the shell (root element + titlebar spacer) rather than full app.
-  const root = page.locator("#root");
-  await expect(root).toBeAttached();
+  expect(runtime.pageErrors, `uncaught exceptions: ${runtime.pageErrors.join("\n")}`).toEqual([]);
+  expect(bridgeErrors, `BridgeError noise: ${bridgeErrors.join("\n")}`).toEqual([]);
 
-  // Titlebar spacer: SidebarHeader renders a --titlebar-height spacer div.
-  // Fall back to asserting the page shell is non-blank.
-  const titlebarSpacer = page.locator('[style*="--titlebar-height"]');
-  const spacerCount = await titlebarSpacer.count();
-  if (spacerCount > 0) {
-    await expect(titlebarSpacer.first()).toBeAttached();
-  } else {
-    const bodyText = await page.evaluate(() => document.body.innerHTML.length);
-    expect(bodyText).toBeGreaterThan(0);
-  }
-
-  // Screenshot lands under the config outputDir (out/playwright-smoke/).
-  await page.screenshot({ path: testInfo.outputPath("smoke-browser.png") });
-  expect(bridgeErrors, `BridgeError console noise: ${bridgeErrors.join("\n")}`).toEqual([]);
+  // Artifact for visual review (out/ is gitignored).
+  await page.screenshot({ path: testInfo.outputPath("smoke-shell.png") });
 });
