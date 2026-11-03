@@ -90,8 +90,10 @@ export function isValidSelector(selector) {
   if (trimmed === "" || trimmed.length > MAX_SELECTOR_LEN) {
     return false;
   }
-  // Never allow markup or script-smuggling inside a stored rule.
-  if (/[<>"`]|javascript:/i.test(trimmed)) {
+  // Never allow markup or script-smuggling inside a stored rule. Braces,
+  // semicolons and at-rules would let a page-controlled id/class close the
+  // selector and append arbitrary CSS to the injected stylesheet.
+  if (/[<>"`{};@\\]|javascript:|\/\*/iu.test(trimmed)) {
     return false;
   }
   return true;

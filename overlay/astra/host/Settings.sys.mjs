@@ -32,10 +32,12 @@ export const Settings = {
   },
 
   async set({ request_id = "", key = "", value = null } = {}) {
-    if (typeof key !== "string" || key === "") {
+    // Keys are a closed vocabulary the app owns. Anything else could forge a
+    // `ui-command` for another surface (the preference push is a string).
+    if (typeof key !== "string" || !/^[a-z0-9._-]+$/iu.test(key)) {
       return admission(false);
     }
-    if (typeof value !== "string") {
+    if (typeof value !== "string" || /[\u0000-\u001f\u007f]/u.test(value)) {
       return admission(false);
     }
     _values.set(key, value);
