@@ -310,6 +310,13 @@ last perceived-latency win.
   regresses, move parked browsers to `-moz-subtree-hidden-only-visually:1`
   rather than re-enabling `preserveLayers`.
 
+**Deferred (2026-11-04): first-load UX / preconnect / per-space warm pool.**
+The spec is `docs/astra/FIRST_LOAD_UX_TESTCASE.md`; the diagnostic is
+`tools/perf/stress/first_load_probe.py`. Measured cold-vs-warm baseline:
+Google 6.13 s → 0.62 s; YouTube 2.48/6.70 s → 1.09/1.06 s. Do **not** implement
+progressive reveal, speculative preconnect or a warm connection pool now.
+No product code is touching it.
+
 **Still open**
 - Real-display 3D A/B: hide/clip the app layer under the content stage, measure
   `gpu_render_pct`/frame, then decide on the stage restructure.
