@@ -28,8 +28,7 @@ import App from "$app/browser/BrowserApp.svelte";
 
 const SURFACE = "browser-chrome";
 const SHELL_NS = "astra-shell";
-/** The shell hands over its mount element and ready hook (P3-T23). */
-const MOUNT_HOOK = "__ASTRA_MOUNT__";
+/** The shell hands over its ready hook (P3-T23). */
 const READY_HOOK = "__ASTRA_READY__";
 
 /** Announce readiness to the embedding shell (no-op standalone). */

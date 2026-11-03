@@ -21,7 +21,7 @@
 // Stdlib only.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appRoot = new URL(".", import.meta.url);
@@ -87,4 +87,4 @@ await writeFile(jarMn, `${before}${block}${after}`);
 // Brand note: the bundle carries the Appendix C prev:-channel rename map
 // (EVENT_RENAMES), which names the previous product; tools/brand-lint.sh
 // excludes this generated dir like other build outputs (see SHELL_APP.md).
-console.log(`stage-chrome: staged ${files.length} files, jar.mn block rewritten, CSP audit clean`);
+console.warn(`stage-chrome: staged ${files.length} files, jar.mn block rewritten, CSP audit clean`);

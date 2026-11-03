@@ -68,7 +68,8 @@ export default defineConfig({
         // (Replicates the default sanitizer's null-byte handling, which a
         // custom function replaces.)
         sanitizeFileName: (name: string) =>
-          name.replace(/[?*~|<>:\"\\\x00-\x1f]/g, (ch) => (ch === "~" ? "-" : "_")),
+          // eslint-disable-next-line no-control-regex -- a filename can carry a control byte; Vite's default sanitizer strips it.
+          name.replace(/[?*~|<>:"\\\x00-\x1f]/g, (ch) => (ch === "~" ? "-" : "_")),
       },
       input: {
         "browser-chrome": fileURLToPath(new URL("./browser-chrome.html", import.meta.url)),
