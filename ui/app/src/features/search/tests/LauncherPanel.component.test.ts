@@ -197,6 +197,17 @@ test("a search that never answers says so, and Try again asks again", async () =
   }
 });
 
+test("a query past the byte bound says so and offers no retry", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  const asked = native.search.mock.calls.length;
+  // The field's 2048 limit counts UTF-16 units; an ideograph costs three bytes.
+  await screen.getByRole("combobox").fill("界".repeat(700));
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("This search is too long");
+  // Retrying would send the same query and fail the same way.
+  expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
+  expect(native.search.mock.calls.length).toBe(asked);
+});
+
 test("the primary modifier plus Shift and C copies the selected address", async () => {
   const written: string[] = [];
   Object.defineProperty(navigator, "clipboard", {

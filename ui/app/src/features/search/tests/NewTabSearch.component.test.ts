@@ -291,6 +291,14 @@ test("the clear control empties the field and closes the list", async () => {
   await expect.element(input).toHaveFocus();
 });
 
+test("a query past the byte bound says so and offers no retry", async () => {
+  const screen = await mount({ tabId: "tab" });
+  await screen.getByRole("combobox").fill("界".repeat(700));
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("This search is too long");
+  expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
+  expect(native.search).not.toHaveBeenCalled();
+});
+
 test("leaving while a search is open cancels it, and its answer is dropped", async () => {
   const screen = await mount({ tabId: "tab" });
   await screen.getByRole("combobox").fill("rust");
