@@ -23,7 +23,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox"))
+ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
+BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
 PORT = int(os.environ.get("ASTRA_NATIVE_NAV_PORT", "2850"))
 sys.path.insert(0, os.path.join(ROOT, "tests", "contract"))
 import load_state as L  # noqa: E402
@@ -35,6 +36,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.server.hits = getattr(self.server, "hits", 0) + 1
+        self.server.requests = getattr(self.server, "requests", [])
+        self.server.requests.append((self.path, dict(self.headers)))
         if self.path.startswith("/slow"):
             time.sleep(4.0)
             body = b"<html><head><title>SLOW PAGE</title></head><body>slow</body></html>"
@@ -78,6 +81,11 @@ catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 HARD = """const id = arguments[0];
 const done = arguments[arguments.length - 1];
 (async () => { try { done(JSON.stringify(await window.__astraHost.Navigation.hardReload({request_id:'p', astra_tab_id:id}))); }
+catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
+
+RELOAD = """const id = arguments[0];
+const done = arguments[arguments.length - 1];
+(async () => { try { done(JSON.stringify(await window.__astraHost.Navigation.reload({request_id:'p', astra_tab_id:id}))); }
 catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 
 STOP = """const id = arguments[0];
@@ -181,8 +189,19 @@ def main():
             if st.get("title") == "CACHED PAGE" and st.get("loading") is False:
                 break
             time.sleep(0.1)
-        first_hits = server.hits - before_hits
-        before_hits = server.hits
+        first_hits = sum(1 for p, _ in server.requests if p.startswith("/cached"))
+        # Soft reload: revalidates, but does not have to bypass the proxy/cache.
+        before = len(server.requests)
+        m.execute_async(RELOAD, [tab["astra_tab_id"]])
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            st = json.loads(m.execute(STATE))
+            if st.get("title") == "CACHED PAGE" and st.get("loading") is False:
+                break
+            time.sleep(0.1)
+        soft = [(p, h) for p, h in server.requests[before:] if p.startswith("/cached")]
+        # Hard reload: BYPASS_PROXY|BYPASS_CACHE must send a no-cache request.
+        before = len(server.requests)
         m.execute_async(HARD, [tab["astra_tab_id"]])
         deadline = time.time() + 15
         while time.time() < deadline:
@@ -190,9 +209,20 @@ def main():
             if st.get("title") == "CACHED PAGE" and st.get("loading") is False:
                 break
             time.sleep(0.1)
-        second_hits = server.hits - before_hits
-        out["reload_hits"] = {"first": first_hits, "hard": second_hits}
-        out["hard_reload_worked"] = second_hits >= 1
+        hard = [(p, h) for p, h in server.requests[before:] if p.startswith("/cached")]
+
+        def bypassed(items):
+            for _, headers in items:
+                pragma = (headers.get("Pragma") or headers.get("pragma") or "").lower()
+                cc = (headers.get("Cache-Control") or headers.get("cache-control") or "").lower()
+                if "no-cache" in pragma or "no-cache" in cc:
+                    return True
+            return False
+
+        out["reload_requests"] = {"first": first_hits, "soft": len(soft), "hard": len(hard)}
+        out["hard_bypass_header"] = bypassed(hard)
+        out["soft_bypass_header"] = bypassed(soft)
+        out["hard_reload_worked"] = len(hard) >= 1 and out["hard_bypass_header"]
     finally:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
@@ -211,6 +241,7 @@ def main():
         and out.get("stop_model_cleared")
         and out.get("zoom_worked")
         and out.get("hard_reload_worked")
+        and out.get("hard_bypass_header")
     )
     return 0 if ok else 1
 

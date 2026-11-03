@@ -225,6 +225,7 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | Date | Phase | Result |
 |---|---|---|
 | 2026-11-04 | P0 | done: `hostapi_v1` 306, `commands_model` 50, `session_restore` 99, `tab_lifecycle` 4, bridge 26; state/brand clean; tag `pre-native-merge-20261104` |
-| 2026-11-04 | P1 | done: `boot_model` 18, `sidecar_spike` PASS; Boot is the single core supervisor; `launchCore` is honest `unavailable` without a command |
-| 2026-11-04 | P2 | done: `native_nav_model` 12; live probe stop `about:blank` after a 4 s slow page and zoom readback `1.5`; overlay + `build --faster` used |
+| 2026-11-04 | P1 | done: `boot_model` 31, `sidecar_spike` PASS; Boot is the single core supervisor (single-flight launch, bounded handshake, timeout shutdown, dead-core detection); shell calls `launchCore` on mount and `shutdown` on quit; pref `astra.core.command` defaults empty |
+| 2026-11-04 | P2 | done: `native_nav_model` 17; live probe stop `about:blank` after a 4 s slow page, model loading cleared, zoom readback `1.5`, soft reload no-cache=false vs hard reload no-cache=true; overlay + `build --faster` used |
+| 2026-11-04 | P1/P2 review | code review found the supervisor unreachable + failure-path bugs; fixed and re-reviewed PASS-WITH-NOTES. Remaining notes are P4/P5 work, not blockers. |
 | 2026-11-04 | P4 design | architect review done: mount is `#tabbrowser-tabbox`, no reparenting, pref-gated; SessionStore is a hazard to contain in P4 and lands in P5 |

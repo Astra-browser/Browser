@@ -23,6 +23,8 @@ import { HOST_API_VERSION } from "./Tabs.sys.mjs";
 import { __ensureDefaultWindow } from "./Windows.sys.mjs";
 
 const FRAME_CAP = 16 * 1024 * 1024;
+const HANDSHAKE_TIMEOUT_MS = 5000;
+const SHUTDOWN_TIMEOUT_MS = 5000;
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -67,7 +69,16 @@ export class BootSidecar {
     const proc = await Subprocess.call({ command, stderr });
     const sidecar = new BootSidecar(proc);
     try {
-      const hello = await sidecar.call("boot.handshake", { core_version: 1 });
+      let timer = 0;
+      const hello = await Promise.race([
+        sidecar.call("boot.handshake", { core_version: 1 }),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Sidecar handshake timed out")),
+            HANDSHAKE_TIMEOUT_MS,
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
       if (hello.kind !== "res" || hello.error) {
         throw new Error(
           hello?.error?.message ? `Sidecar handshake rejected: ${hello.error.message}` : "Sidecar handshake rejected",
@@ -149,6 +160,7 @@ export class BootSidecar {
 let _core = null;
 let _corePromise = null;
 let _launchCore = null;
+let _shuttingDown = false;
 
 /** Test seam: replace the native launcher with a handle factory. */
 export function __setCoreLauncherForTests(launcher) {
@@ -187,6 +199,9 @@ export const Boot = {
    * Concurrent callers share one launch; a dead handle is discarded.
    */
   async launchCore({ request_id = "boot-core", command = "" } = {}) {
+    if (_shuttingDown) {
+      return err(request_id, "core_shutting_down", "the core is shutting down");
+    }
     if (_core?.alive) {
       return ok(request_id, { state: "running" });
     }
@@ -202,6 +217,10 @@ export const Boot = {
     if (!_corePromise) {
       _corePromise = launchCoreHandle(command.trim())
         .then((handle) => {
+          if (_shuttingDown) {
+            void handle.shutdown();
+            throw new Error("core shut down during launch");
+          }
           _core = handle;
           return handle;
         })
@@ -232,23 +251,32 @@ export const Boot = {
 
   async shutdown({ request_id = "boot-shutdown", reason = "quit" } = {}) {
     let coreStopped = false;
-    // A launch in flight must settle before we decide there is no core.
-    if (_corePromise) {
-      try {
-        await _corePromise;
-      } catch {
-        // Launch failure already cleared the handle.
+    _shuttingDown = true;
+    try {
+      // A launch in flight must settle (or time out) before we decide there
+      // is no core. A hung handshake must not block quit forever.
+      if (_corePromise) {
+        try {
+          await Promise.race([
+            _corePromise,
+            new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+          ]);
+        } catch {
+          // Launch failure already cleared the handle.
+        }
       }
-    }
-    const core = _core;
-    _core = null;
-    if (core) {
-      try {
-        await core.shutdown();
-        coreStopped = true;
-      } catch {
-        // The process is gone or refused; shutdown still proceeds.
+      const core = _core;
+      if (core) {
+        try {
+          await core.shutdown();
+          coreStopped = true;
+        } catch {
+          // The process is gone or refused; shutdown still proceeds.
+        }
       }
+      _core = null;
+    } finally {
+      _shuttingDown = false;
     }
     emit("boot.shutdown", { reason });
     return ok(request_id, { shutdown: true, core_stopped: coreStopped });
@@ -261,6 +289,7 @@ export function __resetBootForTests() {
   _core = null;
   _corePromise = null;
   _launchCore = null;
+  _shuttingDown = false;
   if (core) {
     try {
       void core.shutdown();

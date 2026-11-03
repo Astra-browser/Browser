@@ -6,7 +6,7 @@
 //
 //   - handshake keeps version negotiation, default window and event_seq
 //   - a missing core command is an honest `unavailable`, never a fake launch
-//   - coreStatus and shutdown are safe before any core is launched
+//   - launchCore is safe before a core command exists; shutdown is idempotent
 //   - the Appendix C frame stays 4-byte BE length + UTF-8 JSON
 //   - importing Boot in Node does not resolve the chrome-only Subprocess
 //
@@ -117,6 +117,75 @@ __setCoreLauncherForTests(async () => {
 const retry = await Boot.launchCore({ request_id: "boot-retry", command: "/fake/core" });
 check("a dead core can be relaunched", retry.state === "running" && second === 1);
 await Boot.shutdown({ request_id: "boot-shut-2" });
+
+// --- handshake rejection kills the core ----------------------------------
+function fakeProc(responseFor) {
+  let wrote = null;
+  let release = () => {};
+  const written = new Promise((resolve) => {
+    release = resolve;
+  });
+  let kills = 0;
+  let body = "";
+  let served = false;
+  const proc = {
+    stdin: {
+      write(buf) {
+        wrote = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4)));
+        release();
+        return Promise.resolve();
+      },
+    },
+    stdout: {
+      async read() {
+        await written;
+        if (served) {
+          return null;
+        }
+        served = true;
+        const frame = SidecarFrame.encode(responseFor(wrote));
+        body = new TextDecoder().decode(new Uint8Array(frame, 4));
+        return frame.slice(0, 4);
+      },
+      async readString() {
+        return body;
+      },
+    },
+    kill: async () => {
+      kills += 1;
+    },
+  };
+  return { proc, kills: () => kills };
+}
+const rejected = fakeProc((req) => ({
+  ...req,
+  kind: "res",
+  error: { code: "version_mismatch", message: "core too new" },
+}));
+let failedLaunch = null;
+try {
+  await BootSidecar.launch("x", { subprocess: { call: async () => rejected.proc } });
+} catch (e) {
+  failedLaunch = e;
+}
+check("a rejected handshake fails the launch", failedLaunch !== null);
+check("a rejected handshake kills the process", rejected.kills() >= 1);
+
+// --- EOF marks the core dead ---------------------------------------------
+const eof = new BootSidecar({
+  stdin: { write: () => Promise.resolve() },
+  stdout: { read: () => Promise.resolve(null), readString: () => Promise.resolve("") },
+  kill: async () => {},
+});
+await new Promise((resolve) => setTimeout(resolve, 20));
+check("EOF marks the core dead", eof.alive === false);
+let callRejected = false;
+try {
+  await eof.call("boot.status", {});
+} catch {
+  callRejected = true;
+}
+check("a dead core rejects calls", callRejected);
 
 // --- shutdown does not hang on a silent core ------------------------------
 let killed = 0;

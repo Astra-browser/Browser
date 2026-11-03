@@ -61,3 +61,12 @@ python3 tools/marionette-probe/headed-probe.py /tmp/p out/shot   # launch + stat
 python3 tools/marionette-probe/framecheck2.py                    # frame-by-frame boot check (PID-matched)
 python3 tests/contract/shell_app_chrome.py                       # 17 live checks
 ```
+
+## Optional Rust core
+
+The shell calls `Boot.launchCore` on mount with `astra.core.command`. It is
+empty by default, so the browser runs without a core and answers
+`unavailable`. For a dev core, point it at the binary in the profile
+(`user_pref("astra.core.command", "/absolute/path/to/astra-core");`) and
+restart. The `out/sidecar-stub` harness is the current test double; there is
+no packaged core binary yet.

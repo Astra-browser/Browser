@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import Hello from "./Hello.svelte";
   import { loadHost, newRequestId } from "./host.js";
   import { mountUrlBar } from "./urlbar.js";
@@ -95,6 +95,15 @@
     }
   }
 
+  let teardown = null;
+  onDestroy(() => {
+    try {
+      teardown?.();
+    } catch {
+      // Already torn down with the window.
+    }
+  });
+
   onMount(async () => {
     const host = await loadHost();
     if (!host) {
@@ -130,6 +139,25 @@
     }
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
+    // The Rust core is per-process: stop it on application quit, not on a
+    // single window close. Multiple windows may hold this observer; Boot
+    // shutdown is idempotent.
+    let coreStopped = false;
+    const stopCore = () => {
+      if (coreStopped) return;
+      coreStopped = true;
+      void host.Boot.shutdown({ request_id: "shell-quit", reason: "quit-application-granted" });
+    };
+    const quitObserver = {
+      observe(_subject, topic) {
+        if (topic === "quit-application-granted") stopCore();
+      },
+    };
+    try {
+      win?.Services?.obs?.addObserver(quitObserver, "quit-application-granted");
+    } catch {
+      // No Services in a preview DOM.
+    }
     // The browser's shortcuts belong to the product, not to hidden Firefox
     // chrome. The app's keymap is the one registry; the shell matches the same
     // accelerators when focus is on the page (where the app document never
@@ -710,7 +738,7 @@
       }
     };
     win.addEventListener("message", onWindowMenu);
-    return () => {
+    teardown = () => {
       try {
         off();
       } catch {
@@ -718,6 +746,11 @@
       }
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
+      try {
+        win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
+      } catch {
+        // Already gone with the window.
+      }
       shellMenuApi.destroy();
       doc.removeEventListener("MozDOMFullscreen:Request", onFsRequest, true);
       doc.removeEventListener("MozDOMFullscreen:Exit", onFsExit, true);

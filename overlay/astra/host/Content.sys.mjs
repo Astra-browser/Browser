@@ -718,6 +718,7 @@ export const Content = {
       if (!entry) return;
       release(entry);
       browsers.delete(id);
+      zoomLevels.delete(id);
       try {
         entry.browser.remove();
       } catch {
@@ -794,7 +795,7 @@ export const Content = {
         const entry = browsers.get(id);
         if (entry) {
           entry.requested = event.data?.url || entry.requested;
-          markLoading(id);
+          markLoading(id, true);
           watch(id, entry);
           if (!hardReloadBrowser(entry.browser)) {
             stopWatching(entry);
