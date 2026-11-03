@@ -261,3 +261,60 @@ last perceived-latency win.
 6. `perf(ui): lazy-load Work/Settings/Notes/ELK and virtualize long lists`
 7. `perf(compositor): stop painting the app layer under the content rect`
 8. `test(perf): local load visible <500 ms; background tab CPU/memory bounds`
+
+## 8. What has landed / what changed after the tree audit (2026-11-04)
+
+**Landed on main**
+- `b87ba7c` — fast load state. A loopback page that finishes before the first
+  200 ms poll clears `loading` immediately instead of waiting out the 15 s
+  `startDeadline`. Live probe: **206–230 ms** (was 15 s); slow-start probe still
+  holds the skeleton until the first byte, then clears.
+- `a388bb4` — parked tab lifecycle. `manualactiveness="true"`, active tabs
+  `docShellIsActive=true` + `preserveLayers(false)`, parked tabs
+  `preserveLayers(false)` then `docShellIsActive=false`. Live three-tab probe:
+  active visible/rendering, parked hidden/inactive/non-rendering, pages stay
+  loaded with the same `timeOrigin`, switch-back does not reload, and
+  background **audio keeps advancing** while parked.
+- `6dddb53` — settings rail is no longer in the browser startup graph.
+  Startup graph **506,805 → 452,823 bytes (−10.7%)** and **85 → 74 chunks**;
+  browse first paint and first-frame completeness unchanged.
+
+**Measured, not changed**
+- `dom.ipc.processPrelaunch.fission.number` 3→1 did **not** reduce the observed
+  content-process count (5 both) and PSS was 609 vs 646 MiB (noise). Do not ship
+  a blind prealloc change. The 7-vs-4 gap likely includes the hidden stock
+  tabbrowser, extension, privilegedabout and/or a second webIsolated process;
+  audit with `ChromeUtils.requestProcInfo()` / `about:processes` first.
+- The 3D compositor A/B cannot be measured on the private Weston display: it
+  renders with **llvmpipe** and reports 0% DRM render. It needs a real iGPU
+  display and the focus watchdog.
+
+**Corrections from the ESR 153 source audit**
+- `docShellIsActive` is the `<browser>` property: it sets
+  `browsingContext.isActive` and remote `renderLayers`. Setting
+  `browsingContext.isActive` alone leaves rendering on. Wake order:
+  `docShellIsActive=true`, then `preserveLayers(false)`. Park order:
+  `preserveLayers(false)`, then `docShellIsActive=false`.
+- `manualactiveness="true"` is required before manual changes; without it Gecko
+  re-derives activeness when the content process attaches or changes remoteness.
+  With it, the visible tab must be set active explicitly or it does not paint.
+- The pref is **`media.suspend-background-video.enabled` / `.delay-ms`** (not
+  `media.suspend-bkgnd-video`). Deactivating a docshell does not pause media;
+  video decode freezes after the delay, audio continues.
+- There is **no chrome-side `WEBGL_lose_context`**. Background WebGL contexts
+  idle but keep their GPU allocations. `docShellIsActive=false` + layer release
+  stops CPU/GPU drawing, but the 3D GPU-memory target needs **discard/browser
+  removal** (SessionStore + sleeping UI), not deactivation.
+- `display:none` parking already tears down the presentation; the docshell
+  deactivation is what fixes visibility, rAF and CPU. If switch latency
+  regresses, move parked browsers to `-moz-subtree-hidden-only-visually:1`
+  rather than re-enabling `preserveLayers`.
+
+**Still open**
+- Real-display 3D A/B: hide/clip the app layer under the content stage, measure
+  `gpu_render_pct`/frame, then decide on the stage restructure.
+- Discard/sleeping policy with SessionStore, scroll/form restore and exceptions.
+- Runtime startup/PSS re-measure after the settings split (the build win is
+  static; the engine build is required for `spawn→UI ready`).
+- Process-table audit via `ChromeUtils.requestProcInfo()` before any
+  `dom.ipc.*` change.
