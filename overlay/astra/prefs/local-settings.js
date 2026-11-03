@@ -13,3 +13,7 @@ pref("general.config.obscure_value", 0);
 // Optional Rust core process. Empty = no core; the shell asks Boot to
 // launch it and gets an honest `unavailable` instead of a fake process.
 pref("astra.core.command", "");
+
+// P4 spike: dock the native gBrowser panel behind the Astra stage. Off
+// until the native tab mapping lands; flipping it alone cannot cover a page.
+pref("astra.gbrowser.enabled", false);

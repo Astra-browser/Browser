@@ -10,6 +10,7 @@
   import { installContentMenu, runChromeAction } from "./content-menu.js";
   import { createShellMenu } from "./menu.js";
   import { slotStateFor } from "./content/slot-state.js";
+  import { stageRectOf, stageStateFor, stageStyle } from "./content/stage-rect.js";
   import "./urlbar.css";
   import "./frame/frame.css";
   import "./tabs/tab-strip.css";
@@ -147,6 +148,54 @@
       ownWindowId = host.__bindCurrentWindow?.(win) || "win-1";
     } catch {
       // Preview DOM without a chrome window.
+    }
+
+    // P4 spike: dock the native tabbrowser panel behind the Astra stage. The
+    // panel is inert until Content.mountNative marks it mounted, so flipping
+    // the pref cannot cover a working standalone page with a blank deck.
+    let gbrowserEnabled = false;
+    try {
+      gbrowserEnabled = win?.Services?.prefs?.getBoolPref("astra.gbrowser.enabled", false) === true;
+    } catch {
+      gbrowserEnabled = false;
+    }
+    let stageObserver = null;
+    let stageMutation = null;
+    let onStageResize = null;
+    const gbrowserRoot = doc.documentElement;
+    if (gbrowserEnabled) {
+      gbrowserRoot.setAttribute("data-astra-gbrowser", "true");
+      const applyStage = () => {
+        const rect = stageRectOf(slot);
+        const vars = stageStyle(rect);
+        for (const [key, value] of Object.entries(vars)) {
+          gbrowserRoot.style.setProperty(key, value);
+        }
+        const mounted = gbrowserRoot.getAttribute("data-astra-native-mounted") === "true";
+        const state = mounted
+          ? stageStateFor({
+              booted: frameRoot.getAttribute("data-app-booted") === "true",
+              hasPage: slot.dataset.hasPage === "true",
+              loading: slot.dataset.loading === "true",
+              internal: slot.dataset.internal === "true",
+            })
+          : "app";
+        gbrowserRoot.setAttribute("data-astra-stage", state);
+      };
+      stageObserver = new ResizeObserver(applyStage);
+      stageObserver.observe(slot);
+      stageMutation = new MutationObserver(applyStage);
+      stageMutation.observe(slot, {
+        attributes: true,
+        attributeFilter: ["data-has-page", "data-loading", "data-internal"],
+      });
+      stageMutation.observe(frameRoot, {
+        attributes: true,
+        attributeFilter: ["data-app-booted"],
+      });
+      onStageResize = () => applyStage();
+      win?.addEventListener("resize", onStageResize);
+      applyStage();
     }
     // The Rust core is per-process: stop it on application quit, not on a
     // single window close. Multiple windows may hold this observer; Boot
@@ -748,6 +797,13 @@
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
       win.removeEventListener("sizemodechange", onSizeMode);
+      stageObserver?.disconnect();
+      stageMutation?.disconnect();
+      if (onStageResize) {
+        win.removeEventListener("resize", onStageResize);
+      }
+      gbrowserRoot.removeAttribute("data-astra-gbrowser");
+      gbrowserRoot.removeAttribute("data-astra-stage");
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
       } catch {
@@ -950,6 +1006,31 @@
      seam (the hidden DOM and `gBrowser` object persist). */
   :global(#astra-root ~ #browser) {
     display: none;
+  }
+  /* P4 spike: when the pref is on, the native deck is docked over the Astra
+     content slot. It stays hidden until Content.mountNative marks it mounted
+     and the stage has a committed page. Explicit px, not inset (D-30). */
+  :global(:root[data-astra-gbrowser="true"] #browser) {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: transparent;
+  }
+  :global(:root[data-astra-gbrowser="true"] #tabbrowser-tabbox) {
+    display: block !important;
+    position: absolute;
+    left: var(--astra-stage-x, 0px);
+    top: var(--astra-stage-y, 0px);
+    width: var(--astra-stage-w, 0px);
+    height: var(--astra-stage-h, 0px);
+    margin: 0;
+    pointer-events: auto;
+    visibility: hidden;
+  }
+  :global(:root[data-astra-gbrowser="true"][data-astra-stage="page"] #tabbrowser-tabbox) {
+    visibility: visible;
   }
   .astra-split-mount > :global(.astra-split) {
     max-height: 40vh;

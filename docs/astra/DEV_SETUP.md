@@ -70,3 +70,11 @@ empty by default, so the browser runs without a core and answers
 (`user_pref("astra.core.command", "/absolute/path/to/astra-core");`) and
 restart. The `out/sidecar-stub` harness is the current test double; there is
 no packaged core binary yet.
+
+## P4 stage dock (spike)
+
+`astra.gbrowser.enabled` (default false) docks the native
+`#tabbrowser-tabbox` over the Astra content slot. It is inert until
+`Content.mountNative` marks `data-astra-native-mounted`; flipping the pref
+alone must not cover a working page. The geometry probe is
+`tools/perf/stress/gbrowser_stage_probe.py`.
