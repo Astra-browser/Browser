@@ -92,32 +92,32 @@ export default defineConfig({
           provide: {
             privilegedPermissionsPolicy:
               /const PRIVILEGED_PERMISSIONS_POLICY: &str = "([^"]+)";/u.exec(
-                readNativeArtifact(new URL("../desktop/src/lib.rs", import.meta.url), "utf8"),
+                readNativeArtifact(new URL("../desktop/src/lib.rs", import.meta.url)),
               )?.[1] ?? "",
             formSubmitRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-engine/src/platform/form_submit_observer.js",
                 import.meta.url,
               ),
-              "utf8",
+
             ),
             formActionRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-engine/src/platform/macos/agentic_form_diagnostic_probe.js",
                 import.meta.url,
               ),
-              "utf8",
+
             ),
             formOracleRuntime: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/work_form_oracle.js", import.meta.url),
-              "utf8",
+
             ),
             pixelPrivacyRuntime: readNativeArtifact(
               new URL(
                 "../crates/astra-agentic/assets/semantic-pixel-privacy-v1.js",
                 import.meta.url,
               ),
-              "utf8",
+
             ),
             semanticMediaRuntime:
               readNativeArtifact(
@@ -125,19 +125,19 @@ export default defineConfig({
                   "../crates/astra-agentic/assets/semantic-record-media-v1.js",
                   import.meta.url,
                 ),
-                "utf8",
+
               ) +
               readNativeArtifact(
                 new URL("../crates/astra-agentic/assets/semantic-runtime-v1.js", import.meta.url),
-                "utf8",
+
               ),
             humanWallSurvey: readNativeArtifact(
               new URL("../crates/astra-agentic/assets/work-human-wall-v1.js", import.meta.url),
-              "utf8",
+
             ),
             contentStyleSource: readNativeArtifact(
               new URL("../crates/astra-engine/src/host/content_style.js", import.meta.url),
-              "utf8",
+
             ),
             packagedStylePolicy: {
               styleSource: (() => {
@@ -146,7 +146,7 @@ export default defineConfig({
                 // artifact this mirrors lands.
                 try {
                   return JSON.parse(
-                    readNativeArtifact(new URL("../desktop/tauri.conf.json", import.meta.url), "utf8"),
+                    readNativeArtifact(new URL("../desktop/tauri.conf.json", import.meta.url)),
                   ).app.security.csp["style-src"] as string;
                 } catch {
                   return "";
@@ -156,7 +156,7 @@ export default defineConfig({
               inlineStyleCount: ["./browser.html", "./panel.html"].reduce(
                 (count, path) =>
                   count +
-                  (readNativeArtifact(new URL(path, import.meta.url), "utf8").match(/<style(?:\s|>)/giu)
+                  (readNativeArtifact(new URL(path, import.meta.url)).match(/<style(?:\s|>)/giu)
                     ?.length ?? 0),
                 0,
               ),
