@@ -1,21 +1,22 @@
 import type { HistoryVisitView } from "$shared/ipc/bindings";
+import { getLocale } from "$shared/i18n/runtime";
 
 /** A visit row, or the heading that opens the day it belongs to. */
 export type HistoryRow =
   | { kind: "day"; id: string; day: string; label: string; count: number }
   | { kind: "visit"; id: string; day: string; visit: HistoryVisitView };
 
-const DAY_LABEL = new Intl.DateTimeFormat(undefined, {
+const DAY_LABEL = new Intl.DateTimeFormat(getLocale(), {
   weekday: "long",
   day: "numeric",
   month: "long",
 });
-const DAY_LABEL_WITH_YEAR = new Intl.DateTimeFormat(undefined, {
+const DAY_LABEL_WITH_YEAR = new Intl.DateTimeFormat(getLocale(), {
   day: "numeric",
   month: "long",
   year: "numeric",
 });
-const TIME_LABEL = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const TIME_LABEL = new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" });
 
 export function visitedAt(visit: HistoryVisitView): Date {
   return new Date(Number(visit.visited_at) * 1000);

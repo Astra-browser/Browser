@@ -1,6 +1,7 @@
 import { planName, priceLabel } from "$domain/account";
 import type { AccountOfferV1, AccountPriceV1 } from "$shared/ipc/bindings";
 import * as m from "$shared/i18n/messages";
+import { getLocale } from "$shared/i18n/runtime";
 
 export type PlanOffer = Extract<AccountOfferV1, { kind: "plan" }>;
 export type TopUpOffer = Extract<AccountOfferV1, { kind: "top_up" }>;
@@ -139,7 +140,7 @@ export function planCards({
   const free: PlanCard = {
     id: "free",
     name: m.account_plan_free(),
-    price: priceLabel(nothing) ?? m.account_plan_free(),
+    price: priceLabel(nothing, getLocale()) ?? m.account_plan_free(),
     per: null,
     features: plainFeatures("free"),
     action: current === "free" ? "current" : "none",
@@ -149,7 +150,7 @@ export function planCards({
 
   const paidCards = planIds(plans).map((id): PlanCard => {
     const offer = offerAt(plans, id, interval)!;
-    const price = priceLabel(offer.price);
+    const price = priceLabel(offer.price, getLocale());
     const target = offer.price?.amount_minor;
     const downgrade = target !== undefined && nowPrice !== undefined && target < nowPrice;
     let action: PlanAction = "none";

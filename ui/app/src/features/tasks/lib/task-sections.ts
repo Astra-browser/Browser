@@ -1,4 +1,5 @@
 import type { TaskRow } from "$domain/resources";
+import { getLocale } from "$shared/i18n/runtime";
 
 /** What the list is asking about. Scope narrows the day; it never filters by
  *  who holds a task, because a person and an agent share one list. */
@@ -18,19 +19,19 @@ export type TaskSection = {
 export type DueTone = "overdue" | "today" | "soon" | "later";
 
 const DAY_MS = 86_400_000;
-const WEEKDAY = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: "UTC" });
-const SHORT_DAY = new Intl.DateTimeFormat(undefined, {
+const WEEKDAY = new Intl.DateTimeFormat(getLocale(), { weekday: "long", timeZone: "UTC" });
+const SHORT_DAY = new Intl.DateTimeFormat(getLocale(), {
   day: "numeric",
   month: "short",
   timeZone: "UTC",
 });
-const SHORT_DAY_WITH_YEAR = new Intl.DateTimeFormat(undefined, {
+const SHORT_DAY_WITH_YEAR = new Intl.DateTimeFormat(getLocale(), {
   day: "numeric",
   month: "short",
   year: "numeric",
   timeZone: "UTC",
 });
-const CLOCK = new Intl.DateTimeFormat(undefined, {
+const CLOCK = new Intl.DateTimeFormat(getLocale(), {
   hour: "numeric",
   minute: "2-digit",
   timeZone: "UTC",

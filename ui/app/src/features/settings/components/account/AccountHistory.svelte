@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { onMount } from "svelte";
   import {
     accountSession as session,
@@ -55,20 +56,20 @@
     { value: "month", label: m.account_history_range_month() },
     { value: "all", label: m.account_history_range_all() },
   ];
-  const when = new Intl.DateTimeFormat(undefined, {
+  const when = new Intl.DateTimeFormat(getLocale(), {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
-  const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-  const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-  const dated = new Intl.DateTimeFormat(undefined, {
+  const clock = new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" });
+  const weekday = new Intl.DateTimeFormat(getLocale(), { weekday: "long" });
+  const dated = new Intl.DateTimeFormat(getLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  const datedYear = new Intl.DateTimeFormat(undefined, {
+  const datedYear = new Intl.DateTimeFormat(getLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -116,7 +117,7 @@
 
   function amount(units: string | null) {
     if (!positive(units)) return null;
-    const credits = creditsTotal(units, per);
+    const credits = creditsTotal(units, per, getLocale());
     return credits ? m.account_request_charged({ amount: credits }) : null;
   }
 
@@ -178,7 +179,7 @@
   }
 
   function total(group: CallGroup) {
-    const amount = positive(group.total) ? creditsTotal(group.total, per) : null;
+    const amount = positive(group.total) ? creditsTotal(group.total, per, getLocale()) : null;
     const charged = amount ? m.account_request_charged({ amount }) : null;
     if (!group.unsettled) return charged ?? m.account_request_free();
     return [charged, m.account_request_running()].filter(Boolean).join(" · ");

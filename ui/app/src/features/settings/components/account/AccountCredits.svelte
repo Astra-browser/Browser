@@ -5,6 +5,7 @@
   import Button from "$shared/ui/Button";
   import { packsInOrder, sharedLifetime, type TopUpOffer } from "../../lib/plans";
   import AccountDialog from "./AccountDialog.svelte";
+  import { getLocale } from "$shared/i18n/runtime";
 
   let {
     open = $bindable(false),
@@ -36,8 +37,8 @@
     });
   });
 
-  const amount = (offer: TopUpOffer) => creditsLeft(offer.units, per);
-  const price = (offer: TopUpOffer) => priceLabel(offer.price);
+  const amount = (offer: TopUpOffer) => creditsLeft(offer.units, per, getLocale());
+  const price = (offer: TopUpOffer) => priceLabel(offer.price, getLocale());
 
   const action = $derived.by(() => {
     if (!pack) return "";

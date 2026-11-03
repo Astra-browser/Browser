@@ -7,6 +7,7 @@
   import Icon from "$shared/ui/Icon";
   import SettingsRow from "$shared/ui/SettingsRow";
   import { explainAccountFault } from "../../lib/account";
+  import { getLocale } from "$shared/i18n/runtime";
 
   let shown = $state(false);
   let loaded = $state(false);
@@ -51,7 +52,7 @@
   );
 
   function since(device: AccountSessionV1) {
-    const date = shortDate(device.created_at);
+    const date = shortDate(device.created_at, undefined, getLocale());
     return date ? m.account_device_since({ date }) : undefined;
   }
 </script>

@@ -1,5 +1,6 @@
 import type { TimeBucketView } from "$shared/ipc/bindings";
 import { dateOfDay, elapsedBuckets, type Period } from "$domain/time";
+import { getLocale } from "$shared/i18n/runtime";
 
 export interface Totals {
   browse: number;
@@ -52,7 +53,7 @@ export function dailyAverage(period: Period, current: Totals, now = new Date()):
   return elapsed > 0 ? current.all / elapsed : null;
 }
 
-const hourFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric" });
+const hourFormat = new Intl.DateTimeFormat(getLocale(), { hour: "numeric" });
 
 /** The bucket as the readout names it: "2 – 3 PM", "Tuesday, Sep 30". */
 export function describeBucket(period: Period, index: number): string {
@@ -64,7 +65,7 @@ export function describeBucket(period: Period, index: number): string {
       return `${hourFormat.format(start)} – ${hourFormat.format(new Date(2000, 0, 1, 0))}`;
     return hourFormat.formatRange(start, new Date(2000, 0, 1, index + 1));
   }
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getLocale(), {
     weekday: "long",
     month: "short",
     day: "numeric",

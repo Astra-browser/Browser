@@ -427,6 +427,8 @@ test("several packs are a list to pick from, smallest first: credits lead, the p
   native.buy.mockResolvedValue(reply(account));
   const screen = await render(AccountPage);
   await screen.getByRole("button", { name: "Buy credits" }).click();
+  // The packs dialog is its own chunk: it is in the document once it loads.
+  await expect.element(screen.getByRole("radio", { name: /100/u })).toBeChecked();
   const radios = screen.getByRole("radio").elements() as HTMLInputElement[];
   expect(radios.map((radio) => radio.value)).toEqual([
     "staging-topup",

@@ -21,6 +21,7 @@
   import type AccountCredits from "./AccountCredits.svelte";
   import AccountDailyLimit from "./AccountDailyLimit.svelte";
   import type AccountPlans from "./AccountPlans.svelte";
+  import { getLocale } from "$shared/i18n/runtime";
 
   const account = $derived(session.account());
   const busy = $derived(session.pending());
@@ -69,9 +70,9 @@
   /** One statement of the allowance: what is left of what, or the share used where credits aren't stated. */
   const figure = $derived.by(() => {
     if (percent == null) return usage ? m.account_usage_none() : m.account_usage_loading();
-    const left = creditsLeft(usage?.allowance_left, per);
+    const left = creditsLeft(usage?.allowance_left, per, getLocale());
     const total = positive(usage?.allowance_total)
-      ? creditsLeft(usage?.allowance_total, per)
+      ? creditsLeft(usage?.allowance_total, per, getLocale())
       : null;
     if (left && total) return m.account_usage_left_of({ left, total });
     return left
@@ -82,10 +83,10 @@
   const renewalLine = $derived.by(() => {
     if (percent == null || !usage) return null;
     if (usage.one_time) return m.account_usage_trial();
-    const date = shortDate(usage.resets_at);
+    const date = shortDate(usage.resets_at, undefined, getLocale());
     return date ? m.account_usage_refills({ date }) : null;
   });
-  const purchased = $derived(creditsLeft(usage?.purchased_remaining, per));
+  const purchased = $derived(creditsLeft(usage?.purchased_remaining, per, getLocale()));
   const hasPurchased = $derived(positive(usage?.purchased_remaining) && !!purchased);
   const pausedLine = $derived.by(() => {
     if (!usage?.free_paused) return null;
@@ -95,22 +96,22 @@
   });
   const bonusLine = $derived.by(() => {
     if (!positive(usage?.bonus_remaining)) return null;
-    const left = creditsLeft(usage?.bonus_remaining, per);
+    const left = creditsLeft(usage?.bonus_remaining, per, getLocale());
     if (!left) return null;
-    const date = shortDate(usage?.bonus_expires_at);
+    const date = shortDate(usage?.bonus_expires_at, undefined, getLocale());
     return date
       ? m.account_bonus_value({ amount: left, date })
       : m.account_bonus_value_nodate({ amount: left });
   });
-  const heldCredits = $derived(positive(usage?.held) ? creditsTotal(usage?.held, per) : null);
+  const heldCredits = $derived(positive(usage?.held) ? creditsTotal(usage?.held, per, getLocale()) : null);
   const planLine = $derived.by(() => {
     if (!subscription || subscription.status === "inactive") return null;
     if (subscription.status === "unknown") return m.account_plan_unknown();
-    const date = shortDate(subscription.paid_until);
+    const date = shortDate(subscription.paid_until, undefined, getLocale());
     if (!date) return m.account_plan_active();
     if (subscription.cancel_at_period_end) return m.account_plan_ends({ date });
     // Credits that refill the day the plan renews already say when it renews.
-    if (ai && renewalLine && !usage?.one_time && date === shortDate(usage?.resets_at)) return null;
+    if (ai && renewalLine && !usage?.one_time && date === shortDate(usage?.resets_at, undefined, getLocale())) return null;
     return m.account_plan_renews({ date });
   });
   const unconfirmed = $derived(
