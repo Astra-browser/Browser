@@ -96,7 +96,9 @@
   --color-text: #f4f4f6;
   --color-label-secondary: #d8d8db;
   --color-muted: rgb(244 244 246 / 0.68);
+
   /* 5.1:1 on the dark ground; 0.44 composited to 4.0:1 (below AA). */
+
   --color-faint: rgb(244 244 246 / 0.52);
 
   /* Controls are fill and nothing else, on the same ladder as a field, so a
@@ -680,7 +682,9 @@
   --color-text: #1c1c1f;
   --color-label-secondary: #55555c;
   --color-muted: rgb(28 28 31 / 0.62);
+
   /* 4.7:1 on the light ground; 0.42 composited to 2.6:1 (below AA). */
+
   --color-faint: rgb(28 28 31 / 0.63);
 
   --color-control: #ffffff;
