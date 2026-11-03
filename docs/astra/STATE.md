@@ -221,6 +221,35 @@ tests; until then, do not implement them and do not report them as UI defects.
 | P6-T09 | Hand-off to Claude Code / Codex | done | orchestrator | agent/P6-T09-handoff | Merged 2026-11-02; 110+8+27; scoped grants, approval-gated, ETXTBSY-hardened spawn; merge needed mod-line restore |
 | P6-T10 | Port `eval/agentic-browsing` to `tests/eval/` | done | orchestrator | agent/P6-T10-eval | Merged 2026-11-02; 21/21 + smoke 5/5 + cap-negative; note: contract-runner has same log_message flaw, left untouched (follow-up) |
 
+
+## Bugfix batch — owner-reported browser core (2026-11-03)
+
+The owner reported the browser's everyday behaviour as broken (page menu,
+history, Back/Forward, favicons, private windows, search, theme). This batch
+wires **only** the surfaces named here; D-36 still governs everything else.
+Live evidence is the Marionette probe run against the packaged dev build
+(`19 passed, 0 failed`) plus a menu-bridge probe that suppressed the engine
+menu and ran a row end-to-end.
+
+| ID | Fix | Status | Branch | Evidence |
+|---|---|---|---|---|
+| B-01 | Hidden sidebar's peek card no longer swallows page clicks | done | `fix/sidebar-peek-clicks` | frame clipped to the card; `elementFromPoint` outside the card returns the page |
+| B-02 | Back/Forward never lands on the empty New Tab; duplicates collapse | done | `fix/nav-history` | `hostapi_v1` 306 checks incl. A→B→Back→Forward and external adoption |
+| B-03 | Bookmarks stored and read from Places (list/reveal/search/add/rename/move/remove) | done | `fix/bookmarks` | `bookmarks_model` 186 + live `bookmark.add` wrote the page |
+| B-04 | Google is the default engine; content `prefers-color-scheme` follows the app | done | `fix/search-theme` | `search_model` 37, `system_model` 92, live pref 2→app choice |
+| B-05 | Browsing history recorded and read from Places; site favicons resolved | done | `fix/history-favicons` | `history_places` 37, `favicons_model` 39, live visit + icon |
+| B-06 | Astra owns the page menu; private/new windows; loading state; keyboard ids | done | `feat/astra-owns-context-menu` | engine menu prevented, app menu ran "Open Link in New Tab"; private window renders private chrome; new window adopts its URL |
+| B-07 | Site icon fallback when Places has none | done | `fix/favicon-fetch-fallback` | live icon for a site the engine never stored |
+| B-08 | App theme reaches content through the boot channel | done | `fix/theme-content-scheme` | live pref changes from system (2) to the app's choice |
+| B-09 | Agent worktrees excluded from `brand-lint` | done | `feat/astra-owns-context-menu` | gate clean with worktrees present |
+
+**Still deferred after this batch (do not report as fixed):** real split-pane
+content (the split layout is still a single page), container-scoped link
+opening, and a guaranteed DevTools toolbox (the shell asks `gDevTools` for a
+toolbox on the standalone browser and reports refusal without opening a
+Firefox window). Media transport rows delegate to the engine's own
+`nsContextMenu.mediaCommand`, so they act on the exact element clicked.
+
 ## Later phases
 
 P7–P11 all `todo` — see `plan.md` §§8–11.
