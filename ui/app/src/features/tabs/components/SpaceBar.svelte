@@ -1,12 +1,14 @@
 <script lang="ts">
   import "$shared/ui/Menu/surface.css";
   import * as m from "$shared/i18n/messages";
-  import { Add01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
+  import { Add01Icon, ArrowDown01Icon, Globe02Icon } from "@hugeicons/core-free-icons";
   import { tabs } from "$domain/tabs";
   import { uiCommands as ui } from "$domain/ui-commands";
   import Icon from "$shared/ui/Icon";
   import { untrack, type Snippet } from "svelte";
   import SpaceGlyph from "./SpaceGlyph.svelte";
+  import FavIcon from "$shared/ui/FavIcon";
+  import { favicons } from "$domain/favicons";
   import SpaceFlowBody from "./SpaceFlowBody.svelte";
   import * as requests from "../lib/space-requests.svelte";
   import { SpaceFlow } from "../lib/space-flow.svelte";
@@ -27,6 +29,8 @@
   const flow = new SpaceFlow((restore) => {
     if (restore) chip?.focus();
   });
+  /** A space with no mark of its own wears the first site it holds. */
+  const activePreview = $derived(flow.active?.previews.find((ref) => ref !== null) ?? null);
 
   $effect(() => {
     const command = ui.uiCommand();
@@ -80,7 +84,21 @@
     onfocus={load}
     onclick={() => (flow.open ? flow.dismiss() : flow.show())}
   >
-    {#if flow.active}<SpaceGlyph icon={flow.active.icon} color={flow.active.color} />{/if}
+    {#if flow.active}
+      {#if flow.active.icon}
+        <SpaceGlyph icon={flow.active.icon} color={flow.active.color} />
+      {:else if activePreview}
+        {@const ref = activePreview}
+        <span class="space-fav" aria-hidden="true"
+          ><FavIcon
+            image={favicons.image(ref)}
+            tone={favicons.tone(ref)}
+            size={16}
+            fallback={Globe02Icon}
+          /></span
+        >
+      {/if}
+    {/if}
     <span class="space-name">{flow.active?.name ?? ""}</span>
     <span class="space-chevron"><Icon icon={ArrowDown01Icon} size={12} strokeWidth={2} /></span>
   </button>
@@ -242,5 +260,16 @@
     .space-chevron {
       transition: none;
     }
+  }
+
+  /* The site mark stands in the glyph's box, so the name does not move when a
+     space gains or loses its icon. */
+  .space-fav {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 16px;
+    block-size: 16px;
   }
 </style>
