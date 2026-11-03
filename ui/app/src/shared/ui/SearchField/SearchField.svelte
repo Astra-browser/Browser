@@ -100,6 +100,13 @@
     appearance: none;
   }
 
+  /* Firefox draws its own clear button inside a search field; this box has a
+     clear control of its own, and two of them read as a defect. */
+  input::-moz-search-clear-button {
+    appearance: none;
+    display: none;
+  }
+
   /* The page-size search is the same field, larger. Almost round at 46px
      rather than a capsule: a pill in a column of rounded rectangles is the one
      shape that never belongs to the set. */

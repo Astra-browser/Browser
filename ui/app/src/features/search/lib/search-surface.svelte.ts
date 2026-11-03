@@ -242,13 +242,19 @@ export function createSearchSurface(options: {
     }
     const expected = controller?.context();
     if (!row.result || !expected) return;
+    // The row lives in a `$state` projection, so its action is a reactive
+    // proxy; the bridge posts the request with `postMessage`, which refuses a
+    // proxy. Hand over a plain copy or the action never leaves the app and
+    // Enter reports "that action could not be completed".
+    const action = $state.snapshot(row.result.action);
+    const owner = $state.snapshot(expected);
     background = background && !anchored && !!addressOf(row);
     running = true;
     failed = false;
     try {
       const admission = anchored
-        ? await settle(commands.newtabRun(row.result.action, expected))
-        : await commands.launcherRun(row.result.action, expected, background);
+        ? await settle(commands.newtabRun(action, owner))
+        : await commands.launcherRun(action, owner, background);
       if (disposed) return;
       const rejected =
         "accepted" in admission
