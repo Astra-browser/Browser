@@ -176,6 +176,7 @@ try {
     "items-changed": "astra:items",
     "ui-command": "astra:ui-command",
     "operation-processed": "astra:operation-processed",
+    "page-permission-prompt-changed": "astra:page-permission-prompt",
     "runtime-status-changed": "astra:runtime-status",
     "blocker-status-changed": "astra:blocker-status",
     "focus-changed": "astra:focus",

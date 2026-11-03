@@ -33,7 +33,7 @@
 | P3 | `merge/p3-windows` | Bind `Windows` to `BrowserWindowTracker`/`OpenBrowserWindow`; real focus/close/fullscreen; thin projection keyed by native ids | P0 | **merged** |
 | P4 | `merge/p4-gbrowser` | **Complete.** Native `gBrowser` tabs, model projection, mute/pin/discard/space/adoption, native-only shell; legacy standalone mount deleted. | P1–P3 | **merged** |
 | P5 | `merge/p5-session` | Firefox `SessionStore` is live; restored native tabs are adopted, the bootstrap blank tab is dropped. Astra metadata (space/folder/pin/sync) in the Rust store is P5b. | P4 | **P5a merged; P5b next** |
-| P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | **P6a merged (permission store); prompt UI P6b** |
+| P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | **P6a merged (store); P6b-1 merged (geolocation prompt); camera/mic prompt seam open** |
 | P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | **merged** |
 | P8 | `merge/p8-resources` | Split `Resources`: tasks/notes/media → Rust; page source → native browser; delete the in-memory task store; retire `Panes` | P1 | planned |
 | P9 | `merge/p9-media-ext` | Bind `Media` to the native media controller and `WebExtensions` to `AddonManager`, or remove both surfaces | P4 | decision |
@@ -229,6 +229,7 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | 2026-11-04 | P2 | done: `native_nav_model` 17; live probe stop `about:blank` after a 4 s slow page, model loading cleared, zoom readback `1.5`, soft reload no-cache=false vs hard reload no-cache=true; overlay + `build --faster` used |
 | 2026-11-04 | P1/P2 review | code review found the supervisor unreachable + failure-path bugs; fixed and re-reviewed PASS-WITH-NOTES. Remaining notes are P4/P5 work, not blockers. |
 | 2026-11-04 | P1/P2 merge | merged to `main` as `df24279` + `7edb116`; tag `post-p1-p2-20261104`. P3/P4 next. |
+| 2026-11-04 | P6b-1 | `Permissions` publishes `page-permission-prompt-changed`, the app prompt answers via `page_permission_respond`, and a bounded `Operations` ledger settles the disposition. Live probe: real geolocation request renders the Astra prompt, a real click writes ALLOW, deny writes DENY, and the page observes granted/denied. Camera/microphone still use Firefox's WebRTC prompt. |
 | 2026-11-04 | P6a | `Dialogs.decidePermission` writes `Services.perms` (grant/deny, EXPIRE_NEVER); live probe checks ALLOW/DENY. Runtime prompt UI is P6b. |
 | 2026-11-04 | P7b | merged as `de7e8b1`; tag `post-p7b-20261104`. private windows stay context 0; cross-space moves recreate in the target identity (space-2 ↔ space-1). Live probe `containers_private_move_probe.py` PASS. |
 | 2026-11-04 | P7a | merged as `a3e457f`; tag `post-p7-containers-20261104`. space→identity map; native tabs get the identity userContextId; deleting a space removes the identity/data. Live probe `containers_space_probe.py` PASS. Private isolation/P7b next. |

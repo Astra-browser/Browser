@@ -150,6 +150,15 @@
       // Preview DOM without a chrome window.
     }
 
+    // P6b: replace the engine's own prompt for the page permissions the app
+    // renders. Idempotent per process, and safe to retry from another window.
+    try {
+      await host.Permissions?.install?.();
+    } catch {
+      // Without the integration the engine keeps its own prompt; nothing is
+      // silently granted because of this failure.
+    }
+
     // P4: the native tabbrowser deck is the product path. The stage follows
     // the Astra content slot; mountNative marks it mounted once gBrowser owns
     // the tabs.

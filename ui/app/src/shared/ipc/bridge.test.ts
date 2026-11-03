@@ -132,6 +132,8 @@ describe("bridge wiring", () => {
       System: {},
       Resources: {},
       Search: {},
+      Permissions: {},
+      Operations: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
     };

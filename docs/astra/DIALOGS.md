@@ -62,3 +62,37 @@ chrome-document event handlers or `messageManager` frames the tree owner
 marks privileged — never from a `ContentActor` receiving page messages.
 If a new dialog kind is added, it must take the same `actor` gate and add
 a spoof case to `dialogs_security.mjs` before it ships.
+
+## Runtime permission prompt (P6b)
+
+`Permissions.sys.mjs` is the live page-permission path; `Dialogs` remains the
+model for the settings surfaces. A page request now becomes the app's existing
+`PagePermissionPrompt`:
+
+| Step | Owner |
+|---|---|
+| Engine calls `nsIContentPermissionPrompt` | `Permissions.install()` registers an `Integration.contentPermission` override for geolocation and delegates every other type to Firefox |
+| Prompt published | `page-permission-prompt-changed` carries `{ projection_revision, prompt }` (schema: `schemas/permissions.json`) |
+| App answers | `page_permission_respond(profileId, itemId, requestId, decision)` → host route → `Permissions.respond` |
+| Settlement | the disposition arrives on the bounded `Operations` ledger (`operation_status` / `operations_reconcile` / `operation_acknowledge`, `operation-processed`) |
+| Engine write | `SitePermissions.setForPrincipal` with `SCOPE_TEMPORARY` (`allow_once` / `deny_once`) or `SCOPE_PERSISTENT` (`always_allow` / `always_deny`) |
+
+Security properties of this path:
+
+- The prompt token plus the exact `profile_id`/`item_id` is the stale fence.
+  A missing, replayed or mismatched token is refused as `invalid_scope` and
+  resolves nothing.
+- A decision is single-shot: the record leaves the queue before the engine is
+  touched.
+- Ephemeral contexts are published with `rememberable: false`; chrome refuses
+  a durable decision for them even if one arrives.
+- A failed durable write cancels the request and reports
+  `store_admission_rejected`; it never grants.
+- `pagehide` on the requesting browser closes the prompt and cancels the engine
+  request, so chrome state cannot outlive its page.
+
+Scope today: **geolocation**. Camera and microphone use Firefox's separate
+`webrtcUI`/`WebRTCParent` prompt, which is not intercepted yet; the Astra
+prompt renders them, but the engine will still show its own prompt until that
+seam is wired (P6b follow-up).
+
