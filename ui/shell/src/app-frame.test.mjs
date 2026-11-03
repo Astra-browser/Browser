@@ -166,7 +166,7 @@ describe("mountAppFrame relay", () => {
     const host = fakeHost();
     const api = mountAppFrame(env.container, host);
     const listenersWhileMounted = env.listeners.get("message")?.size ?? 0;
-    assert.equal(listenersWhileMounted, 2, "readiness + relay");
+    assert.equal(listenersWhileMounted, 3, "readiness + theme + relay");
     assert.equal(env.container.children.length, 1, "the frame is appended");
 
     api.destroy();
