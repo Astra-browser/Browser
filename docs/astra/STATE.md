@@ -254,6 +254,11 @@ menu and ran a row end-to-end.
 | B-07 | Site icon fallback when Places has none | done | `fix/favicon-fetch-fallback` | live icon for a site the engine never stored |
 | B-08 | App theme reaches content through the boot channel | done | `fix/theme-content-scheme` | live pref changes from system (2) to the app's choice |
 | B-09 | Agent worktrees excluded from `brand-lint` | done | `feat/astra-owns-context-menu` | gate clean with worktrees present |
+| B-10 | The page menu draws above the page; a hidden column recovers after a menu | done | `fix/context-menu-overlay` | live: menu hit-tested above the page; clip lifted and peek re-entered |
+| B-11 | The content stage can enter a page's DOM fullscreen | done | `fix/astra-dom-fullscreen` | ASTRA-0007; live: chrome hidden, stage fills the window, restored on exit |
+| B-12 | Space icon/theme save; previews carry the space's tab favicons | done | `fix/spaces-save` | live: theme/symbol click saved with no editor error |
+| B-13 | Fetched favicons persist in Places, show in History, late icons retried | done | `fix/favicons-history` | live: History rows paint a 32x32 mark |
+| B-14 | Loading skeleton; first browser warmed; load state survives the commit | done | `feat/loading-skeleton`, `fix/load-state` | live: skeleton while a server holds the request; host path 65 ms first / 25 ms second local |
 
 **Still deferred after this batch (do not report as fixed):** real split-pane
 content (the split layout is still a single page), container-scoped link
@@ -261,6 +266,9 @@ opening, and a guaranteed DevTools toolbox (the shell asks `gDevTools` for a
 toolbox on the standalone browser and reports refusal without opening a
 Firefox window). Media transport rows delegate to the engine's own
 `nsContextMenu.mediaCommand`, so they act on the exact element clicked.
+Fullscreen's engine condition is patched and its chrome layout is verified;
+the gesture path still needs a real click to give the page focus, so it is not
+part of the automated probe.
 
 ## Later phases
 
