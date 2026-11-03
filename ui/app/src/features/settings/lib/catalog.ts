@@ -346,7 +346,7 @@ export const fields = {
     section: "search",
     label: m.pref_search_provider,
     description: m.pref_search_provider_help,
-    initial: "DuckDuckGo",
+    initial: "Google",
     options: [
       { value: "DuckDuckGo", label: m.pref_search_provider_option_0 },
       { value: "Google", label: m.pref_search_provider_option_1 },

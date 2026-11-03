@@ -56,7 +56,7 @@ export const SEARCH_ENGINES: readonly SearchEngine[] = [
 ];
 
 /** Ships as the default, mirroring the `search.engine` preference default. */
-export const DEFAULT_ENGINE_ID: BuiltinEngineId = "duckduckgo";
+export const DEFAULT_ENGINE_ID: BuiltinEngineId = "google";
 
 export function getEngine(id: string): SearchEngine | null {
   return SEARCH_ENGINES.find((engine) => engine.id === id) ?? null;

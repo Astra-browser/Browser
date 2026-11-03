@@ -38,3 +38,6 @@ __pycache__/
 UI_IDEA
 # Playwright MCP scratch dir (tool artifact, not repo content)
 .playwright-mcp/
+
+# Agent worktrees (tools, not repo content)
+.worktrees/

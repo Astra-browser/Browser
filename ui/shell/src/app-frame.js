@@ -45,7 +45,7 @@ export const APP_BOOT_TIMEOUT_MS = 60000;
  *   the content browser
  * @param {{onReady?: (mode: string) => void, onFailure?: (message: string) => void}} hooks
  */
-export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
+export function mountAppFrame(container, host, { onReady, onFailure, transformEvent, guardCall } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView ?? null;
   if (!win) {
@@ -176,8 +176,20 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
         // private to the window.
         const moduleName = typeof data.module === "string" ? data.module : "";
         const methodName = typeof data.method === "string" ? data.method : "";
+        const refused =
+          typeof guardCall === "function"
+            ? await guardCall(moduleName, methodName, data.args ?? {})
+            : null;
+        if (refused) {
+          // A surface this window must not reach (a private window has no
+          // history or bookmark store). The reply is the caller's own shape,
+          // so the UI renders its private/empty state instead of an error.
+          payload = refused.payload ?? null;
+          error = refused.error ?? null;
+        }
         const module = host?.[moduleName];
         const reachable =
+          !refused &&
           moduleName !== "" &&
           methodName !== "" &&
           !moduleName.startsWith("_") &&
@@ -186,12 +198,12 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
           typeof module === "object" &&
           Object.prototype.hasOwnProperty.call(module, methodName);
         const fn = reachable ? module[methodName] : null;
-        if (typeof fn !== "function") {
+        if (!refused && typeof fn !== "function") {
           error = {
             code: "unknown_command",
             message: `host has no ${String(data.module)}.${String(data.method)}`,
           };
-        } else {
+        } else if (!refused) {
           payload = await fn(data.args ?? {});
         }
       } catch (e) {
@@ -232,7 +244,8 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const relayEvents = host?.addEventListener
     ? host.addEventListener((event) => {
-        post({ kind: "evt", type: event.type, data: event.data, seq: event.event_seq });
+        const seen = typeof transformEvent === "function" ? transformEvent(event) : event;
+        post({ kind: "evt", type: seen.type, data: seen.data, seq: seen.event_seq });
       })
     : null;
 

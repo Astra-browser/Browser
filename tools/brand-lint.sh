@@ -24,6 +24,7 @@ ALLOW='^(./)?(LICENSE|NOTICE|docs/astra/PROVENANCE\.md)$'
 FAIL=0
 FOUND="$(grep -rIl --exclude-dir=.git --exclude-dir=folder_context \
   --exclude-dir=target --exclude-dir=node_modules --exclude-dir=engine \
+  --exclude-dir=.worktrees \
   --exclude-dir=dist --exclude-dir=reports \
   --exclude='*.png' --exclude='*.webp' --exclude='*.ico' --exclude='*.icns' \
   -i "$PATTERN" $TARGETS 2>/dev/null || true)"

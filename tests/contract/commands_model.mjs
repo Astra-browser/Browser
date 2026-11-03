@@ -74,7 +74,7 @@ for (const page of PAGES) {
 }
 
 {
-  const { seen, result } = await capture(() => Commands.run({ id: "tab.new" }));
+  const { seen, result } = await capture(() => Commands.run({ id: "page.autofillPassword" }));
   check("an unported command is refused", result.accepted === false);
   check("an unported command announces nothing", seen.length === 0);
 }

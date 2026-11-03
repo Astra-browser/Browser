@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ll3cndvp-CQJSnpLa.js";import{C as t}from"./chrome-shared-DVjlqPzs.js";var n=((n={},r={})=>(r.locale??t(),e(760,n)??`New task`));export{n as t};
