@@ -298,6 +298,12 @@
         const peeking = event.data?.peeking === true;
         const column = hidden || typeof width !== "number" || !Number.isFinite(width) ? 0 : width;
         frameRoot.style.setProperty("--astra-sidebar-width", `${Math.max(0, column)}px`);
+        // The card keeps the column's reported width even while hidden (the
+        // page takes the gutter, not the column's room). The peek clip below
+        // needs that width: it is the only part of the chrome that may sit
+        // over the page and take the pointer.
+        const card = typeof width === "number" && Number.isFinite(width) ? Math.max(0, width) : 0;
+        frameRoot.style.setProperty("--astra-sidebar-card-width", `${card}px`);
         // A hidden column peeks as a card over the page. The app frame holds
         // the card, so it has to come above the page surface and let the page
         // show through around it; the app clears its own ground for the same
@@ -610,6 +616,17 @@
     position: relative;
     z-index: 3;
     background: transparent;
+  }
+  /* A transparent frame still swallows every pointer event over the page: the
+     window looked like it had an invisible sheet across it until the card went
+     away. Clip the frame to the card's rectangle (8px window gutter, the
+     card's own 8px padding plus its reported width, 8px block inset). A
+     `clip-path` clips hit-testing as well as paint, so the page underneath
+     takes every press outside the card while the card itself stays live. */
+  :global(.astra-frame[data-astra-sidebar-peek="true"] .astra-app-frame) {
+    clip-path: inset(
+      8px calc(100% - var(--astra-sidebar-card-width, 240px) - 24px) 8px 8px
+    );
   }
   .astra-app-mount > :global(.astra-app-frame) {
     flex: 1 1 auto;
