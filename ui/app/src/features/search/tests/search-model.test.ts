@@ -209,6 +209,26 @@ describe("what the host will navigate to", () => {
     expect(resolve("javascript:alert(1)")?.kind).toBe("search");
   });
 
+  it("navigates local development hosts without a scheme", async () => {
+    const { resolve } = await hostSearch();
+    expect(resolve("localhost:3000")).toMatchObject({
+      kind: "url",
+      url: "http://localhost:3000/",
+    });
+    expect(resolve("127.0.0.1:8080")).toMatchObject({
+      kind: "url",
+      url: "http://127.0.0.1:8080/",
+    });
+    expect(resolve("localhost")).toMatchObject({ kind: "url", url: "http://localhost/" });
+    expect(resolve("example.com:8443")).toMatchObject({
+      kind: "url",
+      url: "https://example.com:8443/",
+    });
+    // A colon that is not a host:port is still words.
+    expect(resolve("note: buy milk")?.kind).toBe("search");
+    expect(resolve("10:30")?.kind).toBe("search");
+  });
+
   it("refuses an internal address arriving as a row's action", async () => {
     const { Search } = await hostSearch();
     // A result row is never an address the person typed, so the same policy
