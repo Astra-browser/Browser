@@ -189,8 +189,13 @@ export function allowGlobalHistory(browser) {
 export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTitle } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
-    onLocationChange(browser, _progress, _request, location) {
+    onLocationChange(browser, progress, _request, location) {
       try {
+        // Subframe navigations are not the tab's address; committing them
+        // would rewrite the model URL/history on every ad or embed iframe.
+        if (progress && progress.isTopLevel === false) {
+          return;
+        }
         const id = tabIdOf ? tabIdOf(browser) : null;
         const url = location && location.spec ? location.spec : "";
         if (id && url) {
@@ -867,7 +872,7 @@ export const Content = {
    * This mount owns the id <-> native tab map and translates host events;
    * Navigation/zoom/stop/print still go through the same event intents.
    */
-  async mountNative(container, { request_id = "content-native" } = {}) {
+  async mountNative(container, { request_id = "content-native", window_id = "" } = {}) {
     const win = container?.ownerDocument?.defaultView ?? null;
     const gb = win?.gBrowser;
     if (!gb || typeof gb.addTab !== "function") {
@@ -878,6 +883,8 @@ export const Content = {
     const tabOf = new Map(); // astra_tab_id -> native tab
     const idOf = new WeakMap(); // native tab -> astra_tab_id
     const browsers = new Map(); // astra_tab_id -> { browser, tab }
+    const pending = new Map(); // astra_tab_id -> URL to load on first activation
+    __setFaviconEventSink((view) => emit("favicons-changed", view));
     let applying = false;
 
     const idOfTab = (tab) => {
@@ -890,7 +897,32 @@ export const Content = {
       tabOf.set(id, tab);
       idOf.set(tab, id);
       const browser = tab.linkedBrowser ?? null;
-      if (browser) browsers.set(id, { browser, tab });
+      if (browser) {
+        browsers.set(id, { browser, tab });
+        // A remote browser inherits the chrome window's false
+        // useGlobalHistory; the native tab needs the same fix as mount().
+        allowGlobalHistory(browser);
+      }
+    };
+    const refreshIcon = (id) => {
+      const tab = tabOf.get(id);
+      const browser = tab?.linkedBrowser;
+      const url = browser?.currentURI?.spec;
+      if (!isLoadableUrl(url) || isPrivateWindow(win)) return;
+      void Favicons.resolve({ url, doc })
+        .then((resolved) => {
+          if (!resolved) return;
+          __applyExternalUpdate(id, {
+            icon: {
+              origin: resolved.entry.origin,
+              revision: resolved.entry.revision,
+            },
+          });
+          Favicons.publish(resolved);
+        })
+        .catch(() => {
+          // A broken icon never blocks the page.
+        });
     };
     const forgetTab = (id) => {
       const tab = tabOf.get(id);
@@ -919,27 +951,30 @@ export const Content = {
       try {
         // Reuse the tabbrowser's initial about:blank tab instead of leaving
         // an unbound tab beside the model's first tab.
+        const wanted = contextFor(id);
         const free = [...gb.tabs].find((candidate) => {
           if (idOfTab(candidate)) return false;
           try {
             const spec = candidate.linkedBrowser?.currentURI?.spec;
-            return !spec || spec === "about:blank";
+            const context = Number(candidate.getAttribute("usercontextid") || 0);
+            return (!spec || spec === "about:blank") && context === wanted;
           } catch {
-            return true;
+            return false;
           }
         });
         if (free) {
           tab = free;
           bindTab(id, tab);
-          if (isLoadableUrl(url)) loadIn(id, url, true);
+          if (isLoadableUrl(url)) pending.set(id, url);
           return tab;
         }
-        tab = gb.addTab(isLoadableUrl(url) ? url : "about:blank", {
+        tab = gb.addTab("about:blank", {
           triggeringPrincipal: principal,
           inBackground: true,
-          userContextId: contextFor(id),
+          userContextId: wanted,
         });
         bindTab(id, tab);
+        if (isLoadableUrl(url)) pending.set(id, url);
       } finally {
         applying = false;
       }
@@ -966,24 +1001,37 @@ export const Content = {
         applying = false;
       }
     };
+    const activate = (id) => {
+      selectTab(id);
+      const url = pending.get(id);
+      if (url) {
+        pending.delete(id);
+        loadIn(id, url, true);
+      }
+    };
 
     // Adopt the tabbrowser's initial tab for the first model tab, then add
     // one native tab per model tab. The model is bootstrapped before mount.
-    const list = await Tabs.list({ request_id });
+    const belongs = (id) => {
+      if (!window_id || !id) return true;
+      const tab = __tabsState().tabs.get(id);
+      return !tab || tab.window_id === window_id;
+    };
+    const list = await Tabs.list({ request_id, window_id });
     const modelTabs = list.tabs ?? [];
     const nativeTabs = [...gb.tabs];
     for (const model of modelTabs) {
       const tab = nativeTabs.shift() ?? ensureTab(model.astra_tab_id, model.url);
       bindTab(model.astra_tab_id, tab);
       if (model.url && model.url !== "about:blank") {
-        loadIn(model.astra_tab_id, model.url, true);
+        pending.set(model.astra_tab_id, model.url);
       }
       if (model.selected) {
-        selectTab(model.astra_tab_id);
+        activate(model.astra_tab_id);
       }
     }
     const selected = modelTabs.find((t) => t.selected) ?? modelTabs[0];
-    if (selected) selectTab(selected.astra_tab_id);
+    if (selected) activate(selected.astra_tab_id);
 
     // Native -> model: selection, close and the end of a document load
     // (`busy` clears when the native browser has finished). The progress
@@ -995,13 +1043,21 @@ export const Content = {
       const changed = event.detail?.changed ?? [];
       if (changed.includes("busy") && !tab.hasAttribute("busy")) {
         __applyExternalUpdate(id, { loading: false });
+        refreshIcon(id);
       }
     };
     gb.tabContainer.addEventListener("TabAttrModified", onAttr);
     const onSelect = () => {
       if (applying) return;
       const id = idOfTab(gb.selectedTab);
-      if (id) void Tabs.select({ astra_tab_id: id });
+      if (id) {
+        void Tabs.select({ astra_tab_id: id });
+      } else {
+        // An engine-created tab is in front. P4.3 adopts it; until then put
+        // the model's tab back rather than showing a page the model lost.
+        const selected = __tabsState().selectedId;
+        if (selected) selectTab(selected);
+      }
     };
     const onClose = (event) => {
       if (applying) return;
@@ -1017,6 +1073,12 @@ export const Content = {
 
     const off = addEventListener((event) => {
       const id = event.data?.astra_tab_id;
+      if (event.data?.window_id && window_id && event.data.window_id !== window_id) {
+        return;
+      }
+      if (id && !belongs(id)) {
+        return;
+      }
       if (event.type === "tab.created" && id) {
         ensureTab(id, event.data.url);
         return;
@@ -1027,7 +1089,7 @@ export const Content = {
         if (tab) {
           applying = true;
           try {
-            gb.removeTab(tab);
+            gb.removeTab(tab, { skipPermitUnload: true, closeWindowWithLastTab: false });
           } catch {
             // Already gone with the window.
           } finally {
@@ -1037,16 +1099,18 @@ export const Content = {
         return;
       }
       if (event.type === "items-changed") {
-        const active = (event.data?.tabs ?? []).find((t) => t.id === event.data?.active);
+        const active = (event.data?.tabs ?? [])
+          .filter((t) => !window_id || t.window_id === window_id)
+          .find((t) => t.id === event.data?.active);
         if (active && active.id) {
           ensureTab(active.id, active.url);
-          selectTab(active.id);
+          activate(active.id);
         }
         return;
       }
       if (event.type === "tab.updated" && id) {
         if (event.data.selected) {
-          selectTab(id);
+          activate(id);
         }
         if ("muted" in event.data) {
           const tab = tabOf.get(id);
@@ -1062,7 +1126,9 @@ export const Content = {
         return;
       }
       if (event.type === "nav.committed" && id && event.data.external !== true) {
+        pending.delete(id);
         loadIn(id, event.data.url, true);
+        refreshIcon(id);
         return;
       }
       if (event.type === "nav.hard-reload" && id) {
@@ -1088,6 +1154,19 @@ export const Content = {
         printBrowser(tabOf.get(id)?.linkedBrowser);
       }
     });
+
+    // Reconcile after the await/listener gap: a tab created or navigated
+    // while mountNative was awaiting must still get its native tab/URL.
+    const fresh = await Tabs.list({ request_id, window_id });
+    for (const model of fresh.tabs ?? []) {
+      ensureTab(model.astra_tab_id, model.url);
+      if (model.url && model.url !== "about:blank") {
+        pending.set(model.astra_tab_id, model.url);
+      }
+      if (model.selected) {
+        activate(model.astra_tab_id);
+      }
+    }
 
     return {
       native: true,

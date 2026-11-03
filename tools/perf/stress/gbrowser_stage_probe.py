@@ -124,7 +124,13 @@ def main():
             except Exception:
                 pass
             time.sleep(0.1)
-        time.sleep(0.5)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            st = json.loads(m.execute(STAGE))
+            if st.get("mounted") == "true":
+                break
+            time.sleep(0.1)
+        time.sleep(0.3)
         tabs = json.loads(m.execute_async(LIST)).get("tabs") or []
         tab = next((t for t in tabs if t.get("selected")), tabs[0] if tabs else None)
         if tab:

@@ -92,6 +92,12 @@ const done = arguments[arguments.length - 1];
 (async () => { try { done(JSON.stringify(await window.__astraHost.Tabs.close({request_id:'p', astra_tab_id:id}))); }
 catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 
+NATIVE_SELECT = """const index = arguments[0];
+return (() => { try { const tab = gBrowser.tabs[index]; if (!tab) return 'no-tab'; gBrowser.selectedTab = tab; return 'ok'; } catch (e) { return String(e); } })();"""
+
+NATIVE_CLOSE = """const index = arguments[0];
+return (() => { try { const tab = gBrowser.tabs[index]; if (!tab) return 'no-tab'; gBrowser.removeTab(tab, { skipPermitUnload: true, closeWindowWithLastTab: false }); return 'ok'; } catch (e) { return String(e); } })();"""
+
 MUTE = """const id = arguments[0], muted = arguments[1];
 const done = arguments[arguments.length - 1];
 (async () => { try { done(JSON.stringify(await window.__astraHost.Tabs.setMuted({request_id:'p', astra_tab_id:id, muted}))); }
@@ -170,15 +176,27 @@ def main():
             time.sleep(1.2)
             out["after_create_native"] = json.loads(m.execute(NATIVE_TABS))
             if made.get("astra_tab_id"):
-                out["select_first"] = json.loads(m.execute_async(SELECT, [first["astra_tab_id"]]))
+                # native -> model: selecting the native tab selects the model tab
+                out["native_select"] = m.execute(NATIVE_SELECT, [0])
                 time.sleep(0.6)
-                out["after_select_native"] = json.loads(m.execute(NATIVE_TABS))
+                out["after_native_select_model"] = json.loads(m.execute_async(LIST))
+                out["after_native_select_native"] = json.loads(m.execute(NATIVE_TABS))
+                # native -> model: closing the native tab closes the model tab
+                out["native_close"] = m.execute(NATIVE_CLOSE, [1])
+                time.sleep(0.8)
+                out["after_native_close_model"] = json.loads(m.execute_async(LIST))
+                out["after_native_close_native"] = json.loads(m.execute(NATIVE_TABS))
                 out["mute"] = json.loads(m.execute_async(MUTE, [first["astra_tab_id"], True]))
                 time.sleep(0.5)
                 out["after_mute_native"] = json.loads(m.execute(NATIVE_TABS))
-                out["close_second"] = json.loads(m.execute_async(CLOSE, [made["astra_tab_id"]]))
-                time.sleep(0.8)
-                out["after_close_native"] = json.loads(m.execute(NATIVE_TABS))
+                # model -> native: create and close again
+                made2 = json.loads(m.execute_async(CREATE, [base + "/two.html"]))
+                out["create_second"] = made2
+                time.sleep(1.0)
+                if made2.get("astra_tab_id"):
+                    out["close_second"] = json.loads(m.execute_async(CLOSE, [made2["astra_tab_id"]]))
+                    time.sleep(0.8)
+                    out["after_close_native"] = json.loads(m.execute(NATIVE_TABS))
     finally:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
@@ -214,7 +232,9 @@ def main():
         and abs((slot.get("h") or 0) - (tabbox.get("h") or 0)) <= 2
         and any((t.get("url") or "").endswith("/one.html") for t in after_nav)
         and len(after_create) == 2
-        and any(t.get("selected") and (t.get("url") or "").endswith("/one.html") for t in after_select)
+        and any(t.get("selected") and (t.get("url") or "").endswith("/one.html") for t in (out.get("after_native_select_native") or []))
+        and (out.get("after_native_select_model", {}).get("selected_tab_id") == out.get("first", {}).get("astra_tab_id"))
+        and len(out.get("after_native_close_model", {}).get("tabs") or []) == 1
         and any(t.get("muted") for t in after_mute)
         and len(after_close) == 1
     )
