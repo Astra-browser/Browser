@@ -259,6 +259,7 @@ menu and ran a row end-to-end.
 | B-12 | Space icon/theme save; previews carry the space's tab favicons | done | `fix/spaces-save` | live: theme/symbol click saved with no editor error |
 | B-13 | Fetched favicons persist in Places, show in History, late icons retried | done | `fix/favicons-history` | live: History rows paint a 32x32 mark |
 | B-14 | Loading skeleton; first browser warmed; load state survives the commit | done | `feat/loading-skeleton`, `fix/load-state` | live: skeleton while a server holds the request; host path 65 ms first / 25 ms second local |
+| B-15 | A space without an icon wears its first site's favicon | done | `fix/space-favicon` | live: previews carry refs; the bar falls back to the first one |
 
 **Still deferred after this batch (do not report as fixed):** real split-pane
 content (the split layout is still a single page), container-scoped link
