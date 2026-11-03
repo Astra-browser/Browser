@@ -304,6 +304,59 @@ let tA, tB, tC;
   void before;
 }
 
+// === Navigation history: the New Tab is not a Back entry ===
+// Owner-reported: Back on the sidebar landed on the empty New Tab because
+// `Tabs.create` seeds the stack with `about:blank` and the first real page was
+// pushed on top of it. A fresh tab's first load must replace that head.
+{
+  const hist = (id) => TabsMod.__historyFor(id);
+  const create = async (rid) =>
+    (await Tabs.create({ request_id: rid, url: "about:blank", background: true })).astra_tab_id;
+
+  const fresh = await create("nh-0");
+  check("fresh tab starts on a blank head",
+    hist(fresh).entries.length === 1 && hist(fresh).entries[0] === "about:blank");
+
+  const first = await Navigation.loadURL({ request_id: "nh-1", astra_tab_id: fresh, url: "https://a.example/" });
+  checkEnv("first load into a fresh tab", first, "nh-1");
+  const afterFirst = await Tabs.get({ request_id: "nh-2", astra_tab_id: fresh });
+  check("first real load replaces the New Tab (Back disabled)", afterFirst.tab.canGoBack === false);
+  check("first real load keeps one entry at index 0",
+    hist(fresh).entries.length === 1
+    && hist(fresh).index === 0
+    && hist(fresh).entries[0] === "https://a.example/");
+
+  await Navigation.loadURL({ request_id: "nh-3", astra_tab_id: fresh, url: "https://b.example/" });
+  const backA = await Navigation.goBack({ request_id: "nh-4", astra_tab_id: fresh });
+  checkEnv("Back from B", backA, "nh-4");
+  check("Back from B lands on A", backA.went_back === true && backA.url === "https://a.example/");
+  const atA = await Tabs.get({ request_id: "nh-5", astra_tab_id: fresh });
+  check("Back to A enables Forward (Back disabled)",
+    atA.tab.canGoBack === false && atA.tab.canGoForward === true);
+
+  const fwdB = await Navigation.goForward({ request_id: "nh-6", astra_tab_id: fresh });
+  checkEnv("Forward from A", fwdB, "nh-6");
+  check("Forward returns to B", fwdB.went_forward === true && fwdB.url === "https://b.example/");
+  const atB = await Tabs.get({ request_id: "nh-7", astra_tab_id: fresh });
+  check("Forward lands on the last entry",
+    atB.tab.canGoBack === true && atB.tab.canGoForward === false);
+
+  const entriesBefore = hist(fresh).entries.length;
+  __commitExternal(fresh, "https://b.example/");
+  check("same-url external commit adds no duplicate", hist(fresh).entries.length === entriesBefore);
+  check("same-url external commit stays at the head", hist(fresh).entries[hist(fresh).index] === "https://b.example/");
+
+  // Shell adoption: an external load into a fresh tab takes the same path.
+  const adopted = await create("nh-8");
+  __commitExternal(adopted, "https://adopted.example/");
+  check("external first load replaces the New Tab (Back disabled)",
+    hist(adopted).entries.length === 1
+    && hist(adopted).index === 0
+    && hist(adopted).entries[0] === "https://adopted.example/");
+  const adoptedTab = await Tabs.get({ request_id: "nh-9", astra_tab_id: adopted });
+  check("adopted tab has nothing behind it", adoptedTab.tab.canGoBack === false);
+}
+
 // === Panes v1 ===
 {
   const s = await Panes.show({ request_id: "p-1", pane_id: "assistant" });

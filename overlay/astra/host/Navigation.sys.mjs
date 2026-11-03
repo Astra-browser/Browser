@@ -40,6 +40,43 @@ function tabOf(astra_tab_id) {
   return { id, tab };
 }
 
+/** A New Tab is a place, not a step: it is never a Back/Forward entry. */
+function isBlankUrl(url) {
+  return url === "" || url === "about:blank";
+}
+
+// Push a committed URL onto a tab's stack without leaving a New Tab behind it.
+// `Tabs.create` seeds the stack with `about:blank`, so a plain push would make
+// the first real page sit on top of the New Tab and Back would land there.
+// Replacing that head (index stays 0) is what makes the first page reachable
+// with Back disabled, like a native browser. A URL equal to the head is a
+// reload and adds nothing; only a genuinely new URL truncates the forward
+// branch (`__pushHistory`). `__historyFor` returns the live object, so the
+// replacement happens in place.
+function pushOrReplaceHistory(id, url) {
+  const h = __historyFor(id);
+  if (!h) {
+    __pushHistory(id, url);
+    return;
+  }
+  const head = h.index >= 0 ? h.entries[h.index] : null;
+  if (head === url) {
+    return;
+  }
+  if (isBlankUrl(head)) {
+    if (h.index === 0) {
+      // The fresh tab's New Tab: the real page takes its place.
+      h.entries[0] = url;
+      return;
+    }
+    // A blank head above real entries should not happen; drop it rather than
+    // keep a New Tab the person has to step through.
+    h.entries.splice(h.index, 1);
+    h.index -= 1;
+  }
+  __pushHistory(id, url);
+}
+
 function commit(id, url, extra = {}) {
   const { tabs } = __tabsState();
   const tab = tabs.get(id);
@@ -88,10 +125,12 @@ export const Navigation = {
     emit("tab.updated", { astra_tab_id: id, url, loading: true });
     // Pressing Enter on the address already in the bar is a reload, not a
     // second visit: a duplicated entry makes Back look like it does nothing.
+    // A fresh tab's head is its New Tab, so the first real page replaces it
+    // instead of stacking on top of a blank the person can never revisit.
     const head = __historyFor(id);
     const reloading = !!head && head.index >= 0 && head.entries[head.index] === url;
     if (!reloading) {
-      __pushHistory(id, url);
+      pushOrReplaceHistory(id, url);
     }
     commit(id, url, reloading ? { reloaded: true } : {});
     return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };
@@ -243,7 +282,8 @@ export const Navigation = {
 // Live-binding ingress (Content.sys.mjs progress listeners): an external
 // load (link click, history.pushState, redirect) observed in a real
 // browser. A URL equal to the current head is a reload (no history push);
-// anything else pushes a new history entry. Never throws.
+// a New Tab head is replaced by the real page; anything else pushes a new
+// history entry. Never throws.
 export function __commitExternal(id, url, extra = {}) {
   const { tabs } = __tabsState();
   const tab = tabs.get(id);
@@ -255,7 +295,7 @@ export function __commitExternal(id, url, extra = {}) {
   if (head === url) {
     commit(id, url, { ...extra, reloaded: true, external: true });
   } else {
-    __pushHistory(id, url);
+    pushOrReplaceHistory(id, url);
     if (typeof extra.title === "string") {
       tab.title = extra.title;
     }
