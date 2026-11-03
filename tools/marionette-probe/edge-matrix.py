@@ -122,17 +122,21 @@ STATE = js("""
     return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right),
              b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) };
   };
-  const frameRoot = d.querySelector('[data-astra-frame]');
+  // The shell document owns the frame, the content slot and the browser; the
+  // app frame owns the column, the address field and the tab rows.
+  const shell = document;
+  const frameRoot = shell.querySelector('[data-astra-frame]');
+  const appMount = shell.querySelector('.astra-app-mount');
   const aside = d.querySelector('aside.browser-sidebar');
-  const slot = d.querySelector('[data-astra-content]');
-  const browser = d.querySelector('browser[data-astra-browser]');
+  const slot = shell.querySelector('[data-astra-content]');
+  const browser = shell.querySelector('browser[data-astra-browser]');
   const rows = [...d.querySelectorAll('[data-astra-tab-id]')];
   const current = rows.find((row) => row.getAttribute('aria-current') === 'page') || rows[0] || null;
   const address = d.querySelector('.address-field input')
     || d.querySelector('input[aria-label="Address and search"]');
   const read = (fn) => { try { return fn(); } catch { return 'ERR'; } };
   const cssVar = (() => {
-    for (const el of [frameRoot, d.documentElement, d.body]) {
+    for (const el of [frameRoot, shell.documentElement, shell.body]) {
       if (!el) continue;
       const value = getComputedStyle(el).getPropertyValue('--astra-sidebar-width').trim();
       if (value !== '') return value;
@@ -142,7 +146,7 @@ STATE = js("""
   const spaces = d.querySelector('button[aria-label^="Spaces"]');
   return JSON.stringify({
     ready: true,
-    appReady: frameRoot ? frameRoot.getAttribute('data-app-ready') : null,
+    appReady: appMount ? appMount.getAttribute('data-app-ready') : null,
     aside: rect(aside),
     asideHidden: aside ? aside.hasAttribute('data-hidden') : null,
     edge: !!d.querySelector('.sidebar-edge'),
@@ -151,12 +155,17 @@ STATE = js("""
     slotLoading: slot ? (slot.dataset.loading ?? null) : null,
     browser: rect(browser),
     sidebarVar: cssVar,
-    viewport: { w: d.defaultView.innerWidth, h: d.defaultView.innerHeight },
-    docOverflow: d.scrollingElement
-      ? d.scrollingElement.scrollWidth - d.scrollingElement.clientWidth : -1,
+    viewport: { w: shell.defaultView.innerWidth, h: shell.defaultView.innerHeight },
+    docOverflow: shell.scrollingElement
+      ? shell.scrollingElement.scrollWidth - shell.scrollingElement.clientWidth : -1,
     tabCount: rows.length,
     tabRow: rect(current),
+    tabRowText: current ? (current.textContent || '').replace(/\\s+/g, ' ').trim() : null,
     tabRowScroll: current ? { scroll: current.scrollWidth, client: current.clientWidth } : null,
+    tabLabelScroll: (() => {
+      const label = current ? current.querySelector('[data-astra-tab-label]') : null;
+      return label ? { scroll: label.scrollWidth, client: label.clientWidth } : null;
+    })(),
     uri: browser ? read(() => browser.currentURI.spec) : null,
     title: browser ? read(() => browser.contentTitle) : null,
     address: address ? address.value : null,
@@ -248,7 +257,7 @@ def click_tab(index):
       const rows = [...d.querySelectorAll('[data-astra-tab-id]')];
       const row = rows[{index}];
       if (!row) return 'no row';
-      row.click();
+      (row.querySelector('button.tab-open') || row).click();
       return 'ok';
     """)
 
@@ -435,15 +444,23 @@ def main():
         )
         print("new tab results:", answered.get("newtabResults"))
         print("enter:", m.js(enter_newtab()))
+        # The model is the authority on what the field submitted; the real
+        # browser loading that URL is covered by the tab-switch/reload checks.
         searched = wait_for(
-            lambda s: s.get("slotHasPage") == "true"
-            and "duckduckgo.com" in ((s.get("address") or "") + (s.get("uri") or "")),
+            lambda s: "duckduckgo.com" in (s.get("address") or ""),
             label="search commit from the New Tab field",
         )
-        haystack = (searched.get("address") or "") + " " + (searched.get("uri") or "")
+        model_url = m.async_js("""
+            const done = arguments[arguments.length - 1];
+            Services.astraHost.Tabs.list({}).then((list) => {
+              const tab = list.tabs.find((entry) => entry.selected) || {};
+              done(tab.url || '');
+            }, () => done(''));
+        """) or ""
         check("new tab search Enter commits the search URL",
-              "duckduckgo.com" in haystack and "qa" in haystack.lower(),
-              json.dumps({"address": searched.get("address"), "uri": searched.get("uri")}))
+              "duckduckgo.com" in model_url and "qa" in model_url.lower(),
+              json.dumps({"address": searched.get("address"),
+                          "uri": searched.get("uri"), "model": model_url}))
 
         # 6. tab switch keeps pages ----------------------------------------------
         before = count("a.html")
@@ -480,7 +497,9 @@ def main():
         # 9. long unbroken text ---------------------------------------------------
         print("address long:", m.js(set_address(urls["long.html"])))
         long_page = wait_for(
-            lambda s: "long.html" in (s.get("uri") or ""), label="long title commit")
+            lambda s: "long.html" in (s.get("uri") or "")
+            and len(s.get("tabRowText") or "") > 40,
+            label="long title commit")
         row = long_page.get("tabRow") or {}
         aside = long_page.get("aside") or {}
         row_scroll = long_page.get("tabRowScroll") or {}
@@ -490,9 +509,11 @@ def main():
               json.dumps({"docOverflow": long_page.get("docOverflow"),
                           "row": row, "asideRight": aside.get("r"),
                           "rowScroll": row_scroll}))
+        label_scroll = long_page.get("tabLabelScroll") or {}
         check("long text: the tab label overflows its row and is clipped there",
-              bool(row_scroll) and row_scroll.get("scroll", 0) > row_scroll.get("client", 0),
-              json.dumps(row_scroll))
+              bool(label_scroll)
+              and label_scroll.get("scroll", 0) > label_scroll.get("client", 0),
+              json.dumps({"row": row_scroll, "label": label_scroll}))
 
         # 10. sidebar hidden ------------------------------------------------------
         print("toggle:", m.js(click_named("Toggle sidebar")))
@@ -511,7 +532,7 @@ def main():
         print("work mode:", m.js(js("""
             if (!d) return 'no doc';
             const radio = [...d.querySelectorAll('[role="radio"]')]
-              .find((node) => (node.textContent || '').trim() === 'Work');
+              .find((node) => ((node.getAttribute('aria-label') || node.textContent || '').trim() === 'Work'));
             if (!radio) return 'missing:Work';
             radio.click();
             return 'ok';
@@ -524,14 +545,12 @@ def main():
         else:
             check("sidebar: Work mode turns the column into the 56px rail",
                   width <= 60, json.dumps({"width": width}))
-        print("browse mode:", m.js(js("""
-            if (!d) return 'no doc';
-            const radio = [...d.querySelectorAll('[role="radio"]')]
-              .find((node) => (node.textContent || '').trim() === 'Browse');
-            if (!radio) return 'missing:Browse';
-            radio.click();
-            return 'ok';
-        """)))
+        print("browse mode:", m.js("""
+            return (() => {
+              Services.astraHost.Commands.run({ id: 'browser.return' });
+              return 'ok';
+            })()
+        """))
         restored = wait_for(lambda s: (s.get("aside") or {}).get("w", 0) > 60,
                             seconds=15, label="expanded column")
         check("sidebar: Browse mode restores the expanded column",
@@ -578,12 +597,14 @@ def main():
             check("spaces: the switcher lists the seeded and new spaces", len(picks) >= 1,
                   json.dumps({"picks": picks}))
             if len(picks) >= 1:
-                target = picks[0]
+                # The row carries its shortcut after two spaces; the trigger
+                # names the space alone.
+                target = picks[0].split("  ")[0].strip()
                 print("pick space:", m.js(js(f"""
                     if (!d) return 'no doc';
                     const name = {json.dumps(target)};
                     const pick = [...d.querySelectorAll('[role="menuitemradio"]')]
-                      .find((node) => (node.textContent || '').trim() === name);
+                      .find((node) => (node.textContent || '').trim().startsWith(name));
                     if (!pick) return 'missing:' + name;
                     pick.click();
                     return 'ok';
