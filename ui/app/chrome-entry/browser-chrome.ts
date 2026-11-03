@@ -49,6 +49,19 @@ function announce(bridge: Bridge): void {
   }
 }
 
+/** Tell the shell which light/dark the app chose, now and on every change.
+ *  Web pages follow it through `layout.css.prefers-color-scheme`. */
+function announceTheme(): void {
+  try {
+    if (!window.parent || window.parent === window) return;
+    const theme = document.documentElement.getAttribute("data-theme");
+    if (theme !== "light" && theme !== "dark") return;
+    window.parent.postMessage({ ns: SHELL_NS, kind: "theme", theme }, "*");
+  } catch {
+    // No shell to tell; the app still runs.
+  }
+}
+
 function fail(message: string, error: unknown): void {
   console.error("[astra-chrome-entry]", message, error);
   try {
@@ -192,6 +205,18 @@ try {
   mount(App, { target });
   // The presentation barrier observes this DOM synchronously.
   flushSync();
+  // The theme is written by the app's own appearance init, a pass after the
+  // mount; watch the one attribute and tell the shell each time it changes.
+  try {
+    new MutationObserver(announceTheme).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    announceTheme();
+  } catch {
+    // No observer: the first `ready` still proves the UI, pages just keep the
+    // system colour scheme.
+  }
   // `announce` is called from `reveal()`: the shell only shows this frame once
   // the first paint is complete, so a half-built chrome is never displayed.
   // Guarantee the first projection: the app asks for its own snapshot during
