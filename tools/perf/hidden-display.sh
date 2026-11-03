@@ -39,5 +39,6 @@ export XDG_RUNTIME_DIR="$runtime"
 export WAYLAND_DISPLAY="$socket"
 export MOZ_ENABLE_WAYLAND=1
 export MOZ_CRASHREPORTER_DISABLE=1
+export ASTRA_TEST_VIRTUAL=1
 unset DISPLAY
 "$@"
