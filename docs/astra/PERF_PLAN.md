@@ -279,6 +279,25 @@ last perceived-latency win.
   Startup graph **506,805 → 452,823 bytes (−10.7%)** and **85 → 74 chunks**;
   browse first paint and first-frame completeness unchanged.
 
+**Post-fix re-measure (2026-11-04, hidden 144 Hz output)**
+One full 10-scenario matrix, Astra vs Firefox 159, **20/20 runs PASS**, while
+the owner's video kept playing on `eDP-1`. The measured window ran on
+`HEADLESS-1` at 144 Hz with `layout.frame_rate=144` pinned in both profiles
+(Astra/ESR 153 otherwise resolves that output to 60 Hz). Single run and an
+ambient iGPU at up to 100% in the 3D rows: treat differences under ~5% as noise.
+- **mixed-8 CPU: 5.81 vs 4.23 cores (+37.3%) → 4.46 vs 4.34 (+2.7%).**
+  7/7 background tabs were actually parked (`docActive=false`).
+- **3d-4 PSS: 631 vs 478 MiB (+32.0%) → 566 vs 493 MiB (+14.9%)**;
+  **3D GPU memory 462 vs 231 MiB (+100.3%) → 354 vs 317 MiB (+11.5%)**.
+- **3D per-frame cost is now parity:** 3d-1 `gpu_render% / rAF` 0.406 vs 0.309
+  (+31.6%) → 0.304 vs 0.314 (−3.2%); 3d-4 0.358 vs 0.353 (+1.4%).
+- **Base memory did not move:** 1 tab 509 vs 429 MiB (+18.7%), 8 static
+  555 vs 493 (+12.7%), video-6 736 vs 644 MiB (+14.3%). video-6 GPU memory
+  improved (78.1% → 57.3% over stock) but is still high.
+- **Runtime startup did not move:** spawn→UI ready 1.85–2.08 s vs stock
+  1.49–1.59 s (+0.35–0.55 s), despite the −10.7% JS graph.
+- Raw data: `out/stress-postfix-20261104-012722/`. No product code changed.
+
 **Measured, not changed**
 - `dom.ipc.processPrelaunch.fission.number` 3→1 did **not** reduce the observed
   content-process count (5 both) and PSS was 609 vs 646 MiB (noise). Do not ship
@@ -321,7 +340,7 @@ No product code is touching it.
 - Real-display 3D A/B: hide/clip the app layer under the content stage, measure
   `gpu_render_pct`/frame, then decide on the stage restructure.
 - Discard/sleeping policy with SessionStore, scroll/form restore and exceptions.
-- Runtime startup/PSS re-measure after the settings split (the build win is
-  static; the engine build is required for `spawn→UI ready`).
+- Startup wall time: the −10.7% JS graph did not move `spawn→UI ready`
+  (still +0.35–0.55 s over stock); profile the shell boot path next.
 - Process-table audit via `ChromeUtils.requestProcInfo()` before any
   `dom.ipc.*` change.
