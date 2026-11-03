@@ -550,19 +550,26 @@ def main():
                 ]
 
             active_reports = tab_reports("a", visibility="visible")
+            active_frames = (
+                int(active_reports[-1]["raf"]) - int(active_reports[0]["raf"])
+                if len(active_reports) >= 2
+                else 0
+            )
+            # A private Weston/pixman display does not schedule vsync frames,
+            # so rAF is unobservable there. The real-display run requires it;
+            # the hidden-display run still proves visibility/docshell state.
+            virtual = os.environ.get("ASTRA_TEST_VIRTUAL") == "1"
             check(
                 "active page reports visible and keeps its rAF loop",
-                len(active_reports) >= 2
-                and int(active_reports[-1]["raf"]) - int(active_reports[0]["raf"]) >= 8,
+                len(active_reports) >= 2 and (virtual or active_frames >= 8),
                 f"reports={len(active_reports)} "
                 f"raf={active_reports[0]['raf'] if active_reports else '-'}"
-                f"->{active_reports[-1]['raf'] if active_reports else '-'}",
+                f"->{active_reports[-1]['raf'] if active_reports else '-'}"
+                + (" (virtual display: rAF not required)" if virtual else ""),
             )
             active_rate = 0.0
             if len(active_reports) >= 2:
-                active_rate = (
-                    int(active_reports[-1]["raf"]) - int(active_reports[0]["raf"])
-                ) / max(0.001, 2.2)
+                active_rate = active_frames / max(0.001, 2.2)
 
             hide_reports = {}
             for tab in ("b", "c"):
@@ -658,7 +665,7 @@ def main():
             observed = shown[-1] if shown else None
             if not observed or not c_hidden:
                 failures.append("media tab never reported across the switch")
-            elif observed.get("paused") == "True" or c_hidden.get("paused") == "True":
+            elif observed.get("paused") == "true" or c_hidden.get("paused") == "true":
                 warnings.append(
                     "autoplay was blocked, so background audio could not be "
                     "measured (media.autoplay.default=0 should allow it)"
@@ -672,8 +679,9 @@ def main():
                     advanced += 20.0
                 check(
                     "background audio keeps advancing while the tab is parked",
-                    observed.get("paused") == "False" and advanced >= 0.5,
-                    f"media={before}->{after} advanced={advanced:.2f}s",
+                    observed.get("paused") == "false" and advanced >= 0.5,
+                    f"media={before}->{after} advanced={advanced:.2f}s "
+                    f"paused={observed.get('paused')}",
                 )
             check(
                 "media tab still holds its page after the round trip",
