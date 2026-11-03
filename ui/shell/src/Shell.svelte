@@ -301,6 +301,16 @@
         // the page travels with the column. A drag reports false and the page
         // tracks the pointer without a transition lagging behind it.
         frameRoot.dataset.astraSidebarAnimate = event.data?.animate === true ? "true" : "false";
+      } else if (event.type === "ui-command") {
+        // Work, Settings, Tasks, Notes and Time are the app's own pages: the
+        // real page surface must get out of their way, and come back on
+        // `browser.return` (the app's own surface event does the rest).
+        const command = typeof event.data === "string" ? event.data : "";
+        if (command === "browser.return") {
+          delete slot.dataset.internal;
+        } else if (command.startsWith("browser.") && command !== "browser.return-failed") {
+          slot.dataset.internal = "true";
+        }
       } else {
         // The stage's two flags (a real page in front, and whether it is still
         // arriving) are derived in `content/slot-state.js` so every path —
@@ -503,6 +513,12 @@
   }
   .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]),
   .astra-frame[data-app-booted="pending"] .astra-content:not([data-has-page="true"]) {
+    display: none;
+  }
+  /* An app page (Work, Settings, Tasks, Notes, Time) owns the window: the
+     real page surface keeps its browser alive but is not painted. Three
+     classes beat the scoped base `.astra-content` display without !important. */
+  :global(.astra-frame .astra-content[data-internal="true"]) {
     display: none;
   }
   /* P3-T17: the native `#browser` box is empty (toolbox, tabbox and sidebars
