@@ -34,7 +34,7 @@
 | P4 | `merge/p4-gbrowser` | **Critical path.** Native `gBrowser` tabs with the strip hidden; model projection; mute, pin, discard, space move, adoption. Native is now the default; deleting the legacy mount is the remaining cleanup. | P1–P3 | **P4.4a merged (native default); P4.4b cleanup next** |
 | P5 | `merge/p5-session` | Firefox `SessionStore` is live; restored native tabs are adopted, the bootstrap blank tab is dropped. Astra metadata (space/folder/pin/sync) in the Rust store is P5b. | P4 | **P5a merged; P5b next** |
 | P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | planned |
-| P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | **P7a merged; P7b next** |
+| P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | **merged** |
 | P8 | `merge/p8-resources` | Split `Resources`: tasks/notes/media → Rust; page source → native browser; delete the in-memory task store; retire `Panes` | P1 | planned |
 | P9 | `merge/p9-media-ext` | Bind `Media` to the native media controller and `WebExtensions` to `AddonManager`, or remove both surfaces | P4 | decision |
 | P10 | `merge/p10-cleanup` | Remove dead routes/models, shrink `HostAPI`, update docs and the audit, final regression pass | all | planned |
@@ -229,6 +229,7 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | 2026-11-04 | P2 | done: `native_nav_model` 17; live probe stop `about:blank` after a 4 s slow page, model loading cleared, zoom readback `1.5`, soft reload no-cache=false vs hard reload no-cache=true; overlay + `build --faster` used |
 | 2026-11-04 | P1/P2 review | code review found the supervisor unreachable + failure-path bugs; fixed and re-reviewed PASS-WITH-NOTES. Remaining notes are P4/P5 work, not blockers. |
 | 2026-11-04 | P1/P2 merge | merged to `main` as `df24279` + `7edb116`; tag `post-p1-p2-20261104`. P3/P4 next. |
+| 2026-11-04 | P7b | private windows stay context 0; cross-space moves recreate in the target identity (space-2 ↔ space-1). Live probe `containers_private_move_probe.py` PASS. |
 | 2026-11-04 | P7a | merged as `a3e457f`; tag `post-p7-containers-20261104`. space→identity map; native tabs get the identity userContextId; deleting a space removes the identity/data. Live probe `containers_space_probe.py` PASS. Private isolation/P7b next. |
 | 2026-11-04 | P5a | merged as `b3b70b7`; tag `post-p5-session-20261104`. SessionStore restores both tabs with native ids; blank bootstrap row removed. P5b is Astra metadata in Rust. |
 | 2026-11-04 | P4.4a | merged as `269864f`; tag `post-p4-default-20261104`. native is default (`astra.gbrowser.enabled=true`); multi-window mounts one native tab per window; `gbrowser_multiwindow_probe` PASS. Standalone mount remains as pref-off fallback; deletion is P4.4b. |
