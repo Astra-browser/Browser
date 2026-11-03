@@ -42,7 +42,11 @@ check("create adds a space", next.spaces.length === 2);
 check("create names it in order", next.spaces[1].name === "Space 2");
 check("create makes it active", next.active_space_id === next.spaces[1].id);
 check("create keeps its look", next.spaces[1].color === 3);
-check("a new space starts empty", next.tabs.length === 0);
+// Every active space keeps one New Tab, so the stage always has an owner.
+check(
+  "a new space starts with its own New Tab",
+  next.tabs.length === 1 && next.tabs[0].url === null,
+);
 
 const second = next.spaces[1].id;
 const switched = await Tabs.switchSpace({ space: first });
