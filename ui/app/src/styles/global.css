@@ -103,12 +103,19 @@ button {
 
 /* A hidden column peeking over a live page is chrome above the page: the
    frame's own ground — html canvas, body, root and caption material — steps
-   aside so only the card paints and the page stays visible around it. */
+   aside so only the card paints and the page stays visible around it. The
+   same ground steps aside while a context menu is open, because the shell
+   raises the whole frame to draw it over the page. */
 :root[data-astra-peek="true"],
 :root[data-astra-peek="true"] body,
 :root[data-astra-peek="true"] #root,
 :root[data-astra-peek="true"] .shell,
-:root[data-astra-peek="true"] .shell[data-caption] {
+:root[data-astra-peek="true"] .shell[data-caption],
+:root[data-astra-menu="true"],
+:root[data-astra-menu="true"] body,
+:root[data-astra-menu="true"] #root,
+:root[data-astra-menu="true"] .shell,
+:root[data-astra-menu="true"] .shell[data-caption] {
   background: transparent !important;
 }
 
