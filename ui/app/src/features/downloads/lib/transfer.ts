@@ -33,8 +33,16 @@ export class TransferRate {
 }
 
 const durations = {
-  second: new Intl.NumberFormat(getLocale(), { style: "unit", unit: "second", unitDisplay: "short" }),
-  minute: new Intl.NumberFormat(getLocale(), { style: "unit", unit: "minute", unitDisplay: "short" }),
+  second: new Intl.NumberFormat(getLocale(), {
+    style: "unit",
+    unit: "second",
+    unitDisplay: "short",
+  }),
+  minute: new Intl.NumberFormat(getLocale(), {
+    style: "unit",
+    unit: "minute",
+    unitDisplay: "short",
+  }),
   hour: new Intl.NumberFormat(getLocale(), {
     style: "unit",
     unit: "hour",

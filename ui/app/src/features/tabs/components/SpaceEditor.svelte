@@ -325,11 +325,8 @@
           <p class="confirm-body">{closing(space.tabs)}</p>
         </div>
         <div class="editor-actions">
-          <Button
-            bind:ref={confirmCancel}
-            size="compact"
-            variant="secondary"
-            onclick={cancelDelete}>{m.space_cancel()}</Button
+          <Button bind:ref={confirmCancel} size="compact" variant="secondary" onclick={cancelDelete}
+            >{m.space_cancel()}</Button
           >
           <Button size="compact" variant="danger" pending={deleting} onclick={remove}
             >{m.space_delete_confirm()}</Button

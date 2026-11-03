@@ -31,7 +31,10 @@
   // the rest read against it rather than against a total they never reach.
   let lead = $derived(sites[0]?.seconds ?? 0);
   let shown = $derived(sites.slice(0, limit));
-  const percent = new Intl.NumberFormat(getLocale(), { style: "percent", maximumFractionDigits: 0 });
+  const percent = new Intl.NumberFormat(getLocale(), {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 </script>
 
 <ul class="sites" class:page={size === "page"} aria-label={m.time_sites()}>

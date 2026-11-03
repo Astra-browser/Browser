@@ -2,7 +2,6 @@ import * as m from "$shared/i18n/messages";
 import { getLocale } from "$shared/i18n/runtime";
 import type { SectionKey } from "./sections";
 
-
 let formats: {
   time: Intl.DateTimeFormat;
   weekday: Intl.DateTimeFormat;

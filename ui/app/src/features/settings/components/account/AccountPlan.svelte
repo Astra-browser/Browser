@@ -103,7 +103,9 @@
       ? m.account_bonus_value({ amount: left, date })
       : m.account_bonus_value_nodate({ amount: left });
   });
-  const heldCredits = $derived(positive(usage?.held) ? creditsTotal(usage?.held, per, getLocale()) : null);
+  const heldCredits = $derived(
+    positive(usage?.held) ? creditsTotal(usage?.held, per, getLocale()) : null,
+  );
   const planLine = $derived.by(() => {
     if (!subscription || subscription.status === "inactive") return null;
     if (subscription.status === "unknown") return m.account_plan_unknown();
@@ -111,7 +113,13 @@
     if (!date) return m.account_plan_active();
     if (subscription.cancel_at_period_end) return m.account_plan_ends({ date });
     // Credits that refill the day the plan renews already say when it renews.
-    if (ai && renewalLine && !usage?.one_time && date === shortDate(usage?.resets_at, undefined, getLocale())) return null;
+    if (
+      ai &&
+      renewalLine &&
+      !usage?.one_time &&
+      date === shortDate(usage?.resets_at, undefined, getLocale())
+    )
+      return null;
     return m.account_plan_renews({ date });
   });
   const unconfirmed = $derived(
