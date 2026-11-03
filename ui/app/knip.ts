@@ -9,6 +9,12 @@ export default {
     "src/entries/*.ts",
     "src/shared/ui/*/index.ts",
     "src/shared/ui/data/*/index.ts",
+    // Ported feature surfaces the chrome shell does not import yet (UI-only
+    // phase): they stay public so the wiring phase can mount them.
+    "src/features/split/index.ts",
+    "src/features/work/canvas/index.ts",
+    "src/features/work/helpers/index.ts",
+    "src/features/work/memory/index.ts",
     "src/**/*.test.ts",
     "*.test.ts",
     "*.config.{js,ts}",
