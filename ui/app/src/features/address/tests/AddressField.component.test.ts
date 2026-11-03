@@ -1,16 +1,31 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
+import { userEvent } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, tabFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { preferences } from "$domain/preferences";
+import { uiCommands } from "$domain/ui-commands";
 import AddressFieldHost from "./AddressFieldHost.svelte";
 
-const native = vi.hoisted(() => ({
-  defaultZoom: "100",
-  page: null as string | null,
-  edit: vi.fn(async () => true),
-}));
+const native = vi.hoisted(() => {
+  // A plain function, not a spy: Vitest's spy result tracking attaches a
+  // handler to the promise it returns, which would hide a rejection the app
+  // never handles — the thing the field is being tested for.
+  const state = {
+    defaultZoom: "100",
+    page: null as string | null,
+    editCalls: 0,
+    editFails: false,
+    navigate: vi.fn(async () => ({ accepted: true, operation_id: null })),
+    edit: async (_tab: string, _url: string) => {
+      state.editCalls += 1;
+      if (state.editFails) throw new Error("not routed");
+      return true;
+    },
+  };
+  return state;
+});
 
 vi.mock("$domain/surface", () => ({ surface: { currentPage: () => native.page } }));
 vi.mock("$domain/permissions", () => ({
@@ -30,6 +45,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     tabsBootstrap: async () => {},
     runCommand: async () => ({ accepted: true, operation_id: null }),
     launcherEdit: native.edit,
+    tabsNavigate: native.navigate,
     settingGet: async (key: string) => (key === "zoom.default" ? native.defaultZoom : null),
   });
 });
@@ -44,7 +60,9 @@ afterEach(() => {
   preferences.dispose();
   native.defaultZoom = "100";
   native.page = null;
-  native.edit.mockClear();
+  native.editCalls = 0;
+  native.editFails = false;
+  native.navigate.mockClear();
 });
 
 async function field(props: { compact?: boolean } = {}) {
@@ -73,7 +91,7 @@ test("a click on a page's address edits it here, and only the shortcut opens the
   await screen.getByRole("textbox", { name: /address/iu }).click();
   expect(document.activeElement).toBe(input);
   await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
-  expect(native.edit).not.toHaveBeenCalled();
+  expect(native.editCalls).toBe(0);
 });
 
 test("editing shows the whole address and rests on the host", async () => {
@@ -83,6 +101,78 @@ test("editing shows the whole address and rests on the host", async () => {
   await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
   input.blur();
   await expect.poll(() => input.value).toBe("www.wikipedia.org");
+});
+
+test("a refused navigation's ring leaves with the page it was about", async () => {
+  native.navigate.mockResolvedValueOnce({ accepted: false, operation_id: null });
+  const { screen, input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("https://missing.invalid/");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("alert")).toBeInTheDocument();
+  expect(input.getAttribute("aria-invalid")).toBe("true");
+
+  // The press that moves to another tab takes the caret out of the field and
+  // the new page's address in; the refusal was about the old page.
+  input.blur();
+  emitNativeEvent("tabChanged", {
+    ...tabs.activeTab()!,
+    projection_revision: stamp(),
+    url: "https://example.com/",
+  });
+  await expect.poll(() => input.value).toBe("example.com");
+  await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
+  expect(input.getAttribute("aria-invalid")).toBeNull();
+});
+
+test("Enter hands the typed line to the host rather than deciding itself", async () => {
+  const { input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("rust lifetimes");
+  await userEvent.keyboard("{Enter}");
+  // One place decides whether those words are an address or a search; the
+  // field only says what was typed, and it says it whole.
+  await vi.waitFor(() =>
+    expect(native.navigate).toHaveBeenCalledWith(tabs.activeId(), "rust lifetimes"),
+  );
+});
+
+test("an address of only spaces navigates nowhere", async () => {
+  const { input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("   ");
+  await userEvent.keyboard("{Enter}");
+  await new Promise((done) => setTimeout(done, 30));
+  expect(native.navigate).not.toHaveBeenCalled();
+  // The page did not move, so the field stays where the person is typing.
+  expect(document.activeElement).toBe(input);
+});
+
+test("a launcher hand-off that the host refuses raises nothing", async () => {
+  const rejections: unknown[] = [];
+  const caught = (event: PromiseRejectionEvent) => {
+    rejections.push(event.reason);
+  };
+  window.addEventListener("unhandledrejection", caught);
+  try {
+    native.editFails = true;
+    const { input } = await field();
+    await uiCommands.init();
+    emitNativeEvent("uiCommand", "url.focus");
+    await vi.waitFor(() => expect(native.editCalls).toBe(1));
+    // The shortcut hands the address to the launcher; when that cannot be
+    // delivered the field must not leave a rejected promise behind, and it
+    // must not quietly take the caret into the sidebar field instead.
+    await new Promise((done) => setTimeout(done, 50));
+    expect(rejections).toEqual([]);
+    expect(document.activeElement).not.toBe(input);
+  } finally {
+    window.removeEventListener("unhandledrejection", caught);
+    uiCommands.dispose();
+  }
 });
 
 test("a press anywhere else in the chrome ends editing", async () => {

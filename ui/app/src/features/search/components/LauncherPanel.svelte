@@ -406,7 +406,10 @@
         {#if failure()}
           <div class="failure" role="alert">
             <span>{failure()}</span>
-            <button type="button" onclick={surface.retry}>{m.panel_retry()}</button>
+            <!-- Nothing a retry can do about a query that cannot fit. -->
+            {#if surface.error !== "too_long"}<button type="button" onclick={surface.retry}
+                >{m.panel_retry()}</button
+              >{/if}
           </div>
         {/if}
         <ResultList

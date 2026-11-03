@@ -133,6 +133,95 @@ test("an obsolete answer cannot put its rows back on screen", async () => {
   await expect.element(screen.getByRole("option", { name: /stale/u })).not.toBeInTheDocument();
 });
 
+test("a visit and the bookmark saved for it are one row", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await screen.getByRole("combobox").fill("example");
+  const owner = await reply("example", [
+    visit("Example", "https://example.com/"),
+    { ...visit("Example saved", "https://example.com/"), kind: "bookmark" },
+    visit("Other", "https://other.example/"),
+  ]);
+  // Two rows leading to one address would give the list two identical keys
+  // and one highlight spanning both, which throws while rendering.
+  await vi.waitFor(() =>
+    expect(
+      [...screen.container.querySelectorAll(".row .title")].map((el) => el.textContent),
+    ).toEqual(["Example", "Other"]),
+  );
+  await userEvent.keyboard("{Enter}");
+  await vi.waitFor(() =>
+    expect(native.run).toHaveBeenCalledExactlyOnceWith(
+      { type: "OpenUrl", url: "https://example.com/" },
+      owner,
+      false,
+    ),
+  );
+});
+
+test("a field holding only spaces asks what an empty field asks", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await reply("", [visit("GitHub", "https://github.com/")]);
+  await expect.element(screen.getByRole("option", { name: /GitHub/u })).toBeVisible();
+  await screen.getByRole("combobox").fill("   ");
+  // The host trims a query, so a field with no words in it is the empty
+  // question; asked as spaces it would come back as a different list and take
+  // the home rows away with it.
+  await reply("", [visit("GitHub", "https://github.com/")]);
+  await expect.element(screen.getByRole("option", { name: /GitHub/u })).toBeVisible();
+});
+
+test("Enter with nothing on screen neither runs nor searches again", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations: [] } });
+  await screen.getByRole("combobox").fill("zzz");
+  await reply("zzz", []);
+  await expect.element(screen.getByText("No matching results").first()).toBeVisible();
+  const asked = native.search.mock.calls.length;
+  await userEvent.keyboard("{Enter}");
+  await new Promise((done) => setTimeout(done, 50));
+  expect(native.run).not.toHaveBeenCalled();
+  expect(native.search.mock.calls.length).toBe(asked);
+});
+
+test("a search that never answers says so, and Try again asks again", async () => {
+  native.search.mockResolvedValue(false);
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  try {
+    await screen.getByRole("combobox").fill("rust");
+    // The controller retries once on its own before it reports a failure.
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Search isn’t responding.");
+    const asked = native.search.mock.calls.length;
+    await screen.getByRole("button", { name: "Try again" }).click();
+    await vi.waitFor(() => expect(native.search.mock.calls.length).toBeGreaterThan(asked));
+  } finally {
+    native.search.mockResolvedValue(true);
+  }
+});
+
+test("a query past the byte bound says so and offers no retry", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  const asked = native.search.mock.calls.length;
+  // The field's 2048 limit counts UTF-16 units; an ideograph costs three bytes.
+  await screen.getByRole("combobox").fill("界".repeat(700));
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("This search is too long");
+  // Retrying would send the same query and fail the same way.
+  expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
+  expect(native.search.mock.calls.length).toBe(asked);
+});
+
+test("the primary modifier plus Shift and C copies the selected address", async () => {
+  const written: string[] = [];
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (text: string) => void written.push(text) },
+  });
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await screen.getByRole("combobox").fill("rust");
+  await reply("rust", [search("rust"), visit("Rust Book", "https://doc.rust-lang.org/book/")]);
+  await userEvent.keyboard(`{ArrowDown}{${primary}>}{Shift>}c{/Shift}{/${primary}}`);
+  await vi.waitFor(() => expect(written).toEqual(["https://doc.rust-lang.org/book/"]));
+  await expect.element(screen.getByText("Link copied")).toBeVisible();
+});
+
 test("home offers recent tabs and destinations, growing only as results need space", async () => {
   const onTool = vi.fn();
   const screen = await render(LauncherPanel, { props: { context, destinations, onTool } });

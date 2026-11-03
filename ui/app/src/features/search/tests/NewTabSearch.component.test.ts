@@ -277,6 +277,48 @@ test("Escape puts the list away, then clears the field", async () => {
   await expect.element(input).toHaveValue("");
 });
 
+test("the clear control empties the field and closes the list", async () => {
+  const screen = await mount({ tabId: "tab" });
+  const input = screen.getByRole("combobox");
+  await input.fill("rust");
+  await reply("rust", [search("rust")]);
+  await expect.element(screen.getByRole("option", { name: /^rust/u })).toBeInTheDocument();
+
+  await screen.getByRole("button", { name: "Clear search" }).click();
+  await expect.element(input).toHaveValue("");
+  await expect.poll(() => screen.container.querySelector(".sheet")).toBeNull();
+  // Clearing is not leaving: the caret stays where the next word goes.
+  await expect.element(input).toHaveFocus();
+});
+
+test("a query past the byte bound says so and offers no retry", async () => {
+  const screen = await mount({ tabId: "tab" });
+  await screen.getByRole("combobox").fill("界".repeat(700));
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("This search is too long");
+  expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
+  expect(native.search).not.toHaveBeenCalled();
+});
+
+test("leaving while a search is open cancels it, and its answer is dropped", async () => {
+  const screen = await mount({ tabId: "tab" });
+  await screen.getByRole("combobox").fill("rust");
+  await vi.waitFor(() => expect(native.search).toHaveBeenCalled());
+  const context = native.search.mock.calls.at(-1)![1];
+  screen.unmount();
+  // The page navigates away or another tab takes the surface; native work for
+  // a field that no longer exists must not keep running.
+  await vi.waitFor(() => expect(native.cancel).toHaveBeenCalledWith(context));
+  emitNativeEvent("searchChanged", {
+    context,
+    query: "rust",
+    results: [search("rust")],
+    completion: null,
+    pending: false,
+  });
+  await new Promise((done) => setTimeout(done, 50));
+  expect(native.run).not.toHaveBeenCalled();
+});
+
 test("the empty state waits for every provider before claiming nothing matched", async () => {
   const screen = await mount({ tabId: "tab" });
   await screen.getByRole("combobox").fill("zzz");

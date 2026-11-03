@@ -184,7 +184,10 @@
           {#if surface.failed || surface.error !== "none"}
             <div class="failure" role="alert">
               {surface.error === "too_long" ? m.panel_query_too_long() : m.panel_action_failed()}
-              <button type="button" onclick={surface.retry}>{m.panel_retry()}</button>
+              <!-- Nothing a retry can do about a query that cannot fit. -->
+              {#if surface.error !== "too_long"}<button type="button" onclick={surface.retry}
+                  >{m.panel_retry()}</button
+                >{/if}
             </div>
           {/if}
           {#if surface.empty}<p class="empty">{m.panel_no_results()}</p>{/if}
