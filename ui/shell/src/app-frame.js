@@ -201,9 +201,8 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
         return;
       }
       try {
-        if (error) win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;
-        if (data.module === "Search") {
-          win.__astraLastSearch = JSON.stringify({ method: data.method, args: data.args, payload });
+        if (error) {
+          win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;
         }
       } catch {
         // Diagnostics only.
@@ -233,13 +232,6 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const relayEvents = host?.addEventListener
     ? host.addEventListener((event) => {
-        try {
-          if (event.type === "search-changed") {
-            win.__astraLastSearchEvent = JSON.stringify(event.data);
-          }
-        } catch {
-          // Diagnostics only.
-        }
         post({ kind: "evt", type: event.type, data: event.data, seq: event.event_seq });
       })
     : null;
@@ -248,7 +240,6 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
     frame = doc.createElementNS(XHTML_NS, "iframe");
     frame.setAttribute("class", "astra-app-frame");
     frame.setAttribute("data-astra-app-frame", "");
-    frame.setAttribute("allow", "clipboard-read; clipboard-write");
     // The embed is first-party chrome, so it may run with the chrome
     // principal it already has; nothing here grants page content anything.
     frame.setAttribute("src", APP_PAGE);
