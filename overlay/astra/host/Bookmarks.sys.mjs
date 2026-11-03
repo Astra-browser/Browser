@@ -41,6 +41,20 @@
 // `unavailable`.
 
 import { Favicons, originOf } from "./Favicons.sys.mjs";
+import { __activeSpaceId } from "./Tabs.sys.mjs";
+
+/** The first space keeps the unfiled root, so existing bookmarks stay put. */
+const DEFAULT_SPACE = "space-1";
+const SPACE_FOLDER_PREFIX = "Astra · ";
+const _spaceRoots = new Map();
+
+function activeSpaceId() {
+  try {
+    return __activeSpaceId() || DEFAULT_SPACE;
+  } catch {
+    return DEFAULT_SPACE;
+  }
+}
 
 /** The panel caps a search at this many characters
  *  (`bookmarks-session.svelte.ts`); a longer query is not one it sent. */
@@ -466,6 +480,84 @@ async function backend() {
   return _backend;
 }
 
+/** Find or create the bookmarks folder that owns one space. */
+async function ensureSpaceRoot(base, space) {
+  const cached = _spaceRoots.get(space);
+  if (cached) {
+    const item = await base.get(cached);
+    if (item && item.kind === FOLDER) return cached;
+    _spaceRoots.delete(space);
+  }
+  const title = `${SPACE_FOLDER_PREFIX}${space}`;
+  const children = await base.children(base.rootId);
+  let folder = children.find((child) => child.kind === FOLDER && child.title === title);
+  if (!folder) {
+    folder = await base.insert({
+      kind: FOLDER,
+      parent: base.rootId,
+      title,
+      url: null,
+      index: base.defaultIndex,
+    });
+  }
+  _spaceRoots.set(space, folder.id);
+  return folder.id;
+}
+
+/** The panel's view of the store for the active space. The default space sees
+ *  the unfiled root minus the folders that belong to other spaces; another
+ *  space sees only its own folder tree. */
+function scopedStore(base, rootId, { hideSpaceFolders = false } = {}) {
+  const scoped = Object.create(base);
+  Object.defineProperty(scoped, "rootId", { value: rootId, enumerable: true });
+  const baseChildren = base.children.bind(base);
+  const baseSearch = base.search.bind(base);
+  const isSpaceFolder = (item) =>
+    item.kind === FOLDER &&
+    typeof item.title === "string" &&
+    item.title.startsWith(SPACE_FOLDER_PREFIX);
+  const insideSpaceFolder = async (item) => {
+    let current = item.parent;
+    let depth = 0;
+    while (current && current !== base.rootId && depth < MAX_DEPTH) {
+      const parent = await base.get(current);
+      if (!parent) return false;
+      if (isSpaceFolder(parent)) return true;
+      current = parent.parent;
+      depth += 1;
+    }
+    return false;
+  };
+  scoped.children = async (id) => {
+    const list = await baseChildren(id);
+    return hideSpaceFolders && id === base.rootId
+      ? list.filter((child) => !isSpaceFolder(child))
+      : list;
+  };
+  scoped.search = async (query, limit) => {
+    const found = await baseSearch(query, limit * 4);
+    const out = [];
+    for (const item of found) {
+      if (hideSpaceFolders && (await insideSpaceFolder(item))) continue;
+      if (!hideSpaceFolders && !(await insideRoot(scoped, item.id))) continue;
+      out.push(item);
+      if (out.length >= limit) break;
+    }
+    return out;
+  };
+  return scoped;
+}
+
+async function panelStore() {
+  const base = await backend();
+  const space = activeSpaceId();
+  if (space === DEFAULT_SPACE) {
+    return scopedStore(base, base.rootId, { hideSpaceFolders: true });
+  }
+  const root = await ensureSpaceRoot(base, space);
+  return scopedStore(base, root);
+}
+
 // --- Listing projection ------------------------------------------------------
 
 /** Folders first, then links; Places' order inside each group. */
@@ -519,7 +611,7 @@ async function crumbs(store, folderId) {
 }
 
 async function listing(profile, folder) {
-  const store = await backend();
+  const store = await panelStore();
   const target = folder === null ? store.rootId : folder;
   const item = await store.get(target);
   if (!item || item.kind !== FOLDER) {
@@ -597,7 +689,7 @@ function saved(profile, id = null) {
 // --- Calls -------------------------------------------------------------------
 
 async function addFolder(profile, call) {
-  const store = await backend();
+  const store = await panelStore();
   const target = await resolveFolder(store, call.parent);
   if (target.error) {
     return error(profile, target.error);
@@ -622,7 +714,7 @@ async function addLink(profile, call) {
   if (!parsed.protocol || parsed.protocol === ":") {
     return error(profile, "invalid");
   }
-  const store = await backend();
+  const store = await panelStore();
   const target = await resolveFolder(store, call.parent);
   if (target.error) {
     return error(profile, target.error);
@@ -638,7 +730,7 @@ async function addLink(profile, call) {
 }
 
 async function rename(profile, call) {
-  const store = await backend();
+  const store = await panelStore();
   const item = await store.get(call.id);
   if (!item) {
     return error(profile, "missing");
@@ -654,7 +746,7 @@ async function rename(profile, call) {
 }
 
 async function move(profile, call) {
-  const store = await backend();
+  const store = await panelStore();
   const item = await store.get(call.id);
   if (!item) {
     return error(profile, "missing");
@@ -681,7 +773,7 @@ async function move(profile, call) {
 }
 
 async function remove(profile, call) {
-  const store = await backend();
+  const store = await panelStore();
   const item = await store.get(call.id);
   if (!item) {
     return error(profile, "missing");
@@ -697,7 +789,7 @@ async function remove(profile, call) {
 }
 
 async function reveal(profile, id) {
-  const store = await backend();
+  const store = await panelStore();
   const item = await store.get(id);
   if (!item || !item.parent) {
     return error(profile, "missing");
@@ -709,7 +801,7 @@ async function reveal(profile, id) {
 }
 
 async function search(profile, query) {
-  const store = await backend();
+  const store = await panelStore();
   const items = (await store.search(query, MAX_RESULTS))
     .filter((item) => item && (item.kind === FOLDER || item.kind === LINK))
     .map((item) => view(store, item));
