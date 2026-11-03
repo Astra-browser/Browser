@@ -74,6 +74,25 @@ test("the field becomes the search and keeps the page's address underneath", asy
   await expect.element(screen.getByRole("searchbox")).not.toBeInTheDocument();
 });
 
+test("find waits for an IME to commit its text", async () => {
+  const { screen, tab } = await field();
+  find.show(tab.id);
+  const search = screen.getByRole("searchbox", { name: "Find on page" });
+  await expect.element(search).toHaveFocus();
+  const input = search.element() as HTMLInputElement;
+  input.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+  input.value = "に";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  await new Promise((done) => setTimeout(done, 200));
+  // Nothing has committed yet, so the page has not been searched for a kana
+  // the person is still choosing.
+  expect(native.find).not.toHaveBeenCalled();
+
+  input.value = "日本";
+  input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "日本" }));
+  await vi.waitFor(() => expect(native.find).toHaveBeenLastCalledWith("日本", true));
+});
+
 test("find next with the field closed picks up the last search", async () => {
   const { screen, tab } = await field();
   find.show(tab.id);

@@ -42,6 +42,9 @@
 
   let input: HTMLInputElement;
   let findInput: HTMLInputElement | undefined = $state();
+  /** An IME owns the find field's text until it commits it; searching what it
+   *  is still composing highlights and scrolls the page for half a word. */
+  let findComposing = false;
   let finding = $derived(find.isOpen());
   let findCount = $derived.by(() => {
     const matches = find.count();
@@ -367,7 +370,14 @@
           spellcheck="false"
           enterkeyhint="search"
           value={find.text()}
-          oninput={(event) => find.setText(event.currentTarget.value)}
+          oncompositionstart={() => (findComposing = true)}
+          oncompositionend={(event) => {
+            findComposing = false;
+            find.setText(event.currentTarget.value);
+          }}
+          oninput={(event) => {
+            if (!findComposing) find.setText(event.currentTarget.value);
+          }}
           onkeydown={(event) => {
             if (event.isComposing) return;
             if (event.key === "Enter") {
