@@ -122,13 +122,13 @@ test("a row is a name, with the icons of its first tabs and a count of the rest,
     ],
   });
   await screen.getByRole("button", { name: "Spaces — Home" }).click();
-  const rows = [...screen.container.querySelectorAll<HTMLElement>("[data-space-row]")];
-  expect(rows).toHaveLength(3);
-  expect(rows[1]!.querySelectorAll(".switch-fav")).toHaveLength(3);
-  expect(rows[1]!.querySelector(".switch-more")?.textContent).toBe("+2");
-  expect(rows[2]!.querySelector(".switch-stack")).toBeNull();
+  const rows = () => [...screen.container.querySelectorAll<HTMLElement>("[data-space-row]")];
+  await expect.poll(() => rows()).toHaveLength(3);
+  expect(rows()[1]!.querySelectorAll(".switch-fav")).toHaveLength(3);
+  expect(rows()[1]!.querySelector(".switch-more")?.textContent).toBe("+2");
+  expect(rows()[2]!.querySelector(".switch-stack")).toBeNull();
   // A space no one dressed gets no mark and no tile of its own.
-  expect(rows[2]!.querySelector(".space-glyph")).toBeNull();
+  expect(rows()[2]!.querySelector(".space-glyph")).toBeNull();
   expect(screen.container.querySelector(".switch-tile")).toBeNull();
 });
 

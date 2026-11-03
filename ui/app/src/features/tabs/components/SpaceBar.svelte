@@ -103,7 +103,7 @@
     data-editing={flow.editing !== null || undefined}
     inert={!flow.open}
   >
-    {#if loaded}<div class="space-panel-body"><SpaceFlowBody {flow} /></div>{/if}
+    {#if loaded || flow.open}<div class="space-panel-body"><SpaceFlowBody {flow} /></div>{/if}
   </div>
 </div>
 
