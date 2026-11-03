@@ -104,6 +104,17 @@
       appError = "Host API unavailable outside the browser window";
       return;
     }
+    // One startup owner for the Rust core. The command comes from
+    // `astra.core.command` (dev/packaged path); empty is an honest
+    // `unavailable` and never starts a fake process. The core is optional:
+    // the browser works without it while the Rust backend is pending.
+    try {
+      const services = frameRoot?.ownerDocument?.defaultView?.Services;
+      const command = services?.prefs?.getStringPref("astra.core.command", "") ?? "";
+      void host.Boot.launchCore({ request_id: "shell-boot", command });
+    } catch {
+      // No Services in a preview DOM.
+    }
     // One Host API instance per window. `resource://` ES modules are per
     // document, so an import inside the app frame would give it a second tab
     // model while this window owns the content browser: a navigation would

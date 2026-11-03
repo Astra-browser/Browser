@@ -29,13 +29,6 @@
       },
       "additionalProperties": false
     },
-    "coreStatus": {
-      "type": "object",
-      "properties": {
-        "request_id": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
     "shutdown": {
       "type": "object",
       "properties": {

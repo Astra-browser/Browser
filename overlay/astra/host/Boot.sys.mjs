@@ -59,15 +59,28 @@ export class SidecarFrame {
  * itself so Node tests can construct one with a stub.
  */
 export class BootSidecar {
-  static async launch(command, { stderr = "ignore" } = {}) {
+  static async launch(command, { stderr = "ignore", subprocess = null } = {}) {
     // Lazy: a Node import of this module must not resolve resource://.
-    const { Subprocess } = await import("resource://gre/modules/Subprocess.sys.mjs");
+    // `subprocess` is a test seam; production resolves the native module.
+    const Subprocess =
+      subprocess ?? (await import("resource://gre/modules/Subprocess.sys.mjs")).Subprocess;
     const proc = await Subprocess.call({ command, stderr });
     const sidecar = new BootSidecar(proc);
-    const hello = await sidecar.call("boot.handshake", { core_version: 1 });
-    if (hello.kind !== "res") {
-      await proc.kill(0);
-      throw new Error("Sidecar handshake rejected");
+    try {
+      const hello = await sidecar.call("boot.handshake", { core_version: 1 });
+      if (hello.kind !== "res" || hello.error) {
+        throw new Error(
+          hello?.error?.message ? `Sidecar handshake rejected: ${hello.error.message}` : "Sidecar handshake rejected",
+        );
+      }
+    } catch (e) {
+      sidecar.alive = false;
+      try {
+        await proc.kill(0);
+      } catch {
+        // The process may already be gone.
+      }
+      throw e;
     }
     return sidecar;
   }
@@ -75,6 +88,7 @@ export class BootSidecar {
   constructor(proc) {
     this.proc = proc;
     this.pending = new Map();
+    this.alive = true;
     this.pump();
   }
 
@@ -89,6 +103,7 @@ export class BootSidecar {
         }
       }
     } catch (e) {
+      this.alive = false;
       for (const resolve of this.pending.values()) {
         resolve({ kind: "res", error: { code: "SIDECAR_EOF", message: String(e) } });
       }
@@ -97,25 +112,52 @@ export class BootSidecar {
   }
 
   call(name, payload, id = `boot-${Date.now()}-${Math.floor(Math.random() * 1e6)}`) {
+    if (!this.alive) {
+      return Promise.reject(new Error("core is not running"));
+    }
     const envelope = { v: 1, id, kind: "req", name, seq: 0, payload };
-    return this.proc.stdin.write(SidecarFrame.encode(envelope)).then(
-      () =>
-        new Promise(resolve => {
-          this.pending.set(id, resolve);
-        }),
-    );
+    return new Promise((resolve, reject) => {
+      // Register before writing: a loopback response can arrive in the same
+      // turn as the write and would otherwise be dropped.
+      this.pending.set(id, resolve);
+      this.proc.stdin.write(SidecarFrame.encode(envelope)).catch((e) => {
+        this.pending.delete(id);
+        reject(e);
+      });
+    });
   }
 
   async shutdown(timeout = 300) {
     try {
-      await this.call("core.shutdown", {});
+      if (this.alive) {
+        await Promise.race([
+          this.call("core.shutdown", {}).catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, timeout)),
+        ]);
+      }
     } finally {
-      await this.proc.kill(timeout);
+      this.alive = false;
+      try {
+        await this.proc.kill(timeout);
+      } catch {
+        // Already gone.
+      }
     }
   }
 }
 
 let _core = null;
+let _corePromise = null;
+let _launchCore = null;
+
+/** Test seam: replace the native launcher with a handle factory. */
+export function __setCoreLauncherForTests(launcher) {
+  _launchCore = typeof launcher === "function" ? launcher : null;
+}
+
+async function launchCoreHandle(command) {
+  return (_launchCore ?? BootSidecar.launch)(command);
+}
 
 export const Boot = {
   async handshake({ request_id = "boot-0", core_version = 0, min_host_api_version = 1 } = {}) {
@@ -142,10 +184,14 @@ export const Boot = {
   /**
    * Launch the Rust core once. The shell owns the command path (packaged
    * binary or dev build); without one the answer is an honest unavailable.
+   * Concurrent callers share one launch; a dead handle is discarded.
    */
   async launchCore({ request_id = "boot-core", command = "" } = {}) {
-    if (_core) {
+    if (_core?.alive) {
       return ok(request_id, { state: "running" });
+    }
+    if (_core && !_core.alive) {
+      _core = null;
     }
     if (typeof command !== "string" || command.trim() === "") {
       return ok(request_id, {
@@ -153,8 +199,22 @@ export const Boot = {
         reason: "no core command configured",
       });
     }
+    if (!_corePromise) {
+      _corePromise = launchCoreHandle(command.trim())
+        .then((handle) => {
+          _core = handle;
+          return handle;
+        })
+        .finally(() => {
+          _corePromise = null;
+        });
+    }
     try {
-      _core = await BootSidecar.launch(command.trim());
+      await _corePromise;
+      if (!_core?.alive) {
+        _core = null;
+        return err(request_id, "core_launch_failed", "core exited during startup");
+      }
       return ok(request_id, { state: "running" });
     } catch (e) {
       _core = null;
@@ -162,29 +222,32 @@ export const Boot = {
     }
   },
 
-  async coreStatus({ request_id = "boot-core-status" } = {}) {
-    return ok(request_id, { state: _core ? "running" : "stopped" });
-  },
-
   async status({ request_id = "boot-status" } = {}) {
     return ok(request_id, {
       ready: true,
       event_seq: eventSeq(),
       window_id: __ensureDefaultWindow(),
-      core: _core ? "running" : "stopped",
     });
   },
 
   async shutdown({ request_id = "boot-shutdown", reason = "quit" } = {}) {
     let coreStopped = false;
-    if (_core) {
+    // A launch in flight must settle before we decide there is no core.
+    if (_corePromise) {
       try {
-        await _core.shutdown();
+        await _corePromise;
+      } catch {
+        // Launch failure already cleared the handle.
+      }
+    }
+    const core = _core;
+    _core = null;
+    if (core) {
+      try {
+        await core.shutdown();
         coreStopped = true;
       } catch {
         // The process is gone or refused; shutdown still proceeds.
-      } finally {
-        _core = null;
       }
     }
     emit("boot.shutdown", { reason });
@@ -192,7 +255,17 @@ export const Boot = {
   },
 };
 
-// Test-only reset. A live core is left alone (tests never launch one).
+// Test-only reset. A live core is stopped, not abandoned.
 export function __resetBootForTests() {
+  const core = _core;
   _core = null;
+  _corePromise = null;
+  _launchCore = null;
+  if (core) {
+    try {
+      void core.shutdown();
+    } catch {
+      // Already gone.
+    }
+  }
 }
