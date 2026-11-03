@@ -13,7 +13,3 @@ pref("general.config.obscure_value", 0);
 // Optional Rust core process. Empty = no core; the shell asks Boot to
 // launch it and gets an honest `unavailable` instead of a fake process.
 pref("astra.core.command", "");
-
-// Native gBrowser tabs are the product path (P4). Set false only to exercise
-// the legacy standalone mount while P4.4b removes it.
-pref("astra.gbrowser.enabled", true);

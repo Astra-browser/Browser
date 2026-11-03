@@ -150,22 +150,23 @@
       // Preview DOM without a chrome window.
     }
 
-    // P4 spike: dock the native tabbrowser panel behind the Astra stage. The
-    // panel is inert until Content.mountNative marks it mounted, so flipping
-    // the pref cannot cover a working standalone page with a blank deck.
-    let gbrowserEnabled = false;
-    try {
-      gbrowserEnabled = win?.Services?.prefs?.getBoolPref("astra.gbrowser.enabled", false) === true;
-    } catch {
-      gbrowserEnabled = false;
+    // P4: the native tabbrowser deck is the product path. The stage follows
+    // the Astra content slot; mountNative marks it mounted once gBrowser owns
+    // the tabs.
+    if (win?.Services?.prefs?.getBoolPref) {
+      try {
+        win.Services.prefs.clearUserPref("astra.gbrowser.enabled");
+      } catch {
+        // No stale user override to clear.
+      }
     }
     let stageObserver = null;
     let stageMutation = null;
     let onStageResize = null;
     let applyGbrowserStage = null;
     const gbrowserRoot = doc.documentElement;
-    if (gbrowserEnabled) {
-      gbrowserRoot.setAttribute("data-astra-gbrowser", "true");
+    gbrowserRoot.setAttribute("data-astra-gbrowser", "true");
+    {
       const applyStage = () => {
         const rect = stageRectOf(slot);
         const vars = stageStyle(rect);
@@ -712,24 +713,19 @@
       slotError = "content binding unavailable";
     } else {
       try {
-        if (gbrowserEnabled) {
-          try {
-            // The native mount maps the model, so the model must exist before
-            // it lists tabs; otherwise a bootstrap tab created in the gap is
-            // never bound.
-            await host.Tabs.bootstrap({ request_id: newRequestId() });
-            mounted = await host.Content.mountNative(slot, { request_id: newRequestId(), window_id: ownWindowId });
-            gbrowserRoot.setAttribute("data-astra-native-mounted", "true");
-            applyGbrowserStage?.();
-          } catch (e) {
-            // The pref is a spike: fall back to the standalone mount rather
-            // than leaving a blank stage.
-            gbrowserRoot.removeAttribute("data-astra-native-mounted");
-            mounted = await host.Content.mount(slot, { request_id: newRequestId() });
-            slotError = String(e?.message ?? e);
-          }
-        } else {
-          mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+        try {
+          // The native mount maps the model, so the model must exist before
+          // it lists tabs; otherwise a bootstrap tab created in the gap is
+          // never bound.
+          await host.Tabs.bootstrap({ request_id: newRequestId() });
+          mounted = await host.Content.mountNative(slot, {
+            request_id: newRequestId(),
+            window_id: ownWindowId,
+          });
+          gbrowserRoot.setAttribute("data-astra-native-mounted", "true");
+          applyGbrowserStage?.();
+        } catch (e) {
+          slotError = String(e?.message ?? e);
         }
       } catch (e) {
         slotError = String(e?.message ?? e);
