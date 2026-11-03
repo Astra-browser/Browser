@@ -27,9 +27,9 @@
 
 | Phase | Branch | Scope | Depends on | Status |
 |---|---|---|---|---|
-| P0 | `merge/p0-baseline` | Run all gates on `main`, record baseline, tag `pre-native-merge-20261104`, create the worktree/branch convention | — | **doing** |
-| P1 | `merge/p1-boot` | Merge `Boot` + `BootSidecar` into one supervisor; lazy native `Subprocess`; package it; keep the Node-pure import path | P0 | planned |
-| P2 | `merge/p2-native-nav` | Make `nav.stop`, page zoom and `Navigation.print` call the live browser; prune dead/duplicate command ids; hard-reload distinction | P0 | planned |
+| P0 | `merge/p0-baseline` | Run all gates on `main`, record baseline, tag `pre-native-merge-20261104`, create the worktree/branch convention | — | **done** |
+| P1 | `merge/p1-boot` | Merge `Boot` + `BootSidecar` into one supervisor; lazy native `Subprocess`; package it; keep the Node-pure import path | P0 | **done, pending merge** |
+| P2 | `merge/p2-native-nav` | Make `nav.stop`, page zoom and `Navigation.print` call the live browser; prune dead/duplicate command ids; hard-reload distinction | P0 | **done, pending merge** |
 | P3 | `merge/p3-windows` | Bind `Windows` to `BrowserWindowTracker`/`OpenBrowserWindow`; real focus/close/fullscreen; thin projection keyed by native ids | P0 | planned |
 | P4 | `merge/p4-gbrowser` | **Critical path.** Spike native `gBrowser` tabs with the native strip hidden; move page lifecycle to `gBrowser`; keep `astra_tab_id` as a projection key; wire mute, discard, unload, move-between-spaces | P1–P3 | planned |
 | P5 | `merge/p5-session` | Replace the JS `Session` model with Firefox `SessionStore` + Astra metadata (space/folder/pin/sync) in the Rust store | P4 | planned |
@@ -177,4 +177,6 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 
 | Date | Phase | Result |
 |---|---|---|
-| 2026-11-04 | P0 | started; baseline gates running |
+| 2026-11-04 | P0 | done: `hostapi_v1` 306, `commands_model` 50, `session_restore` 99, `tab_lifecycle` 4, bridge 26; state/brand clean; tag `pre-native-merge-20261104` |
+| 2026-11-04 | P1 | done: `boot_model` 18, `sidecar_spike` PASS; Boot is the single core supervisor; `launchCore` is honest `unavailable` without a command |
+| 2026-11-04 | P2 | done: `native_nav_model` 12; live probe stop `about:blank` after a 4 s slow page and zoom readback `1.5`; overlay + `build --faster` used |
