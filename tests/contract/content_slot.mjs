@@ -50,7 +50,7 @@ const off = addEventListener((e) => seen.push(e));
 // Fixture URLs are https, not file:. Since f55bd14 the address field treats
 // file:, javascript:, data: and chrome: as *words to search for*
 // (`Search.sys.mjs` NAVIGABLE = http/https/about), so `Navigation.loadURL`
-// would rewrite a file: URL into a DuckDuckGo query and the url echo below
+// would rewrite a file: URL into a web search query and the url echo below
 // would never match. This stub never fetches the pages, so plain hostnames
 // are enough; `new URL("https://fixture.test/a").href` is already canonical,
 // which keeps the resolve round-trip byte-identical.

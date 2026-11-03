@@ -37,7 +37,7 @@ const ENGINES = {
   wikipedia: { name: "Wikipedia", url: "https://en.wikipedia.org/w/index.php?search=%s" },
 };
 
-const DEFAULT_ENGINE = "duckduckgo";
+const DEFAULT_ENGINE = "google";
 
 /** Schemes a typed address may use. Everything else is searched for. */
 const NAVIGABLE = new Set(["http:", "https:"]);
@@ -64,7 +64,7 @@ function customTemplate() {
 }
 
 /** The engine in use: a custom https template when one is set and safe,
- *  otherwise the chosen built-in, otherwise DuckDuckGo. */
+ *  otherwise the chosen built-in, otherwise Google. */
 export function engine() {
   const custom = customTemplate();
   if (custom !== "") {
