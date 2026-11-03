@@ -127,6 +127,7 @@ STATE = js("""
   const shell = document;
   const frameRoot = shell.querySelector('[data-astra-frame]');
   const appMount = shell.querySelector('.astra-app-mount');
+  const frame = shell.querySelector('.astra-frame');
   const aside = d.querySelector('aside.browser-sidebar');
   const slot = shell.querySelector('[data-astra-content]');
   const browser = shell.querySelector('browser[data-astra-browser]');
@@ -149,6 +150,11 @@ STATE = js("""
     appReady: appMount ? appMount.getAttribute('data-app-ready') : null,
     aside: rect(aside),
     asideHidden: aside ? aside.hasAttribute('data-hidden') : null,
+    asidePeek: aside ? aside.hasAttribute('data-peek') : null,
+    peekFlag: frame ? frame.dataset.astraSidebarPeek ?? null : null,
+    appZ: appMount ? getComputedStyle(appMount).zIndex : null,
+    slotZ: slot ? getComputedStyle(slot).zIndex : null,
+    appHtmlBg: d ? getComputedStyle(d.documentElement).backgroundColor : null,
     edge: !!d.querySelector('.sidebar-edge'),
     slot: rect(slot),
     slotHasPage: slot ? (slot.dataset.hasPage ?? null) : null,
@@ -522,6 +528,41 @@ def main():
         check("sidebar: Toggle hides the column and raises the edge",
               hidden.get("asideHidden") is True and hidden.get("edge") is True,
               json.dumps({"hidden": hidden.get("asideHidden"), "edge": hidden.get("edge")}))
+        # 10b. hidden column peeks as chrome over the live page ---------------
+        print("peek:", m.js(js("""
+            if (!d) return 'no doc';
+            d.defaultView.dispatchEvent(new d.defaultView.CustomEvent(
+              'astra:sidebar-edge', { detail: { near: true } }));
+            return 'ok';
+        """)))
+        peeked = wait_for(
+            lambda s: s.get("peekFlag") == "true" and s.get("asidePeek") is True,
+            seconds=10, label="hidden card over the page",
+        )
+        app_z = int(peeked.get("appZ") or 0)
+        slot_z = int(peeked.get("slotZ") or 0)
+        check("sidebar: a hidden column peeks as chrome above the page",
+              peeked.get("peekFlag") == "true"
+              and peeked.get("asidePeek") is True
+              and app_z > slot_z
+              and peeked.get("appHtmlBg") == "rgba(0, 0, 0, 0)",
+              json.dumps({"flag": peeked.get("peekFlag"), "appZ": app_z,
+                          "slotZ": slot_z, "htmlBg": peeked.get("appHtmlBg"),
+                          "aside": peeked.get("aside")}))
+        print("peek out:", m.js(js("""
+            if (!d) return 'no doc';
+            d.defaultView.dispatchEvent(new d.defaultView.CustomEvent(
+              'astra:sidebar-edge', { detail: { near: false } }));
+            return 'ok';
+        """)))
+        retracted = wait_for(
+            lambda s: s.get("peekFlag") != "true" and s.get("asidePeek") is not True,
+            seconds=10, label="card retracts",
+        )
+        check("sidebar: the card gives the page back",
+              retracted.get("peekFlag") != "true" and retracted.get("asidePeek") is not True,
+              json.dumps({"flag": retracted.get("peekFlag"), "peek": retracted.get("asidePeek")}))
+
         print("toggle back:", m.js(click_named("Toggle sidebar")))
         shown = wait_for(lambda s: s.get("asideHidden") is not True, label="sidebar shown")
         check("sidebar: toggling back restores the column",
