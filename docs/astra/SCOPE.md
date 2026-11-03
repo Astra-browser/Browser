@@ -11,6 +11,15 @@
 and real data is a separate later phase — it is not missing, it is deferred on
 purpose.**
 
+## Owner bugfix exception (2026-11-03)
+
+The owner reported a list of everyday browser failures and asked for them to
+be fixed end to end. Those named surfaces — the page context menu, history,
+Back/Forward, bookmarks, favicons, private and new windows, the search default,
+the content colour scheme, the loading state and the keyboard command ids — are
+an explicit exception to the UI-only rule above. Everything else is still
+deferred, and the backlog in `STATE.md` remains a backlog. See D-37.
+
 ## What "UI only" means
 
 In scope:
