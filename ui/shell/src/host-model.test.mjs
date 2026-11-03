@@ -202,6 +202,43 @@ describe("tab selection stays inside the active space", () => {
     assert.equal(back.active_space_id, emptySpace);
     assert.equal(back.tabs.length, 1);
   });
+  it("remembers which tab was in front in each space", async () => {
+    __resetForTests();
+    await Tabs.bootstrap({});
+    await Tabs.create({ request_id: "c0", url: "https://a.example/" });
+    const inFirst = __itemsSnapshot().active;
+
+    await Tabs.createSpace({ request_id: "s1", name: "Two" });
+    await Tabs.create({ request_id: "c1", url: "https://b.example/" });
+    const inSecond = __itemsSnapshot().active;
+    const newTab = __itemsSnapshot().tabs.find((tab) => tab.id !== inSecond)?.id;
+    assert.ok(newTab, "the new space still has its New Tab");
+
+    await Tabs.switchSpace({ request_id: "s2", space: "space-1" });
+    assert.equal(__itemsSnapshot().active, inFirst, "space one returns to its tab");
+    await Tabs.switchSpace({ request_id: "s3", space: "space-2" });
+    assert.equal(__itemsSnapshot().active, inSecond, "space two returns to its tab");
+
+    // Choosing the New Tab is remembered too, not reset to the first tab.
+    await Tabs.select({ request_id: "sel", astra_tab_id: newTab });
+    await Tabs.switchSpace({ request_id: "s4", space: "space-1" });
+    await Tabs.switchSpace({ request_id: "s5", space: "space-2" });
+    assert.equal(__itemsSnapshot().active, newTab);
+  });
+
+  it("closing the active tab selects the next one in its space", async () => {
+    __resetForTests();
+    await Tabs.bootstrap({});
+    const first = __itemsSnapshot().active;
+    const second = (await Tabs.create({ request_id: "c1", url: "https://2.example/" })).astra_tab_id;
+    const third = (await Tabs.create({ request_id: "c2", url: "https://3.example/" })).astra_tab_id;
+    await Tabs.select({ request_id: "s", astra_tab_id: second });
+    await Tabs.close({ request_id: "x", astra_tab_id: second });
+    assert.equal(__itemsSnapshot().active, third, "the tab that took its place comes next");
+
+    await Tabs.close({ request_id: "y", astra_tab_id: third });
+    assert.equal(__itemsSnapshot().active, first, "closing the last falls back to the previous");
+  });
 });
 
 describe("projection follows the model", () => {

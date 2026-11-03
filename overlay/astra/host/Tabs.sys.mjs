@@ -46,6 +46,8 @@ const _order = []; // astra_tab_id in display order
 const _history = new Map(); // astra_tab_id -> { entries: [url], index: n }
 let _nextId = 1;
 let _selectedId = "";
+/** The tab last looked at in each space, so a switch back returns to it. */
+const _selectedBySpace = new Map();
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -74,6 +76,10 @@ function selectInternal(id) {
     tab.selected = tab.astra_tab_id === id;
   }
   _selectedId = id;
+  const tab = _tabs.get(id);
+  if (tab) {
+    _selectedBySpace.set(tab.space_id, id);
+  }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap, selected: true });
   return snap;
@@ -328,6 +334,8 @@ export const Tabs = {
 
   async close({ request_id = "", astra_tab_id = "" } = {}) {
     const tab = _tabs.get(astra_tab_id);
+    // Where it sat in the space that is on screen, before it leaves the order.
+    const closedAt = activeOrder().indexOf(astra_tab_id);
     const existed = _tabs.delete(astra_tab_id);
     _history.delete(astra_tab_id);
     const i = _order.indexOf(astra_tab_id);
@@ -336,14 +344,21 @@ export const Tabs = {
     }
     if (existed) {
       emit("tab.closed", { astra_tab_id, window_id: tab.window_id });
+      // The closed tab is no longer anyone's remembered selection.
+      for (const [space, id] of _selectedBySpace) {
+        if (id === astra_tab_id) _selectedBySpace.delete(space);
+      }
       if (_selectedId === astra_tab_id) {
         _selectedId = "";
-        // The next tab in the space being looked at, not the next tab in the
-        // window: selecting across spaces would put another space's page on
-        // the stage while its space is not the active one.
-        const first = activeOrder()[0];
-        if (first !== undefined) {
-          selectInternal(first);
+        // The tab that took its place, then the one before it; only inside
+        // the space being looked at. A native browser does not jump to the
+        // first tab on every close.
+        const at = closedAt;
+        const after = activeOrder();
+        const next =
+          after[Math.min(Math.max(at, 0), after.length - 1)] ?? after[after.length - 1];
+        if (next !== undefined) {
+          selectInternal(next);
         } else {
           await ensureTabInActiveSpace(request_id);
         }
@@ -429,10 +444,13 @@ export const Tabs = {
   async switchSpace({ request_id = "", space = "" } = {}) {
     if (!spaceOf(space)) return { operation_id: null, accepted: false };
     _activeSpaceId = space;
-    const first = activeOrder()[0];
+    const candidates = activeOrder();
+    const remembered = _selectedBySpace.get(space);
+    const chosen =
+      remembered !== undefined && candidates.includes(remembered) ? remembered : candidates[0];
     _selectedId = "";
-    if (first !== undefined) {
-      selectInternal(first);
+    if (chosen !== undefined) {
+      selectInternal(chosen);
     } else {
       // Coming back to a space that was left without tabs lands on its own
       // New Tab instead of a stage nothing owns.
@@ -629,6 +647,7 @@ export function __resetTabsForTests() {
   _history.clear();
   _nextId = 1;
   _selectedId = "";
+  _selectedBySpace.clear();
   // Spaces are part of the same model: leaving them behind made a suite's
   // spaces visible to the next one in the same process.
   _spaces = [{ id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null }];
