@@ -39,8 +39,10 @@ export function installThemeBridge(frame, host) {
 
   const attach = () => {
     try {
+      observer?.disconnect();
+      observer = null;
       doc = frame.contentDocument;
-      if (!doc || !doc.documentElement) return false;
+      if (!doc || !doc.documentElement) return;
       const View = doc.defaultView;
       if (View?.MutationObserver) {
         observer = new View.MutationObserver(apply);
@@ -50,28 +52,20 @@ export function installThemeBridge(frame, host) {
         });
       }
       apply();
-      return true;
     } catch {
-      return false;
+      // The document is between navigations; the next load re-attaches.
     }
   };
 
-  if (!attach()) {
-    // The child document is not ready at mount; its load event carries it.
-    const onLoad = () => {
-      attach();
-      frame.removeEventListener("load", onLoad);
-    };
-    frame.addEventListener("load", onLoad);
-    return () => {
-      stopped = true;
-      observer?.disconnect();
-      frame.removeEventListener("load", onLoad);
-    };
-  }
+  // The first document is the frame's about:blank; the app's own document
+  // replaces it on load, and that is the one with `data-theme`. Attach now (in
+  // case the document is already the app's) and again on every load.
+  frame.addEventListener("load", attach);
+  attach();
 
   return () => {
     stopped = true;
+    frame.removeEventListener("load", attach);
     try {
       observer?.disconnect();
     } catch {
