@@ -132,21 +132,28 @@ export function mountAppFrame(container, host, { onReady, onFailure, onTheme, tr
     } else if (data.kind === "error") {
       const message = typeof data.message === "string" ? data.message : "app reported an error";
       settle(onFailure, message);
-    } else if (data.kind === "theme") {
-      // The app owns the theme; the shell mirrors it so web pages see the
-      // colour scheme of the chrome around them.
-      const theme = data.theme === "light" ? "light" : "dark";
-      if (typeof onTheme === "function") {
-        try {
-          onTheme(theme);
-        } catch {
-          // A preference write must not break the frame.
-        }
-      }
     }
   };
 
   win.addEventListener("message", onMessage);
+
+  // The theme is not a boot fact: it changes whenever the person picks one.
+  // Keep this listener for the frame's whole life (the readiness listener
+  // above is retired once the app is ready).
+  const onThemeMessage = (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || data.ns !== SHELL_NS) return;
+    if (data.kind !== "theme" || !fromOurFrame(event)) return;
+    const theme = data.theme === "light" ? "light" : "dark";
+    if (typeof onTheme === "function") {
+      try {
+        onTheme(theme);
+      } catch {
+        // A preference write must not break the frame.
+      }
+    }
+  };
+  win.addEventListener("message", onThemeMessage);
 
   // --- Relay: the app's calls reach this window's Host API ------------------
   // The app cannot import the same instance (`resource://` modules are per
@@ -283,6 +290,7 @@ export function mountAppFrame(container, host, { onReady, onFailure, onTheme, tr
     settled = true;
     clearTimeout(timer);
     win.removeEventListener("message", onMessage);
+    win.removeEventListener("message", onThemeMessage);
     win.removeEventListener("message", relay);
     try {
       relayEvents?.();
