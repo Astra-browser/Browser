@@ -86,8 +86,14 @@ export const Navigation = {
     if (loadingTab) loadingTab.loading = true;
     emit("nav.started", { astra_tab_id: id, url });
     emit("tab.updated", { astra_tab_id: id, url, loading: true });
-    __pushHistory(id, url);
-    commit(id, url);
+    // Pressing Enter on the address already in the bar is a reload, not a
+    // second visit: a duplicated entry makes Back look like it does nothing.
+    const head = __historyFor(id);
+    const reloading = !!head && head.index >= 0 && head.entries[head.index] === url;
+    if (!reloading) {
+      __pushHistory(id, url);
+    }
+    commit(id, url, reloading ? { reloaded: true } : {});
     return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };
   },
 

@@ -56,8 +56,23 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
   }
 
   let settled = false;
+  let destroyed = false;
   let timer = 0;
   let frame = null;
+
+  /** True when a message really came from our embed. Chrome documents report
+   *  `null` as `source` (measured), so a named sender that is not the frame
+   *  is refused; the namespace still has to match. */
+  const fromOurFrame = (event) => {
+    try {
+      if (!frame) return true;
+      if (event.source === null || event.source === undefined) return true;
+      return event.source === frame.contentWindow;
+    } catch {
+      // Frame torn down between the post and the dispatch.
+      return false;
+    }
+  };
 
   const settle = (fn, value) => {
     if (settled) {
@@ -73,7 +88,10 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const onMessage = (event) => {
     const data = event.data;
-    if (!data || data.ns !== SHELL_NS) {
+    if (!data || typeof data !== "object" || data.ns !== SHELL_NS) {
+      return;
+    }
+    if (!fromOurFrame(event)) {
       return;
     }
     // Chrome-privileged documents share one principal, so `event.source` is
@@ -132,8 +150,14 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
     }
   };
   const relay = async (event) => {
+    if (destroyed) {
+      return;
+    }
     const data = event.data;
-    if (!data || data.ns !== SHELL_NS) {
+    if (!data || typeof data !== "object" || data.ns !== SHELL_NS) {
+      return;
+    }
+    if (!fromOurFrame(event)) {
       return;
     }
     if (data.kind === "req") {
@@ -146,8 +170,22 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
       let payload = null;
       let error = null;
       try {
-        const module = host?.[data.module];
-        const fn = module?.[data.method];
+        // Only the host's own module objects and their own public methods are
+        // reachable. A name like `constructor` or `call` must not resolve
+        // through a prototype into a Function, and internals (`_`/`__`) stay
+        // private to the window.
+        const moduleName = typeof data.module === "string" ? data.module : "";
+        const methodName = typeof data.method === "string" ? data.method : "";
+        const module = host?.[moduleName];
+        const reachable =
+          moduleName !== "" &&
+          methodName !== "" &&
+          !moduleName.startsWith("_") &&
+          !methodName.startsWith("_") &&
+          module !== null &&
+          typeof module === "object" &&
+          Object.prototype.hasOwnProperty.call(module, methodName);
+        const fn = reachable ? module[methodName] : null;
         if (typeof fn !== "function") {
           error = {
             code: "unknown_command",
@@ -158,6 +196,9 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
         }
       } catch (e) {
         error = { code: "host_error", message: String(e?.message ?? e) };
+      }
+      if (destroyed) {
+        return;
       }
       try {
         if (error) win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;

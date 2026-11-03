@@ -46,14 +46,22 @@ export const Sidebar = {
   // override; `revision` orders concurrent publishers (last writer wins,
   // mirroring the native side's admit).
   async setWidth({ request_id = "", width = null, animate = false, revision = null } = {}) {
-    if (width !== null && (typeof width !== "number" || !Number.isFinite(width))) {
-      return err(request_id, "invalid_width", "width must be a finite number or null");
+    // A negative column would inset the page outside the window.
+    if (width !== null && (typeof width !== "number" || !Number.isFinite(width) || width < 0)) {
+      return err(request_id, "invalid_width", "width must be a finite, non-negative number or null");
     }
     if (typeof animate !== "boolean") {
       return err(request_id, "invalid_animate", "animate must be a boolean");
     }
     if (revision !== null && (typeof revision !== "number" || !Number.isFinite(revision))) {
       return err(request_id, "invalid_revision", "revision must be a finite number or null");
+    }
+    // A revision orders concurrent publishers. A document (or a second copy
+    // of the sidebar module) that reported before can still have a call in
+    // flight after the newer one; its stale width must not move the page
+    // back, so it is answered with the state that stands.
+    if (revision !== null && _state.revision !== null && revision < _state.revision) {
+      return ok(request_id, snapshot());
     }
     _state.width = width;
     _state.animate = animate;
