@@ -143,6 +143,7 @@ def main():
         out["private_create"] = priv
         time.sleep(1.0)
         out["native_after_private"] = json.loads(m.execute(NATIVE))
+        out["after_private"] = json.loads(m.execute_async(LIST))
         if priv.get("window_id"):
             out["private_close"] = json.loads(m.execute_async(CLOSE, [priv["window_id"]]))
     finally:
@@ -176,6 +177,11 @@ def main():
         and len(out.get("native_after_close") or []) == 1
         and out.get("private_create", {}).get("private") is True
         and any(w.get("private") for w in out.get("native_after_private") or [])
+        and any(
+            w.get("private")
+            for w in (out.get("after_private", {}).get("windows") or [])
+            if w.get("window_id") == out.get("private_create", {}).get("window_id")
+        )
         and out.get("private_close", {}).get("closed") is True
     )
     return 0 if ok else 1
