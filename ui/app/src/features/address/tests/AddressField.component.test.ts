@@ -126,6 +126,31 @@ test("a refused navigation's ring leaves with the page it was about", async () =
   expect(input.getAttribute("aria-invalid")).toBeNull();
 });
 
+test("Enter hands the typed line to the host rather than deciding itself", async () => {
+  const { input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("rust lifetimes");
+  await userEvent.keyboard("{Enter}");
+  // One place decides whether those words are an address or a search; the
+  // field only says what was typed, and it says it whole.
+  await vi.waitFor(() =>
+    expect(native.navigate).toHaveBeenCalledWith(tabs.activeId(), "rust lifetimes"),
+  );
+});
+
+test("an address of only spaces navigates nowhere", async () => {
+  const { input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("   ");
+  await userEvent.keyboard("{Enter}");
+  await new Promise((done) => setTimeout(done, 30));
+  expect(native.navigate).not.toHaveBeenCalled();
+  // The page did not move, so the field stays where the person is typing.
+  expect(document.activeElement).toBe(input);
+});
+
 test("a launcher hand-off that the host refuses raises nothing", async () => {
   const rejections: unknown[] = [];
   const caught = (event: PromiseRejectionEvent) => {
