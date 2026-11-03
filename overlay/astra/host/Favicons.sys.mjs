@@ -77,6 +77,7 @@ export function __resetFaviconsForTests() {
   _eventSink = null;
   _liveBackendPromise = null;
   _storedCache.clear();
+  _inflight.clear();
 }
 
 function emit(view) {
@@ -439,6 +440,9 @@ function asRaster(bytes) {
  *  page of visits asks Places once per site, not once per row. Bounded; a
  *  profile that browses forever cannot grow it without limit. */
 const _storedCache = new Map();
+/** Origins already being fetched, so History and Bookmarks cannot start the
+ *  same network request twice. */
+const _inflight = new Map();
 const STORED_CACHE_MAX = 256;
 
 function rememberStored(origin, view) {
@@ -503,6 +507,58 @@ export const Favicons = {
    * the same view shape as `resolve`, or null; a negative answer is cached for
    * the session too.
    */
+  async ensureForUrls({ urls = [], doc = null, profileId = PROFILE_ID, limit = 32 } = {}) {
+    const target =
+      doc ?? (typeof globalThis !== "undefined" ? globalThis.document ?? null : null);
+    if (!target || !Array.isArray(urls) || urls.length === 0) {
+      return new Map();
+    }
+    // One request per origin, not per row.
+    const originUrls = new Map();
+    for (const url of urls) {
+      if (typeof url !== "string" || url === "") continue;
+      const origin = originOf(url);
+      if (origin && !originUrls.has(origin) && originUrls.size < limit) {
+        originUrls.set(origin, url);
+      }
+    }
+    const refs = new Map();
+    const misses = [];
+    await Promise.all(
+      [...originUrls].map(async ([origin, url]) => {
+        const stored = await Favicons.resolveStored({ url, doc: target, profileId });
+        if (stored) {
+          Favicons.publish(stored);
+          refs.set(origin, {
+            origin: stored.entry.origin,
+            revision: stored.entry.revision,
+          });
+        } else {
+          misses.push(url);
+        }
+      }),
+    );
+    // A site with no stored icon is not a failure: fetch it in the background
+    // and publish the raster; the list's `forPage(url)` fallback paints it as
+    // soon as it arrives, so opening History is never blocked on the network.
+    for (const url of misses) {
+      const origin = originOf(url);
+      if (!origin || _inflight.has(origin)) continue;
+      const task = Favicons.resolve({ url, doc: target, profileId })
+        .then((resolved) => {
+          if (resolved) {
+            Favicons.publish(resolved);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          _inflight.delete(origin);
+        });
+      _inflight.set(origin, task);
+    }
+    return refs;
+  },
+
   async resolveStored({ url, doc = null, profileId = PROFILE_ID } = {}) {
     if (typeof url !== "string" || url === "") {
       return null;

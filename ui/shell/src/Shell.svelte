@@ -8,6 +8,7 @@
   import { mountSplit } from "./split/split.js";
   import { mountAppFrame } from "./app-frame.js";
   import { installContentMenu, runChromeAction } from "./content-menu.js";
+  import { createShellMenu } from "./menu.js";
   import { slotStateFor } from "./content/slot-state.js";
   import "./urlbar.css";
   import "./frame/frame.css";
@@ -656,26 +657,15 @@
         return false;
       }
     };
-    const postToApp = (message) => {
-      try {
-        // A content menu is drawn by the app frame, which normally sits under
-        // the page. Raise the frame for as long as the menu is open.
-        if (message?.kind === "menu") setMenuOpen(true);
-        appApi?.element?.contentWindow?.postMessage(message, "*");
-      } catch {
-        // The frame went away; the menu has no reader.
-      }
-    };
     let menuTimer = 0;
     function setMenuOpen(open) {
       clearTimeout(menuTimer);
       frameRoot.dataset.astraMenuOpen = open ? "true" : "false";
       if (open) {
-        // A menu the app never answers (window lost, frame died) must not
-        // leave the page covered. The app sends `menu-close` on its own.
         menuTimer = setTimeout(() => setMenuOpen(false), 30000);
       }
     }
+
     const tabIdOf = (browser) => {
       for (const [id, entry] of mounted?.browsers ?? []) {
         if (entry.browser === browser) return id;
@@ -684,9 +674,12 @@
     };
     const contentMenu = installContentMenu(win, {
       host,
-      postToApp,
+      showMenu: (menu) => shellMenuApi.show(menu),
       isFromApp: fromApp,
       tabIdOf,
+    });
+    const shellMenuApi = createShellMenu(win, {
+      onClose: () => contentMenu?.release?.(),
     });
     const onWindowMenu = (event) => {
       const data = event?.data;
@@ -714,6 +707,7 @@
       }
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
+      shellMenuApi.destroy();
       doc.removeEventListener("MozDOMFullscreen:Request", onFsRequest, true);
       doc.removeEventListener("MozDOMFullscreen:Exit", onFsExit, true);
       doc.removeEventListener("MozDOMFullscreen:Exited", onFsExit, true);

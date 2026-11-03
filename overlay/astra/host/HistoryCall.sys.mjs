@@ -317,29 +317,10 @@ function createPlacesBackend(PlacesUtils) {
  * reply carries only the `{ origin, revision }` reference the UI accepts.
  */
 async function attachIcons(visits) {
-  const refs = new Map();
+  const urls = visits.map((visit) => visit.url);
+  const refs = await Favicons.ensureForUrls({ urls });
   for (const visit of visits) {
-    const origin = originOf(visit.url);
-    if (!origin) {
-      continue;
-    }
-    if (!refs.has(origin)) {
-      let ref = null;
-      try {
-        const resolved = await Favicons.resolveStored({ url: visit.url });
-        if (resolved) {
-          Favicons.publish(resolved);
-          ref = {
-            origin: resolved.entry.origin,
-            revision: resolved.entry.revision,
-          };
-        }
-      } catch {
-        ref = null;
-      }
-      refs.set(origin, ref);
-    }
-    visit.icon = refs.get(origin);
+    visit.icon = refs.get(originOf(visit.url)) ?? null;
   }
 }
 
