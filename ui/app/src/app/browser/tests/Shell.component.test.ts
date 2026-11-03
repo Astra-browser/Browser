@@ -16,6 +16,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     pagePermissionCardHost: async () => {},
     tabsBootstrap: async () => {},
     sidebarSetHidden: async () => {},
+    sidebarSetWidth: async () => {},
   });
 });
 afterEach(() => {
