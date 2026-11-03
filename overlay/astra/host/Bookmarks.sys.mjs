@@ -40,6 +40,8 @@
 // a hostile payload is `invalid`, an unexpected store failure is
 // `unavailable`.
 
+import { Favicons, originOf } from "./Favicons.sys.mjs";
+
 /** The panel caps a search at this many characters
  *  (`bookmarks-session.svelte.ts`); a longer query is not one it sent. */
 const MAX_QUERY = 512;
@@ -474,6 +476,19 @@ function order(a, b) {
   return a.index - b.index;
 }
 
+/** Fill each row's icon from the shared favicon pipeline. Stored icons are
+ *  published before the reply; a missing one is fetched in the background and
+ *  the panel's `forPage(url)` fallback paints it when it arrives. */
+async function paintIcons(items) {
+  const urls = items.filter((item) => typeof item.url === "string" && item.url).map((item) => item.url);
+  if (urls.length === 0) return items;
+  const refs = await Favicons.ensureForUrls({ urls });
+  for (const item of items) {
+    item.icon = item.url ? refs.get(originOf(item.url)) ?? null : null;
+  }
+  return items;
+}
+
 function view(store, item) {
   return {
     id: item.id,
@@ -522,6 +537,7 @@ async function listing(profile, folder) {
     .filter((child) => child && (child.kind === FOLDER || child.kind === LINK))
     .sort(order)
     .map((child) => view(store, child));
+  await paintIcons(items);
   return {
     kind: "listing",
     profile,
@@ -697,6 +713,7 @@ async function search(profile, query) {
   const items = (await store.search(query, MAX_RESULTS))
     .filter((item) => item && (item.kind === FOLDER || item.kind === LINK))
     .map((item) => view(store, item));
+  await paintIcons(items);
   return { kind: "results", profile, items };
 }
 
