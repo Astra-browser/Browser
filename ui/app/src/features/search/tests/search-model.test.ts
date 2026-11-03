@@ -9,6 +9,7 @@ import {
   resultDetail,
   matchRange,
   completionSuffix,
+  distinctResults,
 } from "../lib/search-model";
 import type { SearchContext, SearchResult } from "$shared/ipc/bindings";
 
@@ -37,6 +38,27 @@ describe("search identity", () => {
   it("identifies a row by its action, so a retitled tab keeps its identity", () => {
     expect(resultIdentity(tab("a"))).toBe(resultIdentity(tab("a", "Changed title")));
     expect(resultIdentity(tab("a"))).not.toBe(resultIdentity(tab("b")));
+  });
+  it("keeps one row per action, so a bookmark and its visit cannot collide", () => {
+    const page = (kind: SearchResult["kind"], title: string, url: string): SearchResult => ({
+      kind,
+      title,
+      detail: url,
+      icon: null,
+      action: { type: "OpenUrl", url },
+    });
+    const visit = page("history", "visit", "https://example.com/x");
+    const saved = page("bookmark", "saved", "https://example.com/x");
+    const other = page("history", "other", "https://example.com/y");
+    // Both rows lead to the same address, so they would share a list key and a
+    // highlight. Native's order decides which spelling is kept.
+    expect(distinctResults([visit, saved, other]).map((row) => row.title)).toEqual([
+      "visit",
+      "other",
+    ]);
+    expect(distinctResults([saved, visit]).map((row) => row.title)).toEqual(["saved"]);
+    expect(distinctResults([tab("a"), tab("b")])).toHaveLength(2);
+    expect(distinctResults([])).toEqual([]);
   });
 });
 

@@ -11,6 +11,20 @@ export function resultIdentity(result: SearchResult): string {
   return `command:${action.id}`;
 }
 
+/** Native can name one destination twice — a visit and the bookmark saved for
+ *  it share an action, so they share an identity. A row's identity is also its
+ *  key and what the highlight follows, so the list keeps the first and drops
+ *  the rest: two rows for one action would draw one selection over two keys. */
+export function distinctResults(results: readonly SearchResult[]): SearchResult[] {
+  const seen = new Set<string>();
+  return results.filter((result) => {
+    const identity = resultIdentity(result);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
 export function sameSearch(expected: SearchContext | null, actual: SearchContext | null): boolean {
   return (
     !!expected &&

@@ -133,6 +133,31 @@ test("an obsolete answer cannot put its rows back on screen", async () => {
   await expect.element(screen.getByRole("option", { name: /stale/u })).not.toBeInTheDocument();
 });
 
+test("a visit and the bookmark saved for it are one row", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await screen.getByRole("combobox").fill("example");
+  const owner = await reply("example", [
+    visit("Example", "https://example.com/"),
+    { ...visit("Example saved", "https://example.com/"), kind: "bookmark" },
+    visit("Other", "https://other.example/"),
+  ]);
+  // Two rows leading to one address would give the list two identical keys
+  // and one highlight spanning both, which throws while rendering.
+  await vi.waitFor(() =>
+    expect(
+      [...screen.container.querySelectorAll(".row .title")].map((el) => el.textContent),
+    ).toEqual(["Example", "Other"]),
+  );
+  await userEvent.keyboard("{Enter}");
+  await vi.waitFor(() =>
+    expect(native.run).toHaveBeenCalledExactlyOnceWith(
+      { type: "OpenUrl", url: "https://example.com/" },
+      owner,
+      false,
+    ),
+  );
+});
+
 test("home offers recent tabs and destinations, growing only as results need space", async () => {
   const onTool = vi.fn();
   const screen = await render(LauncherPanel, { props: { context, destinations, onTool } });

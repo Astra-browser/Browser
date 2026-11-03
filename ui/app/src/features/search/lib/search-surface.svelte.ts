@@ -11,6 +11,7 @@ import { calculate, type Calculation } from "./calculator";
 import {
   completionSuffix,
   completionTarget,
+  distinctResults,
   resultIdentity,
   resultSection,
   type ResultSection,
@@ -135,7 +136,7 @@ export function createSearchSurface(options: {
         ]
       : []),
     // Editing a page's address, that page is no destination of its own.
-    ...results
+    ...distinctResults(results)
       .filter(
         (result) =>
           !(result.action.type === "ActivateTab" && result.action.id === context?.seed_tab),
