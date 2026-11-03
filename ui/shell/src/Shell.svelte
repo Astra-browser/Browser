@@ -293,18 +293,38 @@
         if (typeof width === "number" && Number.isFinite(width)) {
           frameRoot.style.setProperty("--astra-sidebar-width", `${width}px`);
         }
+      } else if (event.type === "nav.started") {
+        // Show the slot from the first moment of a load, with the loading
+        // state on, so a slow page is a page arriving rather than a black
+        // window.
+        const url = event.data?.url;
+        if (typeof url === "string" && url !== "" && url !== "about:blank") {
+          slot.dataset.hasPage = "true";
+          slot.dataset.loading = "true";
+        }
       } else if (event.type === "nav.committed") {
         // A real page committed: the content slot takes over the stage.
         const url = event.data?.url;
         if (typeof url === "string" && url !== "" && url !== "about:blank") {
           slot.dataset.hasPage = "true";
+          delete slot.dataset.loading;
+        } else {
+          delete slot.dataset.hasPage;
+          delete slot.dataset.loading;
         }
       } else if (event.type === "items-changed") {
-        // Back on a New Tab (no committed URL): give the stage to the app.
+        // Back on a New Tab (no URL): give the stage to the app.
         const active = event.data?.active;
         const tab = (event.data?.tabs ?? []).find((t) => t.id === active);
         if (tab && !tab.url) {
           delete slot.dataset.hasPage;
+          delete slot.dataset.loading;
+        } else if (tab?.loading) {
+          slot.dataset.hasPage = "true";
+          slot.dataset.loading = "true";
+        } else if (tab?.url) {
+          slot.dataset.hasPage = "true";
+          delete slot.dataset.loading;
         }
       }
     });
@@ -488,7 +508,38 @@
     min-height: 200px;
     display: flex;
     flex-direction: column;
-    background: #fff;
+    /* The chrome's ground while a page is on its way: a load should read as
+       the window waiting, not as the window dying. The page paints over it. */
+    background: var(--color-chrome, #1c1b22);
+  }
+
+  /* A page still arriving says so, quietly, in the middle of the stage. */
+  .astra-content[data-loading="true"]::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 22px;
+    block-size: 22px;
+    margin: -11px 0 0 -11px;
+    border: 2px solid var(--color-border-strong, rgb(255 255 255 / 18%));
+    border-block-start-color: var(--color-text, #f4f4f6);
+    border-radius: 50%;
+    animation: content-loading 720ms linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes content-loading {
+    to {
+      rotate: 360deg;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .astra-content[data-loading="true"]::after {
+      animation: none;
+      border-block-start-color: var(--color-text, #f4f4f6);
+    }
   }
   .astra-content > :global([data-astra-browser]) {
     flex: 1 1 auto;

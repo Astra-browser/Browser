@@ -334,6 +334,29 @@ export function createSearchSurface(options: {
     controller?.change(value);
   }
 
+  /** Enter with words in the field always searches them. The row list is a
+   *  convenience; the host decides what the words mean, the same way the
+   *  address bar does, so a stale or unselected row can never swallow it. */
+  async function searchTyped() {
+    const value = query.trim();
+    if (!value || composing) return;
+    running = true;
+    failed = false;
+    try {
+      const result = await settle(commands.browserOpenUrl(value, false));
+      if (disposed) return;
+      failed = result.outcome === "failed" || result.outcome === "rejected";
+      if (!failed) {
+        open = false;
+        fulfilled = true;
+      }
+    } catch {
+      if (!disposed) failed = true;
+    } finally {
+      if (!disposed) running = false;
+    }
+  }
+
   function submit(background = false) {
     if (composing) return;
     const row = rows.find((candidate) => candidate.id === selectedId);
@@ -545,6 +568,7 @@ export function createSearchSurface(options: {
     end,
     changed,
     submit,
+    searchTyped,
     capture,
     copy,
     activate,

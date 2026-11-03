@@ -110,15 +110,35 @@ export const Content = {
     browser.fixupAndLoadURIString(tab.url, { triggeringPrincipal: principal });
 
     const selected = { id: tab.astra_tab_id };
+    /** Show the selected tab's page; a tab with no page shows the New Tab, so
+     *  the previous tab's page is cleared rather than left underneath. */
+    const show = (url) => {
+      const target = typeof url === "string" && url !== "" ? url : "about:blank";
+      if (safeSpec(browser) === target) {
+        return;
+      }
+      try {
+        browser.fixupAndLoadURIString(target, { triggeringPrincipal: principal });
+      } catch {
+        // A tab torn down mid-switch: the next one will load.
+      }
+    };
     const off = addEventListener((event) => {
       if (event.type === "tab.updated" && event.data.selected) {
         selected.id = event.data.astra_tab_id;
+        // Switching tabs is a load, not a no-op: the browser has to follow
+        // the tab the person is looking at.
+        show(event.data.url);
       }
       if (event.type === "nav.committed" && event.data.astra_tab_id === selected.id) {
-        const current = safeSpec(browser);
-        if (current !== event.data.url) {
-          browser.fixupAndLoadURIString(event.data.url, { triggeringPrincipal: principal });
-        }
+        show(event.data.url);
+      }
+      // The projection is the authority on what is in front: a tab switch, a
+      // closed tab or a New Tab all land here, and the browser follows.
+      if (event.type === "items-changed") {
+        const active = (event.data?.tabs ?? []).find((entry) => entry.id === event.data?.active);
+        if (event.data?.active) selected.id = event.data.active;
+        if (active) show(active.url);
       }
     });
 

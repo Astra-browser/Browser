@@ -178,7 +178,7 @@ function tabView(id) {
     projection_revision: nextRevision(),
     title: tab.title || (blank ? "New Tab" : ""),
     url: blank ? null : tab.url,
-    loading: false,
+    loading: tab.loading === true,
     can_go_back: h.index > 0,
     can_go_forward: h.index >= 0 && h.index < h.entries.length - 1,
     icon: null,

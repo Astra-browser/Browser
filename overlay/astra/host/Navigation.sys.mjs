@@ -44,6 +44,7 @@ function commit(id, url, extra = {}) {
   const { tabs } = __tabsState();
   const tab = tabs.get(id);
   tab.url = url;
+  tab.loading = false;
   const h = __historyFor(id);
   emit("nav.committed", { astra_tab_id: id, url, ...extra });
   emit("tab.updated", {
@@ -78,7 +79,13 @@ export const Navigation = {
       return { ...err(request_id, "invalid_url", "nothing to navigate to"), accepted: false };
     }
     url = target.url;
+    // The row and the stage show a load from the first moment, so a slow page
+    // is visibly loading instead of a blank window.
+    const { tabs } = __tabsState();
+    const loadingTab = tabs.get(id);
+    if (loadingTab) loadingTab.loading = true;
     emit("nav.started", { astra_tab_id: id, url });
+    emit("tab.updated", { astra_tab_id: id, url, loading: true });
     __pushHistory(id, url);
     commit(id, url);
     return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };

@@ -159,6 +159,14 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
       } catch (e) {
         error = { code: "host_error", message: String(e?.message ?? e) };
       }
+      try {
+        if (error) win.__astraLastRelayError = `${String(data.module)}.${String(data.method)}: ${String(error.message ?? "")}`;
+        if (data.module === "Search") {
+          win.__astraLastSearch = JSON.stringify({ method: data.method, args: data.args, payload });
+        }
+      } catch {
+        // Diagnostics only.
+      }
       post({ kind: "res", id, payload, error });
     } else if (data.kind === "window") {
       // The window's own controls: Frame owns minimize/maximize/restore/close.
@@ -184,6 +192,13 @@ export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
 
   const relayEvents = host?.addEventListener
     ? host.addEventListener((event) => {
+        try {
+          if (event.type === "search-changed") {
+            win.__astraLastSearchEvent = JSON.stringify(event.data);
+          }
+        } catch {
+          // Diagnostics only.
+        }
         post({ kind: "evt", type: event.type, data: event.data, seq: event.event_seq });
       })
     : null;

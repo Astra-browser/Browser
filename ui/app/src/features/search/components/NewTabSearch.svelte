@@ -132,7 +132,7 @@
       value={surface.query}
       bind:ref={input}
       oninput={surface.changed}
-      onsubmit={() => surface.submit()}
+      onsubmit={() => void surface.searchTyped()}
       inputProps={{
         role: "combobox",
         "aria-controls": "newtab-search-results",
