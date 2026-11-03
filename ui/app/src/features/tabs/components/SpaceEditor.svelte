@@ -7,7 +7,7 @@
   import { preferences } from "$domain/preferences";
   import Button from "$shared/ui/Button";
   import Icon from "$shared/ui/Icon";
-  import { onMount, untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import "./space-hue.css";
   import { SPACE_COLORS, SPACE_SYMBOLS, emojiOf } from "../lib/space-look";
 
@@ -43,6 +43,8 @@
   let confirming = $state(false);
   let deleting = $state(false);
   let field = $state<HTMLInputElement>();
+  let deleteButton = $state<HTMLButtonElement>();
+  let confirmCancel = $state<HTMLButtonElement>();
   let named = $state(original.name);
   let dirty = false;
   let sending = false;
@@ -84,6 +86,19 @@
     emoji = text;
     const found = emojiOf(text);
     if (found) change(() => (icon = { kind: "emoji", text: found }));
+  }
+
+  // The confirmation stands where the actions were, so the button that asked
+  // for it is gone: the keyboard goes to the way out rather than to the top of
+  // the document, and comes back to Delete if it is taken.
+  $effect(() => {
+    if (!confirming) return;
+    void tick().then(() => confirmCancel?.focus());
+  });
+
+  function cancelDelete() {
+    confirming = false;
+    void tick().then(() => deleteButton?.focus());
   }
 
   function done(event?: SubmitEvent) {
@@ -153,7 +168,7 @@
       if (event.key !== "Escape" || event.isComposing) return;
       event.preventDefault();
       event.stopPropagation();
-      if (confirming) confirming = false;
+      if (confirming) cancelDelete();
       else restore();
     };
     window.addEventListener("keydown", escape, true);
@@ -310,8 +325,11 @@
           <p class="confirm-body">{closing(space.tabs)}</p>
         </div>
         <div class="editor-actions">
-          <Button size="compact" variant="secondary" onclick={() => (confirming = false)}
-            >{m.space_cancel()}</Button
+          <Button
+            bind:ref={confirmCancel}
+            size="compact"
+            variant="secondary"
+            onclick={cancelDelete}>{m.space_cancel()}</Button
           >
           <Button size="compact" variant="danger" pending={deleting} onclick={remove}
             >{m.space_delete_confirm()}</Button
@@ -321,6 +339,7 @@
     {:else}
       <div class="editor-foot editor-actions">
         {#if deletable}<Button
+            bind:ref={deleteButton}
             size="compact"
             variant="ghost"
             class="editor-delete"
