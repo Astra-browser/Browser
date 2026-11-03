@@ -904,6 +904,19 @@ export const Content = {
         // A remote browser inherits the chrome window's false
         // useGlobalHistory; the native tab needs the same fix as mount().
         allowGlobalHistory(browser);
+        // A restored native tab already has its committed URL/title.
+        try {
+          const spec = browser.currentURI?.spec;
+          if (spec && spec !== "about:blank") {
+            __applyExternalUpdate(id, { url: spec });
+          }
+          const title = browser.contentTitle;
+          if (typeof title === "string" && title !== "") {
+            __applyExternalUpdate(id, { title });
+          }
+        } catch {
+          // A tab that is still restoring.
+        }
       }
     };
     const refreshIcon = (id) => {
@@ -1277,6 +1290,45 @@ export const Content = {
       if (model.selected) {
         activate(model.astra_tab_id);
       }
+    }
+
+    // Adopt native tabs SessionStore restored before this mount. They are
+    // already loaded; bind them to model tabs without reloading the page.
+    for (const tab of [...gb.tabs]) {
+      if (idOfTab(tab)) continue;
+      let url = "about:blank";
+      let title = "";
+      try {
+        url = tab.linkedBrowser?.currentURI?.spec || url;
+        title = tab.linkedBrowser?.contentTitle || "";
+      } catch {
+        // A tab that is still restoring.
+      }
+      const id = __adoptNative({
+        url,
+        selected: tab.selected === true,
+        window_id: window_id || "win-1",
+      });
+      bindTab(id, tab);
+      if (title) __applyExternalUpdate(id, { title });
+      __announceAdopted(id, { selected: tab.selected === true });
+    }
+
+    // A restored session arrives beside the shell's bootstrap New Tab. Drop
+    // the blank bootstrap row so the restored tabs are the session, and put
+    // one of them in front.
+    try {
+      const now = await Tabs.list({ request_id, window_id });
+      const rows = now.tabs ?? [];
+      const blank = rows.find((t) => !t.url || t.url === "about:blank");
+      const restored = rows.filter((t) => t.url && t.url !== "about:blank");
+      if (blank && restored.length > 0) {
+        const chosen = restored.find((t) => t.selected) ?? restored[0];
+        await Tabs.close({ astra_tab_id: blank.astra_tab_id });
+        await Tabs.select({ astra_tab_id: chosen.astra_tab_id });
+      }
+    } catch {
+      // Restore is best-effort; never block a working window.
     }
 
     return {

@@ -32,7 +32,7 @@
 | P2 | `merge/p2-native-nav` | Make `nav.stop`, page zoom and `Navigation.print` call the live browser; prune dead/duplicate command ids; hard-reload distinction | P0 | **merged** |
 | P3 | `merge/p3-windows` | Bind `Windows` to `BrowserWindowTracker`/`OpenBrowserWindow`; real focus/close/fullscreen; thin projection keyed by native ids | P0 | **merged** |
 | P4 | `merge/p4-gbrowser` | **Critical path.** Native `gBrowser` tabs with the strip hidden; model projection; mute, pin, discard, space move, adoption. Native is now the default; deleting the legacy mount is the remaining cleanup. | P1–P3 | **P4.4a merged (native default); P4.4b cleanup next** |
-| P5 | `merge/p5-session` | Replace the JS `Session` model with Firefox `SessionStore` + Astra metadata (space/folder/pin/sync) in the Rust store | P4 | planned |
+| P5 | `merge/p5-session` | Firefox `SessionStore` is live; restored native tabs are adopted, the bootstrap blank tab is dropped. Astra metadata (space/folder/pin/sync) in the Rust store is P5b. | P4 | **P5a merged; P5b next** |
 | P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | planned |
 | P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | planned |
 | P8 | `merge/p8-resources` | Split `Resources`: tasks/notes/media → Rust; page source → native browser; delete the in-memory task store; retire `Panes` | P1 | planned |
@@ -229,6 +229,7 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | 2026-11-04 | P2 | done: `native_nav_model` 17; live probe stop `about:blank` after a 4 s slow page, model loading cleared, zoom readback `1.5`, soft reload no-cache=false vs hard reload no-cache=true; overlay + `build --faster` used |
 | 2026-11-04 | P1/P2 review | code review found the supervisor unreachable + failure-path bugs; fixed and re-reviewed PASS-WITH-NOTES. Remaining notes are P4/P5 work, not blockers. |
 | 2026-11-04 | P1/P2 merge | merged to `main` as `df24279` + `7edb116`; tag `post-p1-p2-20261104`. P3/P4 next. |
+| 2026-11-04 | P5a | SessionStore prefs active; live probe: quit/relaunch restores both tabs with native ids, blank bootstrap row removed. P5b is Astra metadata in Rust. |
 | 2026-11-04 | P4.4a | merged as `269864f`; tag `post-p4-default-20261104`. native is default (`astra.gbrowser.enabled=true`); multi-window mounts one native tab per window; `gbrowser_multiwindow_probe` PASS. Standalone mount remains as pref-off fallback; deletion is P4.4b. |
 | 2026-11-04 | P4.3 | merged as `558eca8`; tag `post-p4-p43-20261104`. Pin/unpin, discard/wake, cross-space recreate, engine-tab adoption; `gbrowser_p43_probe.py` PASS. P4.4 deletes the standalone path. |
 | 2026-11-04 | P4.2 | merged as `367ca01`; tag `post-p4-tabs-20261104`. native `mountNative`: window-scoped model ↔ `gBrowser` map, initial-tab adoption, native→model select/close, busy clear, top-level-only commits, background-load on activation, container-aware adoption, mute. Live: stage page, model/native select+close both directions, create/close, `audioMuted` ✓. Pin/discard/session/adoption are P4.3/P5. P4.2 is single-window: `mountNative` refuses a second window until the P5 global id map. |

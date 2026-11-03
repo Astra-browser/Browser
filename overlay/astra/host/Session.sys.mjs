@@ -5,6 +5,10 @@
 // Host API Session module (v1). Startup snapshot/restore for the
 // core-owned organisation (plan §5.4, P2-T09).
 //
+// P5 status: Firefox SessionStore is now the live tab/session source. This
+// module remains for Astra organisation metadata (space/folder/pin/sync) until
+// the Rust store lands; do not treat its tab snapshot as the browser session.
+//
 // Split of responsibilities:
 // - `astra-core` (`crates/astra-core/src/session.rs`) owns the organisation:
 //   spaces, folders, pins, order, per-tab scroll/zoom/history. It persists
