@@ -384,8 +384,7 @@
           font-weight="500"
           letter-spacing={WORDMARK.height * 0.26}
           textLength={WORDMARK.width}
-          lengthAdjust="spacing"
-          >ASTRA</text
+          lengthAdjust="spacing">ASTRA</text
         >
         {#if glint && useSky}<linearGradient
             id={`${id}-glint`}
