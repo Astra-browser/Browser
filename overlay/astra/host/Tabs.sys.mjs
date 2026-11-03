@@ -292,7 +292,12 @@ export function __itemsSnapshot() {
     spaces: _spaces.map((space) => ({
       ...space,
       tabs: _order.filter((id) => _tabs.get(id)?.space_id === space.id).length,
-      previews: [],
+      // The switcher stacks the mark of the space's first tabs beside its
+      // name. A tab with no icon yet is null, which the app draws as a globe.
+      previews: _order
+        .filter((id) => _tabs.get(id)?.space_id === space.id)
+        .slice(0, 3)
+        .map((id) => _tabs.get(id)?.icon ?? null),
     })),
     active_space_id: _activeSpaceId,
     nodes: tabs.map((tab) => ({
