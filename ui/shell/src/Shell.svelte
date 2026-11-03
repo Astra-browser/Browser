@@ -162,6 +162,7 @@
     let stageObserver = null;
     let stageMutation = null;
     let onStageResize = null;
+    let applyGbrowserStage = null;
     const gbrowserRoot = doc.documentElement;
     if (gbrowserEnabled) {
       gbrowserRoot.setAttribute("data-astra-gbrowser", "true");
@@ -193,6 +194,7 @@
         attributes: true,
         attributeFilter: ["data-app-booted"],
       });
+      applyGbrowserStage = applyStage;
       onStageResize = () => applyStage();
       win?.addEventListener("resize", onStageResize);
       applyStage();
@@ -710,7 +712,21 @@
       slotError = "content binding unavailable";
     } else {
       try {
-        mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+        if (gbrowserEnabled) {
+          try {
+            mounted = await host.Content.mountNative(slot, { request_id: newRequestId() });
+            gbrowserRoot.setAttribute("data-astra-native-mounted", "true");
+            applyGbrowserStage?.();
+          } catch (e) {
+            // The pref is a spike: fall back to the standalone mount rather
+            // than leaving a blank stage.
+            gbrowserRoot.removeAttribute("data-astra-native-mounted");
+            mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+            slotError = String(e?.message ?? e);
+          }
+        } else {
+          mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+        }
       } catch (e) {
         slotError = String(e?.message ?? e);
       }
