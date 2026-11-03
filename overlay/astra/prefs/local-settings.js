@@ -16,4 +16,4 @@ pref("astra.core.command", "");
 
 // P4 spike: dock the native gBrowser panel behind the Astra stage. Off
 // until the native tab mapping lands; flipping it alone cannot cover a page.
-pref("astra.gbrowser.enabled", false);
+pref("astra.gbrowser.enabled", true);
