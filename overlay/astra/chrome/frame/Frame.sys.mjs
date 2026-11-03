@@ -140,6 +140,21 @@ export async function dispatchWindowControl(host, chrome, opts = {}) {
     case "close":
       return host.Windows.close({ request_id, window_id });
     case "toggle-fullscreen": {
+      // The owning chrome window is the only thing that can safely toggle its
+      // own native fullscreen state; the Host model does not know which
+      // native window this call came from. Fall back to the model only when
+      // no chrome adapter is present (tests/standalone).
+      if (chrome && typeof chrome.toggleFullscreen === "function") {
+        const full = chrome.toggleFullscreen();
+        return {
+          request_id,
+          host_api_version: 1,
+          window_id,
+          action,
+          dispatched: true,
+          fullscreen: full === true,
+        };
+      }
       const cur = await host.Windows.get({ request_id, window_id });
       if (cur?.error) {
         return cur;

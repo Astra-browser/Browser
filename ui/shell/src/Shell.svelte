@@ -139,6 +139,14 @@
     }
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
+    // Bind this exact chrome window to win-1 before any Host API call. A
+    // lazy Services/getMostRecentWindow can otherwise bind win-1 to a newly
+    // opened window and make fullscreen/close hit the wrong one.
+    try {
+      host.__bindCurrentWindow?.(win);
+    } catch {
+      // Preview DOM without a chrome window.
+    }
     // The Rust core is per-process: stop it on application quit, not on a
     // single window close. Multiple windows may hold this observer; Boot
     // shutdown is idempotent.
@@ -425,6 +433,17 @@
           chromeAdapter[op] = () => win[op]();
         }
       }
+      // Fullscreen belongs to the window that owns this shell. Applying a
+      // Host event here would hit whichever window the module is bound to.
+      chromeAdapter.toggleFullscreen = () => {
+        try {
+          win.fullScreen = !win.fullScreen;
+          mirrorFullscreen(win.fullScreen === true);
+          return win.fullScreen === true;
+        } catch {
+          return false;
+        }
+      };
     }
 
     async function currentWindowId() {
@@ -578,9 +597,7 @@
       } catch {
         // Best-effort diagnostics only.
       }
-      if (event.type === "window.fullscreen-changed") {
-        mirrorFullscreen(event.data?.fullscreen === true);
-      } else if (event.type.startsWith("tab.")) {
+      if (event.type.startsWith("tab.")) {
         void refreshTabs();
       } else if (event.type === "sidebar.changed") {
         // The app publishes the column's laid-out width. Hidden, the column is
