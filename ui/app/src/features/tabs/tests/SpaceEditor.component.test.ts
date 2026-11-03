@@ -7,7 +7,7 @@ import SpaceEditor from "../components/SpaceEditor.svelte";
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
-    settingsGet: async () => null,
+    settingGet: async () => null,
     tabsBootstrap: async () => {},
     keymapEntries: async () => [],
   });
