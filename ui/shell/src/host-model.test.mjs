@@ -363,8 +363,11 @@ describe("content URL gate", () => {
     const { container } = makeDom();
     const mounted = await Content.mount(container, { request_id: "m1" });
     try {
-      assert.equal(browsersIn(container).length, 0);
+      // One browser is warmed on about:blank so the first real address does
+      // not pay content-process startup; it is parked, not in front.
+      assert.equal(browsersIn(container).length, 1);
       assert.equal(mounted.browser, null);
+      assert.equal(mounted.browsers.get(made.astra_tab_id)?.requested, "about:blank");
     } finally {
       mounted.detach();
     }
@@ -379,13 +382,17 @@ describe("content URL gate", () => {
       const id = __itemsSnapshot().tabs[0].id;
       await Navigation.loadURL({ request_id: "n1", astra_tab_id: id, url: "https://a.example/" });
       const page = mounted.browser;
-      assert.deepEqual(page.loads, ["https://a.example/"]);
+      assert.deepEqual(page.loads.filter((u) => u !== "about:blank"), ["https://a.example/"]);
 
       // The projection (not `create`) carries the forbidden address: the
       // gate sits in `show`, on the one path to fixupAndLoadURIString.
       __applyExternalUpdate(id, { url: "file:///etc/hostname" });
       assert.equal(mounted.browser, null, "nothing unsafe is in front");
-      assert.deepEqual(page.loads, ["https://a.example/"], "the browser was not pointed at it");
+      assert.deepEqual(
+        page.loads.filter((u) => u !== "about:blank"),
+        ["https://a.example/"],
+        "the browser was not pointed at it",
+      );
       assert.match(doc.defaultView.__astraLastRelayError ?? "", /content refused/);
     } finally {
       mounted.detach();
@@ -400,7 +407,7 @@ describe("content binding lifetime", () => {
     const { container } = makeDom();
     const mounted = await Content.mount(container, { request_id: "m1" });
     try {
-      assert.equal(browsersIn(container).length, 0, "a New Tab has no page browser");
+      assert.equal(browsersIn(container).length, 1, "the warm browser stands by");
       assert.equal(mounted.browser, null);
 
       const id = __itemsSnapshot().tabs[0].id;
@@ -476,7 +483,7 @@ describe("content binding lifetime", () => {
       const id = __itemsSnapshot().tabs[0].id;
       await Navigation.loadURL({ request_id: "n1", astra_tab_id: id, url: "https://a.example/" });
       const page = mounted.browser;
-      assert.deepEqual(page.loads, ["https://a.example/"]);
+      assert.deepEqual(page.loads.filter((u) => u !== "about:blank"), ["https://a.example/"]);
 
       // The element still reports the address it died on; only the crash
       // signal says the page is gone.
@@ -484,7 +491,10 @@ describe("content binding lifetime", () => {
         handler();
       }
       await Tabs.select({ request_id: "s1", astra_tab_id: id });
-      assert.deepEqual(page.loads, ["https://a.example/", "https://a.example/"]);
+      assert.deepEqual(
+        page.loads.filter((u) => u !== "about:blank"),
+        ["https://a.example/", "https://a.example/"],
+      );
     } finally {
       mounted.detach();
     }

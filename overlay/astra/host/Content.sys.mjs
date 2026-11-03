@@ -131,7 +131,9 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
         const id = tabIdOf ? tabIdOf(browser) : null;
         const url = location && location.spec ? location.spec : "";
         if (id && url) {
-          commit(id, url);
+          // Tell the model whether the browser is still fetching, so the
+          // stage's skeleton and the row's spinner survive an early commit.
+          commit(id, url, { loading: stillLoading(browser) });
         }
       } catch {
         // Progress callbacks must never break page loads.
@@ -264,7 +266,15 @@ export const Content = {
      */
     const watch = (id, entry) => {
       stopWatching(entry);
-      const deadline = Date.now() + 60_000;
+      const beginning = Date.now();
+      const deadline = beginning + 60_000;
+      // A server can hold the request before a single byte arrives; during
+      // that time the browser's load flag is not set yet, and treating that
+      // as "done" made the skeleton vanish while the page was still coming.
+      // Stay in the loading state until the load has actually started, with
+      // a bounded wait for a request that never starts at all.
+      const startDeadline = beginning + 15_000;
+      let seenLoading = false;
       let idle = 0;
       entry.poll = setInterval(() => {
         let loading = true;
@@ -273,14 +283,19 @@ export const Content = {
         } catch {
           loading = false;
         }
-        // A redirect can dip the flag for a moment between documents; two
-        // quiet polls mean the load is really over.
         if (loading) {
+          seenLoading = true;
+        }
+        const live =
+          loading || (!seenLoading && Date.now() < startDeadline);
+        // A redirect can dip the flag for a moment between documents; two
+        // quiet polls after the load has started mean it is really over.
+        if (live) {
           idle = 0;
         } else {
           idle += 1;
         }
-        if (Date.now() < deadline && (loading || idle < 2)) return;
+        if (Date.now() < deadline && (live || idle < 2)) return;
         stopWatching(entry);
         if (!browsers.has(id)) return;
         // `requested` is what this browser was asked to load, not where the

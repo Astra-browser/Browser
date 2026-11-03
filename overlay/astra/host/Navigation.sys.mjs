@@ -81,7 +81,16 @@ function commit(id, url, extra = {}) {
   const { tabs } = __tabsState();
   const tab = tabs.get(id);
   tab.url = url;
-  tab.loading = false;
+  // A commit is not the end of the load: the model commits the address the
+  // moment the person asks for it, and the content binding keeps it loading
+  // until the document lands. An external commit passes the browser's own
+  // flag, so an in-page pushState does not leave the tab spinning.
+  tab.loading =
+    typeof extra.loading === "boolean"
+      ? extra.loading
+      : extra.external === true
+        ? false
+        : true;
   const h = __historyFor(id);
   emit("nav.committed", { astra_tab_id: id, url, ...extra });
   emit("tab.updated", {
@@ -89,6 +98,7 @@ function commit(id, url, extra = {}) {
     url,
     title: tab.title,
     selected: tab.selected,
+    loading: tab.loading,
     canGoBack: h ? h.index > 0 : false,
     canGoForward: h ? h.index < h.entries.length - 1 : false,
   });
@@ -132,7 +142,7 @@ export const Navigation = {
     if (!reloading) {
       pushOrReplaceHistory(id, url);
     }
-    commit(id, url, reloading ? { reloaded: true } : {});
+    commit(id, url, reloading ? { reloaded: true, loading: true } : { loading: true });
     return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };
   },
 
@@ -146,7 +156,7 @@ export const Navigation = {
       return ok(request_id, { astra_tab_id: id, went_back: false, url: tab.url });
     }
     h.index -= 1;
-    commit(id, h.entries[h.index]);
+    commit(id, h.entries[h.index], { loading: true });
     return ok(request_id, { astra_tab_id: id, went_back: true, url: tab.url });
   },
 
@@ -160,7 +170,7 @@ export const Navigation = {
       return ok(request_id, { astra_tab_id: id, went_forward: false, url: tab.url });
     }
     h.index += 1;
-    commit(id, h.entries[h.index]);
+    commit(id, h.entries[h.index], { loading: true });
     return ok(request_id, { astra_tab_id: id, went_forward: true, url: tab.url });
   },
 
@@ -169,7 +179,7 @@ export const Navigation = {
     if (!tab) {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`);
     }
-    commit(id, tab.url, { reloaded: true });
+    commit(id, tab.url, { reloaded: true, loading: true });
     return ok(request_id, { astra_tab_id: id, reloaded: true, url: tab.url });
   },
 
