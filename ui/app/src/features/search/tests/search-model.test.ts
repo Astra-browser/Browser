@@ -137,3 +137,73 @@ describe("inline completion", () => {
     expect(completionSuffix("git", null)).toBeNull();
   });
 });
+
+type HostSearch = {
+  resolve: (input: string) => { kind: "url" | "search"; url: string; query?: string } | null;
+  Search: {
+    newtabRun: (input: {
+      action: unknown;
+      context: unknown;
+    }) => Promise<{ accepted: boolean; operation_id: string | null }>;
+  };
+};
+
+/** The host decides what a typed field means, and the contract harness shares
+ *  that exact module. It lives outside this app, so it is loaded by URL rather
+ *  than bundled; the type above is the little of it these tests read. */
+async function hostSearch(): Promise<HostSearch> {
+  const url = new URL("../../../../../../overlay/astra/host/Search.sys.mjs", import.meta.url);
+  return (await import(/* @vite-ignore */ url.href)) as HostSearch;
+}
+
+describe("what the host will navigate to", () => {
+  it("opens a blank document and nothing else internal", async () => {
+    const { resolve } = await hostSearch();
+    expect(resolve("about:blank")).toMatchObject({ kind: "url", url: "about:blank" });
+    // A parameter on a blank document is inert, so it stays a blank document.
+    expect(resolve("about:blank?from=field")).toMatchObject({
+      kind: "url",
+      url: "about:blank?from=field",
+    });
+    // System-principal pages are words. Handing one to a content browser and
+    // trusting the engine to refuse the load is not a boundary.
+    for (const typed of [
+      "about:config",
+      "about:debugging",
+      "about:addons",
+      "ABOUT:CONFIG",
+      "about:config#advanced",
+      // Near misses that resolve to a different internal page.
+      "about:blank/../config",
+      "about://blank",
+    ]) {
+      expect(resolve(typed)?.kind, typed).toBe("search");
+    }
+  });
+
+  it("searches the internal address it refuses, rather than dropping it", async () => {
+    const { resolve } = await hostSearch();
+    const refused = resolve("about:config");
+    expect(refused?.url).toContain(encodeURIComponent("about:config"));
+    expect(refused?.query).toBe("about:config");
+  });
+
+  it("still navigates the web and searches words", async () => {
+    const { resolve } = await hostSearch();
+    expect(resolve("https://example.com/a")).toMatchObject({ kind: "url" });
+    expect(resolve("http://example.com/")).toMatchObject({ kind: "url" });
+    expect(resolve("hello world")?.kind).toBe("search");
+    expect(resolve("javascript:alert(1)")?.kind).toBe("search");
+  });
+
+  it("refuses an internal address arriving as a row's action", async () => {
+    const { Search } = await hostSearch();
+    // A result row is never an address the person typed, so the same policy
+    // applies before any tab is asked to load it.
+    const refused = await Search.newtabRun({
+      action: { type: "OpenUrl", url: "about:config" },
+      context: { session_id: "test" },
+    });
+    expect(refused.accepted).toBe(false);
+  });
+});

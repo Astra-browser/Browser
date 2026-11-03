@@ -13,10 +13,10 @@
 //     can never be pointed at a plain-http, javascript:, data: or file: URL.
 //   - The query is percent-encoded exactly once, by encodeURIComponent, so it
 //     cannot add parameters, change the host, or break out of the template.
-//   - Typed text only becomes a navigation when it is http, https or about.
-//     javascript:, data:, file:, chrome: and resource: typed by hand are
-//     searched for instead of run, the way the address bar has always been
-//     expected to behave.
+//   - Typed text only becomes a navigation when it is http, https or the one
+//     inert about: page. javascript:, data:, file:, chrome:, resource: and
+//     every privileged about: page typed by hand are searched for instead of
+//     run, the way the address bar has always been expected to behave.
 //   - Nothing is sent anywhere to suggest: no suggestion provider is wired,
 //     so keystrokes stay in this process until the person presses Enter.
 //
@@ -40,7 +40,18 @@ const ENGINES = {
 const DEFAULT_ENGINE = "duckduckgo";
 
 /** Schemes a typed address may use. Everything else is searched for. */
-const NAVIGABLE = new Set(["http:", "https:", "about:"]);
+const NAVIGABLE = new Set(["http:", "https:"]);
+
+/**
+ * The one internal page a typed address may reach. A blank document carries no
+ * privileges; about:config, about:debugging, about:addons and their kin are
+ * system-principal pages, and pointing a content browser at one relies on the
+ * engine refusing the load. Fail closed: every other about: address is words,
+ * as javascript: and data: already are.
+ */
+function isBlankAbout(parsed) {
+  return parsed.protocol === "about:" && parsed.pathname === "blank" && parsed.host === "";
+}
 
 function engineSetting() {
   const id = Settings.current("search.engine");
@@ -92,7 +103,7 @@ export function resolve(input) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) {
     try {
       const parsed = new URL(text);
-      if (NAVIGABLE.has(parsed.protocol)) {
+      if (NAVIGABLE.has(parsed.protocol) || isBlankAbout(parsed)) {
         return { kind: "url", url: parsed.href };
       }
     } catch {
