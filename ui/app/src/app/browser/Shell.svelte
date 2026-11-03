@@ -135,7 +135,7 @@
             { kind: "item" as const, id: "page.reload", label: "Reload Page", hint: "Ctrl+R" },
             {
               kind: "item" as const,
-              id: "page.bookmark",
+              id: "bookmark.current",
               label: "Bookmark This Page",
               hint: "Ctrl+D",
             },
