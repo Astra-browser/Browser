@@ -38,11 +38,38 @@ export function openAt(next: ShellMenu, onChoose: MenuHandler) {
   if (items.length === 0) return;
   handler = onChoose;
   menu = { items, x: next.x, y: next.y };
+  // The menu is drawn in the app frame, which sits under the page surface.
+  // Mark the document and tell the shell to raise the frame while it is open;
+  // the same marker makes the frame's own ground transparent so the page
+  // still shows around the menu.
+  try {
+    document.documentElement.dataset.astraMenu = "true";
+  } catch {
+    // Diagnostics only.
+  }
+  postShell({ kind: "menu-open" });
 }
 
 export function close() {
+  const wasOpen = menu !== null;
   menu = null;
   handler = null;
+  try {
+    delete document.documentElement.dataset.astraMenu;
+  } catch {
+    // Diagnostics only.
+  }
+  if (wasOpen) postShell({ kind: "menu-close" });
+}
+
+/** One-way note to the shell that owns the frame stacking/clip. */
+function postShell(message: Record<string, unknown>) {
+  try {
+    if (!window.parent || window.parent === window) return;
+    window.parent.postMessage({ ns: SHELL_NS, ...message }, "*");
+  } catch {
+    // No shell: the app still runs standalone.
+  }
 }
 
 /** Runs the chosen row, then closes. The chrome owns what the id means. */

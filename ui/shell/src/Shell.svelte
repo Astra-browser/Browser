@@ -498,11 +498,24 @@
     };
     const postToApp = (message) => {
       try {
+        // A content menu is drawn by the app frame, which normally sits under
+        // the page. Raise the frame for as long as the menu is open.
+        if (message?.kind === "menu") setMenuOpen(true);
         appApi?.element?.contentWindow?.postMessage(message, "*");
       } catch {
         // The frame went away; the menu has no reader.
       }
     };
+    let menuTimer = 0;
+    function setMenuOpen(open) {
+      clearTimeout(menuTimer);
+      frameRoot.dataset.astraMenuOpen = open ? "true" : "false";
+      if (open) {
+        // A menu the app never answers (window lost, frame died) must not
+        // leave the page covered. The app sends `menu-close` on its own.
+        menuTimer = setTimeout(() => setMenuOpen(false), 30000);
+      }
+    }
     const tabIdOf = (browser) => {
       for (const [id, entry] of mounted?.browsers ?? []) {
         if (entry.browser === browser) return id;
@@ -517,8 +530,17 @@
     });
     const onWindowMenu = (event) => {
       const data = event?.data;
-      if (!data || data.ns !== "astra-shell" || data.kind !== "menu-run" || !fromApp(event)) return;
-      if (typeof data.id !== "string") return;
+      if (!data || data.ns !== "astra-shell" || !fromApp(event)) return;
+      if (data.kind === "menu-open") {
+        setMenuOpen(true);
+        return;
+      }
+      if (data.kind === "menu-close") {
+        setMenuOpen(false);
+        return;
+      }
+      if (data.kind !== "menu-run" || typeof data.id !== "string") return;
+      setMenuOpen(false);
       if (data.id.startsWith("window.") || data.id === "bookmark.current") {
         void runChromeAction(win, host, data.id);
       }
@@ -531,6 +553,7 @@
         // Already torn down with the window.
       }
       win.removeEventListener("message", onWindowMenu);
+      clearTimeout(menuTimer);
       contentMenu.destroy();
       tabstrip.destroy();
       splitApi.destroy();
@@ -813,6 +836,20 @@
     clip-path: inset(
       8px calc(100% - var(--astra-sidebar-card-width, 240px) - 24px) 8px 8px
     );
+  }
+  /* A context menu is drawn in the app frame, which normally sits under the
+     page. While one is open the frame comes above the page with its own
+     ground transparent (the app sets `data-astra-menu`), and the peek clip is
+     lifted: a menu opened over a hidden column must be visible and clickable,
+     and lifting the clip also gives the page pointer back so the column can
+     be released again. */
+  :global(.astra-frame[data-astra-menu-open="true"] .astra-app-mount) {
+    position: relative;
+    z-index: 4;
+    background: transparent;
+  }
+  :global(.astra-frame[data-astra-menu-open="true"] .astra-app-frame) {
+    clip-path: none;
   }
   .astra-app-mount > :global(.astra-app-frame) {
     flex: 1 1 auto;
