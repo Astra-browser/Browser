@@ -43,7 +43,9 @@ test("Settings stands beside the tab rail and returns to the same web tab", asyn
   expect(screen.container.querySelector('[data-astra-surface="settings"]')).not.toBeNull();
   // The settings rail is deliberately a lazy chunk; wait for it instead of
   // asserting that it is already in the first synchronous paint.
-  await expect.poll(() => screen.container.querySelector(".settings-sidebar-navigation")).not.toBeNull();
+  await expect
+    .poll(() => screen.container.querySelector(".settings-sidebar-navigation"))
+    .not.toBeNull();
   // The tab stays one click away in the rail beside the settings panel.
   expect(screen.container.querySelector(`[data-astra-tab-id="${tab.id}"]`)).not.toBeNull();
   emitNativeEvent("browserReturn", { ...items, projection_revision: revision(11) });
