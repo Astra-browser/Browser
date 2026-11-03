@@ -76,6 +76,7 @@ export function __resetFaviconsForTests() {
   _backend = null;
   _eventSink = null;
   _liveBackendPromise = null;
+  _storedCache.clear();
 }
 
 function emit(view) {
@@ -308,46 +309,78 @@ async function fetchIconSource(doc, pageUrl) {
 }
 
 function createPlacesBackend(PlacesUtils) {
-  return {
-    async raster(url, doc) {
-      if (!doc || !doc.defaultView) {
-        return null;
-      }
-      let favicon = null;
-      try {
-        favicon = await PlacesUtils.favicons.getFaviconForPage(
+  /** Read the icon Places already holds for `url` and rasterize it. */
+  async function stored(url, doc) {
+    if (!doc || !doc.defaultView) {
+      return null;
+    }
+    let favicon = null;
+    try {
+      favicon = await PlacesUtils.favicons.getFaviconForPage(
+        PlacesUtils.toURI(url),
+        SIDE,
+      );
+    } catch {
+      // No favicon row, or Places is unavailable: no stored icon.
+      return null;
+    }
+    if (!favicon?.rawData?.length || !favicon.dataURI) {
+      return null;
+    }
+    // Decode once with the image service. This is the engine's own decoder,
+    // so bytes it cannot read are refused before an element is built; SVG
+    // (which the decoder may not handle but an `<img>` renders) is still
+    // given its chance below.
+    try {
+      const imgTools = Cc["@mozilla.org/image/tools;1"].getService(
+        Ci.imgITools,
+      );
+      const bytes = binaryString(favicon.rawData);
+      imgTools.decodeImageFromBuffer(
+        bytes,
+        bytes.length,
+        favicon.mimeType || "image/png",
+      );
+    } catch {
+      // Not a raster the image service decodes: the element decides.
+    }
+    // `imgIContainer` is not drawable on a canvas; the stored data URI is.
+    return drawRaster(doc, favicon.dataURI.spec);
+  }
+
+  /** Keep an icon this host fetched in Places, so history and later visits
+   *  find it without another network request. Best-effort and not awaited:
+   *  the tab must not wait on a database write. */
+  function persist(url, dataUrl) {
+    try {
+      PlacesUtils.favicons
+        .setFaviconForPage(
           PlacesUtils.toURI(url),
-          SIDE,
-        );
-      } catch {
-        // No favicon row, or Places is unavailable: try the page itself.
-      }
-      if (favicon?.rawData?.length && favicon.dataURI) {
-        // Decode once with the image service. This is the engine's own
-        // decoder, so bytes it cannot read are refused before an element is
-        // built; SVG (which the decoder may not handle but an `<img>` renders)
-        // is still given its chance below.
-        try {
-          const imgTools = Cc["@mozilla.org/image/tools;1"].getService(
-            Ci.imgITools,
-          );
-          const bytes = binaryString(favicon.rawData);
-          imgTools.decodeImageFromBuffer(
-            bytes,
-            bytes.length,
-            favicon.mimeType || "image/png",
-          );
-        } catch {
-          // Not a raster the image service decodes: the element decides.
-        }
-        // `imgIContainer` is not drawable on a canvas; the stored data URI is.
-        const fromPlaces = await drawRaster(doc, favicon.dataURI.spec);
-        if (fromPlaces) {
-          return fromPlaces;
-        }
+          PlacesUtils.toURI(dataUrl),
+          PlacesUtils.toURI(dataUrl),
+          0,
+          false,
+        )
+        .catch(() => {});
+    } catch {
+      // A refused write leaves the in-session raster in place.
+    }
+  }
+
+  return {
+    /** Places only, no network: what history needs. */
+    rasterStored: stored,
+    async raster(url, doc) {
+      const fromPlaces = await stored(url, doc);
+      if (fromPlaces) {
+        return fromPlaces;
       }
       const source = await fetchIconSource(doc, url);
-      return source ? drawRaster(doc, source) : null;
+      if (!source) {
+        return null;
+      }
+      persist(url, source);
+      return drawRaster(doc, source);
     },
   };
 }
@@ -402,6 +435,24 @@ function asRaster(bytes) {
   return bytes instanceof Uint8ClampedArray ? bytes : Uint8ClampedArray.from(bytes);
 }
 
+/** Session cache for history: one resolved view (or "none") per origin, so a
+ *  page of visits asks Places once per site, not once per row. Bounded; a
+ *  profile that browses forever cannot grow it without limit. */
+const _storedCache = new Map();
+const STORED_CACHE_MAX = 256;
+
+function rememberStored(origin, view) {
+  if (_storedCache.has(origin)) {
+    _storedCache.delete(origin);
+  }
+  _storedCache.set(origin, view);
+  while (_storedCache.size > STORED_CACHE_MAX) {
+    const oldest = _storedCache.keys().next();
+    if (oldest.done) break;
+    _storedCache.delete(oldest.value);
+  }
+}
+
 // --- Public API -------------------------------------------------------------
 
 export const Favicons = {
@@ -432,7 +483,7 @@ export const Favicons = {
     if (!bytes) {
       return null;
     }
-    return {
+    const resolved = {
       surface: SURFACE,
       profile_id: typeof profileId === "string" && profileId !== "" ? profileId : PROFILE_ID,
       entry: {
@@ -441,6 +492,52 @@ export const Favicons = {
         rgba: encodeRgba(bytes),
       },
     };
+    rememberStored(origin, resolved);
+    return resolved;
+  },
+
+  /**
+   * Resolve an icon from Places only, without a network request. History uses
+   * this: its rows often name pages from earlier sessions, and fetching every
+   * site again would make opening History cost a page load per row. Answers
+   * the same view shape as `resolve`, or null; a negative answer is cached for
+   * the session too.
+   */
+  async resolveStored({ url, doc = null, profileId = PROFILE_ID } = {}) {
+    if (typeof url !== "string" || url === "") {
+      return null;
+    }
+    const origin = originOf(url);
+    if (!origin) {
+      return null;
+    }
+    if (_storedCache.has(origin)) {
+      const cached = _storedCache.get(origin);
+      return cached ? { ...cached, profile_id: profileId || PROFILE_ID } : null;
+    }
+    const target =
+      doc ?? (typeof globalThis !== "undefined" ? globalThis.document ?? null : null);
+    const store = await backend();
+    if (!target || !store || typeof store.rasterStored !== "function") {
+      return null;
+    }
+    let bytes = null;
+    try {
+      bytes = asRaster(await store.rasterStored(url, target));
+    } catch {
+      bytes = null;
+    }
+    if (!bytes) {
+      rememberStored(origin, null);
+      return null;
+    }
+    const resolved = {
+      surface: SURFACE,
+      profile_id: typeof profileId === "string" && profileId !== "" ? profileId : PROFILE_ID,
+      entry: { origin, revision: revisionOf(bytes), rgba: encodeRgba(bytes) },
+    };
+    rememberStored(origin, resolved);
+    return resolved;
   },
 
   /**

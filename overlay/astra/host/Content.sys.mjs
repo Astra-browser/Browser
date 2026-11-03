@@ -351,11 +351,14 @@ export const Content = {
 
     /** Resolve now, then twice more while the tab has no icon yet. */
     const scheduleIcon = (id, entry, attempt = 0) => {
-      const delay = attempt === 0 ? 0 : attempt === 1 ? 1200 : 3500;
+      // A site can declare its icon late (a script-set link, a slow 404 for
+      // /favicon.ico, a redirect chain). Retry a few times, but always stop;
+      // once an icon lands it is stored in Places so this only runs first.
+      const delay = attempt === 0 ? 0 : attempt === 1 ? 1200 : attempt === 2 ? 3500 : 7000;
       const timer = setTimeout(() => {
         timers.delete(timer);
         void refreshIcon(id, entry).then((settled) => {
-          if (!settled && attempt < 2 && browsers.has(id)) {
+          if (!settled && attempt < 3 && browsers.has(id)) {
             scheduleIcon(id, entry, attempt + 1);
           }
         });
@@ -498,6 +501,20 @@ export const Content = {
     // The window always starts with one tab. A New Tab has no page to load,
     // so no browser is created for it; the app's New Tab fills the stage.
     show(selectedId, tab.url);
+    // Still give that New Tab a browser on about:blank. The first address
+    // typed then reuses a warm content process instead of paying a process
+    // spawn on the critical path; the page never paints while parked.
+    if (selectedId && !browsers.has(selectedId)) {
+      const warm = createBrowser(selectedId);
+      warm.requested = "about:blank";
+      try {
+        warm.browser.fixupAndLoadURIString("about:blank", {
+          triggeringPrincipal: principal,
+        });
+      } catch {
+        // A browser that refuses the warm-up still loads the first address.
+      }
+    }
 
     const off = addEventListener((event) => {
       if (event.type === "tab.updated" && event.data.selected) {
@@ -526,6 +543,13 @@ export const Content = {
         if (active) {
           selectedId = active.id;
           show(active.id, active.url);
+          // Coming back to a tab whose icon never landed (it was fetched
+          // while the tab was in the background) gets another try now that
+          // it is in front; the Places/fetch result is cached after that.
+          const entry = browsers.get(active.id);
+          if (entry && !active.icon) {
+            scheduleIcon(active.id, entry);
+          }
         } else {
           // Nothing to put in front: an empty space, or the last tab closed.
           // The stage belongs to the app's New Tab, so the page kept for the
