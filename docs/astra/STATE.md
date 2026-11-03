@@ -264,6 +264,10 @@ menu and ran a row end-to-end.
 | B-17 | A hidden column peeking over a New Tab keeps the New Tab visible | done | `fix/newtab-peek` | live: no clip, no transparent ground, New Tab screenshotted intact |
 | B-18 | Page shortcuts use the product keymap; native keys they own are disabled | done | `fix/global-keys` | live: Ctrl+D saved a bookmark with no page-action error; F12 opened DevTools |
 | B-19 | DevTools opens for the content stage; fullscreen gets a shell fallback | done | `fix/devtools-fullscreen` | live: `devtools:toolbox` window; fullscreen chrome layout verified |
+| B-20 | Page menu lives in chrome; no frame restack, no black flicker | done | `fix/menu-chrome` | live: menu above the page, app frame untouched |
+| B-21 | Bookmarks and history paint the same site icons as tabs | done | `fix/favicons-and-menu-overlay` | live: YouTube + Google marks in tabs, Bookmarks, History |
+| B-22 | Bookmarks are scoped to the active space | done | `feat/space-isolation` | live: space 2 kept YouTube, space 1 kept Google after switching |
+| B-23 | Every space is its own Firefox container (site data, logins) | done | `feat/space-container` | live: space 2 browser reports userContextId 1, space 1 stays 0 |
 
 **Still deferred after this batch (do not report as fixed):** real split-pane
 content (the split layout is still a single page) and container-scoped link
@@ -274,6 +278,16 @@ are verified; the gesture path still needs a real click to give the page focus,
 so it is not part of the automated probe. The first Google search pays
 network/DNS/TLS; the local host path measures 65 ms first and 25 ms second,
 so the wait is the site, not the address wiring.
+
+**Per-space data, current state:** bookmarks and site data/logins are isolated
+(space 1 keeps the existing root, every other space gets its own bookmark
+folder and a Firefox container). **History, downloads and the search engine
+are still global.** Places stores visits per page, not per space, so filtering
+them in the UI would hide data rather than scope it; the visit-level space
+field belongs in `astra-core` (plan §5.4). The downloads manager is still the
+honest empty stub (`Downloads.call` answers `supported: false`), and the
+search preference has no per-space control yet. These stay on the wiring
+backlog.
 
 ## Later phases
 
