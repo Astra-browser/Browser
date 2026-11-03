@@ -31,9 +31,9 @@ function check(name, actual, expected) {
   }
 }
 
-check("the tab in front is active and keeps its layer", docshellState(true), {
+check("the tab in front is active and does not hold a layer cache", docshellState(true), {
   docShellIsActive: true,
-  preserveLayers: true,
+  preserveLayers: false,
 });
 
 check("a parked tab is inactive and releases its layer", docshellState(false), {

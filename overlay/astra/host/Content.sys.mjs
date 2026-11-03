@@ -85,7 +85,10 @@ export function loadWatchStep({
  */
 export function docshellState(isActive) {
   const active = isActive === true;
-  return { docShellIsActive: active, preserveLayers: active };
+  // Activation sets the docshell active first, then clears preserve (the
+  // tabbrowser's wake order). Parking clears preserve first, so the layer can
+  // actually be released before the docshell goes inactive.
+  return { docShellIsActive: active, preserveLayers: false };
 }
 
 // Schemes the content stage will load. A tab's address can come from a
@@ -266,8 +269,13 @@ export const Content = {
         if (context?.suspendMediaWhenInactive) {
           context.suspendMediaWhenInactive = false;
         }
-        entry.browser.preserveLayers(state.preserveLayers);
-        entry.browser.docShellIsActive = state.docShellIsActive;
+        if (state.docShellIsActive) {
+          entry.browser.docShellIsActive = true;
+          entry.browser.preserveLayers(false);
+        } else {
+          entry.browser.preserveLayers(false);
+          entry.browser.docShellIsActive = false;
+        }
       } catch {
         // A browser torn down mid-switch: the next one will be set.
       }
