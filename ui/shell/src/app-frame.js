@@ -39,11 +39,13 @@ export const APP_BOOT_TIMEOUT_MS = 60000;
  * Mount the packaged app into `container`.
  *
  * @param {Element} container chrome-window element that owns the app
- * @param {object} _host retained for the call signature; the app imports the
- *   Host API itself now, so the frame does not relay anything
+ * @param {object} host this window's Host API instance: the frame relays the
+ *   app's calls to it, because `resource://` modules are per document and a
+ *   second import would give the app its own tab model while this window owns
+ *   the content browser
  * @param {{onReady?: (mode: string) => void, onFailure?: (message: string) => void}} hooks
  */
-export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
+export function mountAppFrame(container, host, { onReady, onFailure } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView ?? null;
   if (!win) {
@@ -117,6 +119,75 @@ export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
 
   win.addEventListener("message", onMessage);
 
+  // --- Relay: the app's calls reach this window's Host API ------------------
+  // The app cannot import the same instance (`resource://` modules are per
+  // document) and cannot read an expando across compartments, so every call
+  // is a message and every event is posted back. Only this window's own frame
+  // can reach the listener, and the namespace is checked.
+  const post = (message) => {
+    try {
+      frame?.contentWindow?.postMessage({ ns: SHELL_NS, ...message }, "*");
+    } catch {
+      // Frame gone: the reply has no reader.
+    }
+  };
+  const relay = async (event) => {
+    const data = event.data;
+    if (!data || data.ns !== SHELL_NS) {
+      return;
+    }
+    if (data.kind === "req") {
+      try {
+        win.__astraRelayCount = (win.__astraRelayCount ?? 0) + 1;
+      } catch {
+        // Diagnostics only.
+      }
+      const id = data.id;
+      let payload = null;
+      let error = null;
+      try {
+        const module = host?.[data.module];
+        const fn = module?.[data.method];
+        if (typeof fn !== "function") {
+          error = {
+            code: "unknown_command",
+            message: `host has no ${String(data.module)}.${String(data.method)}`,
+          };
+        } else {
+          payload = await fn(data.args ?? {});
+        }
+      } catch (e) {
+        error = { code: "host_error", message: String(e?.message ?? e) };
+      }
+      post({ kind: "res", id, payload, error });
+    } else if (data.kind === "window") {
+      // The window's own controls: Frame owns minimize/maximize/restore/close.
+      post({ kind: "window-res", id: data.id, action: data.action });
+      try {
+        const frameMod = await import(/* @vite-ignore */ "resource://astra/frame/Frame.sys.mjs");
+        const chrome = {};
+        for (const op of ["minimize", "maximize", "restore"]) {
+          if (typeof win[op] === "function") chrome[op] = () => win[op]();
+        }
+        const list = await host.Windows.list({ request_id: `win-${Date.now()}` });
+        await frameMod.dispatchWindowControl(host, chrome, {
+          action: data.action,
+          window_id: list.focused_window_id ?? "win-1",
+          request_id: `ctl-${Date.now()}`,
+        });
+      } catch {
+        // No Frame module: the control is unavailable, as before.
+      }
+    }
+  };
+  win.addEventListener("message", relay);
+
+  const relayEvents = host?.addEventListener
+    ? host.addEventListener((event) => {
+        post({ kind: "evt", type: event.type, data: event.data, seq: event.event_seq });
+      })
+    : null;
+
   try {
     frame = doc.createElementNS(XHTML_NS, "iframe");
     frame.setAttribute("class", "astra-app-frame");
@@ -141,6 +212,12 @@ export function mountAppFrame(container, _host, { onReady, onFailure } = {}) {
     settled = true;
     clearTimeout(timer);
     win.removeEventListener("message", onMessage);
+    win.removeEventListener("message", relay);
+    try {
+      relayEvents?.();
+    } catch {
+      // Already torn down.
+    }
     try {
       if (frame) {
         frame.remove();

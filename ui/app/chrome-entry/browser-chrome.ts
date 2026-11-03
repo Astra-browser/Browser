@@ -22,7 +22,7 @@
 
 import { getCurrentWindow, setWindowLabel } from "@astra/bridge";
 import type { Bridge } from "@astra/bridge";
-import { ensureBridge } from "$shared/ipc/bridge.js";
+import { ensureBridge, framedInShell } from "$shared/ipc/bridge.js";
 import { mount, flushSync } from "svelte";
 import App from "$app/browser/BrowserApp.svelte";
 
@@ -72,7 +72,8 @@ function fail(message: string, error: unknown): void {
     const box = doc.createElement("div");
     box.setAttribute("role", "alert");
     box.setAttribute("class", "slot-error");
-    const stack = error instanceof Error && typeof error.stack === "string" ? `\n${error.stack}` : "";
+    const stack =
+      error instanceof Error && typeof error.stack === "string" ? `\n${error.stack}` : "";
     box.textContent = `Astra unavailable: ${message}${stack.slice(0, 600)}`;
     target.appendChild(box);
   }
@@ -91,8 +92,10 @@ try {
   if (!(target instanceof HTMLElement)) {
     throw new Error("trusted UI root is unavailable");
   }
-  // Test seam (live suites + SHELL_APP.md): which bridge mode actually booted.
+  // Test seam (live suites + SHELL_APP.md): which bridge mode actually booted,
+  // and whether it reaches the shell's Host API over the relay or its own.
   target.dataset.bridgeMode = bridge.mode;
+  target.dataset.bridgePath = framedInShell() ? "relay" : "direct";
 
   // First-paint gate (P3-T22): the window must never show a half-built chrome.
   // The app mounts immediately but stays invisible until its first projection

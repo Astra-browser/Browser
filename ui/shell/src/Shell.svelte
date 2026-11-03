@@ -70,6 +70,19 @@
       appError = "Host API unavailable outside the browser window";
       return;
     }
+    // One Host API instance per window. `resource://` ES modules are per
+    // document, so an import inside the app frame would give it a second tab
+    // model while this window owns the content browser: a navigation would
+    // commit into a model nothing listens to and the stage would stay blank.
+    // `Services` is the per-process singleton both chrome documents share, so
+    // the instance travels there rather than through a cross-compartment
+    // expando.
+    try {
+      const services = (frameRoot?.ownerDocument?.defaultView ?? null)?.Services;
+      if (services) services.astraHost = host;
+    } catch {
+      // No Services in a preview DOM: the app falls back to its own import.
+    }
     // P3-T15: mount the full app into the main column. The relay terminates
     // in this window's host modules, so the app boots in host mode. The
     // interim mounts stay wired (live contract tests drive them); they hide
