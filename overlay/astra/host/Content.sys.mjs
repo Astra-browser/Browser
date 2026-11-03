@@ -57,6 +57,40 @@ export function loadWatchStep({
   return { live, seenLoading: observed, fastDone: committed && !loading };
 }
 
+/**
+ * Gecko state for one content browser: a tab in front renders and keeps its
+ * layer, a parked tab gives both back.
+ *
+ * `docShellIsActive = false` is what actually parks a page (ESR 153):
+ * `BrowsingContext::IsActive()` goes false, the outer window becomes
+ * background, so `document.visibilityState` turns `hidden`, the refresh driver
+ * stops (no rAF) and the remote tab stops rendering. The page is NOT unloaded:
+ * its document, scroll position and JS heap stay, so selecting it again is a
+ * layer switch, not a load.
+ *
+ * `preserveLayers` is deliberately false while parked. Firefox's tabbrowser
+ * keeps it true for a small warm layer cache (`deactivateCachedBackgroundTabs`)
+ * and pays the memory for it; the point of parking here is to give that memory
+ * back. It is a no-op on a non-remote browser, and every Astra page browser is
+ * remote.
+ *
+ * Media is intentionally not an input. ESR 153 suspends a hidden page's media
+ * only when the top browsing context opts in through
+ * `suspendMediaWhenInactive` (`HTMLMediaElement::ShouldBeSuspendedByInactiveDocShell`);
+ * the field defaults to false and `applyActivation` keeps it false, so a
+ * parked tab keeps playing audio/video. If that ever stops holding, the narrow
+ * exception is to keep the docshell active while
+ * `browsingContext.mediaController.isPlaying === true` and re-park the tab on
+ * the browser's `DOMAudioPlaybackStopped` event.
+ */
+export function docshellState(isActive) {
+  const active = isActive === true;
+  // Activation sets the docshell active first, then clears preserve (the
+  // tabbrowser's wake order). Parking clears preserve first, so the layer can
+  // actually be released before the docshell goes inactive.
+  return { docShellIsActive: active, preserveLayers: false };
+}
+
 // Schemes the content stage will load. A tab's address can come from a
 // caller (`Tabs.create`), a restored session or the page itself, so the
 // decision to hand an address to the browser belongs here, not in whoever
@@ -219,11 +253,40 @@ export const Content = {
 
     const activeBrowser = () => browsers.get(activeId)?.browser ?? null;
 
+    /**
+     * Mirror one browser's foreground state into Gecko. Runs for every entry
+     * on every switch, so it stays idempotent and cheap; all of it is
+     * best-effort because a browser can be torn down mid-switch.
+     */
+    const applyActivation = (entry, active) => {
+      const state = docshellState(active);
+      try {
+        // Keep background media playing. ESR 153 only suspends a hidden
+        // page's media when the top context opts in, and that opt-in is off
+        // by default; asserting it here means a future default (or a site
+        // that turned it on) cannot silently mute a parked tab.
+        const context = entry.browser.browsingContext;
+        if (context?.suspendMediaWhenInactive) {
+          context.suspendMediaWhenInactive = false;
+        }
+        if (state.docShellIsActive) {
+          entry.browser.docShellIsActive = true;
+          entry.browser.preserveLayers(false);
+        } else {
+          entry.browser.preserveLayers(false);
+          entry.browser.docShellIsActive = false;
+        }
+      } catch {
+        // A browser torn down mid-switch: the next one will be set.
+      }
+    };
+
     const setActive = (id) => {
       activeId = id;
       for (const [key, entry] of browsers) {
+        const active = key === id;
         try {
-          if (key === id) {
+          if (active) {
             entry.browser.setAttribute("data-astra-browser", "content");
             entry.browser.removeAttribute("data-astra-browser-parked");
           } else {
@@ -233,11 +296,13 @@ export const Content = {
         } catch {
           // A browser torn down mid-switch: the next one will show.
         }
+        applyActivation(entry, active);
       }
     };
 
     // No page in front (a New Tab): every browser stays loaded but parked, so
-    // coming back is instant rather than a fresh network load.
+    // coming back is instant rather than a fresh network load and no parked
+    // page keeps painting, running rAF or holding a layer.
     const park = () => {
       activeId = "";
       for (const entry of browsers.values()) {
@@ -247,6 +312,7 @@ export const Content = {
         } catch {
           // Torn down with the window.
         }
+        applyActivation(entry, false);
       }
     };
 
@@ -449,6 +515,12 @@ export const Content = {
       browser.setAttribute("remote", "true");
       browser.setAttribute("remoteType", "web");
       browser.setAttribute("maychangeremoteness", "true");
+      // Activeness is owned by this binding, not by the chrome document that
+      // embeds the browser. Without this Gecko re-derives it from the (active)
+      // chrome window when the content process attaches or changes remoteness,
+      // which is how every parked tab ended up active again. Firefox's own
+      // tabbrowser sets the same attribute on every browser it creates.
+      browser.setAttribute("manualactiveness", "true");
       browser.setAttribute("flex", "1");
       // Parked until a page is in front of it.
       browser.setAttribute("data-astra-browser-parked", "");
@@ -479,6 +551,9 @@ export const Content = {
         iconKey: "",
       };
       browsers.set(id, entry);
+      // Starts parked: the browser is created for a page that is about to be
+      // shown (or warmed on about:blank), and `setActive` turns it on.
+      applyActivation(entry, false);
       try {
         // `oop-browser-crashed` is the content-process crash signal a
         // `<browser>` element dispatches (SessionStore relies on the same
