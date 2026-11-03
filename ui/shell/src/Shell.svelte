@@ -287,12 +287,13 @@
       } else if (event.type.startsWith("tab.")) {
         void refreshTabs();
       } else if (event.type === "sidebar.changed") {
-        // The app publishes its laid-out sidebar width; inset the page
-        // surface by it so a page never covers the app's own sidebar.
+        // The app publishes the column's laid-out width. Hidden, the column is
+        // a card over the page: the page takes the window's gutter, not the
+        // column's width. The CSS adds the 8px gutter + 8px content gap.
         const width = event.data?.width;
-        if (typeof width === "number" && Number.isFinite(width)) {
-          frameRoot.style.setProperty("--astra-sidebar-width", `${width}px`);
-        }
+        const hidden = event.data?.hidden === true;
+        const column = hidden || typeof width !== "number" || !Number.isFinite(width) ? 0 : width;
+        frameRoot.style.setProperty("--astra-sidebar-width", `${column}px`);
       } else if (event.type === "nav.started") {
         // Show the slot from the first moment of a load, with the loading
         // state on, so a slow page is a page arriving rather than a black
@@ -482,9 +483,14 @@
   .astra-frame[data-app-booted="true"] .astra-content,
   .astra-frame[data-app-booted="pending"] .astra-content {
     position: absolute;
-    inset: 0;
+    /* The app draws an 8px window gutter and an 8px gap between the column
+       and its page; the real page surface must land on the same rectangle, or
+       it covers the last 8px of the sidebar. */
+    inset: 8px;
     z-index: 2;
-    inset-inline-start: var(--astra-sidebar-width, 0px);
+    inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 16px);
+    border-radius: 12px;
+    overflow: hidden;
     background: transparent;
   }
   .astra-frame[data-app-booted="true"] .astra-content:not([data-has-page="true"]),
