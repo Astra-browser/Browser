@@ -220,6 +220,8 @@ def paged(path, **params):
     return (path, params)
 
 
+WRITE_OBS = True
+
 SCENARIOS = {
     "baseline-1tab": {
         "desc": "One tab on a local blank page (browser + UI baseline).",
@@ -1348,7 +1350,7 @@ def stop_servers(proc):
             pass
 
 
-def run_one(kind, scenario_name, scenario, outroot, repeat, index):
+def run_one(kind, scenario_name, scenario, outroot, repeat, index, write_obs=True):
     run_id = f"{kind}-{scenario_name}-r{repeat}"
     run_dir = os.path.join(outroot, run_id)
     os.makedirs(run_dir, exist_ok=True)
@@ -1480,7 +1482,8 @@ def run_one(kind, scenario_name, scenario, outroot, repeat, index):
         report_md, verdict = build_run_report(scenario_name, scenario, run, summary, pages, ui_actions, env, checks)
         with open(os.path.join(run_dir, "REPORT.md"), "w", encoding="utf-8") as fh:
             fh.write(report_md)
-        append_observation(run_id, report_md, scenario_name, run, summary, verdict)
+        if write_obs:
+            append_observation(run_id, report_md, scenario_name, run, summary, verdict)
         _cpu = per_phase(summary, "steady").get("cpu_core", {}).get("mean")
         print(f"[{run_id}] {verdict}: cpu {((_cpu or 0)/100):.2f} cores, "
               f"pss {per_phase(summary, 'steady').get('pss_mb', {}).get('mean')} MiB, "
@@ -1504,7 +1507,11 @@ def main():
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--out", default=None)
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--no-observations", action="store_true",
+                    help="do not append this run to observations.md (probes)")
     args = ap.parse_args()
+    global WRITE_OBS
+    WRITE_OBS = not args.no_observations
     if args.list:
         for name, sc in SCENARIOS.items():
             print(f"{name:16s} {sc['desc']}")
@@ -1531,7 +1538,7 @@ def main():
                 idx += 1
                 print(f"=== {kind} · {name} · repeat {repeat} ===", flush=True)
                 try:
-                    res = run_one(kind, name, sc, outroot, repeat, idx)
+                    res = run_one(kind, name, sc, outroot, repeat, idx, write_obs=WRITE_OBS)
                     index.append({k: v for k, v in res.items() if k != "summary"})
                 except Exception as exc:
                     import traceback
