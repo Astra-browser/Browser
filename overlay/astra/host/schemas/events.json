@@ -18,6 +18,7 @@
         "tab.created",
         "tab.updated",
         "tab.moved",
+        "tab.space-changed",
         "tab.closed",
         "tab.pinned",
         "tab.unpinned",

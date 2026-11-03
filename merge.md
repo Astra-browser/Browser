@@ -31,7 +31,7 @@
 | P1 | `merge/p1-boot` | Merge `Boot` + `BootSidecar` into one supervisor; lazy native `Subprocess`; package it; keep the Node-pure import path | P0 | **merged** |
 | P2 | `merge/p2-native-nav` | Make `nav.stop`, page zoom and `Navigation.print` call the live browser; prune dead/duplicate command ids; hard-reload distinction | P0 | **merged** |
 | P3 | `merge/p3-windows` | Bind `Windows` to `BrowserWindowTracker`/`OpenBrowserWindow`; real focus/close/fullscreen; thin projection keyed by native ids | P0 | **merged** |
-| P4 | `merge/p4-gbrowser` | **Critical path.** Spike native `gBrowser` tabs with the native strip hidden; move page lifecycle to `gBrowser`; keep `astra_tab_id` as a projection key; wire mute, discard, unload, move-between-spaces | P1–P3 | **P4.2 merged; P4.3 next** |
+| P4 | `merge/p4-gbrowser` | **Critical path.** Spike native `gBrowser` tabs with the native strip hidden; move page lifecycle to `gBrowser`; keep `astra_tab_id` as a projection key; wire mute, discard, unload, move-between-spaces | P1–P3 | **P4.3 merged; P4.4 cleanup next** |
 | P5 | `merge/p5-session` | Replace the JS `Session` model with Firefox `SessionStore` + Astra metadata (space/folder/pin/sync) in the Rust store | P4 | planned |
 | P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | planned |
 | P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | planned |
@@ -229,6 +229,7 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | 2026-11-04 | P2 | done: `native_nav_model` 17; live probe stop `about:blank` after a 4 s slow page, model loading cleared, zoom readback `1.5`, soft reload no-cache=false vs hard reload no-cache=true; overlay + `build --faster` used |
 | 2026-11-04 | P1/P2 review | code review found the supervisor unreachable + failure-path bugs; fixed and re-reviewed PASS-WITH-NOTES. Remaining notes are P4/P5 work, not blockers. |
 | 2026-11-04 | P1/P2 merge | merged to `main` as `df24279` + `7edb116`; tag `post-p1-p2-20261104`. P3/P4 next. |
+| 2026-11-04 | P4.3 | pin/unpin, discard/wake, cross-space recreate, engine-tab adoption; probe `gbrowser_p43_probe.py` PASS. Merged next; P4.4 deletes the standalone path. |
 | 2026-11-04 | P4.2 | merged as `367ca01`; tag `post-p4-tabs-20261104`. native `mountNative`: window-scoped model ↔ `gBrowser` map, initial-tab adoption, native→model select/close, busy clear, top-level-only commits, background-load on activation, container-aware adoption, mute. Live: stage page, model/native select+close both directions, create/close, `audioMuted` ✓. Pin/discard/session/adoption are P4.3/P5. P4.2 is single-window: `mountNative` refuses a second window until the P5 global id map. |
 | 2026-11-04 | P4.1 | stage dock behind `astra.gbrowser.enabled`; panel rect == slot (256,8,1016,884), hidden until mounted, native strip hidden; `stage_rect` 9 + `shell_app_chrome` PASS. |
 | 2026-11-04 | P3 | merged as `5867be3`; tag `post-p3-windows-20261104`. Windows API opens/focuses/closes real windows; own-window binding; native fullscreen; private detection; live probe 1→2→1 windows, native focus, fullscreen on/off, private create/close. Re-review PASS-WITH-NOTES; remaining notes are P5 session work. |

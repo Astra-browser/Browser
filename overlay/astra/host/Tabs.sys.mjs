@@ -542,7 +542,15 @@ export const Tabs = {
   async moveTabToSpace({ request_id = "", tab = "", space = "" } = {}) {
     const target = _tabs.get(tab);
     if (!target || !spaceOf(space)) return { operation_id: null, accepted: false };
+    const previousSpace = target.space_id;
     target.space_id = space;
+    if (previousSpace !== space) {
+      emit("tab.space-changed", {
+        astra_tab_id: tab,
+        from_space_id: previousSpace,
+        space_id: space,
+      });
+    }
     if (space !== _activeSpaceId) {
       const i = _order.indexOf(tab);
       if (i >= 0) _order.splice(i, 1);
@@ -713,6 +721,55 @@ export const Tabs = {
     return ok(request_id, { astra_tab_id, muted: tab.muted });
   },
 };
+
+/**
+ * Adopt a native tab the engine created (window.open, target=_blank, restore)
+ * into the model without announcing it yet. The caller binds its native tab to
+ * the returned id, then calls `__announceAdopted` so the projection sees it.
+ */
+export function __adoptNative({
+  url = "about:blank",
+  selected = false,
+  window_id = DEFAULT_WINDOW_ID,
+  space_id = _activeSpaceId,
+} = {}) {
+  const astra_tab_id = `tab-${_nextId++}`;
+  _tabs.set(astra_tab_id, {
+    astra_tab_id,
+    url: safeTabUrl(url),
+    title: "",
+    selected: false,
+    window_id,
+    space_id,
+    pinned: false,
+    discarded: false,
+    muted: false,
+  });
+  _order.push(astra_tab_id);
+  __pushHistory(astra_tab_id, safeTabUrl(url));
+  if (selected) {
+    _selectedId = astra_tab_id;
+  }
+  return astra_tab_id;
+}
+
+/** Announce an adopted native tab after its native element is bound. */
+export function __announceAdopted(astra_tab_id, { selected = false } = {}) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return null;
+  if (selected) {
+    selectInternal(astra_tab_id);
+  }
+  emit("tab.created", {
+    astra_tab_id,
+    url: tab.url,
+    window_id: tab.window_id,
+    native: true,
+    selected,
+  });
+  emitItemsChanged();
+  return snapshot(astra_tab_id);
+}
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.
 export function __resetTabsForTests() {

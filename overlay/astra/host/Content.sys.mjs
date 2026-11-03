@@ -17,6 +17,8 @@
 import { addEventListener, emit } from "./Events.sys.mjs";
 import {
   Tabs,
+  __adoptNative,
+  __announceAdopted,
   __applyExternalUpdate,
   __spaceUserContextId,
   __tabsState,
@@ -890,6 +892,7 @@ export const Content = {
           if (!e.getNext().closed) count += 1;
         }
       }
+      console.error("MN guard count", count);
       if (count > 1) {
         throw new Error("mountNative: multi-window is P5");
       }
@@ -1085,12 +1088,31 @@ export const Content = {
       const id = idOfTab(event.target);
       if (id) void Tabs.close({ astra_tab_id: id });
     };
+    const onOpen = (event) => {
+      if (applying) return;
+      const tab = event.target;
+      if (!tab || idOfTab(tab)) return;
+      let url = "about:blank";
+      try {
+        url = tab.linkedBrowser?.currentURI?.spec || url;
+      } catch {
+        // A tab that has not committed yet is a New Tab.
+      }
+      const id = __adoptNative({
+        url,
+        selected: tab.selected === true,
+        window_id: window_id || "win-1",
+      });
+      bindTab(id, tab);
+      __announceAdopted(id, { selected: tab.selected === true });
+    };
     const progress = makeProgressListener({
       tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
     });
     gb.addTabsProgressListener(progress);
     gb.tabContainer.addEventListener("TabSelect", onSelect);
     gb.tabContainer.addEventListener("TabClose", onClose);
+    gb.tabContainer.addEventListener("TabOpen", onOpen);
 
     const off = addEventListener((event) => {
       const id = event.data?.astra_tab_id;
@@ -1135,6 +1157,78 @@ export const Content = {
         if (active && active.id) {
           ensureTab(active.id, active.url);
           activate(active.id);
+        }
+        return;
+      }
+      if ((event.type === "tab.pinned" || event.type === "tab.unpinned") && id) {
+        const tab = tabOf.get(id);
+        try {
+          if (event.type === "tab.pinned") {
+            gb.pinTab(tab);
+          } else {
+            gb.unpinTab(tab);
+          }
+        } catch {
+          // A closing tab keeps the model state.
+        }
+        return;
+      }
+      if (event.type === "tab.discarded" && id) {
+        const tab = tabOf.get(id);
+        if (tab && !tab.hasAttribute("discarded")) {
+          let discarded = false;
+          try {
+            discarded = gb.discardBrowser(tab, true) === true;
+          } catch {
+            discarded = false;
+          }
+          if (!discarded) {
+            __applyExternalUpdate(id, { discarded: false });
+          }
+        }
+        return;
+      }
+      if (event.type === "tab.restored" && id) {
+        const tab = tabOf.get(id);
+        if (tab?.hasAttribute("discarded")) {
+          // `reloadTab` restores the lazy state saved by discardBrowser and
+          // clears the native `discarded` attribute.
+          try {
+            gb.reloadTab(tab);
+          } catch {
+            // The next activation restores it.
+          }
+          const url = __tabsState().tabs.get(id)?.url;
+          if (url) {
+            loadIn(id, url, true);
+          }
+        }
+        return;
+      }
+      if (event.type === "tab.space-changed" && id) {
+        const old = tabOf.get(id);
+        let url = __tabsState().tabs.get(id)?.url || "about:blank";
+        try {
+          url = old?.linkedBrowser?.currentURI?.spec || url;
+        } catch {
+          // Keep the model URL.
+        }
+        if (old) {
+          applying = true;
+          try {
+            if (!old.closing) {
+              gb.removeTab(old, { skipPermitUnload: true, closeWindowWithLastTab: false });
+            }
+          } catch {
+            // Already gone.
+          } finally {
+            applying = false;
+          }
+        }
+        forgetTab(id);
+        ensureTab(id, url);
+        if (__tabsState().tabs.get(id)?.selected) {
+          activate(id);
         }
         return;
       }
@@ -1212,6 +1306,7 @@ export const Content = {
         off();
         try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
+        try { gb.tabContainer.removeEventListener("TabOpen", onOpen); } catch {}
         try { gb.tabContainer.removeEventListener("TabAttrModified", onAttr); } catch {}
         try { gb.removeTabsProgressListener(progress); } catch {}
         for (const id of [...tabOf.keys()]) forgetTab(id);
