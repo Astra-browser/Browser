@@ -11,7 +11,7 @@
 // Event catalogue (see schemas/events.json):
 //   boot.ready, boot.shutdown
 //   window.created, window.focused, window.closed, window.fullscreen-changed
-//   tab.created, tab.updated, tab.moved, tab.closed,
+//   tab.created, tab.updated, tab.moved, tab.space-changed, tab.closed,
 //   tab.pinned, tab.unpinned, tab.discarded, tab.restored
 //   nav.committed, nav.started, nav.stopped, nav.hard-reload,
 //   nav.zoom-changed,
