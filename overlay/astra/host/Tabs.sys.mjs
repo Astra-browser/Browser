@@ -218,6 +218,12 @@ let _spaces = [
   { id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null },
 ];
 let _activeSpaceId = DEFAULT_SPACE_ID;
+
+/** The active space without building a projection (and without bumping its
+ *  revision); host modules use this to scope their own stores. */
+export function __activeSpaceId() {
+  return _activeSpaceId;
+}
 let _nextSpaceId = 2;
 
 function spaceOf(space_id) {

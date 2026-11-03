@@ -247,17 +247,23 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
 
   async function bookmark({ url, title }) {
     if (typeof url !== "string" || !/^https?:/i.test(url)) return NOTHING;
-    const { PlacesUtils } = await win.ChromeUtils.importESModule(
-      "resource://gre/modules/PlacesUtils.sys.mjs",
-    );
-    const info = await PlacesUtils.bookmarks.insert({
-      parentGuid: PlacesUtils.bookmarks.unfiledGuid,
-      url,
-      title: typeof title === "string" && title !== "" ? title : hostOf(url),
+    // Go through the host module so the bookmark lands in the active space's
+    // folder, not the global unfiled root.
+    const saved = await host.Bookmarks.call({
+      profile: "default",
+      call: {
+        kind: "add_link",
+        parent: null,
+        title: typeof title === "string" && title !== "" ? title : hostOf(url),
+        url,
+      },
     });
+    if (!saved || saved.kind !== "saved" || !saved.id) {
+      return { accepted: false };
+    }
     // The app reveals what it saved: native confirms first, then the panel.
-    host.emit?.("ui-command", `bookmark.added=${info.guid}`);
-    return { accepted: true, id: info.guid };
+    host.emit?.("ui-command", `bookmark.added=${saved.id}`);
+    return { accepted: true, id: saved.id };
   }
 
   function openBrowserWindow(options) {
@@ -510,16 +516,20 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
         const tab = tabs.find((entry) => entry.selected) ?? tabs[0];
         const url = typeof tab?.url === "string" ? tab.url : "";
         if (!/^https?:/i.test(url)) return { accepted: false };
-        const { PlacesUtils } = await win.ChromeUtils.importESModule(
-          "resource://gre/modules/PlacesUtils.sys.mjs",
-        );
-        const info = await PlacesUtils.bookmarks.insert({
-          parentGuid: PlacesUtils.bookmarks.unfiledGuid,
-          url,
-          title: tab.title || hostOf(url),
+        const saved = await host.Bookmarks.call({
+          profile: "default",
+          call: {
+            kind: "add_link",
+            parent: null,
+            title: tab.title || hostOf(url),
+            url,
+          },
         });
-        host.emit?.("ui-command", `bookmark.added=${info.guid}`);
-        return { accepted: true, id: info.guid };
+        if (!saved || saved.kind !== "saved" || !saved.id) {
+          return { accepted: false };
+        }
+        host.emit?.("ui-command", `bookmark.added=${saved.id}`);
+        return { accepted: true, id: saved.id };
       } catch {
         return { accepted: false };
       }
