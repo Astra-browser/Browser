@@ -93,14 +93,61 @@ space isolation cannot be correct until tabs are native `gBrowser` tabs.
 
 ### P4 — native tabs
 
-- Spike first: create a `gBrowser` tab, hide the native tab strip, and mount the
-  native content area in the Astra stage without reparenting.
-- Then move `Tabs.create/select/close/duplicate/move` to `gBrowser`.
-- `astra_tab_id` maps to the native tab; the Astra projection stays.
-- Wire `browser.muted`, `gBrowser.discardBrowser`, `TabUnloader`, SessionStore.
-- Moving a tab across spaces must reload in the target container.
-- Tests: live tab lifecycle, mute audio, discard PSS/process drop, unload,
-  restore, UI parity screenshots.
+**Spike design (architect review, 2026-11-04):**
+
+- ESR 153 has **no `#appcontent`**. The content deck is
+  `#browser > #tabbrowser-tabbox > #tabbrowser-tabpanels`; `gBrowser` already
+  owns real browsers today, they are only `display:none`. No reparenting and no
+  new engine patch: ASTRA-0002 already puts `#astra-root` immediately before
+  `#browser`.
+- Dock the native panel behind the Astra stage: keep the native tab strip
+  (`#navigator-toolbox`) hidden, make `#browser` absolute/transparent, position
+  `#tabbrowser-tabbox` with explicit px vars from the Astra content slot
+  (`--astra-stage-x/y/w/h`), and gate visibility on
+  `data-app-booted="true"` + `data-astra-stage="page"`. Use explicit px, not
+  `inset` (D-30).
+- New pref `astra.gbrowser.enabled` (default false) for a one-line rollback
+  through commits 1–3.
+- Keep `astra_tab_id` allocation in `Tabs.sys.mjs`; `Content.mount` maps
+  `astra_tab_id ↔ native tab` and adopts engine-created tabs (`window.open`,
+  target=_blank, ctrl-click, restore) so the sidebar never diverges.
+- Truth flows native → model via `TabOpen/Close/Move/Select/Pinned/AttrModified`
+  plus the existing progress listener. Projection/event shapes stay unchanged.
+- Moves to gBrowser: browser creation/panel mounting, selection/activeness,
+  close/reload/duplicate/move/pin, `discardBrowser`/`TabUnloader`, mute
+  (`muteAudio`), crash, back/forward truth.
+- Stays in Content/Astra: id map + event translation, URL scheme gate,
+  space→`userContextId`, private rules, favicons, hiding/blocker, stage rect,
+  fullscreen.
+- **SessionStore is a P4 hazard, not a P4 feature.** Native tabs start writing
+  and restoring sessions; P4 pins `browser.startup.page=0` and
+  `browser.sessionstore.resume_from_crash=false` and asserts no
+  `sessionstore-backups` writes. P5 owns the real store.
+- **Split view conflict:** native `#tabbrowser-tabpanels[splitview]` and
+  `gBrowser.addTabSplitView` compete with Astra's split; P4 keeps one pane and
+  asserts the attribute is never set.
+- **Risks/gates:** first-paint regression (boot-frame assertion), hidden
+  tab-strip geometry (`gbrowser_stage.py` rect ±1 px), private windows
+  (`userContextId=0`, no history), cross-space move (remove + recreate in the
+  target container), session hazard (no backup writes).
+
+**Spike commits:**
+
+1. `feat(shell): dock the native tabbrowser panel behind the Astra stage` —
+   CSS overlay + `stage-rect.js` + state machine + `Content.mountNative`
+   behind `astra.gbrowser.enabled`; old mount kept. Gates:
+   `shell_app_chrome.py`, new `gbrowser_stage.py`, screenshots.
+2. `feat(host): bind astra_tab_id to native gBrowser tabs` — map, adoption,
+   native events, progress listener, `Tabs.create/select/close/move` delegate.
+3. `feat(host): drive mute, discard and pin through gBrowser` —
+   `muteAudio`, `discardBrowser`, `TabUnloader`, `reloadTab`, `duplicateTab`,
+   `pinTab`; live PSS/process and audio probes.
+4. `refactor(host): delete the standalone content-browser path` — remove
+   `createBrowser`/`park`/warm seeding and the old mount; drop the pref; update
+   `HOST_API_v1.md` and `STATE.md`. Point of no return; merge separately.
+
+**Tests:** live tab lifecycle, mute audio, discard PSS/process drop, unload,
+restore, UI parity screenshots, `containers_isolation`, `session_restore`.
 
 ### P5 — session
 
@@ -180,3 +227,4 @@ sequentially. `git worktree` is used for parallel phases; the main session keeps
 | 2026-11-04 | P0 | done: `hostapi_v1` 306, `commands_model` 50, `session_restore` 99, `tab_lifecycle` 4, bridge 26; state/brand clean; tag `pre-native-merge-20261104` |
 | 2026-11-04 | P1 | done: `boot_model` 18, `sidecar_spike` PASS; Boot is the single core supervisor; `launchCore` is honest `unavailable` without a command |
 | 2026-11-04 | P2 | done: `native_nav_model` 12; live probe stop `about:blank` after a 4 s slow page and zoom readback `1.5`; overlay + `build --faster` used |
+| 2026-11-04 | P4 design | architect review done: mount is `#tabbrowser-tabbox`, no reparenting, pref-gated; SessionStore is a hazard to contain in P4 and lands in P5 |
