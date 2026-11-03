@@ -220,6 +220,14 @@ describe("what the host will navigate to", () => {
       url: "http://127.0.0.1:8080/",
     });
     expect(resolve("localhost")).toMatchObject({ kind: "url", url: "http://localhost/" });
+    expect(resolve("localhost:3000/app?dev=1")).toMatchObject({
+      kind: "url",
+      url: "http://localhost:3000/app?dev=1",
+    });
+    expect(resolve("localhost/health")).toMatchObject({
+      kind: "url",
+      url: "http://localhost/health",
+    });
     expect(resolve("example.com:8443")).toMatchObject({
       kind: "url",
       url: "https://example.com:8443/",

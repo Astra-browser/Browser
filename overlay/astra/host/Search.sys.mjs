@@ -101,20 +101,14 @@ export function resolve(input) {
   if (text === "") return null;
   // A development host is an address, not a scheme. `localhost:3000` and
   // `127.0.0.1:8080` are what a person types most often that look like
-  // `scheme:port`; a local server is http, anything else keeps https.
-  const hostPort = /^(localhost|127\.0\.0\.1|\[::1\]|[^\s/:]+\.[^\s/:]+):(\d{1,5})$/iu.exec(
-    text,
-  );
-  if (hostPort) {
-    const local = /^(localhost|127\.0\.0\.1|\[::1\])$/iu.test(hostPort[1]);
-    try {
-      return { kind: "url", url: new URL(`${local ? "http" : "https"}://${text}`).href };
-    } catch {
-      // Not a port after all; fall through to the scheme check.
-    }
-  }
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/iu.test(text)) {
+  // `scheme:port`; a loopback server is http, anything else keeps https.
+  const loopback = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(?:[/?#][^\s]*)?$/iu;
+  if (loopback.test(text)) {
     return { kind: "url", url: new URL(`http://${text}`).href };
+  }
+  const hostPort = /^[^\s/:]+\.[^\s/:]+:\d{1,5}(?:[/?#][^\s]*)?$/iu;
+  if (hostPort.test(text)) {
+    return { kind: "url", url: new URL(`https://${text}`).href };
   }
   // A scheme the address bar may run.
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) {
