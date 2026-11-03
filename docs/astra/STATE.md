@@ -260,16 +260,20 @@ menu and ran a row end-to-end.
 | B-13 | Fetched favicons persist in Places, show in History, late icons retried | done | `fix/favicons-history` | live: History rows paint a 32x32 mark |
 | B-14 | Loading skeleton; first browser warmed; load state survives the commit | done | `feat/loading-skeleton`, `fix/load-state` | live: skeleton while a server holds the request; host path 65 ms first / 25 ms second local |
 | B-15 | A space without an icon wears its first site's favicon | done | `fix/space-favicon` | live: previews carry refs; the bar falls back to the first one |
+| B-16 | Dismissing the page menu does not flash the page black | done | `fix/menu-dismiss` | close lowers the frame first, then restores the app ground |
+| B-17 | A hidden column peeking over a New Tab keeps the New Tab visible | done | `fix/newtab-peek` | live: no clip, no transparent ground, New Tab screenshotted intact |
+| B-18 | Page shortcuts use the product keymap; native keys they own are disabled | done | `fix/global-keys` | live: Ctrl+D saved a bookmark with no page-action error; F12 opened DevTools |
+| B-19 | DevTools opens for the content stage; fullscreen gets a shell fallback | done | `fix/devtools-fullscreen` | live: `devtools:toolbox` window; fullscreen chrome layout verified |
 
 **Still deferred after this batch (do not report as fixed):** real split-pane
-content (the split layout is still a single page), container-scoped link
-opening, and a guaranteed DevTools toolbox (the shell asks `gDevTools` for a
-toolbox on the standalone browser and reports refusal without opening a
-Firefox window). Media transport rows delegate to the engine's own
+content (the split layout is still a single page) and container-scoped link
+opening. Media transport rows delegate to the engine's own
 `nsContextMenu.mediaCommand`, so they act on the exact element clicked.
-Fullscreen's engine condition is patched and its chrome layout is verified;
-the gesture path still needs a real click to give the page focus, so it is not
-part of the automated probe.
+Fullscreen's engine condition is patched and its chrome layout plus fallback
+are verified; the gesture path still needs a real click to give the page focus,
+so it is not part of the automated probe. The first Google search pays
+network/DNS/TLS; the local host path measures 65 ms first and 25 ms second,
+so the wait is the site, not the address wiring.
 
 ## Later phases
 
