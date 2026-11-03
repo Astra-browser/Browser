@@ -186,7 +186,13 @@ export function createSearchController(options: {
     request: () => active,
     query: () => query,
     receive(result: SearchResults) {
-      if (disposed || !sameSearch(active, result.context) || result.query !== query) return;
+      // The host answers the words it searched for, which it trims; the field
+      // still holds what was typed. A trailing space (or a pasted line with
+      // one) is the same search, so compare the trimmed forms — otherwise the
+      // answer is dropped, the retry repeats it, and a missed answer turns
+      // into "that action could not be completed" for a query that worked.
+      const answers = result.query.trim() === query.trim();
+      if (disposed || !sameSearch(active, result.context) || !answers) return;
       if (!result.pending) clearTimeout(deadline);
       // An empty intermediate response is a provider that had nothing, not an
       // answer. Keeping the previous rows is what stops the list blinking

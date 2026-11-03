@@ -63,6 +63,28 @@ describe("search request lifecycle", () => {
     controller.dispose();
   });
 
+  it("accepts an answer for the typed words when the host trims the query", async () => {
+    const snapshots: SearchSnapshot[] = [];
+    const controller = createSearchController({
+      owner,
+      send: async () => true,
+      update: (state) => snapshots.push(state),
+      id: () => "request",
+    });
+    controller.change("rust ");
+    await vi.advanceTimersByTimeAsync(0);
+    controller.receive({
+      context: { ...owner, request_id: "request" },
+      query: "rust",
+      completion: null,
+      pending: false,
+      results: [row("rust")],
+    });
+    expect(snapshots.at(-1)).toMatchObject({ settled: true, pending: false, error: "none" });
+    expect(snapshots.at(-1)?.results).toHaveLength(1);
+    controller.dispose();
+  });
+
   it("keeps the previous rows visible but unsettled while a replacement is in flight", async () => {
     const snapshots: SearchSnapshot[] = [];
     let id = 0;
