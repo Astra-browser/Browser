@@ -208,7 +208,7 @@ async function showDevTools(win, browser, toolId) {
  * @param {{host: object, postToApp: (message: object) => void, tabIdOf: (browser: Element) => string|null}} deps
  * @returns {{run: (id: string) => Promise<object>, destroy: () => void}}
  */
-export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf }) {
+export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) {
   const doc = win.document;
   const popup = doc.getElementById("contentAreaContextMenu");
   const fromApp =
@@ -399,11 +399,14 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
     const { x, y } = screenPoint(win, menu.contentData?.context);
     current = { menu, browser };
     arm();
-    postToApp({
-      ns: SHELL_NS,
-      kind: "menu",
-      menu: { x, y, items: buildItems(menu, browser) },
-    });
+    if (typeof showMenu === "function") {
+      showMenu({
+        x,
+        y,
+        items: buildItems(menu, browser),
+        choose: (id) => run(id),
+      });
+    }
   }
 
   // A dismissed/refused engine menu must not leave its state behind either.
@@ -425,6 +428,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
 
   return {
     run,
+    release,
     destroy() {
       destroyed = true;
       release();
