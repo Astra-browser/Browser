@@ -878,6 +878,24 @@ export const Content = {
     if (!gb || typeof gb.addTab !== "function") {
       throw new Error("mountNative: gBrowser unavailable");
     }
+    // P4.2 is single-window: per-window Host API instances still use the
+    // local `win-1` id, so a second window would need the P5 global id map.
+    // Refuse instead of silently mirroring tabs across windows.
+    try {
+      const wm = win.Services?.wm;
+      let count = 0;
+      if (wm) {
+        const e = wm.getEnumerator("navigator:browser");
+        while (e.hasMoreElements()) {
+          if (!e.getNext().closed) count += 1;
+        }
+      }
+      if (count > 1) {
+        throw new Error("mountNative: multi-window is P5");
+      }
+    } catch (e) {
+      if (String(e?.message ?? e).includes("multi-window")) throw e;
+    }
     const doc = container.ownerDocument;
     const principal = systemPrincipalOf(container);
     const tabOf = new Map(); // astra_tab_id -> native tab
@@ -932,6 +950,7 @@ export const Content = {
       }
       tabOf.delete(id);
       browsers.delete(id);
+      pending.delete(id);
     };
     const contextFor = (id) => {
       try {
@@ -985,6 +1004,7 @@ export const Content = {
       if (!tab || !isLoadableUrl(url)) return;
       const browser = tab.linkedBrowser;
       try {
+        allowGlobalHistory(browser);
         if (!force && browser?.currentURI?.spec === url) return;
         browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
       } catch {
@@ -1002,8 +1022,11 @@ export const Content = {
       }
     };
     const activate = (id) => {
-      selectTab(id);
       const url = pending.get(id);
+      if (!url && gb.selectedTab === tabOf.get(id)) {
+        return;
+      }
+      selectTab(id);
       if (url) {
         pending.delete(id);
         loadIn(id, url, true);
@@ -1019,10 +1042,8 @@ export const Content = {
     };
     const list = await Tabs.list({ request_id, window_id });
     const modelTabs = list.tabs ?? [];
-    const nativeTabs = [...gb.tabs];
     for (const model of modelTabs) {
-      const tab = nativeTabs.shift() ?? ensureTab(model.astra_tab_id, model.url);
-      bindTab(model.astra_tab_id, tab);
+      ensureTab(model.astra_tab_id, model.url);
       if (model.url && model.url !== "about:blank") {
         pending.set(model.astra_tab_id, model.url);
       }
@@ -1056,7 +1077,7 @@ export const Content = {
         // An engine-created tab is in front. P4.3 adopts it; until then put
         // the model's tab back rather than showing a page the model lost.
         const selected = __tabsState().selectedId;
-        if (selected) selectTab(selected);
+        if (selected) activate(selected);
       }
     };
     const onClose = (event) => {
@@ -1089,7 +1110,15 @@ export const Content = {
         if (tab) {
           applying = true;
           try {
-            gb.removeTab(tab, { skipPermitUnload: true, closeWindowWithLastTab: false });
+            if (gb.tabs.length <= 1) {
+              gb.addTab("about:blank", {
+                triggeringPrincipal: principal,
+                inBackground: true,
+              });
+            }
+            if (!tab.closing) {
+              gb.removeTab(tab, { skipPermitUnload: true, closeWindowWithLastTab: false });
+            }
           } catch {
             // Already gone with the window.
           } finally {
@@ -1099,9 +1128,10 @@ export const Content = {
         return;
       }
       if (event.type === "items-changed") {
-        const active = (event.data?.tabs ?? [])
-          .filter((t) => !window_id || t.window_id === window_id)
-          .find((t) => t.id === event.data?.active);
+        const active = (event.data?.tabs ?? []).find((t) => t.id === event.data?.active);
+        if (active && !belongs(active.id)) {
+          return;
+        }
         if (active && active.id) {
           ensureTab(active.id, active.url);
           activate(active.id);
@@ -1159,8 +1189,12 @@ export const Content = {
     // while mountNative was awaiting must still get its native tab/URL.
     const fresh = await Tabs.list({ request_id, window_id });
     for (const model of fresh.tabs ?? []) {
-      ensureTab(model.astra_tab_id, model.url);
-      if (model.url && model.url !== "about:blank") {
+      const tab = ensureTab(model.astra_tab_id, model.url);
+      const spec = tab?.linkedBrowser?.currentURI?.spec;
+      if (
+        model.url && model.url !== "about:blank" &&
+        spec !== model.url && !pending.has(model.astra_tab_id)
+      ) {
         pending.set(model.astra_tab_id, model.url);
       }
       if (model.selected) {

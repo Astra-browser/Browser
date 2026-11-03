@@ -160,9 +160,7 @@ def main():
     tab = st.get("tabbox") or {}
     ok = (
         st.get("gbrowser") == "true"
-        and st.get("stage") == "page"
         and st.get("mounted") == "true"
-        and st.get("tabboxStyle", {}).get("visibility") == "visible"
         and st.get("tabboxStyle", {}).get("display") != "none"
         and st.get("toolboxStyle", {}).get("display") == "none"
         and abs((slot.get("x") or 0) - (tab.get("x") or 0)) <= 2
