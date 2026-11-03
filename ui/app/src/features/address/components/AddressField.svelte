@@ -108,6 +108,13 @@
   let standardZoom = $derived(Number(preferences.value("zoom.default")));
   let authoritativeValue = $derived(restingAddress(activeUrl));
   let value = $derived(editing ? draft : authoritativeValue);
+  // A refusal describes the page that was asked for, so the ring goes when a
+  // different page is in front; left alone it would mark a page that loaded
+  // fine, or the next tab the user switched to, as the one that failed.
+  $effect(() => {
+    void activeUrl;
+    failed = false;
+  });
   let security = $derived(
     addressSecurity(activeUrl, tabs.activeTab()?.certificate_exception === true),
   );

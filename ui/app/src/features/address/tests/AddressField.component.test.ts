@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
+import { userEvent } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, tabFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
@@ -10,6 +11,7 @@ const native = vi.hoisted(() => ({
   defaultZoom: "100",
   page: null as string | null,
   edit: vi.fn(async () => true),
+  navigate: vi.fn(async () => ({ accepted: true, operation_id: null })),
 }));
 
 vi.mock("$domain/surface", () => ({ surface: { currentPage: () => native.page } }));
@@ -30,6 +32,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     tabsBootstrap: async () => {},
     runCommand: async () => ({ accepted: true, operation_id: null }),
     launcherEdit: native.edit,
+    tabsNavigate: native.navigate,
     settingGet: async (key: string) => (key === "zoom.default" ? native.defaultZoom : null),
   });
 });
@@ -45,6 +48,7 @@ afterEach(() => {
   native.defaultZoom = "100";
   native.page = null;
   native.edit.mockClear();
+  native.navigate.mockClear();
 });
 
 async function field(props: { compact?: boolean } = {}) {
@@ -83,6 +87,29 @@ test("editing shows the whole address and rests on the host", async () => {
   await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
   input.blur();
   await expect.poll(() => input.value).toBe("www.wikipedia.org");
+});
+
+test("a refused navigation's ring leaves with the page it was about", async () => {
+  native.navigate.mockResolvedValueOnce({ accepted: false, operation_id: null });
+  const { screen, input } = await field();
+  input.focus();
+  await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
+  await userEvent.keyboard("https://missing.invalid/");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("alert")).toBeInTheDocument();
+  expect(input.getAttribute("aria-invalid")).toBe("true");
+
+  // The press that moves to another tab takes the caret out of the field and
+  // the new page's address in; the refusal was about the old page.
+  input.blur();
+  emitNativeEvent("tabChanged", {
+    ...tabs.activeTab()!,
+    projection_revision: stamp(),
+    url: "https://example.com/",
+  });
+  await expect.poll(() => input.value).toBe("example.com");
+  await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
+  expect(input.getAttribute("aria-invalid")).toBeNull();
 });
 
 test("a press anywhere else in the chrome ends editing", async () => {
