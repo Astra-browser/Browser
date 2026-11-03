@@ -143,7 +143,9 @@ function escapeLike(value) {
   return value.replace(/[\\%_]/gu, (match) => `\\${match}`);
 }
 
-/** One Places row as a `HistoryVisitView`; `icon` arrives with the projection. */
+import { Favicons, originOf } from "./Favicons.sys.mjs";
+
+/** One Places row as a `HistoryVisitView`; `icon` is filled by `attachIcons`. */
 function toVisit(row) {
   return {
     id: row.id,
@@ -308,6 +310,39 @@ function createPlacesBackend(PlacesUtils) {
 
 // --- Replies ----------------------------------------------------------------
 
+/**
+ * Give each visit the icon the chrome can paint. History names pages from
+ * earlier sessions, so the raster is published from the icon Places already
+ * holds for the site (no network per row), once per origin in this page. The
+ * reply carries only the `{ origin, revision }` reference the UI accepts.
+ */
+async function attachIcons(visits) {
+  const refs = new Map();
+  for (const visit of visits) {
+    const origin = originOf(visit.url);
+    if (!origin) {
+      continue;
+    }
+    if (!refs.has(origin)) {
+      let ref = null;
+      try {
+        const resolved = await Favicons.resolveStored({ url: visit.url });
+        if (resolved) {
+          Favicons.publish(resolved);
+          ref = {
+            origin: resolved.entry.origin,
+            revision: resolved.entry.revision,
+          };
+        }
+      } catch {
+        ref = null;
+      }
+      refs.set(origin, ref);
+    }
+    visit.icon = refs.get(origin);
+  }
+}
+
 async function pageReply(profile, call) {
   const store = await backend();
   if (!store) {
@@ -325,6 +360,7 @@ async function pageReply(profile, call) {
     search: call.query.trim(),
   });
   const visits = rows.slice(0, limit).map(toVisit);
+  await attachIcons(visits);
   const next =
     rows.length > limit ? (visits[visits.length - 1]?.id ?? null) : null;
   return { kind: "page", visits, next, profile };
