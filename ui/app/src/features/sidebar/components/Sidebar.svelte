@@ -12,9 +12,11 @@
     COMPACT_WIDTH,
     PANEL_GAP,
     effectiveWidth,
+    hasPanel,
     holdShown,
     isCompact,
     isHidden,
+    setPanelExtent,
     sidebarResizeActive,
     sidebarResizeSettlement,
     toggleMode,
@@ -406,6 +408,26 @@
         ? COMPACT_WIDTH
         : effectiveWidth(),
   );
+  // Settings' sections are as much a part of the column as the rail beside
+  // them, so the width the shell insets the page by has to carry the panel
+  // too: otherwise the page stands under the settings panel and the inset
+  // snaps only when the panel closes. The panel a page replaced (a tool, say)
+  // is published again on the way out.
+  let inSettings = false;
+  let settingsRestore = 0;
+  $effect(() => {
+    const open = navigating;
+    if (open === inSettings) return;
+    inSettings = open;
+    untrack(() => {
+      if (!open) {
+        setPanelExtent(settingsRestore);
+        return;
+      }
+      settingsRestore = hasPanel() ? effectiveWidth() - COMPACT_WIDTH - PANEL_GAP : 0;
+      setPanelExtent(SETTINGS_PANEL);
+    });
+  });
 
   // Dispatch runs untracked and behind a sequence guard. Handlers read the
   // state they mutate (the sidebar shape, the tab projection), so a tracked
