@@ -218,6 +218,77 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
   };
 }
 
+function browserWindow(browser) {
+  try {
+    return browser?.ownerDocument?.defaultView ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Live zoom for one browser. Returns false when no ZoomManager is reachable. */
+export function applyZoomToBrowser(browser, zoom) {
+  try {
+    const win = browserWindow(browser);
+    const ZoomManager = win?.ZoomManager;
+    if (!ZoomManager || typeof zoom !== "number" || !Number.isFinite(zoom)) {
+      return false;
+    }
+    ZoomManager.setZoomForBrowser(browser, zoom);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Live print for one browser. Returns false when PrintUtils is unreachable. */
+export function printBrowser(browser) {
+  try {
+    const win = browserWindow(browser);
+    const PrintUtils = win?.PrintUtils;
+    if (!PrintUtils || typeof PrintUtils.startPrintWindow !== "function") {
+      return false;
+    }
+    PrintUtils.startPrintWindow(browser.browsingContext, { printToFile: false });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Stop one browser's in-flight load. */
+export function stopBrowser(browser) {
+  try {
+    if (browser && typeof browser.stop === "function") {
+      browser.stop();
+      return true;
+    }
+  } catch {
+    // Browser torn down mid-load.
+  }
+  return false;
+}
+
+/** Reload one browser, bypassing both the HTTP cache and any proxy cache. */
+export function hardReloadBrowser(browser) {
+  try {
+    const win = browserWindow(browser);
+    const nav = win?.Ci?.nsIWebNavigation;
+    if (!browser || typeof browser.reloadWithFlags !== "function" || !nav) {
+      return false;
+    }
+    const flags = nav.LOAD_FLAGS_BYPASS_PROXY | nav.LOAD_FLAGS_BYPASS_CACHE;
+    if (!flags) {
+      return false;
+    }
+    browser.reloadWithFlags(flags);
+    return true;
+  } catch {
+    // Browser torn down mid-reload.
+  }
+  return false;
+}
+
 export const Content = {
   // Mounts the content browsers into `container` (an element in the chrome
   // document) and ensures exactly one live tab exists. One `<browser>` is
@@ -252,6 +323,15 @@ export const Content = {
     let activeId = "";
 
     const activeBrowser = () => browsers.get(activeId)?.browser ?? null;
+    /** astra_tab_id -> last requested zoom, so a remounted browser keeps it. */
+    const zoomLevels = new Map();
+    const noteFailure = (id, what, error) => {
+      try {
+        doc.defaultView.__astraLastRelayError = `content ${what} failed for ${id}: ${String(error)}`;
+      } catch {
+        // Diagnostics only.
+      }
+    };
 
     /**
      * Mirror one browser's foreground state into Gecko. Runs for every entry
@@ -549,8 +629,10 @@ export const Content = {
         abort: null,
         crashed: false,
         iconKey: "",
+        zoom: zoomLevels.get(id) ?? 1,
       };
       browsers.set(id, entry);
+      applyZoomToBrowser(browser, entry.zoom);
       // Starts parked: the browser is created for a page that is about to be
       // shown (or warmed on about:blank), and `setActive` turns it on.
       applyActivation(entry, false);
@@ -595,6 +677,7 @@ export const Content = {
       const target = url;
       const entry = browsers.get(id) ?? createBrowser(id);
       setActive(id);
+      applyZoomToBrowser(entry.browser, entry.zoom ?? 1);
       const settled =
         !entry.crashed && (entry.requested === target || safeSpec(entry.browser) === target);
       if (settled && (!force || stillLoading(entry.browser))) {
@@ -635,6 +718,7 @@ export const Content = {
       if (!entry) return;
       release(entry);
       browsers.delete(id);
+      zoomLevels.delete(id);
       try {
         entry.browser.remove();
       } catch {
@@ -674,6 +758,51 @@ export const Content = {
         // is not an intent and must not cause another load.
         const intent = event.data.external !== true;
         show(selectedId, event.data.url, intent);
+      }
+      if (event.type === "nav.stopped") {
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
+        if (entry) {
+          stopWatching(entry);
+          if (!stopBrowser(entry.browser)) {
+            noteFailure(id, "stop", "browser.stop unavailable");
+          }
+        }
+      }
+      if (event.type === "nav.zoom-changed") {
+        const id = event.data?.astra_tab_id;
+        const zoom = event.data?.zoom;
+        if (typeof zoom === "number" && Number.isFinite(zoom)) {
+          zoomLevels.set(id, zoom);
+        }
+        const entry = browsers.get(id);
+        if (entry) {
+          entry.zoom = zoom;
+          if (!applyZoomToBrowser(entry.browser, zoom)) {
+            noteFailure(id, "zoom", "ZoomManager unavailable");
+          }
+        }
+      }
+      if (event.type === "nav.print-requested") {
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
+        if (entry && !printBrowser(entry.browser)) {
+          noteFailure(id, "print", "PrintUtils unavailable");
+        }
+      }
+      if (event.type === "nav.hard-reload") {
+        const id = event.data?.astra_tab_id;
+        const entry = browsers.get(id);
+        if (entry) {
+          entry.requested = event.data?.url || entry.requested;
+          markLoading(id, true);
+          watch(id, entry);
+          if (!hardReloadBrowser(entry.browser)) {
+            stopWatching(entry);
+            __applyExternalUpdate(id, { loading: false });
+            noteFailure(id, "hard-reload", "reloadWithFlags unavailable");
+          }
+        }
       }
       if (event.type === "tab.closed") {
         forget(event.data.astra_tab_id);
@@ -781,33 +910,13 @@ export const Content = {
   // mirrors it into a real browser element when available. Best-effort:
   // resolves false when no zoom manager is reachable.
   applyZoom(browser, zoom) {
-    try {
-      const win = browser?.ownerDocument?.defaultView;
-      const ZoomManager = win?.ZoomManager;
-      if (!ZoomManager || typeof zoom !== "number" || !Number.isFinite(zoom)) {
-        return false;
-      }
-      ZoomManager.setZoomForBrowser(browser, zoom);
-      return true;
-    } catch {
-      return false;
-    }
+    return applyZoomToBrowser(browser, zoom);
   },
 
   // Live print dispatch for Navigation.print intent. Best-effort: resolves
   // false when PrintUtils is unreachable (model event already emitted).
   printPage(browser) {
-    try {
-      const win = browser?.ownerDocument?.defaultView;
-      const PrintUtils = win?.PrintUtils;
-      if (!PrintUtils || typeof PrintUtils.startPrintWindow !== "function") {
-        return false;
-      }
-      PrintUtils.startPrintWindow(browser.browsingContext, { printToFile: false });
-      return true;
-    } catch {
-      return false;
-    }
+    return printBrowser(browser);
   },
 
   // Element hiding (P4-T11 live wiring). The Content actor owns the

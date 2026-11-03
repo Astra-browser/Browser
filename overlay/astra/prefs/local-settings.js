@@ -9,3 +9,7 @@
 // `obscure_value 0` = plain-text cfg (no byte-shift obfuscation to hide behind).
 pref("general.config.filename", "mozilla.cfg");
 pref("general.config.obscure_value", 0);
+
+// Optional Rust core process. Empty = no core; the shell asks Boot to
+// launch it and gets an honest `unavailable` instead of a fake process.
+pref("astra.core.command", "");

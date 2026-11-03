@@ -18,10 +18,10 @@ binding allowed to touch live browser elements.
 | File | Owns |
 |---|---|
 | `Events.sys.mjs` | event pump; every event carries monotonic `event_seq` (§5.4); `eventsSince(seq)` replays the ring buffer (cap 500) for gap resync, flagging `gap: true` when eviction forces a full snapshot |
-| `Boot.sys.mjs` | `handshake` (version negotiation via `min_host_api_version`, default-window setup, opening `event_seq`), `status`, `shutdown` |
+| `Boot.sys.mjs` | one startup owner for the Rust core: `handshake` (version negotiation via `min_host_api_version`, default-window setup, opening `event_seq`), `launchCore` (native `Subprocess` stdio supervisor; `unavailable` when no core command is configured), `status`, `shutdown` (also stops the core). `BootSidecar.sys.mjs` is a compatibility re-export, not packaged. |
 | `Windows.sys.mjs` | multi-window model: `create` (incl. `private`), `close` (closes the window's tabs, refuses the last window), `focus`, `setFullscreen`, `setTitle`, `get`, `list` |
 | `Tabs.sys.mjs` | tab model: stable `astra_tab_id`s, `window_id` association, ordering, pin/discard/mute, selection, per-tab history stacks; `create`/`get`/`select`/`close`/`list`/`move`/`duplicate`/`pin`/`unpin`/`discard`/`wakeup`/`setTitle`/`setMuted` |
-| `Navigation.sys.mjs` | `loadURL`/`goBack`/`goForward`/`reload`/`stop`, per-tab zoom (`setZoom`/`getZoom`, clamped 0.3–3.0 mirroring FullZoom), find-in-page (`findInPage` + `setFindResult` live-count ingress), `print` dispatch, reader-mode flag (`setReaderMode` + `setReaderAvailable` ingress); `__commitExternal` folds external loads (link clicks, history.pushState) into history + events |
+| `Navigation.sys.mjs` | `loadURL`/`goBack`/`goForward`/`reload`/`hardReload`/`stop`, per-tab zoom (`setZoom`/`getZoom`, clamped 0.3–3.0; the Content binding applies it through `ZoomManager`), find-in-page (`findInPage` + `setFindResult` live-count ingress), `print` dispatch, reader-mode flag (`setReaderMode` + `setReaderAvailable` ingress); `stop`, zoom, print and hard reload reach the live browser via Content (`browser.stop`, `ZoomManager`, `PrintUtils`, `reloadWithFlags(BYPASS_PROXY|BYPASS_CACHE)`); `__commitExternal` folds external loads (link clicks, history.pushState) into history + events |
 | `Panes.sys.mjs` | side-panel / Work-canvas surfaces: `show`/`hide`/`list` plus `attach` (shell `slot` + optional tab mirror), `detach`, `setRect`, `get`, and the `check` generation guard (attach/detach bump `generation`; stale producers drop work) |
 | `Content.sys.mjs` | chrome binding: mounts one remote content `<browser>` into the shell slot and drives loads through the stub (`nav.committed` → browser follows); `attachTabBrowser` registers a tabs progress listener (`makeProgressListener`) feeding external loads/titles back into the model; `applyZoom`/`printPage` perform live zoom/print best-effort |
 | `HostAPI.sys.mjs` | façade: re-exports all modules + `addEventListener`/`emit`/`eventSeq`/`eventsSince` + `__resetForTests` (P1-T05 shape preserved) |
@@ -42,7 +42,7 @@ lane/files); session snapshot/restore is P2-T09.
   `event_seq`. Event types: `boot.ready/shutdown`,
   `window.created/focused/closed/fullscreen-changed`,
   `tab.created/updated/moved/closed/pinned/unpinned/discarded/restored`,
-  `nav.started/committed/stopped/zoom-changed/find-result/print-requested/reader-changed`,
+  `nav.started/committed/stopped/hard-reload/zoom-changed/find-result/print-requested/reader-changed`,
   `pane.shown/hidden/attached/detached/rect-changed`,
   `content.title-changed/location-changed`.
 - `request_id`s are `crypto.randomUUID()` from the UI.

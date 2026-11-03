@@ -38,6 +38,14 @@
       },
       "additionalProperties": false
     },
+    "hardReload": {
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "astra_tab_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "stop": {
       "type": "object",
       "properties": {
