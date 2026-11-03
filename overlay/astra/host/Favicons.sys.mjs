@@ -188,77 +188,166 @@ function loadImage(doc, src) {
   });
 }
 
+function drawRaster(doc, src) {
+  return (async () => {
+    const img = await loadImage(doc, src);
+    if (!img) {
+      return null;
+    }
+    let canvas;
+    let ctx;
+    try {
+      canvas = doc.createElementNS(XHTML_NS, "canvas");
+      canvas.width = SIDE;
+      canvas.height = SIDE;
+      ctx = canvas.getContext("2d", { willReadFrequently: true });
+    } catch {
+      ctx = null;
+    }
+    if (!ctx) {
+      return null;
+    }
+    try {
+      ctx.clearRect(0, 0, SIDE, SIDE);
+      ctx.drawImage(img, 0, 0, SIDE, SIDE);
+      return ctx.getImageData(0, 0, SIDE, SIDE).data;
+    } catch {
+      // A tainted or undrawable icon: no raster this surface accepts.
+      return null;
+    }
+  })();
+}
+
+function blobToDataUrl(win, blob) {
+  return new Promise((resolve) => {
+    try {
+      const reader = new win.FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * The engine only stores an icon for a browser it recognises as a tab
+ * (`LinkHandlerParent` bails when `gBrowser.getTabForBrowser` has nothing).
+ * The Astra stage owns standalone browsers, so Places is often empty even
+ * though the page declared an icon. Read the site's own icon instead: the
+ * conventional `/favicon.ico` first (one small request), then the page's
+ * `<link rel="icon">` when that 404s. A private window never calls this — the
+ * caller filters it out — so no private page's icon is read elsewhere.
+ */
+async function fetchIconSource(doc, pageUrl) {
+  const win = doc?.defaultView;
+  const origin = originOf(pageUrl);
+  if (!win || !origin || typeof win.fetch !== "function") {
+    return null;
+  }
+  const grab = async (src) => {
+    try {
+      const response = await win.fetch(src, { credentials: "include" });
+      if (!response.ok) {
+        return null;
+      }
+      const type = response.headers.get("content-type") || "";
+      if (type.startsWith("text/html")) {
+        return null;
+      }
+      const blob = await response.blob();
+      // An icon larger than this is not an icon; it is a page or a trap.
+      if (!blob || blob.size === 0 || blob.size > 1_000_000) {
+        return null;
+      }
+      return await blobToDataUrl(win, blob);
+    } catch {
+      return null;
+    }
+  };
+  const conventional = await grab(`${origin}/favicon.ico`);
+  if (conventional) {
+    return conventional;
+  }
+  try {
+    const response = await win.fetch(pageUrl, { credentials: "include" });
+    if (!response.ok) {
+      return null;
+    }
+    const type = response.headers.get("content-type") || "";
+    if (!type.includes("html")) {
+      return null;
+    }
+    const text = (await response.text()).slice(0, 512 * 1024);
+    const parsed = new win.DOMParser().parseFromString(text, "text/html");
+    for (const link of parsed.querySelectorAll("link[rel]")) {
+      const rel = (link.getAttribute("rel") || "").toLowerCase();
+      if (!/(^|\s)(icon|apple-touch-icon)(\s|$)/u.test(rel)) {
+        continue;
+      }
+      const href = link.getAttribute("href");
+      if (!href) {
+        continue;
+      }
+      let absolute;
+      try {
+        absolute = new win.URL(href, pageUrl).href;
+      } catch {
+        continue;
+      }
+      const data = await grab(absolute);
+      if (data) {
+        return data;
+      }
+    }
+  } catch {
+    // A page that will not be read again keeps its letter tile.
+  }
+  return null;
+}
+
 function createPlacesBackend(PlacesUtils) {
   return {
     async raster(url, doc) {
-      if (!doc) {
+      if (!doc || !doc.defaultView) {
         return null;
       }
-      const win = doc.defaultView;
-      if (!win) {
-        return null;
-      }
-      let favicon;
+      let favicon = null;
       try {
         favicon = await PlacesUtils.favicons.getFaviconForPage(
           PlacesUtils.toURI(url),
           SIDE,
         );
       } catch {
-        // No favicon row, or Places is unavailable: no icon.
-        return null;
+        // No favicon row, or Places is unavailable: try the page itself.
       }
-      if (
-        !favicon ||
-        !favicon.rawData ||
-        favicon.rawData.length === 0 ||
-        !favicon.dataURI
-      ) {
-        return null;
+      if (favicon?.rawData?.length && favicon.dataURI) {
+        // Decode once with the image service. This is the engine's own
+        // decoder, so bytes it cannot read are refused before an element is
+        // built; SVG (which the decoder may not handle but an `<img>` renders)
+        // is still given its chance below.
+        try {
+          const imgTools = Cc["@mozilla.org/image/tools;1"].getService(
+            Ci.imgITools,
+          );
+          const bytes = binaryString(favicon.rawData);
+          imgTools.decodeImageFromBuffer(
+            bytes,
+            bytes.length,
+            favicon.mimeType || "image/png",
+          );
+        } catch {
+          // Not a raster the image service decodes: the element decides.
+        }
+        // `imgIContainer` is not drawable on a canvas; the stored data URI is.
+        const fromPlaces = await drawRaster(doc, favicon.dataURI.spec);
+        if (fromPlaces) {
+          return fromPlaces;
+        }
       }
-      // Decode once with the image service. This is the engine's own decoder,
-      // so bytes it cannot read are refused before an element is built; SVG
-      // (which the decoder may not handle but an `<img>` renders) is still
-      // given its chance below.
-      try {
-        const imgTools = Cc["@mozilla.org/image/tools;1"].getService(
-          Ci.imgITools,
-        );
-        const bytes = binaryString(favicon.rawData);
-        imgTools.decodeImageFromBuffer(
-          bytes,
-          bytes.length,
-          favicon.mimeType || "image/png",
-        );
-      } catch {
-        // Not a raster the image service decodes: the element below decides.
-      }
-      // `imgIContainer` is not drawable on a canvas; the stored data URI is.
-      const img = await loadImage(doc, favicon.dataURI.spec);
-      if (!img) {
-        return null;
-      }
-      let canvas;
-      let ctx;
-      try {
-        canvas = doc.createElementNS(XHTML_NS, "canvas");
-        canvas.width = SIDE;
-        canvas.height = SIDE;
-        ctx = canvas.getContext("2d", { willReadFrequently: true });
-      } catch {
-        ctx = null;
-      }
-      if (!ctx) {
-        return null;
-      }
-      try {
-        ctx.clearRect(0, 0, SIDE, SIDE);
-        ctx.drawImage(img, 0, 0, SIDE, SIDE);
-        return ctx.getImageData(0, 0, SIDE, SIDE).data;
-      } catch {
-        // A tainted or undrawable icon: no raster this surface accepts.
-        return null;
-      }
+      const source = await fetchIconSource(doc, url);
+      return source ? drawRaster(doc, source) : null;
     },
   };
 }
