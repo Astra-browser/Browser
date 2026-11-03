@@ -7,6 +7,8 @@ license = "MPL-2.0"
 
 [dependencies]
 astra-host-trait = { path = "../astra-host-trait" }
+astra-proto = { path = "../astra-proto" }
+astra-store = { path = "../astra-store" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -14,5 +16,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "json"] }
 
 [dev-dependencies]
-astra-store = { path = "../astra-store" }
 tokio = { version = "1", features = ["macros", "rt"] }
+tempfile = "3"
+
+[[bin]]
+name = "astra-core"
+path = "src/bin/astra_core.rs"
