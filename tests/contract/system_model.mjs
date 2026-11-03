@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // System module contract (wiring): `about_info`, `system_clock_24h`,
 // `update_status`, `update_check`, `default_browser_status`,
-// `login_item_status` and `ui_info` answer the UI natively instead of failing
-// with `unknown_command`.
+// `login_item_status`, `ui_info` and `set_content_color_scheme` answer the UI
+// natively instead of failing with `unknown_command`.
 //
 //   - every answer is the shape `ui/app/src/shared/ipc/bindings.ts` declares,
 //     and carries no key the type does not have
@@ -20,6 +20,10 @@
 //     nor "Astra is not" can be read from the host
 //   - `login_item_status` answers `supported: false` with `enabled` and
 //     `needs_approval` false: the row is hidden, never shown as on
+//   - `set_content_color_scheme` maps light/dark/system to Firefox's
+//     content color-scheme pref (1/0/2), rejects anything that is not a
+//     boolean or null with `invalid_light`, and answers `applied: false`
+//     instead of throwing where no chrome `Services.prefs` is reachable
 //   - answers are fresh per call, so a caller cannot poison the next read
 //   - junk and hostile payloads answer instead of throwing
 //
@@ -33,8 +37,14 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { System } = await import(path.join(HOST, "System.sys.mjs"));
+const { System, __setContentPrefForTests } = await import(
+  path.join(HOST, "System.sys.mjs")
+);
 const { Boot } = await import(path.join(HOST, "Boot.sys.mjs"));
+
+/** The pref Firefox reads a content document's `prefers-color-scheme` from. */
+const CONTENT_COLOR_SCHEME_PREF =
+  "layout.css.prefers-color-scheme.content-override";
 
 let passed = 0;
 let failed = 0;
@@ -56,6 +66,7 @@ const COMMANDS = {
   update_check: "updateCheck",
   default_browser_status: "defaultBrowserStatus",
   login_item_status: "loginItemStatus",
+  set_content_color_scheme: "setContentColorScheme",
   ui_info: "uiInfo",
 };
 
@@ -306,6 +317,160 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
     "a mutated login_item_status does not become the next answer",
     loginAgain.supported === false && loginAgain.enabled === false,
   );
+}
+
+// === set_content_color_scheme: the app's theme reaches content =============
+{
+  check(
+    "set_content_color_scheme is answered by System.setContentColorScheme",
+    typeof System.setContentColorScheme === "function",
+  );
+
+  // No chrome in this process: the module answers honestly, never throws.
+  for (const [name, payload] of [
+    ["light", { light: true }],
+    ["dark", { light: false }],
+    ["system", { light: null }],
+    ["absent", {}],
+    ["no payload", undefined],
+  ]) {
+    const answer = await System.setContentColorScheme(payload);
+    check(`no chrome answers applied:false (${name})`, answer.applied === false);
+    check(
+      `no chrome answer carries only applied (${name})`,
+      sameKeys(answer, ["applied"]),
+    );
+  }
+
+  // A request_id is accepted and changes nothing about the answer.
+  const echoed = await System.setContentColorScheme({
+    request_id: "theme-1",
+    light: true,
+  });
+  check(
+    "a request_id does not change the no-chrome answer",
+    sameKeys(echoed, ["applied"]) && echoed.applied === false,
+  );
+
+  // Only a boolean or null is a theme; everything else is invalid.
+  for (const light of ["true", "system", 1, 0, [], {}, "light"]) {
+    const answer = await System.setContentColorScheme({ light });
+    check(
+      `light ${JSON.stringify(light)} is rejected as invalid_light`,
+      isObject(answer) &&
+        isObject(answer.error) &&
+        answer.error.code === "invalid_light" &&
+        sameKeys(answer, ["error"]),
+    );
+    check(
+      `an invalid light carries only the invalid_light code`,
+      sameKeys(answer.error, ["code"]),
+    );
+  }
+
+  // Junk and hostile payloads answer rather than throw.
+  {
+    const hostile = [
+      undefined,
+      null,
+      "theme",
+      0,
+      Symbol("theme"),
+      {
+        get light() {
+          throw new Error("hostile payload");
+        },
+      },
+      new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("hostile payload");
+          },
+        },
+      ),
+    ];
+    let threw = false;
+    for (const payload of hostile) {
+      try {
+        const answer = await System.setContentColorScheme(payload);
+        if (!isObject(answer)) threw = true;
+      } catch {
+        threw = true;
+      }
+    }
+    check(
+      "set_content_color_scheme answers junk payloads instead of throwing",
+      threw === false,
+    );
+  }
+
+  // The chrome route: Services.prefs.setIntPref on the chrome global.
+  {
+    const writes = [];
+    globalThis.Services = {
+      prefs: {
+        setIntPref(pref, value) {
+          writes.push([pref, value]);
+        },
+      },
+    };
+    const answer = await System.setContentColorScheme({ light: false });
+    delete globalThis.Services;
+    check(
+      "a chrome Services.prefs receives the dark override",
+      answer.applied === true &&
+        answer.value === 0 &&
+        writes.length === 1 &&
+        writes[0][0] === CONTENT_COLOR_SCHEME_PREF &&
+        writes[0][1] === 0,
+    );
+    check(
+      "the applied answer names the value and nothing else",
+      sameKeys(answer, ["applied", "value"]),
+    );
+  }
+
+  // The injectable seam a live shell/test can wire: light/dark/system.
+  {
+    const writes = [];
+    __setContentPrefForTests((pref, value) => writes.push([pref, value]));
+    for (const [light, expected, name] of [
+      [true, 1, "light"],
+      [false, 0, "dark"],
+      [null, 2, "system"],
+      [undefined, 2, "absent"],
+    ]) {
+      const answer = await System.setContentColorScheme({ light });
+      const [pref, value] = writes.at(-1) ?? [];
+      check(
+        `${name} writes ${expected} to the content color-scheme pref`,
+        answer.applied === true &&
+          answer.value === expected &&
+          pref === CONTENT_COLOR_SCHEME_PREF &&
+          value === expected,
+      );
+    }
+    check(
+      "each theme choice is one write",
+      writes.length === 4 && writes.every(([pref]) => pref === CONTENT_COLOR_SCHEME_PREF),
+    );
+
+    // A writer that fails answers `applied: false` instead of throwing.
+    __setContentPrefForTests(() => {
+      throw new Error("no prefs");
+    });
+    const failed = await System.setContentColorScheme({ light: true });
+    check(
+      "a throwing pref writer answers applied:false",
+      sameKeys(failed, ["applied"]) && failed.applied === false,
+    );
+    __setContentPrefForTests(null);
+    check(
+      "with the seam reset, no chrome answers applied:false again",
+      (await System.setContentColorScheme({ light: true })).applied === false,
+    );
+  }
 }
 
 // === Junk and hostile payloads answer instead of throwing ==================

@@ -35,10 +35,17 @@
 //   `needs_approval` false: this build cannot register a login item, and
 //   General settings hides the row on `supported: false` rather than showing
 //   a switch that could not do anything.
+// - `set_content_color_scheme` maps the app's light/dark/system choice onto
+//   Firefox's `layout.css.prefers-color-scheme.content-override` pref
+//   (1/0/2). Content reads that mirrored pref, so a page's
+//   `prefers-color-scheme` follows the chrome's theme instead of the OS.
 //
-// Pure logic, no Firefox internals, no Events import: nothing here changes
-// state, so there is no event to announce. `ui_info` lives here because Boot
-// answers the handshake only; it never answers `ui_info`.
+// `set_content_color_scheme` is the one write here: it reaches the chrome
+// window's `Services.prefs` and answers `{ applied: false }` outside chrome
+// (a Node test or preview) instead of throwing. No Events import: the app
+// already knows the theme it chose, so there is no event to announce.
+// `ui_info` lives here because Boot answers the handshake only; it never
+// answers `ui_info`.
 
 /** `Material`'s opaque tier: no native effect is behind the window. */
 const MATERIAL_NONE = "none";
@@ -46,6 +53,52 @@ const MATERIAL_NONE = "none";
 /** The resolved hour cycles that mean a 24-hour clock, and the two that do
  *  not. Anything else (a runtime reporting neither) stays unknown. */
 const HOUR_24 = { h11: true, h23: true, h12: false, h24: false };
+
+/** Firefox reads a content document's `prefers-color-scheme` from this pref:
+ *  0 = dark, 1 = light, 2 = follow the system. It is mirrored to content
+ *  (`mirror: always`), so a chrome write reaches the pages already open. */
+const CONTENT_COLOR_SCHEME_PREF =
+  "layout.css.prefers-color-scheme.content-override";
+
+/** Test-only pref writer, wired by a contract test with no chrome window. */
+let contentPrefWriter = null;
+
+export function __setContentPrefForTests(fn) {
+  contentPrefWriter = typeof fn === "function" ? fn : null;
+}
+
+/** The chrome window's `Services.prefs`, or null outside a chrome process.
+ *  Read per call: a Node import has no chrome global at all. */
+function contentPrefs() {
+  try {
+    const scopes = [globalThis];
+    if (globalThis.window && globalThis.window !== globalThis) {
+      scopes.push(globalThis.window);
+    }
+    const view = globalThis.document?.defaultView;
+    if (view && !scopes.includes(view)) {
+      scopes.push(view);
+    }
+    for (const scope of scopes) {
+      const prefs = scope?.Services?.prefs;
+      if (prefs && typeof prefs.setIntPref === "function") {
+        return prefs;
+      }
+    }
+  } catch {
+    // A partial or hostile global is the same as no chrome.
+  }
+  return null;
+}
+
+/** A safe field read: a hostile getter answers "absent", never throws. */
+function field(payload, name) {
+  try {
+    return payload?.[name];
+  } catch {
+    return undefined;
+  }
+}
 
 /** The hour cycle this process resolved, or null where it named none. */
 function localHourCycle() {
@@ -102,6 +155,43 @@ export const System = {
   // `LoginItemStatus`: this build cannot register one, so the row is hidden.
   async loginItemStatus() {
     return { supported: false, enabled: false, needs_approval: false };
+  },
+
+  /**
+   * Mirror the app's theme into content `prefers-color-scheme`: `light:
+   * true` is light, `false` dark, `null` (or absent) follows the system.
+   * Answers `{ applied: true, value }` with the pref's integer, or
+   * `{ applied: false }` where no chrome `Services.prefs` is reachable.
+   * The app already knows the theme it chose, so nothing is announced.
+   */
+  async setContentColorScheme(payload = {}) {
+    const light = field(payload, "light");
+    let value;
+    if (light === true) {
+      value = 1;
+    } else if (light === false) {
+      value = 0;
+    } else if (light === undefined || light === null) {
+      value = 2;
+    } else {
+      return { error: { code: "invalid_light" } };
+    }
+    let write = contentPrefWriter;
+    if (!write) {
+      const prefs = contentPrefs();
+      if (prefs) {
+        write = (name, int) => prefs.setIntPref(name, int);
+      }
+    }
+    if (!write) {
+      return { applied: false };
+    }
+    try {
+      write(CONTENT_COLOR_SCHEME_PREF, value);
+    } catch {
+      return { applied: false };
+    }
+    return { applied: true, value };
   },
 
   // `UiInfo`: the material axis' opaque tier, which the UI already paints
