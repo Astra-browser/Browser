@@ -112,6 +112,15 @@ describe("result presentation", () => {
     expect(matchRange("İstanbul", "i")).toEqual([0, 1]);
     expect(matchRange("🙂İstanbul", "tan")).toEqual([4, 7]);
   });
+  it("measures a match in right-to-left text and around emoji", () => {
+    expect(matchRange("مثال عربي", "عربي")).toEqual([5, 9]);
+    expect(matchRange("日本語のテキスト", "テキスト")).toEqual([4, 8]);
+    // A surrogate pair is two units wide; the span still slices the title.
+    expect(matchRange("🙂 Rust 🙂", "rust")).toEqual([3, 7]);
+    expect("🙂 Rust 🙂".slice(3, 7)).toBe("Rust");
+    // A mixed-direction title keeps the match where the query is.
+    expect(matchRange("Rust — مثال", "مثال")).toEqual([7, 11]);
+  });
 });
 
 describe("inline completion", () => {
@@ -135,6 +144,10 @@ describe("inline completion", () => {
     expect(completionSuffix("gitl", "github.com")).toBeNull();
     expect(completionSuffix("", "github.com")).toBeNull();
     expect(completionSuffix("git", null)).toBeNull();
+    // Sliced by what was typed, not by a folded copy: a host may be written
+    // in another script, and the suffix is still just the remainder.
+    expect(completionSuffix("日本", "日本語.jp")).toBe("語.jp");
+    expect(completionSuffix("  git", "github.com")).toBeNull();
   });
 });
 

@@ -170,6 +170,47 @@ test("a field holding only spaces asks what an empty field asks", async () => {
   await expect.element(screen.getByRole("option", { name: /GitHub/u })).toBeVisible();
 });
 
+test("Enter with nothing on screen neither runs nor searches again", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations: [] } });
+  await screen.getByRole("combobox").fill("zzz");
+  await reply("zzz", []);
+  await expect.element(screen.getByText("No matching results").first()).toBeVisible();
+  const asked = native.search.mock.calls.length;
+  await userEvent.keyboard("{Enter}");
+  await new Promise((done) => setTimeout(done, 50));
+  expect(native.run).not.toHaveBeenCalled();
+  expect(native.search.mock.calls.length).toBe(asked);
+});
+
+test("a search that never answers says so, and Try again asks again", async () => {
+  native.search.mockResolvedValue(false);
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  try {
+    await screen.getByRole("combobox").fill("rust");
+    // The controller retries once on its own before it reports a failure.
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Search isn’t responding.");
+    const asked = native.search.mock.calls.length;
+    await screen.getByRole("button", { name: "Try again" }).click();
+    await vi.waitFor(() => expect(native.search.mock.calls.length).toBeGreaterThan(asked));
+  } finally {
+    native.search.mockResolvedValue(true);
+  }
+});
+
+test("the primary modifier plus Shift and C copies the selected address", async () => {
+  const written: string[] = [];
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (text: string) => void written.push(text) },
+  });
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await screen.getByRole("combobox").fill("rust");
+  await reply("rust", [search("rust"), visit("Rust Book", "https://doc.rust-lang.org/book/")]);
+  await userEvent.keyboard(`{ArrowDown}{${primary}>}{Shift>}c{/Shift}{/${primary}}`);
+  await vi.waitFor(() => expect(written).toEqual(["https://doc.rust-lang.org/book/"]));
+  await expect.element(screen.getByText("Link copied")).toBeVisible();
+});
+
 test("home offers recent tabs and destinations, growing only as results need space", async () => {
   const onTool = vi.fn();
   const screen = await render(LauncherPanel, { props: { context, destinations, onTool } });
