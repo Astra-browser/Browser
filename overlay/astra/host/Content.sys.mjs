@@ -34,12 +34,36 @@ import {
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
+export function loadWatchStep({
+  loading,
+  seenLoading,
+  currentUrl,
+  requestedUrl,
+  previousUrl,
+  elapsedMs,
+  startDeadlineMs,
+}) {
+  // A fast local page can finish before the first 200 ms poll. The document is
+  // already on the requested URL (or has redirected off the previous one), so
+  // treat that as "started and finished", not "the request never started".
+  const committed =
+    !loading &&
+    typeof currentUrl === "string" &&
+    currentUrl !== "" &&
+    currentUrl !== "about:blank" &&
+    (currentUrl === requestedUrl || currentUrl !== previousUrl);
+  const observed = seenLoading === true || loading === true || committed;
+  const live = loading === true || (!observed && elapsedMs < startDeadlineMs);
+  return { live, seenLoading: observed, fastDone: committed && !loading };
+}
+
 // Schemes the content stage will load. A tab's address can come from a
 // caller (`Tabs.create`), a restored session or the page itself, so the
 // decision to hand an address to the browser belongs here, not in whoever
 // asked: `data:`, `file:`, `javascript:`, `blob:`, `chrome:` and
 // `resource:` would otherwise run in the page that this binding loads with
 // the system principal.
+
 const LOADABLE_SCHEMES = new Set(["http:", "https:"]);
 
 /** True when `url` is an address the content browser may be pointed at. */
@@ -288,14 +312,26 @@ export const Content = {
         } catch {
           loading = false;
         }
-        if (loading) {
+        const step = loadWatchStep({
+          loading,
+          seenLoading,
+          currentUrl: safeSpec(entry.browser),
+          requestedUrl: entry.requested,
+          previousUrl: entry.previous,
+          elapsedMs: Date.now() - beginning,
+          startDeadlineMs: startDeadline - beginning,
+        });
+        if (step.seenLoading) {
           seenLoading = true;
         }
-        const live =
-          loading || (!seenLoading && Date.now() < startDeadline);
+        const live = step.live;
         // A redirect can dip the flag for a moment between documents; two
         // quiet polls after the load has started mean it is really over.
-        if (live) {
+        // A fast committed load skips that grace period: the document is
+        // already on screen and the skeleton must not stay over it.
+        if (step.fastDone) {
+          idle = 2;
+        } else if (live) {
           idle = 0;
         } else {
           idle += 1;
@@ -436,6 +472,7 @@ export const Content = {
       const entry = {
         browser,
         requested: "",
+        previous: "",
         poll: 0,
         abort: null,
         crashed: false,
@@ -497,6 +534,7 @@ export const Content = {
         return;
       }
       entry.crashed = false;
+      entry.previous = safeSpec(entry.browser);
       entry.requested = target;
       // The browsing context can be replaced when remoteness changes, so the
       // history flag is set on the context that is about to load.
