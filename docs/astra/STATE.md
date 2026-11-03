@@ -292,3 +292,16 @@ backlog.
 ## Later phases
 
 P7–P11 all `todo` — see `plan.md` §§8–11.
+
+## Native binding merge (2026-11-04)
+
+Execution plan and phase status: `merge.md`. The new wire shapes below are
+recorded here per SCOPE rule 5.
+
+| Shape | Why | Phase |
+|---|---|---|
+| `Boot.launchCore({ command })` + pref `astra.core.command` | One startup owner for the Rust core. The shell calls it on mount; an empty command answers `unavailable` instead of faking a process. | P1 |
+| `Boot.shutdown().core_stopped` | Report whether a core was actually stopped; the shell/quit path can wait on a real answer. | P1 |
+| `Navigation.hardReload` + event `nav.hard-reload` | Ctrl/Shift reload must bypass proxy and cache (`LOAD_FLAGS_BYPASS_PROXY | BYPASS_CACHE`), not be a soft reload. Keymap `.alt*` ids normalise to the base command. | P2 |
+| Live `stop`/`zoom`/`print` dispatch in `Content` | The model intents now reach `browser.stop()`, `ZoomManager` and `PrintUtils`; no new shape beyond `nav.hard-reload`. | P2 |
+| Print surface blocker | P2 dispatches `PrintUtils.startPrintWindow`, which is Firefox's own print window. P6 owns the Astra print UI; until then this is a recorded native-surface exception. | P2/P6 |
