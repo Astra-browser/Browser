@@ -47,8 +47,15 @@ const off = addEventListener((e) => seen.push(e));
 }
 
 // --- Tabs.create: one live tab ---
-const A = "file:///tmp/astra-t10-a.html";
-const B = "file:///tmp/astra-t10-b.html";
+// Fixture URLs are https, not file:. Since f55bd14 the address field treats
+// file:, javascript:, data: and chrome: as *words to search for*
+// (`Search.sys.mjs` NAVIGABLE = http/https/about), so `Navigation.loadURL`
+// would rewrite a file: URL into a DuckDuckGo query and the url echo below
+// would never match. This stub never fetches the pages, so plain hostnames
+// are enough; `new URL("https://fixture.test/a").href` is already canonical,
+// which keeps the resolve round-trip byte-identical.
+const A = "https://fixture.test/a";
+const B = "https://fixture.test/b";
 let tabId;
 {
   const res = await Tabs.create({ request_id: "t-1", url: A });
