@@ -2,6 +2,8 @@
 // Search contract: what a typed field means, and that the answer is safe.
 //
 //   - a URL stays a URL; words become a search on the chosen engine
+//   - Google is the default engine; an unset, blank or unknown setting falls
+//     back to it, and an explicit stored engine still wins
 //   - the query is encoded exactly once, so it cannot add parameters or
 //     change the host
 //   - only http, https and about are navigable; javascript:, data:, file:,
@@ -34,14 +36,14 @@ function check(name, cond) {
 __resetSettingsForTests();
 
 // --- engine ---------------------------------------------------------------
-check("the default engine is DuckDuckGo", engine().id === "duckduckgo");
+check("the default engine is Google", engine().id === "google");
 check(
   "a query becomes that engine's https URL",
-  searchUrl("hello world") === "https://duckduckgo.com/?q=hello%20world",
+  searchUrl("hello world") === "https://www.google.com/search?q=hello%20world",
 );
 check(
   "the query is encoded exactly once",
-  searchUrl("a&b=c#d") === "https://duckduckgo.com/?q=a%26b%3Dc%23d",
+  searchUrl("a&b=c#d") === "https://www.google.com/search?q=a%26b%3Dc%23d",
 );
 check("an empty query has no URL", searchUrl("   ") === null);
 
@@ -53,15 +55,20 @@ check(
   searchUrl("rust lifetimes") === "https://www.google.com/search?q=rust%20lifetimes",
 );
 await Settings.set({ key: "search.engine", value: "nope" });
-check("an unknown engine falls back to the default", engine().id === "duckduckgo");
+check("an unknown engine falls back to the default", engine().id === "google");
+await Settings.set({ key: "search.engine", value: "" });
+check("a blank engine falls back to the default", engine().id === "google");
+await Settings.set({ key: "search.engine", value: "duckduckgo" });
+check("an explicit stored engine still wins", engine().id === "duckduckgo");
+await Settings.set({ key: "search.engine", value: "" });
 
 // --- custom engine safety -------------------------------------------------
 await Settings.set({ key: "search.custom-url", value: "http://search.example/?q=%s" });
-check("a plain-http custom engine is refused", engine().id === "duckduckgo");
+check("a plain-http custom engine is refused", engine().id === "google");
 await Settings.set({ key: "search.custom-url", value: "javascript:alert('%s')" });
-check("a javascript custom engine is refused", engine().id === "duckduckgo");
+check("a javascript custom engine is refused", engine().id === "google");
 await Settings.set({ key: "search.custom-url", value: "https://search.example/?q=" });
-check("a custom engine without %s is refused", engine().id === "duckduckgo");
+check("a custom engine without %s is refused", engine().id === "google");
 await Settings.set({ key: "search.custom-url", value: "https://search.example/?q=%s" });
 check("a safe https custom engine is used", engine().id === "custom");
 check(
@@ -113,9 +120,9 @@ check("the row is a search", answer.results[0].kind === "search");
 check(
   "the row opens the engine URL",
   answer.results[0].action.type === "OpenUrl" &&
-    answer.results[0].action.url === "https://duckduckgo.com/?q=hello%20world",
+    answer.results[0].action.url === "https://www.google.com/search?q=hello%20world",
 );
-check("the answer names the engine", answer.results[0].detail === "Search DuckDuckGo");
+check("the answer names the engine", answer.results[0].detail === "Search Google");
 check("the answer echoes the query", answer.query === "hello world");
 check("the answer echoes the context", answer.context.request_id === "r1");
 
