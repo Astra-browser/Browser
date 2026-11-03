@@ -189,8 +189,13 @@ export function allowGlobalHistory(browser) {
 export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTitle } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
-    onLocationChange(browser, _progress, _request, location) {
+    onLocationChange(browser, progress, _request, location) {
       try {
+        // Subframe navigations are not the tab's address; committing them
+        // would rewrite the model URL/history on every ad or embed iframe.
+        if (progress && progress.isTopLevel === false) {
+          return;
+        }
         const id = tabIdOf ? tabIdOf(browser) : null;
         const url = location && location.spec ? location.spec : "";
         if (id && url) {
@@ -857,6 +862,359 @@ export const Content = {
         browsers.clear();
         activeId = "";
         selectedId = "";
+      },
+    };
+  },
+
+  /**
+   * P4.2: map the Astra tab model onto native gBrowser tabs. The native tab
+   * strip stays hidden; the shell docks #tabbrowser-tabbox over the stage.
+   * This mount owns the id <-> native tab map and translates host events;
+   * Navigation/zoom/stop/print still go through the same event intents.
+   */
+  async mountNative(container, { request_id = "content-native", window_id = "" } = {}) {
+    const win = container?.ownerDocument?.defaultView ?? null;
+    const gb = win?.gBrowser;
+    if (!gb || typeof gb.addTab !== "function") {
+      throw new Error("mountNative: gBrowser unavailable");
+    }
+    // P4.2 is single-window: per-window Host API instances still use the
+    // local `win-1` id, so a second window would need the P5 global id map.
+    // Refuse instead of silently mirroring tabs across windows.
+    try {
+      const wm = win.Services?.wm;
+      let count = 0;
+      if (wm) {
+        const e = wm.getEnumerator("navigator:browser");
+        while (e.hasMoreElements()) {
+          if (!e.getNext().closed) count += 1;
+        }
+      }
+      if (count > 1) {
+        throw new Error("mountNative: multi-window is P5");
+      }
+    } catch (e) {
+      if (String(e?.message ?? e).includes("multi-window")) throw e;
+    }
+    const doc = container.ownerDocument;
+    const principal = systemPrincipalOf(container);
+    const tabOf = new Map(); // astra_tab_id -> native tab
+    const idOf = new WeakMap(); // native tab -> astra_tab_id
+    const browsers = new Map(); // astra_tab_id -> { browser, tab }
+    const pending = new Map(); // astra_tab_id -> URL to load on first activation
+    __setFaviconEventSink((view) => emit("favicons-changed", view));
+    let applying = false;
+
+    const idOfTab = (tab) => {
+      if (!tab) return "";
+      return idOf.get(tab) || tab.getAttribute("astra-tab-id") || "";
+    };
+    const bindTab = (id, tab) => {
+      if (!id || !tab) return;
+      tab.setAttribute("astra-tab-id", id);
+      tabOf.set(id, tab);
+      idOf.set(tab, id);
+      const browser = tab.linkedBrowser ?? null;
+      if (browser) {
+        browsers.set(id, { browser, tab });
+        // A remote browser inherits the chrome window's false
+        // useGlobalHistory; the native tab needs the same fix as mount().
+        allowGlobalHistory(browser);
+      }
+    };
+    const refreshIcon = (id) => {
+      const tab = tabOf.get(id);
+      const browser = tab?.linkedBrowser;
+      const url = browser?.currentURI?.spec;
+      if (!isLoadableUrl(url) || isPrivateWindow(win)) return;
+      void Favicons.resolve({ url, doc })
+        .then((resolved) => {
+          if (!resolved) return;
+          __applyExternalUpdate(id, {
+            icon: {
+              origin: resolved.entry.origin,
+              revision: resolved.entry.revision,
+            },
+          });
+          Favicons.publish(resolved);
+        })
+        .catch(() => {
+          // A broken icon never blocks the page.
+        });
+    };
+    const forgetTab = (id) => {
+      const tab = tabOf.get(id);
+      if (tab) {
+        idOf.delete(tab);
+        tab.removeAttribute("astra-tab-id");
+      }
+      tabOf.delete(id);
+      browsers.delete(id);
+      pending.delete(id);
+    };
+    const contextFor = (id) => {
+      try {
+        const tab = __tabsState().tabs.get(id);
+        if (tab && !isPrivateWindow(win)) {
+          return __spaceUserContextId(tab.space_id);
+        }
+      } catch {
+        // A tab without a record keeps the default context.
+      }
+      return 0;
+    };
+    const ensureTab = (id, url) => {
+      let tab = tabOf.get(id);
+      if (tab) return tab;
+      applying = true;
+      try {
+        // Reuse the tabbrowser's initial about:blank tab instead of leaving
+        // an unbound tab beside the model's first tab.
+        const wanted = contextFor(id);
+        const free = [...gb.tabs].find((candidate) => {
+          if (idOfTab(candidate)) return false;
+          try {
+            const spec = candidate.linkedBrowser?.currentURI?.spec;
+            const context = Number(candidate.getAttribute("usercontextid") || 0);
+            return (!spec || spec === "about:blank") && context === wanted;
+          } catch {
+            return false;
+          }
+        });
+        if (free) {
+          tab = free;
+          bindTab(id, tab);
+          if (isLoadableUrl(url)) pending.set(id, url);
+          return tab;
+        }
+        tab = gb.addTab("about:blank", {
+          triggeringPrincipal: principal,
+          inBackground: true,
+          userContextId: wanted,
+        });
+        bindTab(id, tab);
+        if (isLoadableUrl(url)) pending.set(id, url);
+      } finally {
+        applying = false;
+      }
+      return tab;
+    };
+    const loadIn = (id, url, force = false) => {
+      const tab = tabOf.get(id);
+      if (!tab || !isLoadableUrl(url)) return;
+      const browser = tab.linkedBrowser;
+      try {
+        allowGlobalHistory(browser);
+        if (!force && browser?.currentURI?.spec === url) return;
+        browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
+      } catch {
+        // A tab torn down mid-load.
+      }
+    };
+    const selectTab = (id) => {
+      const tab = tabOf.get(id);
+      if (!tab || gb.selectedTab === tab) return;
+      applying = true;
+      try {
+        gb.selectedTab = tab;
+      } finally {
+        applying = false;
+      }
+    };
+    const activate = (id) => {
+      const url = pending.get(id);
+      if (!url && gb.selectedTab === tabOf.get(id)) {
+        return;
+      }
+      selectTab(id);
+      if (url) {
+        pending.delete(id);
+        loadIn(id, url, true);
+      }
+    };
+
+    // Adopt the tabbrowser's initial tab for the first model tab, then add
+    // one native tab per model tab. The model is bootstrapped before mount.
+    const belongs = (id) => {
+      if (!window_id || !id) return true;
+      const tab = __tabsState().tabs.get(id);
+      return !tab || tab.window_id === window_id;
+    };
+    const list = await Tabs.list({ request_id, window_id });
+    const modelTabs = list.tabs ?? [];
+    for (const model of modelTabs) {
+      ensureTab(model.astra_tab_id, model.url);
+      if (model.url && model.url !== "about:blank") {
+        pending.set(model.astra_tab_id, model.url);
+      }
+      if (model.selected) {
+        activate(model.astra_tab_id);
+      }
+    }
+    const selected = modelTabs.find((t) => t.selected) ?? modelTabs[0];
+    if (selected) activate(selected.astra_tab_id);
+
+    // Native -> model: selection, close and the end of a document load
+    // (`busy` clears when the native browser has finished). The progress
+    // listener keeps the title/URL side; this keeps the loading flag honest.
+    const onAttr = (event) => {
+      const tab = event.target;
+      const id = idOfTab(tab);
+      if (!id) return;
+      const changed = event.detail?.changed ?? [];
+      if (changed.includes("busy") && !tab.hasAttribute("busy")) {
+        __applyExternalUpdate(id, { loading: false });
+        refreshIcon(id);
+      }
+    };
+    gb.tabContainer.addEventListener("TabAttrModified", onAttr);
+    const onSelect = () => {
+      if (applying) return;
+      const id = idOfTab(gb.selectedTab);
+      if (id) {
+        void Tabs.select({ astra_tab_id: id });
+      } else {
+        // An engine-created tab is in front. P4.3 adopts it; until then put
+        // the model's tab back rather than showing a page the model lost.
+        const selected = __tabsState().selectedId;
+        if (selected) activate(selected);
+      }
+    };
+    const onClose = (event) => {
+      if (applying) return;
+      const id = idOfTab(event.target);
+      if (id) void Tabs.close({ astra_tab_id: id });
+    };
+    const progress = makeProgressListener({
+      tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
+    });
+    gb.addTabsProgressListener(progress);
+    gb.tabContainer.addEventListener("TabSelect", onSelect);
+    gb.tabContainer.addEventListener("TabClose", onClose);
+
+    const off = addEventListener((event) => {
+      const id = event.data?.astra_tab_id;
+      if (event.data?.window_id && window_id && event.data.window_id !== window_id) {
+        return;
+      }
+      if (id && !belongs(id)) {
+        return;
+      }
+      if (event.type === "tab.created" && id) {
+        ensureTab(id, event.data.url);
+        return;
+      }
+      if (event.type === "tab.closed" && id) {
+        const tab = tabOf.get(id);
+        forgetTab(id);
+        if (tab) {
+          applying = true;
+          try {
+            if (gb.tabs.length <= 1) {
+              gb.addTab("about:blank", {
+                triggeringPrincipal: principal,
+                inBackground: true,
+              });
+            }
+            if (!tab.closing) {
+              gb.removeTab(tab, { skipPermitUnload: true, closeWindowWithLastTab: false });
+            }
+          } catch {
+            // Already gone with the window.
+          } finally {
+            applying = false;
+          }
+        }
+        return;
+      }
+      if (event.type === "items-changed") {
+        const active = (event.data?.tabs ?? []).find((t) => t.id === event.data?.active);
+        if (active && !belongs(active.id)) {
+          return;
+        }
+        if (active && active.id) {
+          ensureTab(active.id, active.url);
+          activate(active.id);
+        }
+        return;
+      }
+      if (event.type === "tab.updated" && id) {
+        if (event.data.selected) {
+          activate(id);
+        }
+        if ("muted" in event.data) {
+          const tab = tabOf.get(id);
+          const want = event.data.muted === true;
+          try {
+            if (tab && tab.linkedBrowser?.audioMuted !== want) {
+              tab.toggleMuteAudio();
+            }
+          } catch {
+            // A tab torn down mid-toggle.
+          }
+        }
+        return;
+      }
+      if (event.type === "nav.committed" && id && event.data.external !== true) {
+        pending.delete(id);
+        loadIn(id, event.data.url, true);
+        refreshIcon(id);
+        return;
+      }
+      if (event.type === "nav.hard-reload" && id) {
+        const tab = tabOf.get(id);
+        try {
+          const Ci = win.Ci;
+          tab?.linkedBrowser?.reloadWithFlags(
+            Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_PROXY |
+              Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_CACHE,
+          );
+        } catch {}
+        return;
+      }
+      if (event.type === "nav.stopped" && id) {
+        try { tabOf.get(id)?.linkedBrowser?.stop(); } catch {}
+        return;
+      }
+      if (event.type === "nav.zoom-changed" && id) {
+        applyZoomToBrowser(tabOf.get(id)?.linkedBrowser, event.data?.zoom);
+        return;
+      }
+      if (event.type === "nav.print-requested" && id) {
+        printBrowser(tabOf.get(id)?.linkedBrowser);
+      }
+    });
+
+    // Reconcile after the await/listener gap: a tab created or navigated
+    // while mountNative was awaiting must still get its native tab/URL.
+    const fresh = await Tabs.list({ request_id, window_id });
+    for (const model of fresh.tabs ?? []) {
+      const tab = ensureTab(model.astra_tab_id, model.url);
+      const spec = tab?.linkedBrowser?.currentURI?.spec;
+      if (
+        model.url && model.url !== "about:blank" &&
+        spec !== model.url && !pending.has(model.astra_tab_id)
+      ) {
+        pending.set(model.astra_tab_id, model.url);
+      }
+      if (model.selected) {
+        activate(model.astra_tab_id);
+      }
+    }
+
+    return {
+      native: true,
+      get browser() {
+        return gb.selectedBrowser ?? null;
+      },
+      browsers,
+      detach() {
+        off();
+        try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
+        try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
+        try { gb.tabContainer.removeEventListener("TabAttrModified", onAttr); } catch {}
+        try { gb.removeTabsProgressListener(progress); } catch {}
+        for (const id of [...tabOf.keys()]) forgetTab(id);
       },
     };
   },

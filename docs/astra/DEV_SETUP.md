@@ -77,4 +77,5 @@ no packaged core binary yet.
 `#tabbrowser-tabbox` over the Astra content slot. It is inert until
 `Content.mountNative` marks `data-astra-native-mounted`; flipping the pref
 alone must not cover a working page. The geometry probe is
-`tools/perf/stress/gbrowser_stage_probe.py`.
+`tools/perf/stress/gbrowser_stage_probe.py`; the native tab mapping probe is
+`tools/perf/stress/gbrowser_tabs_probe.py`.

@@ -162,6 +162,7 @@
     let stageObserver = null;
     let stageMutation = null;
     let onStageResize = null;
+    let applyGbrowserStage = null;
     const gbrowserRoot = doc.documentElement;
     if (gbrowserEnabled) {
       gbrowserRoot.setAttribute("data-astra-gbrowser", "true");
@@ -193,6 +194,7 @@
         attributes: true,
         attributeFilter: ["data-app-booted"],
       });
+      applyGbrowserStage = applyStage;
       onStageResize = () => applyStage();
       win?.addEventListener("resize", onStageResize);
       applyStage();
@@ -710,7 +712,25 @@
       slotError = "content binding unavailable";
     } else {
       try {
-        mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+        if (gbrowserEnabled) {
+          try {
+            // The native mount maps the model, so the model must exist before
+            // it lists tabs; otherwise a bootstrap tab created in the gap is
+            // never bound.
+            await host.Tabs.bootstrap({ request_id: newRequestId() });
+            mounted = await host.Content.mountNative(slot, { request_id: newRequestId(), window_id: ownWindowId });
+            gbrowserRoot.setAttribute("data-astra-native-mounted", "true");
+            applyGbrowserStage?.();
+          } catch (e) {
+            // The pref is a spike: fall back to the standalone mount rather
+            // than leaving a blank stage.
+            gbrowserRoot.removeAttribute("data-astra-native-mounted");
+            mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+            slotError = String(e?.message ?? e);
+          }
+        } else {
+          mounted = await host.Content.mount(slot, { request_id: newRequestId() });
+        }
       } catch (e) {
         slotError = String(e?.message ?? e);
       }
@@ -804,6 +824,7 @@
       }
       gbrowserRoot.removeAttribute("data-astra-gbrowser");
       gbrowserRoot.removeAttribute("data-astra-stage");
+      gbrowserRoot.removeAttribute("data-astra-native-mounted");
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
       } catch {

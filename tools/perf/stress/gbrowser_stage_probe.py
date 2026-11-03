@@ -124,7 +124,13 @@ def main():
             except Exception:
                 pass
             time.sleep(0.1)
-        time.sleep(0.5)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            st = json.loads(m.execute(STAGE))
+            if st.get("mounted") == "true":
+                break
+            time.sleep(0.1)
+        time.sleep(0.3)
         tabs = json.loads(m.execute_async(LIST)).get("tabs") or []
         tab = next((t for t in tabs if t.get("selected")), tabs[0] if tabs else None)
         if tab:
@@ -154,9 +160,7 @@ def main():
     tab = st.get("tabbox") or {}
     ok = (
         st.get("gbrowser") == "true"
-        and st.get("stage") == "app"
-        and st.get("mounted") is None
-        and st.get("tabboxStyle", {}).get("visibility") == "hidden"
+        and st.get("mounted") == "true"
         and st.get("tabboxStyle", {}).get("display") != "none"
         and st.get("toolboxStyle", {}).get("display") == "none"
         and abs((slot.get("x") or 0) - (tab.get("x") or 0)) <= 2
