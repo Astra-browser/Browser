@@ -1,1 +1,0 @@
-export{t as default}from"./AskCard-D6IPXip_.js";

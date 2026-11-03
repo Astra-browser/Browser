@@ -1,7 +1,7 @@
 {
   "browser-panel": {
     "browser": {
-      "js": 484311,
+      "js": 441176,
       "css": 151379
     },
     "lazy:app/browser/WorkWorkspace.svelte": {
@@ -205,8 +205,12 @@
       "css": 3760
     },
     "lazy:features/settings/components/Settings.svelte": {
-      "js": 141242,
+      "js": 191853,
       "css": 9138
+    },
+    "lazy:features/settings/components/SettingsNavigation.svelte": {
+      "js": 53798,
+      "css": 0
     },
     "lazy:features/settings/components/SettingsIdentity.svelte": {
       "js": 2318,
