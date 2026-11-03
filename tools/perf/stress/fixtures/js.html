@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stress JS</title>
+<style>html,body{margin:0;height:100%;background:#0d1117;color:#c9d1d9;font:14px ui-monospace,monospace;display:grid;place-items:center}</style>
+</head>
+<body>
+<div id="hud">js workers starting…</div>
+<script>
+  const hud = document.getElementById('hud');
+  const workerSrc = `
+    let spins = 0;
+    self.onmessage = () => {
+      const end = Date.now() + 60 * 1000;
+      while (Date.now() < end) {
+        let x = 0;
+        for (let i = 0; i < 250000; i++) x += Math.sqrt(i % 997) * 1.000001;
+        if (x < 0) self.postMessage('no');
+      }
+    };
+    self.postMessage('ready');
+  `;
+  const url = URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' }));
+  const workers = Array.from({ length: 2 }, () => new Worker(url));
+  for (const w of workers) w.postMessage('go');
+  // Main thread also burns, but yields so rendering/typing still happens.
+  let n = 0;
+  function burn() {
+    const end = performance.now() + 22;
+    while (performance.now() < end) {
+      n += Math.sqrt(n % 1009) * 1.000001;
+    }
+    hud.textContent = `js burn main=${Math.round(n)} workers=4`;
+    setTimeout(burn, 8);
+  }
+  burn();
+</script>
+<script src="/common.js"></script>
+</body>
+</html>

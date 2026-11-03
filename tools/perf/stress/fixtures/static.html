@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stress static</title>
+<style>
+  html,body{margin:0;background:#0f1419;color:#d8e0ea;font:14px/1.45 system-ui}
+  header{position:sticky;top:0;padding:14px 20px;background:#17202a;border-bottom:1px solid #29323c}
+  main{max-width:980px;margin:0 auto;padding:20px}
+  article{margin:0 0 22px;padding:16px;border:1px solid #26313b;border-radius:12px;background:#131a21}
+  .row{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;margin:12px 0}
+  .tile{height:64px;border-radius:8px;background:linear-gradient(135deg,#1f6feb44,#a371f733);border:1px solid #2d3a47}
+  h2{margin:.2em 0 .5em;font-size:16px;color:#9ecbff}
+</style>
+</head>
+<body>
+<header><strong>static fixture</strong> — layout, paint, scroll surface</header>
+<main id="content"></main>
+<script>
+  const main = document.getElementById('content');
+  for (let a = 0; a < 18; a++) {
+    const art = document.createElement('article');
+    art.innerHTML = `<h2>Article ${a + 1}</h2>` +
+      Array.from({ length: 7 }, (_, i) =>
+        `<p>Paragraph ${i + 1}: the quick brown fox jumps over the lazy dog. ` +
+        `Layout and paint work should remain flat while this page is idle. ` +
+        `Numbers ${a}-${i}-${(a * 7 + i) * 13} exercise text shaping and line breaking.</p>`).join('') +
+      `<div class="row">${Array.from({ length: 18 }, () => '<div class="tile"></div>').join('')}</div>`;
+    main.appendChild(art);
+  }
+  // A few inline SVG icons so paint has vector work too.
+  for (let i = 0; i < 30; i++) {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('width', '24');
+    s.setAttribute('height', '24');
+    s.innerHTML = '<circle cx="12" cy="12" r="9" fill="none" stroke="#6cb6ff" stroke-width="2"/>' +
+      '<path d="M6 12h12M12 6v12" stroke="#a371f7" stroke-width="1.5"/>';
+    main.appendChild(s);
+  }
+</script>
+<script src="/common.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stress 3D</title>
+<style>html,body{margin:0;height:100%;background:#05070a;overflow:hidden}canvas{display:block;width:100%;height:100%}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const params = new URLSearchParams(location.search);
+  // A fixed drawing-buffer size makes the GPU comparison independent of the
+  // chrome layout (Astra's sidebar changes the content rect) and of DPR.
+  const fixedW = Number(params.get('w') || 0);
+  const fixedH = Number(params.get('h') || 0);
+  const sync = params.get('sync') === '1';
+  const gl = canvas.getContext('webgl2', { antialias: false, powerPreference: 'high-performance' });
+  if (!gl) {
+    document.body.innerHTML = '<h1 style="color:#f66">no webgl2</h1>';
+    return;
+  }
+  const vsSrc = `#version 300 es
+  in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+  const fsSrc = `#version 300 es
+  precision highp float;
+  uniform vec2 res;
+  uniform float time;
+  out vec4 outColor;
+
+  float sdSphere(vec3 p, float r){ return length(p) - r; }
+  float sdBox(vec3 p, vec3 b){ vec3 q = abs(p) - b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
+  float map(vec3 p){
+    float t = time * 0.7;
+    vec3 q = p;
+    q.xz = mat2(cos(t), -sin(t), sin(t), cos(t)) * q.xz;
+    float a = sdSphere(q - vec3(0.0, 0.0, 0.0), 1.0);
+    float b = sdBox(q - vec3(0.0, 0.0, 0.0), vec3(0.72));
+    float d = max(a, -b);
+    for (int i = 0; i < 7; i++) {
+      float fi = float(i);
+      vec3 c = vec3(sin(fi * 2.1 + t) * 1.8, cos(fi * 1.7 - t * 0.8) * 1.8, cos(fi * 2.9 + t) * 1.8);
+      d = min(d, sdSphere(p - c, 0.38 + 0.1 * sin(fi + t)));
+    }
+    return d;
+  }
+  vec3 normalAt(vec3 p){
+    vec2 e = vec2(0.0015, 0.0);
+    return normalize(vec3(map(p+e.xyy)-map(p-e.xyy), map(p+e.yxy)-map(p-e.yxy), map(p+e.yyx)-map(p-e.yyx)));
+  }
+  void main(){
+    vec2 uv = (gl_FragCoord.xy * 2.0 - res) / res.y;
+    vec3 ro = vec3(0.0, 0.2, -4.2);
+    vec3 rd = normalize(vec3(uv, 1.55));
+    float t = 0.0;
+    float hit = 0.0;
+    for (int i = 0; i < 110; i++) {
+      vec3 p = ro + rd * t;
+      float d = map(p);
+      if (d < 0.001) { hit = 1.0; break; }
+      t += d * 0.9;
+      if (t > 24.0) break;
+    }
+    vec3 col = vec3(0.015, 0.02, 0.035) + 0.12 * vec3(uv.x*0.5+0.5, uv.y*0.5+0.5, 0.8);
+    if (hit > 0.5) {
+      vec3 p = ro + rd * t;
+      vec3 n = normalAt(p);
+      vec3 light = normalize(vec3(0.6, 0.8, -0.4));
+      float diff = max(dot(n, light), 0.0);
+      float spec = pow(max(dot(reflect(-light, n), -rd), 0.0), 48.0);
+      col = vec3(0.18, 0.42, 0.85) * diff + vec3(0.9) * spec + vec3(0.03, 0.05, 0.08);
+    }
+    // Tonemap + vignette so the fragment cost stays real.
+    col = col / (col + vec3(1.0));
+    col *= 1.0 - 0.25 * dot(uv, uv);
+    outColor = vec4(pow(col, vec3(0.9)), 1.0);
+  }`;
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const uRes = gl.getUniformLocation(prog, 'res');
+  const uTime = gl.getUniformLocation(prog, 'time');
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  let frames = 0;
+  function resize() {
+    if (fixedW && fixedH) {
+      if (canvas.width !== fixedW || canvas.height !== fixedH) {
+        canvas.width = fixedW;
+        canvas.height = fixedH;
+      }
+      return;
+    }
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  }
+  const t0 = performance.now();
+  function frame(now) {
+    resize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, (now - t0) / 1000);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // With sync=1 the callback rate measures completed GPU work instead of
+    // the compositor's vsync rate (rAF can otherwise run ahead of the GPU).
+    if (sync) gl.finish();
+    frames += 1;
+    if (frames % 60 === 0) {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      window.__glRenderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.addEventListener('resize', resize);
+})();
+</script>
+<script src="/common.js"></script>
+</body>
+</html>

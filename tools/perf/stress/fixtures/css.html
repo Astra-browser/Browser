@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stress CSS</title>
+<style>
+  html,body{margin:0;height:100%;background:#080b10;overflow:hidden}
+  .stage{position:absolute;inset:0;perspective:900px}
+  .layer{position:absolute;width:260px;height:260px;border-radius:28px;
+    background:conic-gradient(from 90deg,#1f6feb,#a371f7,#2ea043,#f0883e,#1f6feb);
+    filter:blur(14px) saturate(1.2);opacity:.75;mix-blend-mode:screen;
+    animation:spin var(--dur,14s) linear infinite, drift var(--dur2,9s) ease-in-out infinite alternate;
+    will-change:transform,opacity}
+  @keyframes spin{to{transform:rotate(360deg) scale(1.15)}}
+  @keyframes drift{from{translate:-80px -40px}to{translate:80px 40px}}
+  .copy{position:absolute;left:20px;bottom:16px;color:#dbe7f5;font:13px ui-monospace,monospace;z-index:9}
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<div class="copy">compositor stress — 64 blurred, blended, animated layers</div>
+<script>
+  const stage = document.getElementById('stage');
+  for (let i = 0; i < 64; i++) {
+    const d = document.createElement('div');
+    d.className = 'layer';
+    d.style.left = `${(i * 137) % 92}%`;
+    d.style.top = `${(i * 71) % 88}%`;
+    d.style.setProperty('--dur', `${8 + (i % 11)}s`);
+    d.style.setProperty('--dur2', `${6 + (i % 7)}s`);
+    d.style.animationDelay = `${-i * 0.17}s`;
+    stage.appendChild(d);
+  }
+</script>
+<script src="/common.js"></script>
+</body>
+</html>

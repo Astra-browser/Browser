@@ -142,3 +142,148 @@ Deliberately NOT measured in this task: pulling a ~large stock Firefox ESR
   proxy). Owner confirms before they gate.
 - `$generichide` cosmetic path and `serialize()`/snapshot reload cost are
   measured at unit level in `crates/astra-blocker`; not repeated here.
+
+## 7. Stress matrix — UI + wiring phase (2026-11-03)
+
+`tools/perf/stress/` is a loopback-only stress harness that samples CPU, PSS,
+DRM GPU engine time, GPU memory, iGPU rc6 and dGPU telemetry together while
+the real headed build runs. It covers one tab, New Tab, 8 static tabs, 2/6
+1080p videos, 1/4 WebGL tabs, a mixed 8-tab run, 6 memory-heavy tabs and a
+real-click UI tour, against both the Astra dev build and the installed stock
+Firefox 159.
+
+Results: `STRESS_REPORT.md` (consolidated) and `observations.md` (one block per
+run); raw samples in `out/stress-final/`. Headline: **settled idle is fine and
+memory is +~75 MiB**, but a fast page load leaves the tab in `loading: true`
+for 15 s (`Content.watch()` waits for a poll to see `isLoadingDocument=true`),
+so the shell skeleton/spinner and favicon orbit burn ~0.4–0.5 core and ~12–15%
+GPU after the page is already painted. A focused 3D rerun also showed no 60 Hz
+cap: Astra held ~144 rAF/s at ~58% GPU vs stock ~139 at ~43%. Background
+docshells stay active, so parked tabs still report `visible` and background
+video/JS work costs more than stock.
+
+### 7.1 Percentage deltas — Astra vs stock Firefox
+
+Positive Δ = Astra higher. Δ% is `(Astra − Firefox) / Firefox`; the absolute columns are the truth when the baseline is near zero. Stock is Firefox 159.0; Astra is ESR 153.6.0, so some delta is version-related. `n/a` means the Firefox baseline was exactly 0.
+
+**Headline**
+
+| Metric | Astra | Firefox | Δ | Δ% |
+|---|---|---|---|---|
+| One page — settled PSS | 509.4 MiB | 436.0 MiB | +73.4 MiB | +16.8% |
+| New Tab — settled PSS | 512.3 MiB | 431.7 MiB | +80.6 MiB | +18.7% |
+| 8 static tabs — settled PSS | 562.8 MiB | 500.1 MiB | +62.7 MiB | +12.5% |
+| 6 videos — settled PSS | 760.7 MiB | 687.7 MiB | +73.0 MiB | +10.6% |
+| 6 videos — settled CPU | 0.45 cores | 0.28 cores | +0.17 cores | +62.5% |
+| 6 videos — GPU video engine | 15.2% | 3.8% | +11.5 pp | +304.5% |
+| 4 3D tabs — settled CPU | 0.67 cores | 0.27 cores | +0.40 cores | +148.5% |
+| 4 3D tabs — settled PSS | 631.4 MiB | 478.4 MiB | +153.0 MiB | +32.0% |
+| 4 3D tabs — GPU memory | 462.5 MiB | 230.9 MiB | +231.6 MiB | +100.3% |
+| 3D 720p — rAF/s | 143.6 | 139.4 | +4.2 | +3.0% |
+| 3D 720p — GPU render | 58.4% | 43.0% | +15.3 pp | +35.6% |
+| One page — first-10s CPU | 0.44 cores | 0.03 cores | +0.42 cores | +1550.0% |
+| One page — first-10s GPU | 12.0% | 0.0% | +12.0% | n/a (from 0) |
+| Cold start — spawn→UI ready | 1.88–2.14 s | 1.41–1.51 s | +0.4–0.6 s | +30–40% |
+
+**Settled memory (PSS, MiB)**
+
+| Scenario | Astra | Firefox | Δ MiB | Δ% |
+|---|---|---|---|---|
+| baseline-1tab | 509.4 | 436.0 | +73.4 | +16.8% |
+| baseline-newtab | 512.3 | 431.7 | +80.6 | +18.7% |
+| tabs-8static | 562.8 | 500.1 | +62.7 | +12.5% |
+| video-2 | 626.2 | 522.8 | +103.4 | +19.8% |
+| video-6 | 760.7 | 687.7 | +73.0 | +10.6% |
+| 3d-1 | 511.5 | 456.2 | +55.3 | +12.1% |
+| 3d-4 | 631.4 | 478.4 | +153.0 | +32.0% |
+| mixed-8 | 748.4 | 623.9 | +124.5 | +20.0% |
+| memory-6 | 1028.5 | 974.0 | +54.5 | +5.6% |
+| ui-tour | 672.8 | 593.4 | +79.4 | +13.4% |
+
+**Settled CPU (cores)**
+
+| Scenario | Astra | Firefox | Δ cores | Δ% |
+|---|---|---|---|---|
+| baseline-1tab | 0.00 | 0.00 | +0.00 | n/a |
+| baseline-newtab | 0.04 | 0.00 | +0.04 | n/a (from 0) |
+| tabs-8static | 0.04 | 0.02 | +0.02 | +107.7% |
+| video-2 | 0.23 | 0.19 | +0.04 | +19.4% |
+| video-6 | 0.45 | 0.28 | +0.17 | +62.5% |
+| 3d-1 | 0.35 | 0.29 | +0.06 | +21.9% |
+| 3d-4 | 0.67 | 0.27 | +0.40 | +148.5% |
+| mixed-8 | 5.81 | 4.23 | +1.58 | +37.3% |
+| memory-6 | 0.02 | 0.02 | +0.00 | +8.7% |
+| ui-tour | 0.10 | 0.22 | -0.12 | -55.0% |
+
+**Post-load transient CPU (first 10 s, cores)**
+
+| Scenario | Astra | Firefox | Δ cores | Δ% |
+|---|---|---|---|---|
+| baseline-1tab | 0.44 | 0.03 | +0.42 | +1550.0% |
+| baseline-newtab | 0.05 | 0.02 | +0.03 | +140.3% |
+| tabs-8static | 0.53 | 0.02 | +0.51 | +2275.3% |
+| video-2 | 0.23 | 0.21 | +0.02 | +11.9% |
+| video-6 | 0.52 | 0.34 | +0.18 | +51.5% |
+| 3d-1 | 0.63 | 0.28 | +0.34 | +121.0% |
+| 3d-4 | 0.71 | 0.30 | +0.41 | +136.9% |
+| mixed-8 | 5.63 | 4.23 | +1.40 | +33.1% |
+| memory-6 | 0.57 | 0.02 | +0.55 | +3169.8% |
+| ui-tour | 0.71 | 0.20 | +0.51 | +249.1% |
+
+**GPU engines (settled)**
+ 
+| Scenario | Render Astra | Render Firefox | Δ render | Δ% | Video Astra | Video Firefox | Δ video | Δ% |
+|---|---|---|---|---|---|---|---|---|
+| baseline-1tab | 0.0% | 0.0% | +0.0 pp | n/a | 0.0% | 0.0% | +0.0 pp | n/a |
+| baseline-newtab | 0.0% | 0.0% | +0.0 pp | n/a | 0.0% | 0.0% | +0.0 pp | n/a |
+| tabs-8static | 0.0% | 0.0% | +0.0 pp | n/a | 0.0% | 0.0% | +0.0 pp | n/a |
+| video-2 | 0.9% | 0.9% | -0.0 pp | -1.1% | 5.0% | 3.9% | +1.1 pp | +28.3% |
+| video-6 | 0.9% | 0.8% | +0.0 pp | +2.4% | 15.2% | 3.8% | +11.5 pp | +304.5% |
+| 3d-1 | 58.4% | 43.0% | +15.3 pp | +35.6% | 0.0% | 0.0% | +0.0 pp | n/a |
+| 3d-4 | 48.6% | 51.9% | -3.3 pp | -6.3% | 0.0% | 0.0% | +0.0 pp | n/a |
+| mixed-8 | 1.0% | 0.9% | +0.1 pp | +6.7% | 5.5% | 4.1% | +1.5 pp | +36.7% |
+| memory-6 | 0.0% | 0.0% | +0.0 pp | n/a | 0.0% | 0.0% | +0.0 pp | n/a |
+| ui-tour | 0.0% | 4.6% | -4.6 pp | -100.0% | 0.0% | 0.0% | +0.0 pp | n/a |
+ 
+**GPU memory (settled, MiB)**
+ 
+| Scenario | Astra | Firefox | Δ MiB | Δ% |
+|---|---|---|---|---|
+| baseline-1tab | 201.3 | 187.0 | +14.3 | +7.6% |
+| baseline-newtab | 231.3 | 164.3 | +67.0 | +40.8% |
+| tabs-8static | 207.7 | 207.2 | +0.5 | +0.2% |
+| video-2 | 312.2 | 264.2 | +48.1 | +18.2% |
+| video-6 | 489.4 | 274.8 | +214.6 | +78.1% |
+| 3d-1 | 239.5 | 142.8 | +96.7 | +67.7% |
+| 3d-4 | 462.5 | 230.9 | +231.6 | +100.3% |
+| mixed-8 | 371.0 | 271.1 | +99.9 | +36.8% |
+| memory-6 | 199.0 | 199.3 | -0.3 | -0.2% |
+| ui-tour | 231.8 | 153.1 | +78.7 | +51.4% |
+
+**3D and per-frame efficiency (settled)**
+
+| Metric | Astra | Firefox | Δ | Δ% |
+|---|---|---|---|---|
+| 3d-1 rAF/s | 143.6 | 139.4 | +4.2 | +3.0% |
+| 3d-1 CPU cores/frame | 0.2435 | 0.2057 | +0.0378 | +18.4% |
+| 3d-1 GPU %/frame | 0.4063 | 0.3087 | +0.0976 | +31.6% |
+| 3d-4 rAF/s | 143.1 | 144.1 | -1.0 | -0.7% |
+| 3d-4 CPU cores/frame | 0.4683 | 0.1872 | +0.2811 | +150.2% |
+| 3d-4 GPU %/frame | 0.3400 | 0.3604 | -0.0204 | -5.7% |
+
+**Behaviour counts (not percentages)**
+
+| Scenario | Astra visibility mismatches | Firefox |
+|---|---|---|
+| baseline-1tab | 0 | 0 |
+| baseline-newtab | 0 | 0 |
+| tabs-8static | 7 | 0 |
+| video-2 | 1 | 0 |
+| video-6 | 5 | 0 |
+| 3d-1 | 0 | 0 |
+| 3d-4 | 3 | 0 |
+| mixed-8 | 7 | 0 |
+| memory-6 | 5 | 0 |
+| ui-tour | 0 | 0 |
+
+Notes: `ui-tour` stock opens `about:preferences`, so its GPU/CPU columns are not an apples-to-apples UI comparison. `tabs-8static`, `memory-6` and `video-2` CPU percentages sit on 0.02–0.23-core baselines and are noisy; the absolute delta is the useful figure. `3d-4` CPU/frame includes the extra parent cost of four live tabs, not pure 3D rendering. The visibility mismatch column is the number of parked pages that still report `document.visibilityState = visible`.
