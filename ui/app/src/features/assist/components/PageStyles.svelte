@@ -21,7 +21,7 @@
     let live = true;
     commands.pageStylesAll(id).then(
       (view) => {
-        if (live) sites = view.sites;
+        if (live) sites = Array.isArray(view?.sites) ? view.sites : [];
       },
       () => {
         if (live) failed = true;

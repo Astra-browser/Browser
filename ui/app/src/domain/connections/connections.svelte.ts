@@ -139,8 +139,9 @@ export class ConnectionsSession {
     }
   }
 
-  private adopt(response: WorkConnectionsResponseV1, tools: boolean): boolean {
-    if (response.version !== 1 || response.profile !== this.profile || response.error) return false;
+  private adopt(response: WorkConnectionsResponseV1 | null, tools: boolean): boolean {
+    if (!response || response.version !== 1 || response.profile !== this.profile || response.error)
+      return false;
     this.unavailable = false;
     if (tools) this.clis = response.clis;
     this.servers = response.servers;

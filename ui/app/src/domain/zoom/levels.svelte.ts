@@ -42,13 +42,14 @@ export class ZoomLevelsSession {
     );
     if (answer.state === "aborted") return false;
     this.busy = false;
-    if (answer.state !== "received" || answer.value.kind !== "levels") {
+    const view = answer.state === "received" ? answer.value : null;
+    if (!view || view.kind !== "levels") {
       this.unavailable = true;
       return false;
     }
     this.unavailable = false;
     this.loaded = true;
-    this.levels = answer.value.levels;
+    this.levels = Array.isArray(view.levels) ? view.levels : [];
     return true;
   }
 }

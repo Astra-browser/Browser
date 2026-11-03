@@ -45,6 +45,7 @@ export class WorkSitesSession {
     if (generation !== this.generation) return false;
     if (
       response.state !== "received" ||
+      !response.value ||
       response.value.version !== 1 ||
       response.value.profile !== this.profile ||
       response.value.error

@@ -22,6 +22,7 @@ export async function noteCall(
   );
   if (result.state !== "received") return { kind: "error", error: "outcome_unknown" };
   const reply = result.value;
+  if (!reply || !reply.response) return { kind: "error", error: "outcome_unknown" };
   if (reply.profile !== profile && reply.response.kind !== "error")
     return { kind: "error", error: "unavailable" };
   return reply.response;

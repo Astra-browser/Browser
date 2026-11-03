@@ -90,7 +90,7 @@ export async function refresh(): Promise<void> {
   const result = await commands.webExtensionList();
   if (result.status === "ok") {
     available = true;
-    installed = result.data;
+    installed = Array.isArray(result.data) ? result.data : [];
     if (settling !== null && named(settling)?.state !== "starting") settling = null;
     // Extensions start in the background after a change; follow them until
     // every one has settled.
