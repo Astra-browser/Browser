@@ -101,7 +101,12 @@ export function createSearchController(options: {
 
   async function send() {
     if (disposed || composing) return;
-    if (new TextEncoder().encode(query).byteLength > 2048) {
+    // A field holding only spaces asks what an empty field asks; send it as
+    // the empty query so the host answers with the same thing (its home list)
+    // instead of a search for the spaces. Text that has words keeps the exact
+    // spelling typed, since the host trims and echoes what it searched for.
+    const text = query.trim() === "" ? "" : query;
+    if (new TextEncoder().encode(text).byteLength > 2048) {
       publish({
         results: [],
         completion: null,
@@ -112,7 +117,7 @@ export function createSearchController(options: {
       });
       return;
     }
-    if (!options.owner || (!query.trim() && options.emptyQuery === "skip")) {
+    if (!options.owner || (!text && options.emptyQuery === "skip")) {
       visible = [];
       completion = null;
       answered = "";
@@ -145,7 +150,7 @@ export function createSearchController(options: {
         });
     }, RESPONSE_DEADLINE_MS);
     try {
-      if (!(await options.send(query, request.request_id))) fail(request);
+      if (!(await options.send(text, request.request_id))) fail(request);
     } catch {
       fail(request);
     }

@@ -158,6 +158,18 @@ test("a visit and the bookmark saved for it are one row", async () => {
   );
 });
 
+test("a field holding only spaces asks what an empty field asks", async () => {
+  const screen = await render(LauncherPanel, { props: { context, destinations } });
+  await reply("", [visit("GitHub", "https://github.com/")]);
+  await expect.element(screen.getByRole("option", { name: /GitHub/u })).toBeVisible();
+  await screen.getByRole("combobox").fill("   ");
+  // The host trims a query, so a field with no words in it is the empty
+  // question; asked as spaces it would come back as a different list and take
+  // the home rows away with it.
+  await reply("", [visit("GitHub", "https://github.com/")]);
+  await expect.element(screen.getByRole("option", { name: /GitHub/u })).toBeVisible();
+});
+
 test("home offers recent tabs and destinations, growing only as results need space", async () => {
   const onTool = vi.fn();
   const screen = await render(LauncherPanel, { props: { context, destinations, onTool } });
