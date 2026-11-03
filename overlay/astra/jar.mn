@@ -15,9 +15,9 @@
 #   resource://astra/host/schemas/*.json (P1-T10, protocol is authoritative)
 
 astra.jar:
-% content astra %content/astra/ contentaccessible=yes
-% resource astra %content/astra/res/ contentaccessible=yes
-% resource astra-app %content/astra/app/ contentaccessible=yes
+% content astra %content/astra/
+% resource astra %content/astra/res/
+% resource astra-app %content/astra/app/
   content/astra/hello.html               (chrome/hello.html)
   content/astra/res/shell-chrome.css     (chrome/shell-chrome.css)
   content/astra/res/shell/shell.mjs      (chrome/shell/shell.mjs)
