@@ -9,7 +9,11 @@ import * as launch from "$session/motion.svelte";
 import * as sidebar from "$session/sidebar-mode.svelte";
 import Shell from "../Shell.svelte";
 
-const native = vi.hoisted(() => ({ width: vi.fn(async () => {}) }));
+const native = vi.hoisted(() => ({
+  width: vi.fn<(value: number | null, animate: boolean, revision: number | null) => Promise<void>>(
+    async () => {},
+  ),
+}));
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
