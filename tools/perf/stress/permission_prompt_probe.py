@@ -10,8 +10,9 @@ app must render the Astra prompt, a real click on "Allow while visiting the
 site" must travel the bridge -> host route -> Permissions.respond path, and
 the engine must record the decision in `Services.perms`.
 
-Two loopback origins are used because one origin cannot show two first
-prompts: 127.0.0.1 is allowed, localhost is denied.
+Every origin is a distinct loopback address so each case gets its own first
+prompt: 127.0.0.1 allows, localhost denies, 127.0.0.2 navigates away while the
+prompt is up, 127.0.0.3 closes the tab while the prompt is up.
 """
 import http.server
 import json
@@ -52,10 +53,12 @@ PAGE = """<!doctype html>
 <p>ASTRA-GEO</p>
 """
 
+PLAIN = "<!doctype html><meta charset=\"utf-8\"><title>ASTRA-PLAIN</title><p>plain</p>"
+
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 (stdlib callback name)
-        body = PAGE.encode()
+        body = (PLAIN if self.path.startswith("/plain") else PAGE).encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -91,14 +94,7 @@ const done = arguments[arguments.length - 1];
     const off = host.addEventListener((event) => {
       if (event?.type === "page-permission-prompt-changed") seen.push(event);
     });
-    const shellDoc = document;
-    let frame = null;
-    for (let i = 0; i < 60; i += 1) {
-      frame = shellDoc.querySelector("iframe.astra-app-frame");
-      if (frame?.contentDocument?.querySelector("[data-astra-page-permission-prompt]")) break;
-      frame = frame ?? shellDoc.querySelector("iframe.astra-app-frame");
-      await wait(250);
-    }
+    const frame = document.querySelector("iframe.astra-app-frame");
     if (!frame) {
       off();
       done(JSON.stringify({ error: "no app frame in the shell window" }));
@@ -106,28 +102,37 @@ const done = arguments[arguments.length - 1];
     }
     const frameDoc = frame.contentDocument;
 
+    const waitForPrompt = async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const view = host.Permissions.current();
+        if (view.prompt) return view.prompt;
+        await wait(250);
+      }
+      return null;
+    };
+    const waitForRendered = async () => {
+      for (let i = 0; i < 40; i += 1) {
+        const node = frameDoc.querySelector("[data-astra-page-permission-prompt]");
+        if (node) return node;
+        await wait(250);
+      }
+      return null;
+    };
+    const browserFor = (astraTabId) => {
+      for (const tab of gBrowser.tabs) {
+        if (tab.getAttribute("astra-tab-id") === astraTabId) return tab.linkedBrowser;
+      }
+      return null;
+    };
+
     const openAndExpect = async (url, label) => {
       const made = await host.Tabs.create({ request_id: `p6b-open-${label}`, url });
       if (made?.error) throw new Error(`tab create failed: ${made.error.message}`);
-      const browser = gBrowser.getBrowserForTab(
-        gBrowser.tabs[gBrowser.tabs.length - 1]
-      );
-      let prompt = null;
-      for (let i = 0; i < 60; i += 1) {
-        const view = host.Permissions.current();
-        if (view.prompt) { prompt = view.prompt; break; }
-        await wait(250);
-      }
+      const prompt = await waitForPrompt();
       if (!prompt) throw new Error(`no Astra prompt for ${url}`);
-      // The app must be showing it, not just the host holding it.
-      let rendered = null;
-      for (let i = 0; i < 40; i += 1) {
-        rendered = frameDoc.querySelector("[data-astra-page-permission-prompt]");
-        if (rendered) break;
-        await wait(250);
-      }
+      const rendered = await waitForRendered();
       if (!rendered) throw new Error(`the Astra prompt did not render for ${url}`);
-      return { browser, prompt, rendered, astra_tab_id: made.astra_tab_id };
+      return { prompt, rendered, astra_tab_id: made.astra_tab_id, browser: browserFor(made.astra_tab_id) };
     };
 
     // --- allow -----------------------------------------------------------
@@ -141,11 +146,10 @@ const done = arguments[arguments.length - 1];
     step("prompt is rememberable", allow.prompt.rememberable === true);
     step("prompt is fenced to the Astra tab", allow.prompt.item_id === allow.astra_tab_id, [allow.prompt.item_id, allow.astra_tab_id]);
     step("prompt uses the default profile", allow.prompt.profile_id === "default", allow.prompt.profile_id);
+    step("prompt is not blocked by the system", allow.prompt.blocked_by_system === false);
     step("prompt starts unknown", before !== Services.perms.ALLOW_ACTION, before);
-    const revision = host.Permissions.current().projection_revision;
-    step("revision is 32 hex", /^[0-9a-f]{32}$/.test(revision), revision);
+    step("revision is 32 hex", /^[0-9a-f]{32}$/.test(host.Permissions.current().projection_revision));
 
-    // Real click: the app's own button, through the bridge route.
     await wait(700); // the prompt refuses a click aimed at what it covered
     const buttons = [...allow.rendered.querySelectorAll("button")];
     const allowAlways = buttons.find((b) => (b.textContent ?? "").includes("Allow while visiting"));
@@ -159,9 +163,15 @@ const done = arguments[arguments.length - 1];
     step("the prompt closed after the click", closed);
     const after = Services.perms.testExactPermissionFromPrincipal(allowPrincipal, "geo");
     step("Services.perms records the allow", after === Services.perms.ALLOW_ACTION, after);
+    let shared = false;
+    for (let i = 0; i < 20; i += 1) {
+      if (allow.browser?._sharingState?.geo === true) { shared = true; break; }
+      await wait(100);
+    }
+    step("the tab reports location sharing", shared, allow.browser?._sharingState?.geo);
     let title = "";
     for (let i = 0; i < 60; i += 1) {
-      title = allow.browser.contentTitle ?? "";
+      title = allow.browser?.contentTitle ?? "";
       if (title === "ASTRA-PERM-granted") break;
       await wait(250);
     }
@@ -177,7 +187,6 @@ const done = arguments[arguments.length - 1];
     const denyButtons = [...deny.rendered.querySelectorAll("button")];
     let denyAlways = denyButtons.find((b) => (b.textContent ?? "").includes("Always block"));
     if (!denyAlways) {
-      // The app's copy may differ; the durable deny is the last choice.
       const durable = denyButtons.filter((b) => !(b.textContent ?? "").includes("this time"));
       denyAlways = durable[durable.length - 1];
     }
@@ -191,20 +200,46 @@ const done = arguments[arguments.length - 1];
     step("the deny prompt closed", deniedClosed);
     const deniedState = Services.perms.testExactPermissionFromPrincipal(denyPrincipal, "geo");
     step("Services.perms records the deny", deniedState === Services.perms.DENY_ACTION, deniedState);
+    step("the tab stops reporting sharing", deny.browser?._sharingState?.geo !== true, deny.browser?._sharingState?.geo);
     let denyTitle = "";
     for (let i = 0; i < 60; i += 1) {
-      denyTitle = deny.browser.contentTitle ?? "";
+      denyTitle = deny.browser?.contentTitle ?? "";
       if (denyTitle === "ASTRA-PERM-denied") break;
       await wait(250);
     }
     step("the page observes denied", denyTitle === "ASTRA-PERM-denied", denyTitle);
 
-    step("prompt events were published", seen.length >= 4, seen.length);
+    // --- navigate away with the prompt up --------------------------------
+    const away = await openAndExpect(`http://127.0.0.2:__PORT__/away.html`, "away");
+    await host.Navigation.loadURL({
+      request_id: "p6b-away-nav",
+      astra_tab_id: away.astra_tab_id,
+      url: `http://127.0.0.2:__PORT__/plain.html`,
+    });
+    let awayCleared = false;
+    for (let i = 0; i < 60; i += 1) {
+      if (!host.Permissions.current().prompt) { awayCleared = true; break; }
+      await wait(250);
+    }
+    step("navigating away closes the prompt", awayCleared);
+    step("navigating away leaves nothing queued", host.Permissions.pending().length === 0, host.Permissions.pending());
+
+    // --- close the tab with the prompt up --------------------------------
+    const closing = await openAndExpect(`http://127.0.0.3:__PORT__/close.html`, "close");
+    await host.Tabs.close({ request_id: "p6b-close", astra_tab_id: closing.astra_tab_id });
+    let closeCleared = false;
+    for (let i = 0; i < 60; i += 1) {
+      if (!host.Permissions.current().prompt) { closeCleared = true; break; }
+      await wait(250);
+    }
+    step("closing the tab closes the prompt", closeCleared);
+    step("closing the tab leaves nothing queued", host.Permissions.pending().length === 0, host.Permissions.pending());
+
+    step("prompt events were published", seen.length >= 8, seen.length);
     step(
-      "the first event carried a prompt and the last cleared it",
-      seen.length >= 4 && seen[0].data?.prompt !== null && seen[seen.length - 1].data?.prompt === null
+      "the last event cleared the prompt",
+      seen.length > 0 && seen[seen.length - 1].data?.prompt === null
     );
-    step("no prompt is left waiting", host.Permissions.pending().length === 0, host.Permissions.pending());
 
     Services.perms.removeFromPrincipal(allowPrincipal, "geo");
     Services.perms.removeFromPrincipal(denyPrincipal, "geo");
@@ -219,9 +254,11 @@ const done = arguments[arguments.length - 1];
 
 
 def main():
-    httpd = Server(("0.0.0.0", PORT), Handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
+    servers = []
+    for address in ("127.0.0.1", "127.0.0.2", "127.0.0.3"):
+        server = Server((address, PORT), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        servers.append(server)
     profile = tempfile.mkdtemp(prefix="astra-permprompt-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
         fh.write(f'user_pref("marionette.port", {MPORT});\n')
@@ -254,7 +291,8 @@ def main():
             except Exception:
                 pass
         log.close()
-        httpd.shutdown()
+        for server in servers:
+            server.shutdown()
         if out.get("ok") is True:
             shutil.rmtree(profile, ignore_errors=True)
         else:

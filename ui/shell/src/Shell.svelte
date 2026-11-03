@@ -151,9 +151,10 @@
     }
 
     // P6b: replace the engine's own prompt for the page permissions the app
-    // renders. Idempotent per process, and safe to retry from another window.
+    // renders. The integration is process-wide; this window joins the routing
+    // registry. Safe to retry from another window.
     try {
-      await host.Permissions?.install?.();
+      await host.Permissions?.install?.({ window: win });
     } catch {
       // Without the integration the engine keeps its own prompt; nothing is
       // silently granted because of this failure.
@@ -410,6 +411,13 @@
         appBooted = mode === "host";
         if (!appBooted) {
           appError = `app booted in ${mode} mode, expected host`;
+        } else {
+          // A prompt raised before the app frame subscribed must still show.
+          try {
+            void host.Permissions?.republish?.();
+          } catch {
+            // No permission surface in a preview DOM.
+          }
         }
       },
       onFailure: (message) => {
@@ -830,6 +838,13 @@
       gbrowserRoot.removeAttribute("data-astra-gbrowser");
       gbrowserRoot.removeAttribute("data-astra-stage");
       gbrowserRoot.removeAttribute("data-astra-native-mounted");
+      // Leaving the routing registry keeps a closed window from receiving
+      // another tab's permission prompt.
+      try {
+        void host.Permissions?.uninstall?.({ window: win });
+      } catch {
+        // Already gone with the window.
+      }
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
       } catch {

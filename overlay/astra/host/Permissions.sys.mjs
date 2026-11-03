@@ -11,16 +11,19 @@
 // - This module owns the prompt state machine (queue, stale fences, revision,
 //   decision validation, settlement admission). It is pure logic and imports
 //   in Node, so the contract test exercises the exact chrome behaviour.
-// - The chrome integration (`Permissions.install`) is the only place that
-//   knows Firefox: it replaces the engine's own prompt for Astra tabs and
-//   supplies the engine allow/cancel/persist closures.
+// - `install()` is the only place that knows Firefox: it registers one
+//   process-wide `Integration.contentPermission` override and routes each
+//   request to the host instance of the window that owns the tab.
 //
 // SECURITY - trust boundary:
-// - The prompt token is the capability. `respond` requires the token plus the
-//   exact profile/item the prompt was published for; anything else is refused
-//   as `invalid_scope` and changes nothing.
+// - The prompt token plus the exact profile/item is the capability. `respond`
+//   requires all three; anything else is refused as `invalid_scope` and
+//   changes nothing.
 // - A decision is single-shot: the record leaves the queue before the engine
 //   is touched, so a replayed or double-clicked response cannot resolve twice.
+// - A prompt is fenced to the document it was raised for. When the browser
+//   navigates or the tab closes, the prompt is cancelled, and `respond` also
+//   refuses a request whose document already changed.
 // - Content never reaches this module. Only chrome-privileged code can call
 //   `ask` with engine closures.
 // - A failed durable write cancels the request instead of granting it, and the
@@ -29,21 +32,20 @@
 import { emit } from "./Events.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
 
-/** Astra prompt kinds the app can render. */
-export const KINDS = new Set(["camera", "microphone", "geolocation"]);
+/** The page permissions the Astra prompt renders. Camera and microphone use
+ *  Firefox's separate WebRTC prompt (P6b follow-up); claiming them here would
+ *  intercept a request whose `allow()` needs device choices this prompt does
+ *  not collect, so only geolocation is mapped for now. */
+export const KINDS = new Set(["geolocation"]);
 
 /** Engine permission type -> Astra kind. */
 export const KIND_BY_ENGINE_TYPE = {
   geolocation: "geolocation",
-  camera: "camera",
-  microphone: "microphone",
 };
 
 /** Astra kind -> `SitePermissions` / `Services.perms` name. */
 export const ENGINE_PERMISSION_NAME = {
   geolocation: "geo",
-  camera: "camera",
-  microphone: "microphone",
 };
 
 const DECISIONS = new Set([
@@ -61,9 +63,14 @@ const DURABLE_DECISIONS = new Set(["always_allow", "always_deny"]);
  *  lexicographic admission test is correct. */
 const ZERO_REVISION = "00000000000000000000000000000000";
 
-/** One on-screen prompt is bounded by the window's tab strip; the queue only
- *  exists so a request is never dropped on the floor. */
+/** One prompt is on screen; the queue only exists so a request is never
+ *  dropped on the floor. Overflow cancels the *incoming* request, never the
+ *  prompt a person is already looking at. */
 const MAX_QUEUE = 8;
+
+/** Process-wide registry of window -> host instance, stored on the shared
+ *  IntegrationPoint so every `resource://` document instance sees it. */
+const REGISTRY = Symbol.for("astra.permissions.windows");
 
 const _records = new Map(); // prompt_id -> record
 const _queue = []; // prompt_id, oldest first
@@ -72,18 +79,24 @@ let _minted = 0;
 let _sidebarHost = false;
 let _view = { projection_revision: ZERO_REVISION, prompt: null };
 
-function randomHex8() {
-  return Math.floor(Math.random() * 0x100000000)
-    .toString(16)
-    .padStart(8, "0")
-    .slice(-8);
+function randomHex(bytes) {
+  const buffer = new Uint8Array(bytes);
+  const crypto = globalThis.crypto;
+  if (typeof crypto?.getRandomValues === "function") {
+    crypto.getRandomValues(buffer);
+  } else {
+    for (let i = 0; i < buffer.length; i += 1) {
+      buffer[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function mintPromptId() {
   _minted += 1;
   const counter = _minted.toString(16).padStart(8, "0").slice(-8);
   // Opaque echo fence: the app only ever hands this value back.
-  return `${counter}${randomHex8()}${randomHex8()}${randomHex8()}`;
+  return `${counter}${randomHex(12)}`;
 }
 
 function mintRevision() {
@@ -101,7 +114,7 @@ function publicPrompt(record) {
     rememberable: record.rememberable,
     processing: false,
     in_sidebar: _sidebarHost,
-    blocked_by_system: false,
+    blocked_by_system: record.blocked_by_system === true,
   };
 }
 
@@ -122,53 +135,118 @@ function detach(record) {
   const index = _queue.indexOf(record.prompt_id);
   if (index >= 0) _queue.splice(index, 1);
   _records.delete(record.prompt_id);
-  if (record.browser && record.onPageHide) {
-    try {
-      record.browser.removeEventListener("pagehide", record.onPageHide, true);
-    } catch {
-      // The browser was already torn down with its window.
-    }
+  try {
+    record.release?.();
+  } catch {
+    // The window or browser was already torn down.
   }
-  record.browser = null;
-  record.onPageHide = null;
+  record.release = null;
+}
+
+/** Close the prompt when its document goes away, for remote tabs too:
+ *  `pagehide` on the `<browser>` is not delivered to chrome for every tab. */
+function watchDocument(record, browser) {
+  const releases = [];
+  const close = () => {
+    if (_records.get(record.prompt_id) !== record) return;
+    detach(record);
+    try {
+      record.cancel?.();
+    } catch {
+      // Already cancelled with the document.
+    }
+    publish();
+  };
+
+  try {
+    const progress = browser.webProgress;
+    if (progress && typeof progress.addProgressListener === "function") {
+      const listener = {
+        QueryInterface:
+          typeof ChromeUtils !== "undefined"
+            ? ChromeUtils.generateQI([
+                "nsIWebProgressListener",
+                "nsISupportsWeakReference",
+              ])
+            : undefined,
+        onLocationChange() {
+          close();
+        },
+        onStateChange() {},
+        onStatusChange() {},
+        onSecurityChange() {},
+        onContentBlockingEvent() {},
+      };
+      const flags =
+        typeof Ci !== "undefined" ? Ci.nsIWebProgress.NOTIFY_LOCATION : 0;
+      progress.addProgressListener(listener, flags);
+      releases.push(() => {
+        try {
+          progress.removeProgressListener(listener);
+        } catch {
+          // Already gone with the window.
+        }
+      });
+    }
+  } catch {
+    // No progress listener: respond's own liveness check still fences it.
+  }
+
+  try {
+    // A remote `<browser>` has no `ownerGlobal`; the document still reaches
+    // the window that owns the tab.
+    const win = browser.ownerGlobal ?? browser.ownerDocument?.defaultView ?? null;
+    const container = win?.gBrowser?.tabContainer;
+    if (container && typeof container.addEventListener === "function") {
+      const onTabClose = (event) => {
+        if (event?.target?.linkedBrowser === browser) close();
+      };
+      container.addEventListener("TabClose", onTabClose);
+      releases.push(() => {
+        try {
+          container.removeEventListener("TabClose", onTabClose);
+        } catch {
+          // Already gone with the window.
+        }
+      });
+    }
+  } catch {
+    // No tab container in a preview DOM.
+  }
+
+  record.release = () => {
+    for (const release of releases) release();
+  };
 }
 
 /**
  * Publish one prompt for an engine permission request.
  *
  * `allow`/`cancel` resolve the engine request; `persist(allow, durable)` writes
- * the site decision and returns whether it landed. Both are supplied by the
- * chrome integration (or a stub in the contract test).
+ * the site decision and returns whether it landed; `rollback()` removes a
+ * durable decision the engine could not accept; `blocked_by_system` mirrors
+ * the operating-system block the engine reported.
  */
 export function ask({
   kind = "",
   origin = "",
   item_id = "",
   profile_id = "default",
-  rememberable = true,
+  rememberable = false,
   allow = null,
   cancel = null,
   persist = null,
+  rollback = null,
   principal = null,
   browser = null,
+  blocked_by_system = false,
 } = {}) {
   if (!KINDS.has(kind)) return null;
   if (typeof origin !== "string" || origin === "") return null;
   if (typeof item_id !== "string" || item_id === "") return null;
-  // Never let an unbounded queue swallow a person's current request: drop the
-  // oldest unrendered prompt and cancel it, so the engine is not left waiting.
-  while (_queue.length >= MAX_QUEUE) {
-    const oldest = _records.get(_queue[0]);
-    if (!oldest) {
-      _queue.shift();
-      continue;
-    }
-    detach(oldest);
-    try {
-      oldest.cancel?.();
-    } catch {
-      // The request may already be gone with its document.
-    }
+  if (_queue.length >= MAX_QUEUE) {
+    // The caller cancels this request; the visible prompt is untouched.
+    return null;
   }
   const record = {
     prompt_id: mintPromptId(),
@@ -177,41 +255,42 @@ export function ask({
     item_id,
     profile_id: typeof profile_id === "string" && profile_id !== "" ? profile_id : "default",
     rememberable: rememberable === true,
+    blocked_by_system: blocked_by_system === true,
     kinds: [kind],
     allow,
     cancel,
     persist,
+    rollback,
     principal,
     browser: null,
-    onPageHide: null,
+    release: null,
+    loaded_spec: "",
   };
+  if (browser) {
+    try {
+      record.loaded_spec = browser.currentURI?.spec ?? "";
+    } catch {
+      record.loaded_spec = "";
+    }
+    record.browser = browser;
+    watchDocument(record, browser);
+  }
   _records.set(record.prompt_id, record);
   _queue.push(record.prompt_id);
-  if (browser && typeof browser.addEventListener === "function") {
-    // A prompt must never outlive its page. The engine usually cancels the
-    // request with the document, but the Astra prompt is chrome state and has
-    // to close on its own when the page hides.
-    const onPageHide = () => {
-      if (_records.get(record.prompt_id) !== record) return;
-      detach(record);
-      try {
-        record.cancel?.();
-      } catch {
-        // Already cancelled with the document.
-      }
-      publish();
-    };
-    record.browser = browser;
-    record.onPageHide = onPageHide;
-    try {
-      browser.addEventListener("pagehide", onPageHide, true);
-    } catch {
-      record.browser = null;
-      record.onPageHide = null;
-    }
-  }
   publish();
   return record.prompt_id;
+}
+
+/** True when the prompt still belongs to the document it was raised for. */
+function documentIsCurrent(record) {
+  const browser = record.browser;
+  if (!browser || record.loaded_spec === "") return true;
+  try {
+    const spec = browser.currentURI?.spec ?? "";
+    return spec === "" || spec === record.loaded_spec;
+  } catch {
+    return false;
+  }
 }
 
 export const Permissions = {
@@ -240,24 +319,36 @@ export const Permissions = {
       // offer one, and chrome refuses it if it arrives anyway.
       return refuse("invalid_scope");
     }
+    if (!documentIsCurrent(record)) {
+      // The page navigated while the prompt was up. A late answer belongs to
+      // a document that is gone.
+      detach(record);
+      publish();
+      return refuse("invalid_scope");
+    }
     const wantsAllow = ALLOW_DECISIONS.has(decision);
 
     // Single-shot: leave the queue before touching the engine.
     detach(record);
 
-    let persisted = true;
-    if (typeof record.persist === "function") {
-      try {
-        persisted = record.persist(wantsAllow, durable) === true;
-      } catch {
-        persisted = false;
+    // `dismiss` decides nothing: it closes the prompt and cancels this one
+    // request without recording a block for the site.
+    let stored = true;
+    if (decision !== "dismiss") {
+      if (typeof record.persist === "function") {
+        try {
+          stored = record.persist(wantsAllow, durable) !== false;
+        } catch {
+          stored = false;
+        }
+      } else if (durable) {
+        // A durable decision with no store behind it is not a grant.
+        stored = false;
       }
-    } else if (durable) {
-      // A durable decision with no store behind it is not a grant.
-      persisted = false;
     }
 
-    const effectiveAllow = wantsAllow && persisted;
+    const effectiveAllow = wantsAllow && stored;
+    let resolved = true;
     try {
       if (effectiveAllow) {
         record.allow?.();
@@ -267,12 +358,24 @@ export const Permissions = {
         record.cancel?.();
       }
     } catch {
-      // The request went away with its document; the prompt still closes.
+      // The request went away with its document.
+      resolved = false;
     }
 
     publish();
 
-    if (!persisted) {
+    if (!resolved) {
+      if (durable && stored) {
+        // Undo a durable decision the engine never observed.
+        try {
+          record.rollback?.();
+        } catch {
+          // Best effort; the disposition already says it is unverified.
+        }
+      }
+      return admit({ outcome: "rejected", reason: "store_outcome_unknown" });
+    }
+    if (!stored) {
       return admit({ outcome: "rejected", reason: "store_admission_rejected" });
     }
     if (decision === "dismiss") {
@@ -299,6 +402,11 @@ export const Permissions = {
     };
   },
 
+  /** Re-announce the open prompt, e.g. when the app frame finished loading. */
+  republish() {
+    if (_view.prompt) publish();
+  },
+
   /** Test/diagnostic view of what is waiting, oldest first. */
   pending() {
     return _queue
@@ -313,41 +421,73 @@ export const Permissions = {
   },
 
   /**
-   * Chrome startup: replace the engine's own prompt for the kinds the app
-   * renders, and leave every other permission on Firefox's path.
-   *
-   * Idempotent per process, because every browser window mounts the shell.
+   * Chrome startup: register one process-wide override and route each request
+   * to the host instance of the window that owns the tab. Idempotent, and a
+   * closed window falls back to the engine's own prompt instead of a dead
+   * event pump.
    */
-  async install() {
-    if (_installed) return true;
+  async install({ window: win = null } = {}) {
     if (typeof ChromeUtils === "undefined") return false;
+    let point = null;
     try {
       const { Integration } = ChromeUtils.importESModule(
         "resource://gre/modules/Integration.sys.mjs"
       );
-      Integration.contentPermission.register((base) => ({
-        createPermissionPrompt(type, request) {
-          const kind = KIND_BY_ENGINE_TYPE[type];
-          if (!kind) {
-            return base.createPermissionPrompt(type, request);
-          }
-          return {
-            prompt() {
-              promptForRequest(kind, type, request);
-            },
-          };
-        },
-      }));
-      _installed = true;
-      return true;
+      point = Integration.contentPermission;
     } catch {
       return false;
+    }
+    if (!point) return false;
+    if (!point[REGISTRY]) {
+      const registry = new Map();
+      point[REGISTRY] = registry;
+      try {
+        point.register((base) => ({
+          createPermissionPrompt(type, request) {
+            const kind = KIND_BY_ENGINE_TYPE[type];
+            if (!kind) {
+              return base.createPermissionPrompt(type, request);
+            }
+            const owner = browserWindowFor(request);
+            const entry = owner ? registry.get(owner) : null;
+            if (!entry) {
+              // No Astra window owns this tab: keep the engine's own prompt.
+              return base.createPermissionPrompt(type, request);
+            }
+            return {
+              prompt() {
+                entry.promptForRequest(kind, type, request);
+              },
+            };
+          },
+        }));
+      } catch {
+        delete point[REGISTRY];
+        return false;
+      }
+    }
+    if (win) {
+      point[REGISTRY].set(win, { promptForRequest });
+    }
+    return true;
+  },
+
+  /** A closing window leaves the registry, so its prompts stop being routed. */
+  async uninstall({ window: win = null } = {}) {
+    if (!win || typeof ChromeUtils === "undefined") return;
+    try {
+      const { Integration } = ChromeUtils.importESModule(
+        "resource://gre/modules/Integration.sys.mjs"
+      );
+      Integration.contentPermission[REGISTRY]?.delete(win);
+    } catch {
+      // The process is already gone.
     }
   },
 
   /** Test-only: reset the prompt queue, revision and sidebar host. */
   __resetForTests() {
-    for (const record of _records.values()) {
+    for (const record of [..._records.values()]) {
       detach(record);
     }
     _records.clear();
@@ -356,21 +496,18 @@ export const Permissions = {
     _minted = 0;
     _sidebarHost = false;
     _view = { projection_revision: ZERO_REVISION, prompt: null };
-    _installed = false;
   },
 };
 
-let _installed = false;
-
 // --- Chrome-only engine glue -------------------------------------------------
+
+const lazyModules = {};
 
 function lazyModule(specifier, key) {
   if (typeof ChromeUtils === "undefined") return null;
   lazyModules[key] ??= ChromeUtils.importESModule(specifier)[key] ?? null;
   return lazyModules[key];
 }
-
-const lazyModules = {};
 
 function isPrivateWindow(win) {
   const PrivateBrowsingUtils = lazyModule(
@@ -386,6 +523,23 @@ function isPrivateWindow(win) {
 
 function profileForWindow(win) {
   return isPrivateWindow(win) ? "incognito" : "default";
+}
+
+function browserForRequest(request) {
+  try {
+    return request.element ?? request.window?.docShell?.chromeEventHandler ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function browserWindowFor(request) {
+  const browser = browserForRequest(request);
+  try {
+    return browser?.ownerGlobal ?? browser?.ownerDocument?.defaultView ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function tabIdForBrowser(browser) {
@@ -420,21 +574,21 @@ function sitePermissionState(principal, kind, browser) {
   return "";
 }
 
-function persistPermission(record, allow, durable) {
+function persistPermission(kind, principal, browser, allow, durable) {
   const SitePermissions = lazyModule(
     "resource:///modules/SitePermissions.sys.mjs",
     "SitePermissions"
   );
   if (!SitePermissions) return false;
-  const name = ENGINE_PERMISSION_NAME[record.kind];
+  const name = ENGINE_PERMISSION_NAME[kind];
   if (!name) return false;
   try {
     SitePermissions.setForPrincipal(
-      record.principal,
+      principal,
       name,
       allow ? SitePermissions.ALLOW : SitePermissions.BLOCK,
       durable ? SitePermissions.SCOPE_PERSISTENT : SitePermissions.SCOPE_TEMPORARY,
-      record.browser ?? undefined
+      browser ?? undefined
     );
     return true;
   } catch {
@@ -442,14 +596,77 @@ function persistPermission(record, allow, durable) {
   }
 }
 
-function promptForRequest(kind, type, request) {
-  let browser = null;
+function removePermission(kind, principal, browser) {
+  const SitePermissions = lazyModule(
+    "resource:///modules/SitePermissions.sys.mjs",
+    "SitePermissions"
+  );
+  const name = ENGINE_PERMISSION_NAME[kind];
+  if (!SitePermissions || !name) return;
   try {
-    browser = request.element ?? request.window?.docShell?.chromeEventHandler ?? null;
+    SitePermissions.removeFromPrincipal(principal, name, browser ?? undefined);
   } catch {
-    browser = null;
+    // Already removed with the window.
   }
-  const win = browser?.ownerGlobal ?? browser?.ownerDocument?.defaultView ?? null;
+}
+
+/** Geoposition is shared with the site, not just granted: the toolbar and the
+ *  site panel read this state, and "Stop sharing" clears it. */
+function setGeoSharing(browser, sharing) {
+  try {
+    // Remote browsers expose the window through their document, not
+    // `ownerGlobal`.
+    const win = browser?.ownerGlobal ?? browser?.ownerDocument?.defaultView ?? null;
+    win?.gBrowser?.updateBrowserSharing?.(browser, { geo: sharing === true });
+  } catch {
+    // No tabbrowser in a preview DOM.
+  }
+  if (!sharing) return;
+  try {
+    const host = browser?.currentURI?.host;
+    if (!host) return;
+    const { ContentPrefService2 } = ChromeUtils.importESModule(
+      "resource://gre/modules/ContentPrefService2.sys.mjs"
+    );
+    ContentPrefService2.set(
+      host,
+      "permissions.geoLocation.lastAccess",
+      new Date().toString(),
+      browser.loadContext
+    );
+  } catch {
+    // The timestamp is a nicety; the grant already happened.
+  }
+}
+
+function systemBlocked(request) {
+  try {
+    const option = request.types
+      .QueryInterface(Ci.nsIArray)
+      .queryElementAt(0, Ci.nsIContentPermissionType).options?.[0];
+    return option === "sysdlg" || option === "syssetting";
+  } catch {
+    return false;
+  }
+}
+
+function cancelQuietly(request) {
+  try {
+    request.cancel();
+  } catch {
+    // Already gone.
+  }
+}
+
+function promptForRequest(kind, type, request) {
+  const browser = browserForRequest(request);
+  if (!browser) {
+    // Fail closed: without an owning browser there is no Astra tab to fence
+    // the prompt to, and no window to render it in.
+    cancelQuietly(request);
+    return;
+  }
+  const win = browser.ownerGlobal ?? browser.ownerDocument?.defaultView ?? null;
   let principal = null;
   try {
     principal = request.getDelegatePrincipal(type);
@@ -461,23 +678,25 @@ function promptForRequest(kind, type, request) {
     }
   }
   if (!principal) {
-    // Nothing to show or store: fail closed rather than let the request hang.
-    try {
-      request.cancel();
-    } catch {
-      // Already gone.
+    cancelQuietly(request);
+    return;
+  }
+  // The engine's own prompts ignore non-standard URLs; a permission written
+  // for an opaque origin would follow the person around.
+  try {
+    if (!(principal.URI instanceof Ci.nsIStandardURL)) {
+      cancelQuietly(request);
+      return;
     }
+  } catch {
+    cancelQuietly(request);
     return;
   }
   // An existing policy answers without a prompt, exactly like the engine's own
   // PermissionPrompt.prompt() short-circuit.
   const state = sitePermissionState(principal, kind, browser);
   if (state === "block") {
-    try {
-      request.cancel();
-    } catch {
-      // Already gone.
-    }
+    cancelQuietly(request);
     return;
   }
   let delegatedUnsafe = false;
@@ -497,11 +716,7 @@ function promptForRequest(kind, type, request) {
 
   const origin = principal.origin || principal.URI?.spec || "";
   if (origin === "") {
-    try {
-      request.cancel();
-    } catch {
-      // Already gone.
-    }
+    cancelQuietly(request);
     return;
   }
 
@@ -510,20 +725,25 @@ function promptForRequest(kind, type, request) {
     origin,
     item_id: tabIdForBrowser(browser),
     profile_id: profileForWindow(win),
-    rememberable: !isPrivateWindow(win),
+    // An unsafe third-party delegate must not be granted a durable policy for
+    // an embedding page the person cannot see in this prompt.
+    rememberable: !isPrivateWindow(win) && !delegatedUnsafe,
+    blocked_by_system: systemBlocked(request),
     principal,
     browser,
-    allow: () => request.allow(),
-    cancel: () => request.cancel(),
-    persist: (allow, durable) => persistPermission({ kind, principal, browser }, allow, durable),
+    allow: () => {
+      setGeoSharing(browser, true);
+      request.allow();
+    },
+    cancel: () => {
+      setGeoSharing(browser, false);
+      request.cancel();
+    },
+    persist: (allow, durable) => persistPermission(kind, principal, browser, allow, durable),
+    rollback: () => removePermission(kind, principal, browser),
   });
   if (token === null) {
-    // Unrenderable request: do not leave the engine waiting on a prompt that
-    // does not exist.
-    try {
-      request.cancel();
-    } catch {
-      // Already gone.
-    }
+    // Unrenderable or over the queue bound: do not leave the engine waiting.
+    cancelQuietly(request);
   }
 }

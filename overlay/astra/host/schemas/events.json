@@ -42,7 +42,9 @@
         "content.location-changed",
         "items-changed",
         "sidebar.changed",
-        "ui-command"
+        "ui-command",
+        "operation-processed",
+        "page-permission-prompt-changed"
       ]
     },
     "data": { "type": "object" }

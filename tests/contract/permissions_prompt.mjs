@@ -9,12 +9,12 @@
 //   - a decision is single-shot and resolves the engine exactly once
 //   - an ephemeral context cannot receive durable policy
 //   - a failed durable write cancels instead of granting
-//   - the queue shows one prompt at a time
-//   - pagehide closes a prompt that outlived its page
+//   - the queue shows one prompt at a time and never evicts the visible one
+//   - navigation and tab close cancel a prompt that outlived its document
+//   - dismiss decides nothing: no store write, no site block
 //
 // Usage: node tests/contract/permissions_prompt.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { strict as assert } from "node:assert";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -245,6 +245,7 @@ const lastView = () => seen.filter((e) => e.type === "page-permission-prompt-cha
     decision: "dismiss",
   });
   check("dismiss cancels the request", calls.cancel === 1 && calls.allow === 0);
+  check("dismiss writes no site policy", calls.persist.length === 0);
   check("dismiss reports no_op", (await disposition(admission)).outcome === "no_op");
 }
 
@@ -315,17 +316,38 @@ const lastView = () => seen.filter((e) => e.type === "page-permission-prompt-cha
 }
 
 // --- Page lifecycle ----------------------------------------------------------
-{
-  reset();
-  const listeners = new Map();
-  const browser = {
+function fakeBrowser(spec = "https://a.example/") {
+  const state = { spec, listeners: new Map(), removed: 0, closed: false };
+  const tabContainer = {
     addEventListener(type, fn) {
-      listeners.set(type, fn);
+      state.listeners.set(`tab:${type}`, fn);
     },
     removeEventListener(type, fn) {
-      if (listeners.get(type) === fn) listeners.delete(type);
+      if (state.listeners.get(`tab:${type}`) === fn) state.listeners.delete(`tab:${type}`);
     },
   };
+  const progress = {
+    addProgressListener(fn) {
+      state.listeners.set("progress", fn);
+    },
+    removeProgressListener() {
+      state.removed += 1;
+    },
+  };
+  const browser = {
+    get currentURI() {
+      return { spec: state.spec };
+    },
+    webProgress: progress,
+    ownerGlobal: { gBrowser: { tabContainer } },
+  };
+  state.tab = { linkedBrowser: browser };
+  return { browser, state, tabContainer };
+}
+
+{
+  reset();
+  const { browser, state, tabContainer } = fakeBrowser();
   let cancelled = 0;
   Permissions.ask({
     kind: "geolocation",
@@ -338,11 +360,65 @@ const lastView = () => seen.filter((e) => e.type === "page-permission-prompt-cha
       cancelled += 1;
     },
   });
-  check("a prompt watches its page", listeners.has("pagehide"));
-  listeners.get("pagehide")();
-  check("pagehide closes the prompt", lastView().prompt === null);
-  check("pagehide cancels the engine request", cancelled === 1);
-  check("pagehide releases the listener", listeners.size === 0);
+  check("a prompt watches its document", state.listeners.has("progress"));
+  state.listeners.get("progress").onLocationChange();
+  check("navigation closes the prompt", lastView().prompt === null);
+  check("navigation cancels the engine request", cancelled === 1);
+  check("navigation releases the progress listener", state.removed === 1);
+  check("navigation releases the tab listener", !state.listeners.has("tab:TabClose"));
+  tabContainer.addEventListener; // keep the fake referenced
+}
+
+{
+  reset();
+  const { browser, state } = fakeBrowser();
+  let cancelled = 0;
+  Permissions.ask({
+    kind: "geolocation",
+    origin: "https://a.example",
+    item_id: "tab-1",
+    profile_id: "default",
+    rememberable: true,
+    browser,
+    cancel: () => {
+      cancelled += 1;
+    },
+  });
+  state.listeners.get("tab:TabClose")({ target: state.tab });
+  check("closing the tab closes the prompt", lastView().prompt === null);
+  check("closing the tab cancels the engine request", cancelled === 1);
+}
+
+{
+  // A late answer for a document that already changed is a stale fence.
+  reset();
+  const { browser, state } = fakeBrowser();
+  let allowed = 0;
+  let cancelled = 0;
+  const token = Permissions.ask({
+    kind: "geolocation",
+    origin: "https://a.example",
+    item_id: "tab-1",
+    profile_id: "default",
+    rememberable: true,
+    browser,
+    allow: () => {
+      allowed += 1;
+    },
+    cancel: () => {
+      cancelled += 1;
+    },
+  });
+  state.spec = "https://b.example/";
+  const stale = await Permissions.respond({
+    prompt_id: token,
+    profile_id: "default",
+    item_id: "tab-1",
+    decision: "allow_once",
+  });
+  check("a late answer for a new document is refused", (await disposition(stale)).reason === "invalid_scope");
+  check("a late answer never allows", allowed === 0 && cancelled === 0);
+  check("a late answer closes the prompt", lastView().prompt === null);
 }
 
 // --- Invalid descriptors -----------------------------------------------------
@@ -364,22 +440,104 @@ const lastView = () => seen.filter((e) => e.type === "page-permission-prompt-cha
   check("no prompt was published", seen.length === published && Permissions.pending().length === 0);
 }
 
-off();
-
-// --- Ledger classification ---------------------------------------------------
+// --- Further refusals --------------------------------------------------------
 {
+  reset();
+  const { token, calls } = harness();
   const bad = await Permissions.respond({
+    prompt_id: token,
+    profile_id: "default",
+    item_id: "tab-1",
+    decision: "maybe",
+  });
+  check("an invalid decision is refused", (await disposition(bad)).reason === "invalid_input");
+  check("an invalid decision resolves nothing", calls.allow === 0 && calls.cancel === 0);
+  check("an invalid decision leaves the prompt up", Permissions.pending().length === 1);
+
+  const missing = await Permissions.respond({
     prompt_id: "none",
     profile_id: "default",
     item_id: "tab-1",
     decision: "maybe",
   });
-  check("an invalid decision is refused", bad.accepted === true);
+  check("a missing token outranks the decision check", (await disposition(missing)).reason === "invalid_scope");
+}
+
+{
+  reset();
+  const { token, calls } = harness({
+    persist: () => {
+      throw new Error("store down");
+    },
+  });
+  const admission = await Permissions.respond({
+    prompt_id: token,
+    profile_id: "default",
+    item_id: "tab-1",
+    decision: "always_allow",
+  });
+  check("a throwing store is rejected", (await disposition(admission)).reason === "store_admission_rejected");
+  check("a throwing store never allows", calls.allow === 0 && calls.cancel === 1);
+}
+
+{
+  reset();
+  let allowed = 0;
+  let cancelled = 0;
+  const token = Permissions.ask({
+    kind: "geolocation",
+    origin: "https://a.example",
+    item_id: "tab-1",
+    profile_id: "default",
+    rememberable: true,
+    allow: () => {
+      allowed += 1;
+    },
+    cancel: () => {
+      cancelled += 1;
+    },
+  });
+  const admission = await Permissions.respond({
+    prompt_id: token,
+    profile_id: "default",
+    item_id: "tab-1",
+    decision: "always_allow",
+  });
+  check("a durable decision with no store is rejected", (await disposition(admission)).reason === "store_admission_rejected");
+  check("a durable decision with no store cancels", allowed === 0 && cancelled === 1);
+}
+
+{
+  reset();
   check(
-    "an invalid decision is classified invalid_scope first",
-    ["invalid_scope"].includes((await disposition(bad)).reason),
+    "ask does not grant durable policy by default",
+    (() => {
+      const t = Permissions.ask({ kind: "geolocation", origin: "https://a.example", item_id: "tab-1" });
+      Permissions.ask({ kind: "geolocation", origin: "https://a.example", item_id: "tab-1" });
+      return lastView()?.prompt?.rememberable === false;
+    })(),
   );
 }
+
+// --- Queue bound -------------------------------------------------------------
+{
+  reset();
+  const tokens = [];
+  for (let i = 0; i < 8; i += 1) {
+    tokens.push(harness().token);
+  }
+  const head = Permissions.current().prompt;
+  const overflow = Permissions.ask({
+    kind: "geolocation",
+    origin: "https://overflow.example",
+    item_id: "tab-9",
+  });
+  check("the ninth request is refused", overflow === null);
+  check("overflow keeps the visible prompt", Permissions.current().prompt?.request_id === head?.request_id);
+  check("overflow does not grow the queue", Permissions.pending().length === 8);
+}
+
+off();
 
 console.log(
   `\npermissions prompt contract: ${failed === 0 ? "PASS" : "FAIL"} (${passed} checks, ${failed} failed)`,

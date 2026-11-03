@@ -83,16 +83,29 @@ Security properties of this path:
   A missing, replayed or mismatched token is refused as `invalid_scope` and
   resolves nothing.
 - A decision is single-shot: the record leaves the queue before the engine is
-  touched.
-- Ephemeral contexts are published with `rememberable: false`; chrome refuses
-  a durable decision for them even if one arrives.
+  touched. A prompt is also fenced to the document it was raised for: a
+  navigation (chrome progress listener) or tab close cancels it, and a late
+  answer for a document that already changed is refused.
+- The queue shows one prompt at a time. Overflow cancels the *incoming*
+  request; it never evicts the prompt a person is looking at.
+- Ephemeral contexts, and unsafe third-party delegates, are published with
+  `rememberable: false`; chrome refuses a durable decision for them even if
+  one arrives.
+- `dismiss` closes the prompt and cancels only this request: it writes no site
+  policy, so Escape does not silently block the site.
 - A failed durable write cancels the request and reports
-  `store_admission_rejected`; it never grants.
-- `pagehide` on the requesting browser closes the prompt and cancels the engine
-  request, so chrome state cannot outlive its page.
+  `store_admission_rejected`; a durable write the engine never observed is
+  rolled back and reported `store_outcome_unknown`. It never grants.
+- An allow or deny updates `gBrowser.updateBrowserSharing(browser, {geo})`, so
+  the toolbar indicator and "Stop sharing" keep working.
+- One process-wide `Integration.contentPermission` override routes each
+  request to the host instance of the window that owns the tab; an unowned
+  browser (or a closed window) falls back to Firefox's own prompt instead of a
+  dead event pump.
 
 Scope today: **geolocation**. Camera and microphone use Firefox's separate
 `webrtcUI`/`WebRTCParent` prompt, which is not intercepted yet; the Astra
 prompt renders them, but the engine will still show its own prompt until that
-seam is wired (P6b follow-up).
+seam is wired (P6b follow-up). The live probe covers allow, deny, navigate
+away, tab close, and the location-sharing state.
 

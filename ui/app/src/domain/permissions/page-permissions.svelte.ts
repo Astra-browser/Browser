@@ -119,6 +119,12 @@ async function settle(
   decision: PagePermissionPromptDecisionInput,
 ): Promise<void> {
   if (!samePrompt(state.prompt, retained) || busy()) return;
+  // Native publishes the closed projection before the admission resolves, so
+  // the prompt is normally gone by the time the disposition lands. Keep the
+  // generation, not the prompt identity, as the liveness test; the failure
+  // notice must still reach a prompt that is on screen (e.g. a store refusal
+  // that arrives before the close event).
+  const generation = lifecycle;
   responding = true;
   notice = null;
   try {
@@ -138,18 +144,20 @@ async function settle(
       IPC_TIMEOUT_MS,
     );
     if (!admission.accepted || admission.operation_id === null) {
-      notice = m.page_permission_unavailable();
-      responding = false;
+      if (generation === lifecycle) {
+        notice = m.page_permission_unavailable();
+        responding = false;
+      }
       return;
     }
     const resolution = await operations.waitForDisposition(
       admission.operation_id,
       SETTLEMENT_TIMEOUT_MS,
     );
-    if (!samePrompt(state.prompt, retained)) return;
+    if (generation !== lifecycle) return;
     if (resolution.state === "processed") {
       notice = dispositionMessage(resolution.disposition);
-      if (notice !== null) responding = false;
+      responding = false;
     } else if (resolution.state === "pending") {
       notice = m.page_permission_still_applying();
     } else {
@@ -157,7 +165,7 @@ async function settle(
       responding = false;
     }
   } catch {
-    if (samePrompt(state.prompt, retained)) {
+    if (generation === lifecycle) {
       notice = m.page_permission_service_unavailable();
       responding = false;
     }

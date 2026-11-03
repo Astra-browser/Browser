@@ -65,10 +65,16 @@ let _minted = 0;
 function mintOperationId() {
   _minted += 1;
   const counter = _minted.toString(16).padStart(8, "0").slice(-8);
-  const salt = Math.floor(Math.random() * 0x100000000)
-    .toString(16)
-    .padStart(8, "0")
-    .slice(-8);
+  const buffer = new Uint8Array(4);
+  const crypto = globalThis.crypto;
+  if (typeof crypto?.getRandomValues === "function") {
+    crypto.getRandomValues(buffer);
+  } else {
+    for (let i = 0; i < buffer.length; i += 1) {
+      buffer[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const salt = Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0")).join("");
   const id = `${counter}${salt}`;
   return OPERATION_ID.test(id) ? id : "0000000000000000";
 }

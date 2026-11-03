@@ -11,7 +11,6 @@
 //
 // Usage: node tests/contract/operations_ledger.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { strict as assert } from "node:assert";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
