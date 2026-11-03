@@ -588,6 +588,14 @@
           <p class="slot-error" role="alert">{slotError}</p>
         {/if}
         {#if loadingHost}
+          <div class="load-skeleton" aria-hidden="true">
+            <div class="sk sk-bar"></div>
+            <div class="sk sk-hero"></div>
+            <div class="sk sk-line" style:inline-size="62%"></div>
+            <div class="sk sk-line" style:inline-size="86%"></div>
+            <div class="sk sk-line" style:inline-size="74%"></div>
+            <div class="sk sk-line" style:inline-size="40%"></div>
+          </div>
           <div class="loading-stage" role="status" aria-live="polite">
             <span class="loading-spinner" aria-hidden="true"></span>
             <span>{loadingHost}</span>
@@ -791,6 +799,63 @@
 
   @media (prefers-reduced-motion: reduce) {
     .loading-spinner {
+      animation: none;
+    }
+  }
+
+  /* A page still arriving gets a shape to look at, not a black rectangle:
+     a toolbar, a hero and lines laid out like a page, quietly shimmering. */
+  .load-skeleton {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 6% 8%;
+    background: var(--color-chrome, #1c1b22);
+    pointer-events: none;
+  }
+
+  .sk {
+    border-radius: var(--radius-control, 6px);
+    background: linear-gradient(
+      90deg,
+      var(--color-raised, #2b2a33) 25%,
+      var(--color-fill, #3a3a44) 40%,
+      var(--color-raised, #2b2a33) 55%
+    );
+    background-size: 220% 100%;
+    animation: sk-shimmer 1.25s linear infinite;
+  }
+
+  .sk-bar {
+    block-size: 26px;
+    inline-size: 100%;
+  }
+
+  .sk-hero {
+    block-size: 36%;
+    inline-size: 100%;
+    border-radius: var(--radius-card, 12px);
+  }
+
+  .sk-line {
+    block-size: 12px;
+    inline-size: 76%;
+  }
+
+  @keyframes sk-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -120% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sk {
       animation: none;
     }
   }
