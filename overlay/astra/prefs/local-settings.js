@@ -14,6 +14,6 @@ pref("general.config.obscure_value", 0);
 // launch it and gets an honest `unavailable` instead of a fake process.
 pref("astra.core.command", "");
 
-// P4 spike: dock the native gBrowser panel behind the Astra stage. Off
-// until the native tab mapping lands; flipping it alone cannot cover a page.
+// Native gBrowser tabs are the product path (P4). Set false only to exercise
+// the legacy standalone mount while P4.4b removes it.
 pref("astra.gbrowser.enabled", true);
