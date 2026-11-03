@@ -142,8 +142,9 @@
     // Bind this exact chrome window to win-1 before any Host API call. A
     // lazy Services/getMostRecentWindow can otherwise bind win-1 to a newly
     // opened window and make fullscreen/close hit the wrong one.
+    let ownWindowId = "win-1";
     try {
-      host.__bindCurrentWindow?.(win);
+      ownWindowId = host.__bindCurrentWindow?.(win) || "win-1";
     } catch {
       // Preview DOM without a chrome window.
     }
@@ -433,37 +434,14 @@
           chromeAdapter[op] = () => win[op]();
         }
       }
-      // Fullscreen belongs to the window that owns this shell. Applying a
-      // Host event here would hit whichever window the module is bound to.
-      chromeAdapter.toggleFullscreen = () => {
-        try {
-          win.fullScreen = !win.fullScreen;
-          mirrorFullscreen(win.fullScreen === true);
-          return win.fullScreen === true;
-        } catch {
-          return false;
-        }
-      };
     }
 
     async function currentWindowId() {
-      try {
-        const list = await host.Windows.list({ request_id: newRequestId() });
-        return list.focused_window_id ?? "win-1";
-      } catch {
-        return "win-1";
-      }
+      return ownWindowId || "win-1";
     }
 
     function mirrorFullscreen(fullscreen) {
       frameRoot.setAttribute("data-astra-fullscreen", fullscreen ? "true" : "false");
-      try {
-        if (win && typeof win.fullScreen === "boolean") {
-          win.fullScreen = fullscreen === true;
-        }
-      } catch {
-        // Preview DOM or restricted context: attribute still mirrors state.
-      }
     }
 
     async function handleControl(action) {
@@ -572,7 +550,7 @@
               actions: Frame.WINDOW_ACTIONS,
               dispatchWindowControl: (opts = {}) =>
                 (async () => {
-                  const window_id = opts.window_id ?? (await currentWindowId());
+                  const window_id = opts.window_id ?? ownWindowId;
                   return Frame.dispatchWindowControl(host, chromeAdapter, {
                     request_id: newRequestId(),
                     ...opts,
@@ -597,7 +575,11 @@
       } catch {
         // Best-effort diagnostics only.
       }
-      if (event.type.startsWith("tab.")) {
+      if (event.type === "window.fullscreen-changed") {
+        if (event.data?.window_id === ownWindowId) {
+          mirrorFullscreen(event.data?.fullscreen === true);
+        }
+      } else if (event.type.startsWith("tab.")) {
         void refreshTabs();
       } else if (event.type === "sidebar.changed") {
         // The app publishes the column's laid-out width. Hidden, the column is

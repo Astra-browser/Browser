@@ -123,6 +123,8 @@ def main():
 
         if nid:
             out["focus"] = json.loads(m.execute_async(FOCUS, [nid]))
+            time.sleep(0.4)
+            out["native_after_focus"] = json.loads(m.execute(NATIVE))
             out["close"] = json.loads(m.execute_async(CLOSE, [nid]))
             time.sleep(1.0)
             out["after_close"] = json.loads(m.execute_async(LIST))
@@ -149,11 +151,17 @@ def main():
     ok = (
         len(out.get("initial", {}).get("windows") or []) == 1
         and len(out.get("after_create", {}).get("windows") or []) == 2
+        and len(out.get("native_after_create") or []) == 2
+        and out.get("focus", {}).get("focused") is True
+        and any(w.get("focused") for w in out.get("native_after_focus") or [])
         and any(w.get("fullscreen") for w in out.get("native_frame_full") or [])
         and not any(w.get("fullscreen") for w in out.get("native_frame_restore") or [])
         and out.get("close", {}).get("closed") is True
         and len(out.get("after_close", {}).get("windows") or []) == 1
+        and len(out.get("native_after_close") or []) == 1
+        and out.get("private_create", {}).get("private") is True
         and any(w.get("private") for w in out.get("native_after_private") or [])
+        and out.get("private_close", {}).get("closed") is True
     )
     return 0 if ok else 1
 

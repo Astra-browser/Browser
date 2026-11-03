@@ -42,6 +42,8 @@ function check(name, cond) {
   }
 }
 
+check("HostAPI exports __bindCurrentWindow", typeof HostAPI.__bindCurrentWindow === "function");
+
 // Envelope assertion for every call result.
 function checkEnv(name, res, rid) {
   check(`${name} echoes request_id`, res.request_id === rid);

@@ -70,7 +70,10 @@ async function openNativeWindow(isPrivate) {
     const { BrowserWindowTracker } = CU.importESModule(
       "resource:///modules/BrowserWindowTracker.sys.mjs",
     );
-    const win = await BrowserWindowTracker.openWindow({ private: isPrivate === true });
+    const win = await BrowserWindowTracker.openWindow({
+      private: isPrivate === true,
+      openerWindow: currentChromeWindow() ?? undefined,
+    });
     return win ?? null;
   } catch {
     return null;
@@ -92,10 +95,14 @@ function bindNative(id, win, { replace = false } = {}) {
     win.addEventListener(
       "close",
       () => {
+        if (_native.get(id) !== win) {
+          return;
+        }
         _native.delete(id);
+        const tabsClosed = __closeTabsInWindow(id);
         const existed = _windows.delete(id);
         if (existed) {
-          emit("window.closed", { window_id: id, tabs_closed: 0 });
+          emit("window.closed", { window_id: id, tabs_closed: tabsClosed });
         }
         if (_focusedId === id) {
           _focusedId = "";
@@ -119,16 +126,15 @@ function bindNative(id, win, { replace = false } = {}) {
  */
 export function __bindCurrentWindow(win) {
   if (!win) {
-    return false;
+    return "";
   }
   const existing = _native.get("win-1");
-  // A second window's shell may share this module instance. Never let it
-  // steal win-1 from the window that already owns it.
+  // Never let a second window steal win-1 from the window that owns it.
   if (existing && existing !== win && existing.closed !== true) {
-    return false;
+    return "win-1";
   }
   bindNative("win-1", win, { replace: true });
-  return true;
+  return "win-1";
 }
 
 /** Read native state back into the projection before answering. */
@@ -189,6 +195,9 @@ export const Windows = {
   async create({ request_id = "", private: isPrivate = false, background = false, title = "" } = {}) {
     __ensureDefaultWindow();
     const real = await openNativeWindow(isPrivate);
+    if (!real && chromeServices()) {
+      return err(request_id, "window_create_failed", "the chrome window did not open");
+    }
     const window_id = `win-${++_nextId}`;
     _windows.set(window_id, {
       window_id,
@@ -211,10 +220,10 @@ export const Windows = {
     if (!_windows.has(window_id)) {
       return err(request_id, "no_such_window", `unknown window ${window_id}`);
     }
-    if (_windows.size <= 1) {
+    const real = nativeOf(window_id);
+    if (_windows.size <= 1 && !real) {
       return err(request_id, "last_window", "refusing to close the last window");
     }
-    const real = nativeOf(window_id);
     const wasFocused = window_id === _focusedId;
     const tabsClosed = __closeTabsInWindow(window_id);
     _windows.delete(window_id);
@@ -248,10 +257,15 @@ export const Windows = {
     if (!win) {
       return err(request_id, "no_such_window", `unknown window ${window_id}`);
     }
-    // The owning shell applies `window.fullScreen` to its own window when it
-    // sees this event. Setting it here would hit whichever window this module
-    // instance is bound to and could fullscreen the wrong one.
-    win.fullscreen = fullscreen === true;
+    const real = nativeOf(window_id);
+    if (real) {
+      try {
+        real.fullScreen = fullscreen === true;
+      } catch {
+        // A closing window keeps the model answer.
+      }
+    }
+    win.fullscreen = real ? real.fullScreen === true : fullscreen === true;
     emit("window.fullscreen-changed", { window_id, fullscreen: win.fullscreen });
     return ok(request_id, { window_id, fullscreen: win.fullscreen });
   },
