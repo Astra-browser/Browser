@@ -128,6 +128,79 @@ function buildItems(menu, browser) {
   return items;
 }
 
+/** One real XUL tab per content browser, kept for the toolbox's lifetime.
+ *  DevTools attaches listeners to the tab element and resolves the browser
+ *  through `linkedBrowser`; a plain object made it throw at the first
+ *  `addEventListener`. */
+const _devTabs = new WeakMap();
+
+function devTabFor(win, browser) {
+  let tab = _devTabs.get(browser);
+  if (!tab) {
+    tab = win.document.createXULElement("tab");
+    // Some of these names are prototype getters in the chrome realm (the
+    // toolbox only reads them); define an own value instead of assigning.
+    const own = (name, value) => {
+      try {
+        tab[name] = value;
+      } catch {
+        try {
+          Object.defineProperty(tab, name, {
+            value,
+            configurable: true,
+            writable: true,
+          });
+        } catch {
+          // The toolbox falls back to the browser it was given.
+        }
+      }
+    };
+    own("linkedBrowser", browser);
+    own("documentGlobal", win);
+    own("linkedPanel", null);
+    own("userContextId", 0);
+    _devTabs.set(browser, tab);
+  }
+  return tab;
+}
+
+/** Open DevTools for an Astra content browser. `DevToolsShim` is the supported
+ *  entry point (it initialises the toolbox lazily); the toolbox gets a window
+ *  of its own because the native tabbox that hosts a bottom toolbox is hidden
+ *  in this shell. */
+async function showDevTools(win, browser, toolId) {
+  try {
+    win.__astraDevtools = { browser: !!browser, toolId: toolId ?? null };
+  } catch {
+    // Diagnostics only.
+  }
+  if (!browser) {
+    try {
+      win.__astraDevtoolsError = "no_browser";
+    } catch {}
+    return { accepted: false };
+  }
+  try {
+    const { DevToolsShim } = win.ChromeUtils.importESModule(
+      "chrome://devtools-startup/content/DevToolsShim.sys.mjs",
+    );
+    if (!DevToolsShim?.isEnabled?.()) {
+      return { accepted: false };
+    }
+    await DevToolsShim.showToolboxForTab(devTabFor(win, browser), {
+      toolId,
+      hostType: "window",
+      reason: "contextmenu",
+    });
+    return { accepted: true };
+  } catch (error) {
+    try {
+      win.__astraDevtoolsError = String(error?.message ?? error);
+    } catch {}
+    return { accepted: false };
+  }
+}
+
 /**
  * Install the content menu for one chrome window.
  *
@@ -228,32 +301,6 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
     }
   }
 
-  async function openDevTools(browser, toolId) {
-    try {
-      const tab = {
-        tagName: "tab",
-        linkedBrowser: browser,
-        ownerGlobal: win,
-        documentGlobal: win,
-        linkedPanel: null,
-        userContextId: 0,
-      };
-      if (!win.gDevTools || typeof win.gDevTools.showToolboxForTab !== "function") {
-        return { accepted: false };
-      }
-      await win.gDevTools.showToolboxForTab(tab, {
-        toolId,
-        reason: "contextmenu",
-      });
-      return { accepted: true };
-    } catch {
-      // DevTools refuses a browser it cannot describe as a tab. Reporting the
-      // refusal is honest; opening the engine's own toolbox window would break
-      // the one-interface rule.
-      return { accepted: false };
-    }
-  }
-
   function reloadTab(browser) {
     try {
       browser.reload();
@@ -329,7 +376,7 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
         host.emit?.("ui-command", "browser.source");
         return NOTHING;
       case "page.devtools":
-        return openDevTools(browser, "inspector");
+        return showDevTools(win, browser, "inspector");
       case "page.reload":
         return reloadTab(browser);
       default:
@@ -390,31 +437,17 @@ export function installContentMenu(win, { host, postToApp, isFromApp, tabIdOf })
 
 /** Actions the app's own chrome menu asks for; the shell owns the chrome. */
 export async function runChromeAction(win, host, id, { browser = null } = {}) {
+  try {
+    win.__astraLastChromeAction = id;
+  } catch {
+    // Diagnostics only.
+  }
   const openWindow = (options) => {
     if (typeof win.OpenBrowserWindow === "function") return win.OpenBrowserWindow(options);
     const { BrowserWindowTracker } = win.ChromeUtils.importESModule(
       "resource:///modules/BrowserWindowTracker.sys.mjs",
     );
     return BrowserWindowTracker.openWindow(options);
-  };
-  const devtools = async (toolId) => {
-    if (!browser || !win.gDevTools) return { accepted: false };
-    try {
-      await win.gDevTools.showToolboxForTab(
-        {
-          tagName: "tab",
-          linkedBrowser: browser,
-          ownerGlobal: win,
-          documentGlobal: win,
-          linkedPanel: null,
-          userContextId: 0,
-        },
-        { toolId, reason: "keyboard" },
-      );
-      return { accepted: true };
-    } catch {
-      return { accepted: false };
-    }
   };
   switch (id) {
     case "window.new": {
@@ -439,7 +472,7 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
       }
     case "page.devtools":
     case "page.devtools.alt":
-      return devtools("inspector");
+      return showDevTools(win, browser, undefined);
     case "page.save":
       try {
         if (!browser) return { accepted: false };

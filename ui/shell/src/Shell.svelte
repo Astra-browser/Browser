@@ -118,6 +118,161 @@
     }
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
+    // The browser's shortcuts belong to the product, not to hidden Firefox
+    // chrome. The app's keymap is the one registry; the shell matches the same
+    // accelerators when focus is on the page (where the app document never
+    // sees the key) and runs the same command ids. The native keys those
+    // commands own are disabled below, so Ctrl+D cannot fall through to the
+    // page-action bookmark flow that has no anchor in this window.
+    const KEY_ALIAS = {
+      "nav.back.alt": "nav.back",
+      "nav.forward.alt": "nav.forward",
+      "tab.next.alt": "tab.next",
+      "tab.previous.alt": "tab.previous",
+      "page.devtools.alt": "page.devtools",
+    };
+    const NATIVE_KEYS = [
+      "addBookmarkAsKb",
+      "key_savePage",
+      "printKb",
+      "key_openDownloads",
+      "key_openAddons",
+      "openFileKb",
+      "key_newNavigator",
+      "key_newNavigatorTab",
+      "key_close",
+      "key_closeWindow",
+      "goBackKb",
+      "goForwardKb",
+      "goBackKb2",
+      "goForwardKb2",
+      "key_reload",
+      "key_reload2",
+      "key_reload_skip_cache",
+      "key_reload_skip_cache2",
+      "showAllHistoryKb",
+      "key_showAllHistory",
+      "key_enterFullScreen",
+      "key_enterFullScreen_old",
+      "key_enterFullScreen_compat",
+      "key_toggleReaderMode",
+      "key_togglePictureInPicture",
+      "key_toggleMute",
+      // DevTools registers its shortcuts as <key> elements at startup.
+      "key_toggleToolboxF12",
+      "key_toggleToolbox",
+      "key_browserToolbox",
+      "key_browserConsole",
+      "key_responsiveDesignMode",
+      "key_inspector",
+      "key_webconsole",
+    ];
+    const KEY_ORDER = ["Ctrl", "Alt", "Shift", "Meta"];
+    const normalKey = (key) => {
+      if (key.length === 1) return key.toUpperCase();
+      if (key.startsWith("VK_")) key = key.slice(3);
+      if (key.startsWith("Arrow")) key = key.slice(5);
+      return key;
+    };
+    const canonicalKey = (accelerator) => {
+      const parts = String(accelerator).split("+").map((part) => part.trim()).filter(Boolean);
+      if (parts.length === 0) return "";
+      const key = normalKey(parts.pop());
+      const mods = new Set();
+      for (const part of parts) {
+        if (part === "CmdOrCtrl" || part === "Ctrl" || part === "Control") mods.add("Ctrl");
+        else if (part === "Alt" || part === "Option") mods.add("Alt");
+        else if (part === "Shift") mods.add("Shift");
+        else if (part === "Meta" || part === "Cmd" || part === "Command") mods.add("Meta");
+      }
+      return [...KEY_ORDER.filter((m) => mods.has(m)), key].join("+");
+    };
+    const acceleratorOf = (event) => {
+      const mods = [];
+      if (event.ctrlKey) mods.push("Ctrl");
+      if (event.altKey) mods.push("Alt");
+      if (event.shiftKey) mods.push("Shift");
+      if (event.metaKey) mods.push("Meta");
+      return [...mods, normalKey(event.key ?? "")].join("+");
+    };
+    const globalKeys = new Map();
+    try {
+      for (const entry of await host.Keymap.entries({})) {
+        if (!entry?.accelerator) continue;
+        const key = canonicalKey(entry.accelerator);
+        if (key) globalKeys.set(key, KEY_ALIAS[entry.id] ?? entry.id);
+      }
+    } catch {
+      // No keymap: the native keys stay as they are and the app still works.
+    }
+    // Function keys the native keyset owns but the registry names differently.
+    globalKeys.set("F5", "nav.reload");
+    globalKeys.set("F11", "window.fullscreen");
+    globalKeys.set("F12", "page.devtools");
+    const disableNativeKeys = () => {
+      for (const id of NATIVE_KEYS) {
+        try {
+          doc.getElementById(id)?.setAttribute("disabled", "true");
+        } catch {
+          // A key the build does not have.
+        }
+      }
+    };
+    disableNativeKeys();
+    // DevTools creates its key elements during startup, which can land after
+    // this mount; one later pass covers it.
+    const keySweep = setTimeout(disableNativeKeys, 1500);
+    const onGlobalKey = (event) => {
+      if (event.defaultPrevented || event.isComposing) return;
+      let fromApp = false;
+      try {
+        fromApp = !!appApi?.element && event.target?.ownerDocument === appApi.element.contentDocument;
+      } catch {
+        fromApp = false;
+      }
+      // The app document's own keymap handles its keys; this path exists for
+      // the page and the chrome around it.
+      if (fromApp) return;
+      const id = globalKeys.get(acceleratorOf(event));
+      if (!id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void host.Commands.run({ id });
+    };
+    win.addEventListener("keydown", onGlobalKey, true);
+    // A page's fullscreen request can be refused by the engine for reasons
+    // outside the stage's control (the content not yet focused on a first
+    // click). The chrome document's fullscreen element is the stage browser
+    // by then; if the engine did not apply the chrome layout, do it here so
+    // the page still gets the window. Leaving fullscreen clears it either way.
+    const onFsRequest = (event) => {
+      const target = event.target;
+      const astra =
+        target?.hasAttribute?.("data-astra-browser") ||
+        target?.hasAttribute?.("data-astra-browser-parked");
+      if (!astra) return;
+      setTimeout(() => {
+        if (doc.documentElement.hasAttribute("inDOMFullscreen")) return;
+        if (!doc.fullscreenElement) return;
+        doc.documentElement.setAttribute("inDOMFullscreen", "true");
+        try {
+          win.fullScreen = true;
+        } catch {
+          // The window manager refused; the layout still fills the window.
+        }
+      }, 250);
+    };
+    const onFsExit = () => {
+      doc.documentElement.removeAttribute("inDOMFullscreen");
+      try {
+        if (win.fullScreen) win.fullScreen = false;
+      } catch {
+        // Already out.
+      }
+    };
+    doc.addEventListener("MozDOMFullscreen:Request", onFsRequest, true);
+    doc.addEventListener("MozDOMFullscreen:Exit", onFsExit, true);
+    doc.addEventListener("MozDOMFullscreen:Exited", onFsExit, true);
     // A private window keeps nothing. Its tabs inherit the window's private
     // browsing context, so Places never records them; the projection also
     // has to say so or the app would paint a normal window's chrome and offer
@@ -406,7 +561,12 @@
         // the card, so it has to come above the page surface and let the page
         // show through around it; the app clears its own ground for the same
         // window (`data-astra-peek`).
-        frameRoot.dataset.astraSidebarPeek = hidden && peeking ? "true" : "false";
+        // The peek treatment (clip + raise over the page) only applies when a
+        // real page is in front. Over a New Tab the app frame holds the page
+        // the person is looking at, so clipping it to the card left only a
+        // dark strip. With no page the card simply slides inside the app.
+        const overPage = slot.dataset.hasPage === "true";
+        frameRoot.dataset.astraSidebarPeek = hidden && peeking && overPage ? "true" : "false";
         // `animate` marks a deliberate change of shape (the app's `travel`):
         // the page travels with the column. A drag reports false and the page
         // tracks the pointer without a transition lagging behind it.
@@ -553,6 +713,11 @@
         // Already torn down with the window.
       }
       win.removeEventListener("message", onWindowMenu);
+      win.removeEventListener("keydown", onGlobalKey, true);
+      doc.removeEventListener("MozDOMFullscreen:Request", onFsRequest, true);
+      doc.removeEventListener("MozDOMFullscreen:Exit", onFsExit, true);
+      doc.removeEventListener("MozDOMFullscreen:Exited", onFsExit, true);
+      clearTimeout(keySweep);
       clearTimeout(menuTimer);
       contentMenu.destroy();
       tabstrip.destroy();

@@ -239,7 +239,10 @@
     clearTimeout(linger);
     clearTimeout(lowered);
     lowered = undefined;
-    if (away) chromeOverPage(true);
+    // Only a live page has anything to show through the chrome. Over a New
+    // Tab the ground stays opaque: making it transparent revealed the window's
+    // black canvas and the page looked like it had gone blank.
+    if (away && overPage) chromeOverPage(true);
     if (!peeking) opened = performance.now();
     if (peeking) {
       void commands.sidebarPeek(true, true, slides());
