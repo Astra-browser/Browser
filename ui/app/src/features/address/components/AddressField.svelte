@@ -148,9 +148,11 @@
   function editInLauncher(): boolean {
     const tab = tabs.activeTab();
     if (!tab?.url || (tab.content ?? "web") !== "web") return false;
-    // Work has no page in front, so there the launcher opens empty.
-    if (surface.currentPage() === "work") void commands.runCommand("launcher.toggle");
-    else void commands.launcherEdit(tab.id, tab.url);
+    // Work has no page in front, so there the launcher opens empty. A hand-off
+    // the host refuses is not the field's to report: it stays where it is.
+    if (surface.currentPage() === "work")
+      void commands.runCommand("launcher.toggle").catch(() => {});
+    else void commands.launcherEdit(tab.id, tab.url).catch(() => {});
     return true;
   }
 

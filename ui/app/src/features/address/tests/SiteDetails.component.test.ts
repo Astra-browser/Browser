@@ -12,6 +12,7 @@ const native = vi.hoisted(() => ({
   list: vi.fn<(origin?: string) => Promise<SitePermissionsView | null>>(),
   set: vi.fn(async (..._args: unknown[]) => true),
   commands: [] as string[],
+  rejectCommands: false,
 }));
 vi.mock("$domain/permissions", () => ({
   sitePermissions: { list: native.list, set: native.set },
@@ -21,6 +22,7 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     runCommand: async (id: string) => {
       native.commands.push(id);
+      if (native.rejectCommands) throw new Error("not routed");
       return { accepted: true, operation_id: null };
     },
   });
@@ -51,6 +53,7 @@ function pageOf(over: Partial<SitePage> = {}): SitePage {
 
 beforeEach(() => {
   native.commands = [];
+  native.rejectCommands = false;
   native.list.mockResolvedValue(view());
 });
 afterEach(() => {
@@ -219,6 +222,28 @@ test("zoom shows only away from the default, with its level, steps and Reset", a
   await zoom.getByRole("button", { name: "Zoom in" }).click();
   await zoom.getByRole("button", { name: "Reset", exact: true }).click();
   expect(native.commands).toEqual(["zoom.out", "zoom.in", "zoom.reset"]);
+});
+
+test("a zoom command the host refuses raises nothing and leaves the level alone", async () => {
+  const rejections: unknown[] = [];
+  const caught = (event: PromiseRejectionEvent) => {
+    rejections.push(event.reason);
+  };
+  window.addEventListener("unhandledrejection", caught);
+  try {
+    native.rejectCommands = true;
+    const screen = await details({ page: pageOf({ zoom: 125 }) });
+    const zoom = screen.getByRole("group", { name: "Page zoom" });
+    await zoom.getByRole("button", { name: "Zoom out" }).click();
+    expect(native.commands).toEqual(["zoom.out"]);
+    // The step did not land, so the level it shows is the one that is still
+    // true; a rejected command is heard by the console, not by the panel.
+    await new Promise((done) => setTimeout(done, 50));
+    expect(rejections).toEqual([]);
+    await expect.element(zoom).toHaveTextContent("125%");
+  } finally {
+    window.removeEventListener("unhandledrejection", caught);
+  }
 });
 
 test("a page at the default zoom, or with none yet, shows no zoom", async () => {
