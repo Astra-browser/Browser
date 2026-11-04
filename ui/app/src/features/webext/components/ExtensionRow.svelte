@@ -166,8 +166,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 52px;
-    padding: 8px 12px;
+    min-height: 56px;
+    padding: 10px 14px;
   }
 
   .icon {
@@ -201,6 +201,8 @@
   .name {
     overflow: hidden;
     font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 18px;
     color: var(--color-text);
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -212,7 +214,8 @@
 
   .status {
     overflow: hidden;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
+    line-height: 15px;
     color: var(--color-muted);
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -245,7 +248,8 @@
     border: 0;
     background: none;
     font: inherit;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
+    font-weight: 500;
     color: var(--color-text);
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -254,7 +258,7 @@
 
   .access {
     flex: none;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     color: var(--color-faint);
   }
 
@@ -282,8 +286,8 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    padding: 0 12px 10px;
-    font-size: var(--text-label);
+    padding: 0 14px 12px;
+    font-size: var(--text-caption);
     color: var(--color-muted);
   }
 

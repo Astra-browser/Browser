@@ -31,12 +31,12 @@
   .card {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
-    padding: 10px 10px 10px 12px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-panel);
-    background: var(--color-raised);
+    padding: 12px 12px 12px 14px;
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    box-shadow: var(--shadow-card);
   }
 
   .badge {
@@ -68,17 +68,20 @@
 
   .name {
     font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 18px;
     color: var(--color-text);
   }
 
   .blurb {
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
+    line-height: 15px;
     color: var(--color-muted);
   }
 
   .installed {
     flex: none;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     color: var(--color-faint);
   }
 </style>

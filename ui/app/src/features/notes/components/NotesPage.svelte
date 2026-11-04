@@ -360,12 +360,14 @@
   .notes-page {
     display: grid;
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
     height: 100%;
   }
 
+  /* Two paper cards on the page ground: the list you scan and the note you
+     read. Same material, one soft drop each, no drawn edge. */
   .notes-column,
   .notes-stage {
     position: relative;
@@ -374,8 +376,9 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border-radius: var(--content-radius);
-    background: var(--color-page);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    box-shadow: var(--shadow-card);
   }
 
   .narrow {
@@ -392,7 +395,7 @@
     flex-direction: column;
     gap: 12px;
     flex: none;
-    padding: 20px 14px 10px 18px;
+    padding: 22px 14px 10px 20px;
   }
 
   .column-title {
@@ -410,19 +413,19 @@
     margin: 0;
     overflow: hidden;
     color: var(--color-text);
-    font-size: 22px;
-    font-weight: 650;
+    font-size: var(--text-title);
+    font-weight: 600;
     line-height: 28px;
-    letter-spacing: -0.028em;
+    letter-spacing: -0.026em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .title-text p {
-    min-height: 16px;
+    min-height: 15px;
     margin: 1px 0 0;
     color: var(--color-faint);
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     font-variant-numeric: tabular-nums;
   }
 
@@ -437,12 +440,13 @@
     gap: 4px;
     padding: 28px 22px;
     color: var(--color-muted);
-    font-size: var(--text-body);
-    line-height: 19px;
+    font-size: var(--text-label);
+    line-height: 18px;
   }
 
   .column-empty strong {
     color: var(--color-text);
+    font-size: var(--text-body);
     font-weight: 600;
   }
 
@@ -533,7 +537,7 @@
 
   .stage-status {
     color: var(--color-faint);
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     font-variant-numeric: tabular-nums;
   }
 
@@ -577,7 +581,7 @@
     max-width: 760px;
     min-height: 100%;
     margin-inline: auto;
-    padding: 20px 48px 0;
+    padding: 24px 48px 0;
   }
 
   .narrow .stage-column {
@@ -649,26 +653,25 @@
   .stage-empty-icon {
     display: grid;
     place-items: center;
-    width: 60px;
-    height: 60px;
-    border-radius: var(--radius-control-large);
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-card);
     background: var(--color-fill);
-    box-shadow: inset 0 0 0 1px var(--color-border);
     color: var(--color-muted);
   }
 
   .stage-empty-text {
     display: grid;
-    gap: 6px;
+    gap: 5px;
     max-width: 340px;
   }
 
   .stage-empty-text h2 {
     margin: 0;
     color: var(--color-text);
-    font-size: 17px;
-    font-weight: 650;
-    letter-spacing: -0.018em;
+    font-size: var(--text-page-title);
+    font-weight: 600;
+    letter-spacing: -0.012em;
   }
 
   .stage-empty-text p {
