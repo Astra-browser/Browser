@@ -220,6 +220,7 @@ def main():
                 "no_such_actor_bug_2044741": text.count("No such JSProcessActor"),
                 "teardown_bug_1944477": text.count("Connection closed, pending request")
                 + text.count("already destroyed actor"),
+                "target_lookup_miss": text.count("Unable to find target with innerWindowId"),
             }
         except OSError:
             pass
