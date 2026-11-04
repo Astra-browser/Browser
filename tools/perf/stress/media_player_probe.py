@@ -115,6 +115,18 @@ const done = arguments[arguments.length - 1];
     const made = { astra_tab_id: toneId };
     step("the tone tab is ready", typeof toneId === "string" && toneId !== "", toneId);
     await wait(1500);
+    {
+      // The hidden display can report the element as playing while the engine
+      // has no active media controller (no audio device). That is the
+      // environment, not the projection: skip instead of failing.
+      const b0 = [...gBrowser.tabs].find((t) => t.getAttribute("astra-tab-id") === toneId)?.linkedBrowser;
+      let active = false;
+      try { active = b0?.browsingContext?.mediaController?.isActive === true; } catch (e) { active = false; }
+      if (!active) {
+        done(JSON.stringify({ skip: "no active media controller in this display (no audio device)" }));
+        return;
+      }
+    }
     const behind = await host.Tabs.create({ request_id: "media-behind", url: "about:blank" });
     const toneBrowser = [...gBrowser.tabs].find((t) => t.getAttribute("astra-tab-id") === made.astra_tab_id)?.linkedBrowser;
     let ctrl = null;
@@ -220,6 +232,7 @@ def main():
         opened = json.loads(m.execute_async(OPEN.replace("__PORT__", str(PORT))))
         time.sleep(2)
         if ":paused:" in (opened.get("title") or ""):
+            out = {"skip": "the hidden display cannot start audio"}
             print(
                 "media_player_probe: SKIP — the hidden display cannot start audio "
                 f"({opened.get('title')}); run this on a headed machine",
@@ -227,6 +240,9 @@ def main():
             )
             return 2
         out = json.loads(m.execute_async(RUN, [opened.get("id", "")]))
+        if out.get("skip"):
+            print(f"media_player_probe: SKIP — {out['skip']}", file=sys.stderr)
+            return 2
     finally:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
@@ -238,7 +254,9 @@ def main():
                 pass
         log.close()
         httpd.shutdown()
-        if out.get("steps") and all(s["ok"] for s in out["steps"]):
+        # A skip is the environment, not a failure to diagnose: do not leave a
+        # 50 MB profile per run behind (this filled /tmp once).
+        if out.get("skip") or (out.get("steps") and all(s["ok"] for s in out["steps"])):
             shutil.rmtree(profile, ignore_errors=True)
         else:
             print(f"profile kept: {profile}", file=sys.stderr)
