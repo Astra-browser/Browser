@@ -214,6 +214,7 @@
     "astra:resource-close",
     "astra:resource-close-cancelled",
     "astra:swipe",
+    "astra:tab",
     "astra:voice-changed",
     "astra:voice-levels",
     "astra:web-extension-access",

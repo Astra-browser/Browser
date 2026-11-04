@@ -51,9 +51,14 @@ function check(name, cond) {
 
 const routes = [];
 for (const match of transport.matchAll(
-  /^\s*([a-z0-9_]+): \["([A-Za-z0-9_]+)", "([A-Za-z0-9_]+)"/gmu,
+  /^\s*([a-z0-9_]+): \["([A-Za-z0-9_]+)", "([A-Za-z0-9_]+)"([^\]]*)\]/gmu,
 )) {
-  routes.push({ name: match[1], module: match[2], method: match[3] });
+  routes.push({
+    name: match[1],
+    module: match[2],
+    method: match[3],
+    mapsTab: /astra_tab_id|TAB_ARG/u.test(match[4] ?? ""),
+  });
 }
 check("the route table was parsed", routes.length > 50);
 const missing = routes.filter(
@@ -93,6 +98,22 @@ const forwarded = new Set(
 for (const channel of REQUIRED) {
   check(`${channel} is declared`, declared.has(channel));
   check(`${channel} is forwarded by chrome-entry`, forwarded.has(channel));
+}
+
+// A route whose host method reads `astra_tab_id` must map the wire's `id`,
+// or the call arrives with an empty tab (the failure this merge fixed twice).
+for (const route of routes) {
+  let moduleSource = "";
+  try {
+    moduleSource = await readFile(path.join(HOST, `${route.module}.sys.mjs`), "utf8");
+  } catch {
+    continue;
+  }
+  const signature = new RegExp(
+    `async\\s+${route.method}\\s*\\(\\s*\\{([^}]*)\\}`,
+  ).exec(moduleSource);
+  if (!signature || !/\bastra_tab_id\b/u.test(signature[1])) continue;
+  check(`${route.name} maps id to astra_tab_id`, route.mapsTab === true);
 }
 
 // The prompt routes the app calls must be routed.

@@ -98,7 +98,6 @@ function selectInternal(id) {
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap, selected: true });
-  emitTabChanged(id);
   return snap;
 }
 
@@ -132,7 +131,6 @@ export function __setFailure(astra_tab_id, failure = null) {
   if (!tab) return false;
   tab.failure = failure;
   emit("tab.updated", { astra_tab_id, failure });
-  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -144,7 +142,6 @@ export function __setCertificateException(astra_tab_id, accepted = false, origin
   tab.certificate_exception = accepted === true;
   tab.certificate_exception_origin = accepted === true ? origin : "";
   emit("tab.updated", { astra_tab_id, certificate_exception: tab.certificate_exception });
-  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -155,7 +152,6 @@ export function __setPageRequest(astra_tab_id, request = null) {
   if (!tab) return false;
   tab.page_request = request;
   emit("tab.updated", { astra_tab_id, page_request: request });
-  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -296,7 +292,6 @@ export function __applyExternalUpdate(id, patch = {}) {
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap });
-  emitTabChanged(id);
   emitItemsChanged();
   return snap;
 }
@@ -416,12 +411,6 @@ function tabView(id) {
     certificate_exception: tab.certificate_exception === true,
     audio: tab.muted ? { muted: true, can_mute: true } : null,
   };
-}
-
-/** Emit the per-tab delta on the contract channel (`tab-changed`). */
-export function emitTabChanged(astra_tab_id) {
-  const view = tabView(astra_tab_id);
-  if (view) emit("tab-changed", view);
 }
 
 /** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
@@ -880,8 +869,7 @@ export const Tabs = {
     tab.title = title;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
-    emitTabChanged(astra_tab_id);
-    // Live progress listeners land here. The sidebar and the window title are
+      // Live progress listeners land here. The sidebar and the window title are
     // painted from the projection, so a title the page reports has to reach
     // it or the row keeps saying "New Tab" for the life of the tab.
     emitItemsChanged();
@@ -896,8 +884,7 @@ export const Tabs = {
     tab.muted = muted === true;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
-    emitTabChanged(astra_tab_id);
-    emitItemsChanged();
+      emitItemsChanged();
     // `settle()` needs an admission; Content applies the native mute. Keep the
     // standard envelope fields so the Host API v1 contract still holds.
     return {

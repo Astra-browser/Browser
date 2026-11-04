@@ -48,7 +48,6 @@
         "ui-command",
         "operation-processed",
         "page-permission-prompt-changed",
-        "tab-changed",
         "page.request-answered"
       ]
     },

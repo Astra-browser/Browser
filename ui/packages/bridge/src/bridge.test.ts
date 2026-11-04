@@ -285,6 +285,48 @@ describe("host transport", () => {
     expect(calls[0]).toMatchObject(["setHidden", { hidden: true, request_id: "req-2" }]);
   });
 
+  test("page-request and extension routes carry their arguments", async () => {
+    const seen: Record<string, Record<string, unknown>> = {};
+    const fake = {
+      Tabs: {
+        answerPageRequest: async (args: Record<string, unknown>) => {
+          seen.answer = args;
+          return { accepted: true };
+        },
+      },
+      WebExtensions: {
+        prepare: async (args: Record<string, unknown>) => {
+          seen.prepare = args;
+          return { review_id: "r1" };
+        },
+        retry: async (args: Record<string, unknown>) => {
+          seen.retry = args;
+          return null;
+        },
+        setPinned: async (args: Record<string, unknown>) => {
+          seen.pinned = args;
+          return null;
+        },
+      },
+      Navigation: {},
+      addEventListener: () => () => {},
+      eventSeq: () => 0,
+    };
+    const b = new Bridge({
+      mode: "host",
+      dispatch: createHostDispatch(fake as never),
+      newId: () => "req-4",
+    });
+    await b.invoke("tabs_answer_page_request", { id: "tab-2", answer: "dismiss" });
+    expect(seen.answer).toMatchObject({ astra_tab_id: "tab-2", answer: "dismiss" });
+    await b.invoke("web_extension_prepare", { tabId: "tab-2" });
+    expect(seen.prepare).toMatchObject({ tab_id: "tab-2" });
+    await b.invoke("web_extension_retry", { profileId: "p", installId: "i" });
+    expect(seen.retry).toMatchObject({ profile_id: "p", install_id: "i" });
+    await b.invoke("web_extension_set_pinned", { id: "ext", pinned: true });
+    expect(seen.pinned).toMatchObject({ id: "ext", pinned: true });
+  });
+
   test("host mode without dispatch throws", () => {
     expect(() => new Bridge({ mode: "host" })).toThrow(BridgeError);
   });

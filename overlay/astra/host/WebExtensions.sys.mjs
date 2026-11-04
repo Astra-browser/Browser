@@ -271,8 +271,8 @@ export const WebExtensions = {
   },
 
   /** Reload a failed extension, which re-runs its startup. */
-  async retry({ installId = "", id = "" } = {}) {
-    const addon = await findAddon(installId || id);
+  async retry({ install_id = "", installId = "", id = "" } = {}) {
+    const addon = await findAddon(install_id || installId || id);
     if (!addon) throw fail("no such extension");
     try {
       await addon.reload();
@@ -336,9 +336,9 @@ export const WebExtensions = {
    * packages (CRX) are not installable by this engine; AMO listings resolve to
    * their signed XPI.
    */
-  async prepare({ tabId = "" } = {}) {
+  async prepare({ tab_id = "", tabId = "" } = {}) {
     const { tabs } = __tabsState();
-    const tab = tabs.get(String(tabId));
+    const tab = tabs.get(String(tab_id || tabId));
     const url = tab?.url ?? "";
     let parsed = null;
     try {
