@@ -65,6 +65,9 @@ function snapshot(id) {
   const h = _history.get(id) ?? { entries: [], index: -1 };
   return {
     ...tab,
+    // Private windows must never reach the on-disk organisation store; the
+    // Content mount marks their tabs as soon as the native tab is bound.
+    private: tab.private === true,
     // A mark belongs to the site that produced it: a navigation that lands on
     // another origin (typed address, `Navigation.commit`) must never keep the
     // old site's reference in a projection.
@@ -91,6 +94,57 @@ function selectInternal(id) {
 
 export function __tabsState() {
   return { tabs: _tabs, history: _history, get selectedId() { return _selectedId; } };
+}
+
+/**
+ * Mark a tab as belonging to a private window (P5b). Content calls this when
+ * it binds a native tab, because the model itself never learns about window
+ * privacy; the organisation store refuses anything not explicitly public.
+ */
+export function __markPrivate(astra_tab_id, isPrivate) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return false;
+  tab.private = isPrivate === true;
+  return true;
+}
+
+/** Spaces and the active space, without building a projection. */
+export function __spacesState() {
+  return {
+    spaces: _spaces.map((space) => ({ ...space })),
+    active_space_id: _activeSpaceId,
+  };
+}
+
+/**
+ * Replace the space list from a restored organisation snapshot (P5b). Runs
+ * before bootstrap so adopted tabs land in a space that already exists.
+ */
+export function __applySpaces(spaces, active_space_id = "") {
+  if (!Array.isArray(spaces) || spaces.length === 0) return false;
+  const seen = new Set();
+  const next = [];
+  for (const space of spaces) {
+    const id = typeof space?.id === "string" ? space.id : "";
+    if (!/^space-\d+$/u.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    next.push({
+      id,
+      name: typeof space.name === "string" && space.name !== "" ? space.name : id,
+      icon: typeof space.icon === "string" ? space.icon : null,
+      color: Number.isInteger(space.color) ? space.color : 0,
+      theme: typeof space.theme === "string" ? space.theme : null,
+    });
+  }
+  if (next.length === 0) return false;
+  _spaces = next;
+  _activeSpaceId = seen.has(active_space_id) ? active_space_id : next[0].id;
+  const highest = next.reduce((max, space) => {
+    const n = Number(/^space-(\d+)$/u.exec(space.id)?.[1] ?? 0);
+    return Math.max(max, n);
+  }, 1);
+  _nextSpaceId = highest + 1;
+  return true;
 }
 
 // Test-only + Windows.close: close every tab in a window.
@@ -372,6 +426,7 @@ export const Tabs = {
       pinned: false,
       discarded: false,
       muted: false,
+      private: false,
     });
     if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
       _order.splice(index, 0, astra_tab_id);
@@ -733,6 +788,7 @@ export function __adoptNative({
   selected = false,
   window_id = DEFAULT_WINDOW_ID,
   space_id = _activeSpaceId,
+  private: privateWindow = false,
 } = {}) {
   const astra_tab_id = `tab-${_nextId++}`;
   _tabs.set(astra_tab_id, {
@@ -745,6 +801,7 @@ export function __adoptNative({
     pinned: false,
     discarded: false,
     muted: false,
+    private: privateWindow === true,
   });
   _order.push(astra_tab_id);
   __pushHistory(astra_tab_id, safeTabUrl(url));

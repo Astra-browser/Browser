@@ -20,6 +20,7 @@ import {
   __adoptNative,
   __announceAdopted,
   __applyExternalUpdate,
+  __markPrivate,
   __spaceUserContextId,
   __tabsState,
 } from "./Tabs.sys.mjs";
@@ -332,6 +333,9 @@ export const Content = {
     const bindTab = (id, tab) => {
       if (!id || !tab) return;
       tab.setAttribute("astra-tab-id", id);
+      // P5b: the organisation store must never keep a private tab. Content is
+      // the only layer that knows the window, so it stamps the record here.
+      __markPrivate(id, isPrivateWindow(win));
       tabOf.set(id, tab);
       idOf.set(tab, id);
       const browser = tab.linkedBrowser ?? null;

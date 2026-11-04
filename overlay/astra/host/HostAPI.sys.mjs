@@ -20,7 +20,7 @@
 
 import { addEventListener, bufferedCount, emit, eventSeq, eventsSince } from "./Events.sys.mjs";
 import { Boot, __resetBootForTests } from "./Boot.sys.mjs";
-import { HOST_API_VERSION, Tabs, __resetTabsForTests } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, Tabs, __resetTabsForTests, __spacesState } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
 import { Windows, __bindCurrentWindow, __resetWindowsForTests } from "./Windows.sys.mjs";
 import { Session, __resetSessionForTests } from "./Session.sys.mjs";
@@ -47,6 +47,7 @@ import { System } from "./System.sys.mjs";
 import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
+import { Metadata } from "./Metadata.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
@@ -82,12 +83,14 @@ export {
   Search,
   Permissions,
   Operations,
+  Metadata,
   addEventListener,
   emit,
   eventSeq,
   eventsSince,
   bufferedCount,
   __commitExternal,
+  __spacesState,
 };
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.

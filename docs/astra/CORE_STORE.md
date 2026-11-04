@@ -43,8 +43,44 @@ spawns the real executable and proves: save in one process, load in a new one,
 invalid payloads refused without clobbering the last good row, named snapshots
 independent, version gate, EOF exit.
 
-## Status
+## Host wiring (P5b-2)
 
-P5b-1 (this binary) is merged. **P5b-2** — the host capture/apply wiring and the
-quit/relaunch proof — is still open: the shell does not launch this binary yet,
-so no user-visible metadata survives a restart through it.
+`Metadata.sys.mjs` owns the browser side:
+
+- The shell launches the sidecar when `astra.core.command` names a binary, with
+  `--db <profile>/astra/core.sqlite` (or the `astra.core.database` override).
+  No command is an honest `unavailable`; nothing is faked.
+- Before `Tabs.bootstrap`, `prepare()` loads the snapshot and installs the saved
+  spaces, so a tab adopted from SessionStore lands in a space that exists.
+- After `Content.mountNative`, `restore()` matches saved tabs to live tabs by
+  URL (one snapshot entry per live tab, in position order) and re-applies the
+  space and pin.
+- `init()` saves on organisation events (`space.*`, `tab.*`, `items-changed`,
+  `nav.committed`) with a 600 ms debounce. Quit rewrites the **last accepted**
+  snapshot rather than capturing a tearing-down window.
+
+Privacy rules, all fail-closed:
+
+| Rule | Effect |
+|---|---|
+| Only `tab.private === false` | `Content` stamps privacy from the window when it binds the native tab; an unmarked tab is not captured |
+| Private windows are dropped | a private window neither restores nor saves (`prepare`/`save`/`restore` return `private`) |
+| Only `http:`/`https:` URLs | New Tab, `about:`, `data:`, `file:`, `blob:` never reach disk |
+| Empty capture never overwrites | a window with no persistable tab leaves the saved organisation alone |
+| Window list unavailable | the save is refused, not guessed |
+
+Live proof: `tools/perf/stress/metadata_restore_probe.py` creates a Work space
+with a pinned tab, saves, opens a private window (which must refuse to save),
+checks the SQLite row has no private URL, quits cleanly, relaunches, and
+re-applies the saved organisation to a tab at the saved URL.
+
+## Known limits
+
+- **Multi-window:** each window's `Metadata` writes its own model, so the last
+  writer wins. A single-window profile is correct; a multi-window merge is
+  P5b-3.
+- **Folders:** the UI's tab folders still live in `localStorage`; the store
+  schema and `SessionSnapshot.folders` are ready, but the host has no folder
+  model to capture yet.
+- **Scroll/zoom/history:** `SessionStore` owns those; the snapshot carries only
+  organisation.

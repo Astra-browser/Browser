@@ -121,7 +121,28 @@
     try {
       const services = frameRoot?.ownerDocument?.defaultView?.Services;
       const command = services?.prefs?.getStringPref("astra.core.command", "") ?? "";
-      void host.Boot.launchCore({ request_id: "shell-boot", command });
+      // The organisation store lives beside the profile, never in a shared
+      // location: a database is per profile, like cookies and history.
+      let database = services?.prefs?.getStringPref("astra.core.database", "") ?? "";
+      if (command !== "" && database === "") {
+        try {
+          const chromeWin = frameRoot?.ownerDocument?.defaultView ?? null;
+          const ifile = chromeWin?.Ci?.nsIFile ?? (typeof Ci !== "undefined" ? Ci.nsIFile : null);
+          const file = ifile ? services.dirsvc.get("ProfD", ifile) : null;
+          database = file?.path ? `${file.path}/astra/core.sqlite` : "";
+        } catch {
+          database = "";
+        }
+      }
+      // P5b: the sidecar must be up before the organisation snapshot is read.
+      // A missing binary is an honest unavailable; the browser still boots.
+      if (command !== "" && database !== "") {
+        await host.Boot.launchCore({
+          request_id: "shell-boot",
+          command,
+          arguments: ["--db", database],
+        });
+      }
     } catch {
       // No Services in a preview DOM.
     }
@@ -217,7 +238,20 @@
     const stopCore = () => {
       if (coreStopped) return;
       coreStopped = true;
-      void host.Boot.shutdown({ request_id: "shell-quit", reason: "quit-application-granted" });
+      // Flush the last organisation change before the sidecar exits; the
+      // debounced save may not have fired yet.
+      void (async () => {
+        try {
+          await host.Metadata?.flush?.();
+        } catch {
+          // The core is already gone; nothing left to persist.
+        }
+        try {
+          await host.Boot.shutdown({ request_id: "shell-quit", reason: "quit-application-granted" });
+        } catch {
+          // Shutdown is best effort on quit.
+        }
+      })();
     };
     const quitObserver = {
       observe(_subject, topic) {
@@ -731,6 +765,13 @@
     } else {
       try {
         try {
+          // P5b: install the saved spaces before any tab exists, so a tab
+          // adopted from SessionStore lands in a space that already exists.
+          try {
+            await host.Metadata?.prepare?.({ private: privateWindow });
+          } catch {
+            // No core or no snapshot: the browser keeps its default space.
+          }
           // The native mount maps the model, so the model must exist before
           // it lists tabs; otherwise a bootstrap tab created in the gap is
           // never bound.
@@ -741,6 +782,14 @@
           });
           gbrowserRoot.setAttribute("data-astra-native-mounted", "true");
           applyGbrowserStage?.();
+          // Re-apply each restored tab's space and pin now that the native
+          // mount adopted them, then keep the store current.
+          try {
+            await host.Metadata?.restore?.({ private: privateWindow });
+            host.Metadata?.init?.({ private: privateWindow });
+          } catch {
+            // A failed restore leaves the tabs where the engine put them.
+          }
         } catch (e) {
           slotError = String(e?.message ?? e);
         }
@@ -844,6 +893,11 @@
         void host.Permissions?.uninstall?.({ window: win });
       } catch {
         // Already gone with the window.
+      }
+      try {
+        host.Metadata?.dispose?.();
+      } catch {
+        // Already torn down with the window.
       }
       try {
         win?.Services?.obs?.removeObserver(quitObserver, "quit-application-granted");
