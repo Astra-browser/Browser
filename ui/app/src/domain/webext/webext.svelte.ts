@@ -112,12 +112,18 @@ async function reviewing(request: () => Promise<Reviewed>): Promise<void> {
   if (preparing) return;
   preparing = true;
   failure = null;
-  const result = await request();
-  preparing = false;
-  if (result.status === "ok") {
-    pendingReview = result.data;
-    failure = null;
-  } else failure = result.error;
+  try {
+    const result = await request();
+    if (result.status === "ok") {
+      pendingReview = result.data;
+      failure = null;
+    } else failure = result.error;
+  } catch (error) {
+    // A thrown bridge command must not leave the install menu disabled.
+    failure = error instanceof Error ? error.message : String(error);
+  } finally {
+    preparing = false;
+  }
 }
 
 export const prepare = (tabId: string) => reviewing(() => commands.webExtensionPrepare(tabId));

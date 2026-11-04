@@ -58,13 +58,19 @@ const done = arguments[arguments.length - 1];
     const { FileUtils } = ChromeUtils.importESModule("resource://gre/modules/FileUtils.sys.mjs");
     await AddonManager.readyPromise;
 
-    let installed = null;
+    let review = null;
     try {
-      const file = new FileUtils.File("__XPI__");
-      const install = await AddonManager.getInstallForFile(file, null);
-      installed = await install.install();
+      review = await host.WebExtensions.prepareFile({ path: "__XPI__" });
     } catch (e) {
       out.installError = String(e);
+    }
+    step("prepareFile reviews the package", review?.from_file === true && review?.name === "Astra Probe Extension", review);
+    if (review) {
+      try {
+        await host.WebExtensions.confirm({ id: review.id, reviewId: review.review_id });
+      } catch (e) {
+        out.installError = String(e);
+      }
     }
     let addon = null;
     for (let i = 0; i < 80; i += 1) {
@@ -124,6 +130,10 @@ const done = arguments[arguments.length - 1];
     }
     step("uninstall removes it", !gone);
     step("the engine no longer knows it", (await AddonManager.getAddonByID("__ID__")) === null);
+
+    const cancelled = await host.WebExtensions.prepareFile({ path: "__XPI__" });
+    await host.WebExtensions.cancel({ reviewId: cancelled.review_id });
+    step("a cancelled review installs nothing", (await AddonManager.getAddonByID("__ID__")) === null);
     done(JSON.stringify(out));
   } catch (error) {
     done(JSON.stringify({ ...out, error: String(error?.message ?? error) }));
