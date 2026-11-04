@@ -269,6 +269,13 @@ export const DialogPrompts = {
     const insecure = isInsecure(channel);
     const realm = typeof authInfo.realm === "string" ? authInfo.realm : "";
     const request = ++_nextRequest;
+    const loadedSpec = (() => {
+      try {
+        return browser.currentURI?.spec ?? "";
+      } catch {
+        return "";
+      }
+    })();
 
     return Dialogs.requestAuth({
       request_id: `auth-${request}`,
@@ -283,12 +290,24 @@ export const DialogPrompts = {
       actor: "chrome",
     }).then((res) => {
       if (res?.error) return false;
+      // The document may have navigated while the dialog record was minted.
+      if (tabIdFor(browser) !== tabId) {
+        void Dialogs.respondAuth({
+          request_id: `auth-${request}`,
+          dialog_id: res.dialog?.dialog_id ?? "",
+          cancel: true,
+          actor: "chrome",
+        });
+        return false;
+      }
       const pending = {
         request,
         tabId,
         authInfo,
         dialogId: res.dialog?.dialog_id ?? "",
         resolve: null,
+        loadedSpec,
+        browser,
         channel,
         loadGroup: channel.loadGroup ?? null,
         observer: null,
@@ -331,6 +350,16 @@ export const DialogPrompts = {
     const numeric = Number(request);
     const pending = _pending.get(numeric);
     if (!pending || pending.tabId !== astra_tab_id) {
+      return refuse("invalid_scope");
+    }
+    // The answer must still belong to the document the challenge was for.
+    try {
+      if ((pending.browser?.currentURI?.spec ?? "") !== pending.loadedSpec) {
+        cancelPending(numeric);
+        return refuse("invalid_scope");
+      }
+    } catch {
+      cancelPending(numeric);
       return refuse("invalid_scope");
     }
     if (credentials === null || credentials === undefined) {

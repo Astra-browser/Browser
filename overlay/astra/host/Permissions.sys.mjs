@@ -416,8 +416,16 @@ export function askForWebRTC({
   } catch {
     tabId = "";
   }
-  // Only Astra's own tabs: an engine-internal browser keeps Firefox's prompt.
-  if (tabId === "") return false;
+  // Inside an Astra window every WebRTC request is Astra's: with no modelled
+  // tab, fail closed rather than opening Firefox's doorhanger.
+  if (tabId === "") {
+    try {
+      deny?.(false);
+    } catch {
+      // Already gone.
+    }
+    return true;
+  }
   if (typeof isAllowed === "function") {
     try {
       if (isAllowed() === true) return true;

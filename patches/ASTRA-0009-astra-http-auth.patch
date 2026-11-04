@@ -9,10 +9,10 @@ Verified-On: 153.6.0
 Removal-Plan: drop when the engine exposes a first-class HTTP-auth prompt integration point, or when Astra stops rendering its own sign-in card
 ---
 diff --git a/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs b/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
-index 0522aec971..d922fe30ff 100644
+index 0522aec971..eeb1d6b0e1 100644
 --- a/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
 +++ b/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
-@@ -735,13 +735,34 @@ LoginManagerAuthPrompter.prototype = {
+@@ -735,13 +735,39 @@ LoginManagerAuthPrompter.prototype = {
          );
        }
  
@@ -28,7 +28,8 @@ index 0522aec971..d922fe30ff 100644
 +      // no entry) keeps the engine prompt.
 +      let astraEntry = null;
 +      try {
-+        const astraWindow = this._browser?.ownerDocument?.defaultView ?? null;
++        const astraWindow =
++          this._browser?.ownerDocument?.defaultView ?? this._chromeWindow ?? null;
 +        astraEntry = astraWindow
 +          ? Services.astraDialogWindows?.get(astraWindow) ?? null
 +          : null;
@@ -36,11 +37,15 @@ index 0522aec971..d922fe30ff 100644
 +        astraEntry = null;
 +      }
 +      const astraOwned = astraEntry
-+        ? astraEntry.promptAuth({
-+            browser: this._browser,
-+            channel: aChannel,
-+            authInfo: aAuthInfo,
-+          })
++        ? this._browser
++          ? astraEntry.promptAuth({
++              browser: this._browser,
++              channel: aChannel,
++              authInfo: aAuthInfo,
++            })
++          : // An Astra window with no browser (proxy/privileged challenge):
++            // Astra stays the only UI, so fail closed instead of a dialog.
++            Promise.resolve(false)
 +        : null;
 +      ok = astraOwned
 +        ? await astraOwned

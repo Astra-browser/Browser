@@ -969,7 +969,7 @@ def ui_action(run, action, arg=None):
             form.dispatchEvent(new d.defaultView.SubmitEvent('submit', { bubbles: true, cancelable: true }));
           }
           ok = await waitFor(() => {
-            const b = document.querySelector('browser[data-astra-browser]');
+            const b = gBrowser.selectedBrowser;
             return !!b && !b.webProgress?.isLoadingDocument && String(b.currentURI?.spec || '').includes('/static.html');
           }, 20000);
         } else if (action === 'switch') {
@@ -980,7 +980,7 @@ def ui_action(run, action, arg=None):
           const open = row.querySelector('button.tab-open') || row;
           open.click();
           ok = await waitFor(() => {
-            const b = document.querySelector('browser[data-astra-browser]');
+            const b = gBrowser.selectedBrowser;
             return shell()?.getAttribute('data-astra-active-tab') === id
               && !!b && !b.webProgress?.isLoadingDocument;
           }, 5000);

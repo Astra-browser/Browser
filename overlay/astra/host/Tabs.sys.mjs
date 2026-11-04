@@ -717,12 +717,20 @@ export const Tabs = {
     if (!Number.isInteger(index) || index < 0) {
       return err(request_id, "invalid_index", "index must be a non-negative integer");
     }
+    // The UI's index is the row position inside the tab's space; `_order` is
+    // global across spaces, so splice within the space's slice.
     const from = _order.indexOf(astra_tab_id);
+    const siblings = _order.filter(
+      (id) => id !== astra_tab_id && _tabs.get(id)?.space_id === tab.space_id
+    );
+    const anchor = siblings[Math.min(index, siblings.length)] ?? null;
+    let clamped = from;
     if (from >= 0) {
       _order.splice(from, 1);
+      clamped = anchor === null ? _order.length : _order.indexOf(anchor);
+      if (clamped < 0) clamped = _order.length;
+      _order.splice(clamped, 0, astra_tab_id);
     }
-    const clamped = Math.min(index, _order.length);
-    _order.splice(clamped, 0, astra_tab_id);
     emit("tab.moved", { astra_tab_id, from_index: from, to_index: clamped });
     // The projection owns sidebar order, so a moved row has to reach it.
     emitItemsChanged();
