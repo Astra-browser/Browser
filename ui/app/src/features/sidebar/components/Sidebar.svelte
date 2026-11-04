@@ -43,6 +43,23 @@
   } = $props();
   let settings = $derived(browserPage.currentPage() === "settings");
   const SETTINGS_PANEL = 264;
+  // Below this width the sections rail costs the reading page more than it
+  // gives it. The column keeps only its dots and the section picker moves
+  // into the page itself (Settings.svelte).
+  const NARROW_WINDOW = "(max-width: 760px)";
+  // Read at construction, not only in the effect: opening Settings in a
+  // narrow window must not paint the full rail for the first frame.
+  let narrowWindow = $state(
+    typeof window === "undefined" ? false : window.matchMedia(NARROW_WINDOW).matches,
+  );
+  $effect(() => {
+    const media = window.matchMedia(NARROW_WINDOW);
+    const sync = () => (narrowWindow = media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  });
+  const settingsExtent = $derived(narrowWindow ? 0 : SETTINGS_PANEL);
   let taskPage = $derived(
     browserPage.currentPage() === "tasks" || browserPage.currentPage() === "notes",
   );
@@ -417,7 +434,7 @@
   });
   let width = $derived(
     navigating
-      ? COMPACT_WIDTH + PANEL_GAP + SETTINGS_PANEL
+      ? COMPACT_WIDTH + (settingsExtent > 0 ? PANEL_GAP + settingsExtent : 0)
       : railPage && tools.activeTool() === null
         ? COMPACT_WIDTH
         : effectiveWidth(),
@@ -426,20 +443,26 @@
   // them, so the width the shell insets the page by has to carry the panel
   // too: otherwise the page stands under the settings panel and the inset
   // snaps only when the panel closes. The panel a page replaced (a tool, say)
-  // is published again on the way out.
+  // is published again on the way out. The extent follows the window shape,
+  // so narrowing while Settings is open folds the panel and widens the page
+  // without the page being laid out twice.
   let inSettings = false;
   let settingsRestore = 0;
   $effect(() => {
     const open = navigating;
-    if (open === inSettings) return;
-    inSettings = open;
+    const extent = settingsExtent;
     untrack(() => {
       if (!open) {
+        if (!inSettings) return;
+        inSettings = false;
         setPanelExtent(settingsRestore);
         return;
       }
-      settingsRestore = hasPanel() ? effectiveWidth() - COMPACT_WIDTH - PANEL_GAP : 0;
-      setPanelExtent(SETTINGS_PANEL);
+      if (!inSettings) {
+        inSettings = true;
+        settingsRestore = hasPanel() ? effectiveWidth() - COMPACT_WIDTH - PANEL_GAP : 0;
+      }
+      setPanelExtent(extent);
     });
   });
 
@@ -559,7 +582,7 @@
         {@render browserBody(compact)}
         {@render dock(compact)}
       </div>{/key}
-    {#if settings}<div class="sidebar-tool-host">
+    {#if settings && settingsExtent > 0}<div class="sidebar-tool-host">
         {@render settingsNavigation()}
       </div>{:else if tools.activeTool() !== null}<div class="sidebar-tool-host">
         {@render toolPanel(tools.activeTool()!)}

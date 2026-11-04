@@ -345,6 +345,30 @@ Specta output and has no generator in this tree, so the
 `PagePermissionKindView` union was extended in place (the file is already the
 sanctioned generated-binding exception in `tools/brand-lint.sh`).
 
+## Owner report: drag a tab to keep it (2026-11-04)
+
+Dragging a tab onto the Essentials dock did nothing and always answered
+"Could not move this tab. Try again." Three separate defects on one path:
+
+| ID | Fix | Status | Evidence |
+|---|---|---|---|
+| D-41a | `tabs_set_essential` had no Host route and no `Tabs` method, so the app's only drag verb (`tab-drag.move`) failed with `unknown_command`. Added `Tabs.setEssential({ astra_tab_id, essential, before })` (keep/unkeep + place in one call), routed it with `TAB_ARG`, removed it from the wire baseline | done | `hostapi_v1.mjs` 324 checks (keep, drop-before order, in-place reorder, release, projection sections, unknown tab, bad flag); `wire_coverage.mjs` 48 (route target exists, id mapped, 199 known gaps) |
+| D-41b | The projection put every tab in `today`; `pinned` never reached the sidebar, so a kept tab had no fulfilment section. `__itemsSnapshot` now projects kept tabs as `favorites` in run order and open tabs as `today`, `tabs` sorted to match | done | same host contract checks: "kept tabs project as favourites in drop order", "a kept tab leaves Today", "a released tab returns to Today" |
+| D-41c | `tabDrag.end()` treated a refused `tab_drag_over(null, null)` (still an unrouted native-hint command) as a placement failure, so every drag ended in the error banner even when the move applied. The hover-hint release is now silent; only `move`/`leaveSplit` settle a placement | done | `tab-drag.svelte.test.ts` 4/4; `RailDrag.component.test.ts` + `TabReorder.component.test.ts` 6/6 |
+
+Live proof (packaged dev build, Marionette, throwaway profile,
+`/tmp/opencode/essentials-probe.py`): an open tab dragged onto the dock ends
+`pinned: true` with its tile under `[data-essentials-drop]` and no alert;
+dragging that tile back among the open tabs ends `pinned: false`, the tile
+gone, still no alert. `@astra/frame check` clean (1228 unit tests), state-check
+and brand-lint clean.
+
+Deferred (unchanged gaps, still in `wire_baseline.json`): `tab_drag_over` and
+`tab_drop` remain unrouted — dragging a tab out of the sidebar onto the page
+has no native detach/window-drop backend yet, and the hover hint is not drawn.
+The Essentials dock, rail and in-list reorder no longer depend on them.
+
+
 ## Owner report: a committed page must not wait behind the skeleton (2026-11-04)
 
 "Loading a page is taking more time." The skeleton was covering pages that had
@@ -379,3 +403,49 @@ reliable chrome-side signal. True first-paint timing lives in the content
 process (`PerformancePaintTiming`); wiring it would need a JSWindowActor and a
 new event. A document that commits and then paints slowly therefore shows the
 stage's ground for that gap, which is what Firefox does.
+
+## Owner report: one interface for menus, sheets and settings (2026-11-04)
+
+The owner asked for the same interface everywhere — the page menu, the pop-ups,
+settings — and a layout that survives a narrow window. The page menu was the
+last surface still drawn with its own recipe: an opaque 18px slab, 30px rows,
+inset dividers and 11px labels, none of it matching the chrome's menus. The
+dialogs had drifted the same way: four radii, three shadows and three scrims
+across `.settings-dialog`, `PromptSheet`, `NoteLeavePrompt` and `AccountDialog`.
+
+| ID | Fix | Status | Evidence |
+|---|---|---|---|
+| UI-1 | The page menu (right-click on chrome and on a page) now uses the menu system's recipe: `--color-float` ground, 22px panel, 6px pad, 34px rows, 8px item inset, full-bleed separators, menu headings and hints, menu open/close motion | done | live computed style: `rgb(61, 61, 68)`, radius `22px`, pad `6px`, row `33px`, row radius `16px`, font `13px`, separator bleed `-6px` (`out/ui-consistency/wide-menu.png`) |
+| UI-2 | One overlay recipe (`--overlay-ground/-radius/-shadow/-pad/-scrim`, dark + light): every settings dialog, extension prompt sheet, note-leave prompt and the account dialog now share the same ground, corner, edge, padding and scrim. The bits-ui scrim and both native `::backdrop`s use it too | done | `AccountDialog.svelte`, `PromptSheet.svelte`, `NoteLeavePrompt.svelte`, `.settings-dialog*` in `browser.css`; light/dark look captures |
+| UI-3 | The launcher's action sheet is a menu and now takes the menu geometry (solid float, 22px, 34px rows) instead of a bespoke 18px card | done | `LauncherActions.svelte`; light/dark captures |
+| UI-4 | Below 760px the settings sections rail folds to the 56px rail and a section picker + search + close move into the page, so the reading column keeps the window instead of ~180px. Widening restores the rail in place (no second layout) | done | live probe: wide sidebar `328` with nav `264`; narrow viewport `652` → sidebar `56`, `.settings-sidebar-navigation` absent, `.settings-compact-nav` `display:flex`, page padding `26px 18px 44px`; back wide → `328` again |
+| UI-5 | Settings rows stack their control on its own line under 560px (container query), and the callout/action rows stack under 480px, so labels never collapse into single words | done | 520px/600px component captures (`ui/target/probe-ui`) |
+| UI-6 | Right-click works across Astra's own UI: the app now opens its menu everywhere except where a tab/site/folder owns one (those prevent the event first). The tab and in-use-indicator menus no longer call the unrouted `tab_menu_popup`; `src/app/browser/tab-menu.ts` registers a presenter with the tabs domain and draws New Tab / Reload / Copy Link / Keep / Split / Mute / Move to Space / Clear data / Close from existing routes | done | live: tab menu `["New Tab","Add to Essentials"]`, new-tab ground menu `["New Tab","New Window",…]`; `TabMenu.component.test.ts` 4/4 (full page rows, per-tab actions, kept/lone-tab variants, media-only) |
+
+Live proof (packaged dev build, Marionette, chrome context, throwaway profile):
+
+```sh
+(cd ui && bun run --filter @astra/frame build:chrome)
+(cd forge/astra-forge && cargo run -q -- overlay && cargo run -q -- build --faster)
+tools/perf/hidden-display.sh python3 tools/marionette-probe/ui-consistency-probe.py out/ui-consistency
+```
+
+The probe opens the real page menu from the sidebar's `contextmenu` path, runs
+Settings from the menu's own row, narrows the window and widens it again. All
+steps pass. Screenshots: `wide-menu.png`,
+`wide-settings.png`, `narrow-settings.png`, `back-wide.png`.
+
+Gates: `bun run check` clean (svelte-check 0/0, eslint, stylelint, prettier,
+knip, **1227 unit tests** after retiring the obsolete menu-target test; the
+tab-menu component test adds 4); component batch 17 files / 85 tests (the only
+failure is the known `DropdownCsp` case that needs the missing native artifact);
+`shell_app_chrome` PASS, `hostapi_v1` 324, `shell_assembly` PASS, `frame_model`
+PASS, `wire_coverage` 48, bridge 27, `check-styles` 144 files, forge lint 11
+patches clean, footprint within budget, state-check and brand-lint clean. The
+12 component failures seen in the wider settings/shared batch were reproduced
+identically with this change stashed (account billing text, shortcut recorder
+and `US$` currency formatting), so they are not from this work.
+
+Deferred: Work's canvas popovers/HUD keep their canvas-specific float recipe
+(a canvas object is not a menu); extension pop-ups remain native windows owned
+by the engine; per-space theming is unchanged.

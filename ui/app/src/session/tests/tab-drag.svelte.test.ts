@@ -26,13 +26,15 @@ it("clears an active drag exactly once", async () => {
   expect(host.dragOver).toHaveBeenCalledExactlyOnceWith(null, null);
 });
 
-it("handles reset rejection without an unhandled promise", async () => {
+it("swallows a refused drag-hint reset without reporting a move failure", async () => {
   host.dragOver.mockRejectedValue(new Error("native transport unavailable"));
   const drag = await import("../tab-drag.svelte");
   drag.begin("tab-1");
   drag.end();
   await Promise.resolve();
-  expect(drag.moveFailed()).toBe(true);
+  // Releasing the hover hint is not a placement; only `move`/`leaveSplit` can
+  // say a tab was not moved.
+  expect(drag.moveFailed()).toBe(false);
 });
 
 it("does not report a previous reset failure on a new drag", async () => {

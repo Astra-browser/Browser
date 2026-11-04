@@ -12,9 +12,12 @@
   import * as state from "../lib/settings-state.svelte";
   import NewTabPage from "./sections/NewTabPage.svelte";
   import Icon from "$shared/ui/Icon";
-  import { ArrowRight01Icon, Search01Icon } from "@hugeicons/core-free-icons";
+  import IconButton from "$shared/ui/IconButton";
+  import Select from "$shared/ui/Select";
+  import { ArrowRight01Icon, Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
   import EmptyState from "$shared/ui/EmptyState";
   import Button from "$shared/ui/Button";
+  import { surface as browser } from "$domain/surface";
   const loaders = {
     appearance: () => import("./sections/AppearancePage.svelte"),
     general: () => import("./sections/GeneralPage.svelte"),
@@ -48,6 +51,11 @@
   });
   let loader = $derived(current.id in loaders ? loaders[current.id as keyof typeof loaders] : null);
   let results = $derived(searchSettings(state.query()));
+  // Below 760px the sections rail folds and these three stand in for it:
+  // a section picker, the same search, and the way back out.
+  let sectionOptions = $derived(
+    offered.map((section) => ({ value: section.id, label: section.title() })),
+  );
   let content: HTMLElement;
   let focusedRevision = -1;
   async function focusTarget() {
@@ -94,6 +102,30 @@
 <section class="settings-shell" aria-label={m.settings_title()}>
   <div class="settings-content scrolls" bind:this={content}>
     <div class="settings-page">
+      <div class="settings-compact-nav">
+        <Select
+          label={m.settings_title()}
+          labelHidden
+          options={sectionOptions}
+          value={current.id}
+          onchange={(value) => state.select(value as SettingsSection)}
+        />
+        <label class="settings-compact-search">
+          <Icon icon={Search01Icon} size={14} />
+          <input
+            type="search"
+            aria-label={m.settings_search()}
+            placeholder={m.settings_search()}
+            value={state.query()}
+            oninput={(event) => state.setQuery(event.currentTarget.value)}
+          />
+        </label>
+        <IconButton
+          icon={Cancel01Icon}
+          label={m.settings_back()}
+          onclick={() => void browser.close()}
+        />
+      </div>
       {#key state.query() ? "search" : current.id}<div class="settings-view">
           <header class="settings-page-heading">
             <h1 tabindex="-1">
@@ -138,3 +170,77 @@
     </div>
   </div>
 </section>
+
+<style>
+  /* The rail's stand-in for a window too narrow to hold one. It is absent at
+     every width that shows the sections panel, so the page keeps its single
+     heading and nothing is offered twice. */
+  .settings-compact-nav {
+    display: none;
+  }
+
+  @media (width <= 760px) {
+    .settings-compact-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-block-end: 22px;
+    }
+
+    .settings-compact-nav > :global(.field) {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 240px;
+    }
+
+    .settings-compact-nav > :global(.field .ui-select) {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .settings-compact-search {
+      display: flex;
+      flex: 1 1 140px;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      min-height: var(--search-height);
+      padding-inline: var(--control-inset);
+      border-radius: var(--radius-field);
+      background: var(--color-field);
+      color: var(--color-faint);
+    }
+
+    .settings-compact-search:focus-within {
+      background: var(--color-field-hover);
+      box-shadow: var(--shadow-field-focus);
+      color: var(--color-muted);
+    }
+
+    .settings-compact-search input {
+      min-width: 0;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      outline: none;
+      color: var(--color-text);
+      font-size: var(--text-body);
+    }
+  }
+
+  @media (width <= 520px) {
+    .settings-compact-nav {
+      flex-wrap: wrap;
+    }
+
+    .settings-compact-nav > :global(.field) {
+      flex: 1 1 auto;
+      max-width: none;
+    }
+
+    .settings-compact-search {
+      order: 2;
+      flex-basis: 100%;
+    }
+  }
+</style>

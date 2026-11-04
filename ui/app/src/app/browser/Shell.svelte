@@ -77,6 +77,7 @@
   import { IS_WINDOWS } from "$shared/platform";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
   import { ContextMenu, install as installShellMenu, openAt } from "$features/menus";
+  import { installTabMenuPresenter } from "./tab-menu";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
   /** New Note, from the menu or its shortcut: a note starts where notes are open. */
@@ -102,17 +103,22 @@
     handleNativeSection("settings.section.about");
     void browserPage.open("settings");
   }
-  // The sidebar's own menu stands where the engine would offer Reload. The
-  // page's menu arrives from the shell (see `installShellMenu`), so both are
-  // drawn by the app and neither is a Firefox menu.
+  // Astra's own menu stands wherever the engine would offer a browser menu.
+  // The page's menu arrives from the shell (see `installShellMenu`), so both
+  // are drawn by the app and neither is a Firefox menu. Anything in the app
+  // that does not own a menu of its own — the sidebar's empty space, the new
+  // tab, settings, lists — gets this one; a tab, a kept site or a folder has
+  // already handled the event (and marked it), so it is not overridden.
   onMount(() => {
     const stopShellMenu = installShellMenu();
+    const stopTabMenu = installTabMenuPresenter();
     const stopChromeMenu = installChromeMenu((event) => {
-      if (!(event.target instanceof Element) || !event.target.closest(".browser-sidebar")) return;
+      if (!(event.target instanceof Element)) return;
       openChromeContextMenu(event);
     });
     return () => {
       stopChromeMenu();
+      stopTabMenu();
       stopShellMenu();
     };
   });
@@ -312,9 +318,7 @@
     handledCommand = command.seq;
     untrack(() => {
       if (command.id === "split.choose") splitting = true;
-      if (command.id === "tab.copyLink") void tabs.copyMenuTargetLink().then(linkCopied);
       if (command.id === "page.copyLink") void tabs.copyActiveLink().then(linkCopied);
-      if (command.id === "tab.clearSiteData") clearRequest.ask(tabs.takeMenuTargetUrl());
       if (command.id === "page.clearSiteData") clearRequest.ask(tabs.activeTab()?.url);
       if (command.id === "find.show") findInPage.show(tabs.activeId());
       if (command.id === "find.next") findInPage.step(true, tabs.activeId());

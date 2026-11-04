@@ -355,6 +355,37 @@ function activeOrder() {
   return _order.filter((id) => _tabs.get(id)?.space_id === _activeSpaceId);
 }
 
+/**
+ * Put a tab where a drop asked for it: immediately before `before` inside its
+ * own run (kept tabs, or open ones), or at the end of that run. `_order` is
+ * global across spaces, so only this space's slots are rewritten; every other
+ * space keeps the positions it had.
+ */
+function placeInRun(astra_tab_id, before) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) {
+    return -1;
+  }
+  const kept = tab.pinned === true;
+  const members = _order.filter(
+    (id) => id !== astra_tab_id && _tabs.get(id)?.space_id === tab.space_id
+  );
+  const run = members.filter((id) => (_tabs.get(id)?.pinned === true) === kept);
+  const rest = members.filter((id) => (_tabs.get(id)?.pinned === true) !== kept);
+  const at = before === null ? -1 : run.indexOf(before);
+  const insertAt = at < 0 ? run.length : at;
+  const ordered = [...run.slice(0, insertAt), astra_tab_id, ...run.slice(insertAt)];
+  const spaceOrder = kept ? [...ordered, ...rest] : [...rest, ...ordered];
+  let cursor = 0;
+  for (let i = 0; i < _order.length; i += 1) {
+    if (_tabs.get(_order[i])?.space_id === tab.space_id) {
+      _order[i] = spaceOrder[cursor];
+      cursor += 1;
+    }
+  }
+  return _order.indexOf(astra_tab_id);
+}
+
 /** The space in front always has somewhere to go: a window whose active space
  *  holds no tab has nothing to put on the stage, and every caller downstream
  *  (address bar, navigation, content) resolves a selected tab first. A space
@@ -416,7 +447,11 @@ function tabView(id) {
 /** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
 export function __itemsSnapshot() {
   const order = activeOrder();
-  const tabs = order.map(tabView).filter(Boolean);
+  // Kept sites are the section above Today, and their run comes first: the
+  // sidebar, the rail and the dock all read the order from these nodes.
+  const kept = order.filter((id) => _tabs.get(id)?.pinned === true);
+  const open = order.filter((id) => _tabs.get(id)?.pinned !== true);
+  const tabs = [...kept, ...open].map(tabView).filter(Boolean);
   const active = _selectedId && order.includes(_selectedId) ? _selectedId : (order[0] ?? null);
   return {
     projection_revision: nextRevision(),
@@ -432,12 +467,20 @@ export function __itemsSnapshot() {
         .map((id) => _tabs.get(id)?.icon ?? null),
     })),
     active_space_id: _activeSpaceId,
-    nodes: tabs.map((tab) => ({
-      id: tab.id,
-      parent_id: null,
-      section: "today",
-      kind: { type: "tab", tab_id: tab.id },
-    })),
+    nodes: [
+      ...kept.map((id) => ({
+        id,
+        parent_id: null,
+        section: "favorites",
+        kind: { type: "tab", tab_id: id },
+      })),
+      ...open.map((id) => ({
+        id,
+        parent_id: null,
+        section: "today",
+        kind: { type: "tab", tab_id: id },
+      })),
+    ],
     tabs,
     active,
     split_group: null,
@@ -797,6 +840,49 @@ export const Tabs = {
     tab.pinned = false;
     emit("tab.unpinned", { astra_tab_id });
     return admitted(request_id, { astra_tab_id, pinned: false });
+  },
+
+  /**
+   * The app's one placement verb: keep a tab (pin it) or let it go, and put it
+   * before `before` inside its run. A drag calls this for a reorder just as for
+   * a keep, so a tab never changes section without also landing where the
+   * person let go of it.
+   */
+  async setEssential({ request_id = "", astra_tab_id = "", essential = false, before = null } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
+    }
+    if (typeof essential !== "boolean") {
+      return err(request_id, "invalid_essential", "essential must be a boolean");
+    }
+    let anchor = typeof before === "string" && before !== "" ? before : null;
+    if (anchor === astra_tab_id) {
+      anchor = null;
+    }
+    if (anchor !== null) {
+      const target = _tabs.get(anchor);
+      if (!target) {
+        return err(request_id, "no_such_tab", `unknown tab ${anchor}`);
+      }
+      // A row can only be placed among the tabs its list shows, so an anchor
+      // from another space is a stale drop, not a position.
+      if (target.space_id !== tab.space_id) {
+        return err(request_id, "tab_in_other_space", `unknown tab ${anchor} in this space`);
+      }
+    }
+    const changed = tab.pinned !== essential;
+    const from = _order.indexOf(astra_tab_id);
+    tab.pinned = essential;
+    const index = placeInRun(astra_tab_id, anchor);
+    if (changed) {
+      emit(essential ? "tab.pinned" : "tab.unpinned", { astra_tab_id });
+    }
+    emit("tab.moved", { astra_tab_id, from_index: from, to_index: index });
+    // The projection owns which section a tab sits in, so a kept or moved row
+    // has to reach it.
+    emitItemsChanged();
+    return admitted(request_id, { astra_tab_id, pinned: essential, index });
   },
 
   // Sleep a tab (live: `gBrowser.discardBrowser`). Keeps history +

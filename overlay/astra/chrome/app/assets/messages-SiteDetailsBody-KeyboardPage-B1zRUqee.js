@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-Diuh21aB.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(248,n)??`Zoom in`)),r=((n={},r={})=>(r.locale??e(),t(249,n)??`Zoom out`));export{n,r as t};

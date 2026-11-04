@@ -1,5 +1,5 @@
 import "$styles/global.css";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
@@ -18,6 +18,11 @@ vi.mock("$shared/ipc/bindings", async () => {
     sidebarSetHidden: async () => {},
     sidebarSetWidth: async () => {},
   });
+});
+// A window wide enough to hold the settings rail; below 760px the rail folds
+// into the page by design and this suite is about the rail.
+beforeEach(async () => {
+  await page.viewport(1100, 800);
 });
 afterEach(() => {
   surface.dispose();

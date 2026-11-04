@@ -234,6 +234,41 @@ let tA, tB, tC;
   check("muted true", mu.muted === true);
   checkErr("tabs.setMuted unknown", await Tabs.setMuted({ request_id: "t-25", astra_tab_id: "tab-nope" }), "t-25", "no_such_tab");
 
+  // The drag verb: keep (pin) or let go, and land where the person dropped.
+  const k1 = (await Tabs.create({ request_id: "t-28", url: "https://keep1.example/", background: true })).astra_tab_id;
+  const k2 = (await Tabs.create({ request_id: "t-29", url: "https://keep2.example/", background: true })).astra_tab_id;
+  const kept = await Tabs.setEssential({ request_id: "t-30", astra_tab_id: k1, essential: true, before: null });
+  checkEnv("tabs.setEssential", kept, "t-30");
+  check("kept tab reports pinned", kept.pinned === true && kept.accepted === true);
+  check("emitted tab.pinned for keep",
+    seen.some((e) => e.type === "tab.pinned" && e.data.astra_tab_id === k1));
+  const keptFirst = await Tabs.setEssential({ request_id: "t-31", astra_tab_id: k2, essential: true, before: k1 });
+  const k1After = await Tabs.get({ request_id: "t-31b", astra_tab_id: k1 });
+  check("a drop before another kept tab lands first", keptFirst.index < k1After.tab.index);
+  let favourites = TabsMod.__itemsSnapshot().nodes
+    .filter((node) => node.section === "favorites" && node.kind.type === "tab")
+    .map((node) => node.kind.tab_id);
+  check("kept tabs project as favourites in drop order", favourites.join() === [k2, k1].join());
+  check("a kept tab leaves Today",
+    !TabsMod.__itemsSnapshot().nodes.some((node) => node.kind.type === "tab"
+      && node.kind.tab_id === k1 && node.section === "today"));
+  const released = await Tabs.setEssential({ request_id: "t-32", astra_tab_id: k1, essential: false, before: null });
+  check("released tab reports unpinned", released.pinned === false);
+  check("emitted tab.unpinned for release",
+    seen.some((e) => e.type === "tab.unpinned" && e.data.astra_tab_id === k1));
+  check("a released tab returns to Today",
+    TabsMod.__itemsSnapshot().nodes.some((node) => node.kind.type === "tab"
+      && node.kind.tab_id === k1 && node.section === "today"));
+  checkErr("tabs.setEssential unknown",
+    await Tabs.setEssential({ request_id: "t-33", astra_tab_id: "tab-nope", essential: true }), "t-33", "no_such_tab");
+  checkErr("tabs.setEssential bad flag",
+    await Tabs.setEssential({ request_id: "t-34", astra_tab_id: k2, essential: "yes" }), "t-34", "invalid_essential");
+  await Tabs.setEssential({ request_id: "t-35", astra_tab_id: k2, essential: false, before: null });
+  // The same call is how the open list reorders in place.
+  const movedOpen = await Tabs.setEssential({ request_id: "t-36", astra_tab_id: k1, essential: false, before: tB });
+  const anchorIndex = (await Tabs.get({ request_id: "t-36b", astra_tab_id: tB })).tab.index;
+  check("an open tab reorders before an anchor", movedOpen.pinned === false && movedOpen.index < anchorIndex);
+
   checkErr("tabs.create empty url", await Tabs.create({ request_id: "t-26", url: "" }), "t-26", "invalid_url");
 
   const winList = await Tabs.list({ request_id: "t-27", window_id: "win-1" });

@@ -283,12 +283,21 @@
   margin-inline: auto;
   padding: 40px clamp(24px, 6vw, 72px);
 }
-@container (max-width: 450px) {
+@container (max-width: 560px) {
   .settings-page .ui-settings-row {
     flex-wrap: wrap;
+    align-items: flex-start;
     gap: 12px;
   }
+  /* A control that keeps sharing the line with its label at this width
+     squeezes the label into a column of single words. It takes its own line
+     and the row's full measure instead. */
   .settings-page .ui-settings-control {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+  .settings-page .ui-settings-control > .ui-select,
+  .settings-page .ui-settings-control > .ui-button {
     max-width: 100%;
   }
 }
@@ -565,16 +574,21 @@
   border-radius: var(--radius-control);
   margin-bottom: 26px;
 }
+/* Every dialog shares one recipe: the same ground, corner, edge and scrim as
+   a prompt sheet or the account dialog, so a dialog never looks like it came
+   from a different build than the menu that opened it. */
 .settings-dialog-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgb(0 0 0 / 0.3);
+  background: var(--overlay-scrim);
+  backdrop-filter: blur(2px);
   animation: interface-fade var(--motion-base) var(--ease-out);
 }
 /* The same dimming behind a native modal dialog in Settings. */
 .settings-modal::backdrop {
-  background: rgb(0 0 0 / 0.3);
+  background: var(--overlay-scrim);
+  backdrop-filter: blur(2px);
 }
 .settings-dialog {
   position: fixed;
@@ -582,15 +596,16 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(480px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   overflow-y: auto;
-  border-radius: var(--radius-card);
-  padding: 26px;
+  overscroll-behavior: contain;
+  border-radius: var(--overlay-radius);
+  padding: 24px;
   color: var(--color-text);
-  background: var(--color-raised);
-  box-shadow: var(--shadow-overlay);
-  border: 1px solid var(--color-border-strong);
+  background: var(--overlay-ground);
+  box-shadow: var(--overlay-shadow);
   outline: none;
   animation: interface-fade var(--motion-base) var(--ease-out);
 }
@@ -637,6 +652,25 @@
   .preview-notice {
     flex-direction: column;
     gap: 4px;
+  }
+}
+/* A narrow window gets the whole reading column: the section rail folds to
+   its dots above the page (see Settings.svelte), and the sheet only has to
+   keep its own margins from the edges. */
+@media (max-width: 760px) {
+  .settings-page {
+    padding: 26px 18px 44px;
+  }
+  .settings-page-heading {
+    margin-block-end: 24px;
+  }
+  .settings-page-heading h1 {
+    font-size: 23px;
+  }
+  .settings-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    padding: 18px;
   }
 }
 @media (forced-colors: active) {
@@ -868,14 +902,18 @@
   color: var(--color-faint);
   margin-bottom: 6px;
 }
-@container (max-width:520px) {
+@container (max-width: 480px) {
   .settings-callout {
     flex-wrap: wrap;
+    align-items: flex-start;
     padding: 18px;
     gap: 12px;
   }
   .settings-callout > .ui-button {
-    margin-inline-start: 60px;
+    margin-inline-start: 0;
+  }
+  .settings-action-control {
+    justify-content: flex-start;
   }
 }
 :root[data-density="compact"] .browser-sidebar {

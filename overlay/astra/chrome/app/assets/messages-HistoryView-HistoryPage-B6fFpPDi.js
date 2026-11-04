@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-DqxxQTWz.js";var n=((n={},r={})=>(r.locale??t(),e(1196,n)??`Search history`));export{n as t};

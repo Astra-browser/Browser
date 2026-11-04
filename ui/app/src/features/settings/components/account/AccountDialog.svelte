@@ -58,20 +58,35 @@
 <style>
   .account-dialog {
     box-sizing: border-box;
-    inline-size: min(var(--width), calc(100vw - 48px));
-    max-block-size: calc(100vh - 48px);
+    inline-size: min(var(--width), calc(100vw - 32px));
+    max-block-size: calc(100vh - 32px);
     margin: auto;
-    padding: 26px;
+    padding: 24px;
     overflow-y: auto;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-card);
+    overscroll-behavior: contain;
+    border-radius: var(--overlay-radius);
     color: var(--color-text);
-    background: var(--color-raised);
-    box-shadow: var(--shadow-overlay);
+    background: var(--overlay-ground);
+    box-shadow: var(--overlay-shadow);
+  }
+
+  /* The platform's modal dims the page behind it; the scrim is the same one
+     every Astra sheet uses, not the browser's default. */
+  .account-dialog::backdrop {
+    background: var(--overlay-scrim);
+    backdrop-filter: blur(2px);
   }
 
   .account-dialog[open] {
     animation: interface-fade var(--motion-base) var(--ease-out);
+  }
+
+  @media (width <= 520px) {
+    .account-dialog {
+      inline-size: calc(100vw - 24px);
+      max-block-size: calc(100vh - 24px);
+      padding: 18px;
+    }
   }
 
   h2 {

@@ -106,54 +106,88 @@
     z-index: 90;
   }
 
+  /* The page menu is a menu, so it is drawn with the same recipe as every
+     other menu in the product: 22px panel, 34px rows and the same insets.
+     It stays solid (`--color-float`), like a Select's pop-up, because it
+     floats over a web page the chrome cannot see through; the chrome's own
+     menus are the only ones that can afford glass. */
   .shell-menu {
     position: fixed;
-    min-width: 220px;
-    max-width: min(320px, calc(100vw - 16px));
+    box-sizing: border-box;
+    min-width: 216px;
+    max-width: min(340px, calc(100vw - 16px));
     max-height: min(70vh, 560px);
     overflow-y: auto;
-    padding: 4px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
+    overscroll-behavior: contain;
+    padding: var(--menu-pad);
+    border-radius: var(--radius-menu);
+    background: var(--color-float);
     color: var(--color-text);
-    box-shadow: var(--shadow-overlay);
+    box-shadow: var(--shadow-menu), var(--shine-top);
     outline: none;
+    animation:
+      shell-menu-fade var(--motion-fast) var(--ease-out),
+      shell-menu-in var(--motion-base) var(--ease-out);
+  }
+
+  /* Own keyframes: the page menu loads on its own and cannot depend on the
+     menu system's stylesheet having been reached first. Same numbers. */
+  @keyframes shell-menu-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes shell-menu-in {
+    from {
+      transform: scale(0.96) translateY(-4px);
+    }
   }
 
   .shell-menu-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    min-height: 30px;
-    padding: 0 8px;
+    min-height: var(--menu-row);
+    padding: 6px var(--menu-item-inset);
     border: 0;
-    border-radius: var(--radius-control);
+    border-radius: calc(var(--radius-menu) - var(--menu-pad));
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-body);
+    font-weight: 450;
+    line-height: 18px;
     text-align: start;
     cursor: default;
+    /* stylelint-disable-next-line property-no-vendor-prefix */
+    -webkit-user-select: none;
+    user-select: none;
+    transition: background-color var(--motion-instant) var(--ease-smooth);
   }
 
   .shell-menu-item:disabled {
     opacity: 0.45;
   }
 
-  .shell-menu-item:focus-visible {
-    background: var(--color-fill);
+  .shell-menu-item:focus-visible,
+  .shell-menu-item:hover:not(:disabled) {
+    background: var(--row-active);
     outline: none;
   }
 
-  .shell-menu-item:hover:not(:disabled) {
-    background: var(--color-fill);
-    outline: none;
+  .shell-menu-item:active:not(:disabled) {
+    background: var(--row-pressed);
   }
 
   .shell-menu-item[data-danger] {
     color: var(--color-danger);
+  }
+
+  .shell-menu-item[data-danger]:focus-visible,
+  .shell-menu-item[data-danger]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-danger) 16%, transparent);
   }
 
   .shell-menu-icon {
@@ -163,6 +197,7 @@
     flex: none;
     width: 16px;
     height: 16px;
+    color: var(--color-muted);
   }
 
   .shell-menu-label {
@@ -176,21 +211,56 @@
   .shell-menu-hint {
     flex: none;
     margin-inline-start: auto;
-    padding-inline-start: 12px;
-    color: var(--color-text-faint);
-    font-size: var(--text-xs);
+    padding-inline-start: 28px;
+    color: var(--color-faint);
+    font-size: var(--text-label);
+    font-variant-numeric: tabular-nums;
   }
 
+  .shell-menu-item:hover .shell-menu-hint,
+  .shell-menu-item:focus-visible .shell-menu-hint {
+    color: var(--color-muted);
+  }
+
+  /* Full bleed: a divider that stops short of the edge reads as a misaligned
+     row rather than as a break in the list. */
   .shell-menu-separator {
     height: 1px;
-    margin: 4px 6px;
-    background: var(--color-border);
+    margin: 5px calc(var(--menu-pad) * -1);
+    background: var(--color-menu-separator);
   }
 
   .shell-menu-heading {
-    padding: 6px 8px 2px;
-    color: var(--color-text-faint);
-    font-size: var(--text-xs);
-    font-weight: 600;
+    padding: 10px var(--menu-item-inset) 5px;
+    color: var(--color-faint);
+    font-size: var(--text-caption);
+    font-weight: 550;
+    line-height: 14px;
+    letter-spacing: 0.01em;
+  }
+
+  /* The first heading has no list above it; the panel's own padding is the
+     whole inset it needs. */
+  .shell-menu-heading:first-child {
+    padding-block-start: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shell-menu {
+      animation: shell-menu-fade var(--motion-instant) linear;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .shell-menu {
+      border: 1px solid CanvasText;
+      box-shadow: none;
+    }
+
+    .shell-menu-item:focus-visible,
+    .shell-menu-item:hover:not(:disabled) {
+      background: Highlight;
+      color: HighlightText;
+    }
   }
 </style>

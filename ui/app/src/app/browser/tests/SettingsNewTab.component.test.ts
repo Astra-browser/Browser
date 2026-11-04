@@ -1,6 +1,7 @@
 import "$styles/global.css";
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
+import { page as browserPage } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision, spaceFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
@@ -13,6 +14,8 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     pagePermissionCardHost: async () => {},
     tabsBootstrap: async () => {},
+    sidebarSetHidden: async () => {},
+    sidebarSetWidth: async () => {},
   });
 });
 afterEach(() => {
@@ -21,6 +24,9 @@ afterEach(() => {
 });
 
 test("a new tab opened from Settings over a page shows the new tab", async () => {
+  // The settings rail needs a window wide enough to hold it; below 760px it
+  // folds into the page by design.
+  await browserPage.viewport(1100, 800);
   await surface.init();
   await tabs.init();
   const page = tabFixture();

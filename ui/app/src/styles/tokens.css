@@ -406,6 +406,17 @@
      panel from the page; the drop only has to say which one is in front. */
   --shadow-menu: 0 0 0 1px rgb(255 255 255 / 0.08), 0 14px 44px -10px rgb(0 0 0 / 0.34);
 
+  /* One recipe for everything that opens over the product and is not a menu:
+     a dialog, a prompt sheet, a pop-up card. The ground stays opaque because
+     these sheets sit over a web page, not over chrome the chrome can see;
+     the corner, the edge and the scrim are shared so a prompt cannot read as
+     a different product from the menu beside it. */
+  --overlay-ground: var(--color-raised);
+  --overlay-radius: var(--radius-panel);
+  --overlay-shadow: var(--shadow-menu), var(--shine-top);
+  --overlay-pad: 20px;
+  --overlay-scrim: rgb(10 10 12 / 0.56);
+
   /* Light caught by the edges of something that floats: a line along the top
      where the light falls and a fainter one along the foot, as on the
      platform's own glass. Never a glow, and only on what genuinely floats or
@@ -783,6 +794,11 @@
   --sidebar-card-edge: rgb(24 24 27 / 0.12);
   --shadow-popover: var(--shadow-float);
   --shadow-menu: 0 0 0 1px rgb(24 24 27 / 0.09), 0 14px 44px -10px rgb(24 24 27 / 0.16);
+  --overlay-ground: var(--color-raised);
+  --overlay-radius: var(--radius-panel);
+  --overlay-shadow: var(--shadow-menu), var(--shine-top);
+  --overlay-pad: 20px;
+  --overlay-scrim: rgb(24 24 27 / 0.18);
   --shine: inset 0 1px 0 0 rgb(255 255 255 / 0.3);
   --shine-top: inset 0 1px 0 0 rgb(255 255 255 / 0.55);
   --shadow-sheet: 0 -10px 40px -20px rgb(24 24 27 / 0.14);

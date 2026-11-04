@@ -82,13 +82,20 @@
     box-sizing: border-box;
     max-height: calc(100vh - 56px);
     overflow-y: auto;
-    padding: 16px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-panel);
-    background: var(--color-raised);
-    box-shadow: var(--shadow-overlay);
+    overscroll-behavior: contain;
+    padding: var(--overlay-pad);
+    border-radius: var(--overlay-radius);
+    background: var(--overlay-ground);
+    box-shadow: var(--overlay-shadow);
     text-align: start;
     animation: sheet-in var(--motion-slow) var(--ease-out) both;
+  }
+
+  @media (width <= 520px) {
+    .sheet {
+      padding: 14px;
+      max-height: calc(100vh - 32px);
+    }
   }
 
   @keyframes sheet-in {
