@@ -69,7 +69,7 @@ test("the column's document cannot scroll sideways in a column-wide view", async
   render(Shell);
   await settle();
   // Focused as the keyboard does: a click opens the launcher instead.
-  document.querySelector<HTMLInputElement>("aside input[data-astra-address]")!.focus();
+  document.querySelector<HTMLInputElement>("[data-astra-address]")!.focus();
   await settle();
 
   const root = document.scrollingElement!;

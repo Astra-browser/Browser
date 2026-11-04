@@ -69,7 +69,23 @@ test("landmarks name the shell regions for assistive technology", async () => {
   expect(main?.getAttribute("tabindex")).toBe("-1");
 });
 
-test("keyboard order runs skip link, address field, tabs, then content", async () => {
+test("the address field stands in the main-page bar, never in the sidebar", async () => {
+  await surface.init();
+  await tabs.init();
+  emitNativeEvent("itemsChanged", boot());
+  const screen = await render(Shell);
+
+  const field = screen.container.querySelector("[data-astra-address]")!;
+  const bar = screen.container.querySelector(".stage-column > [data-content-bar]")!;
+  const sidebar = screen.container.querySelector("aside")!;
+  expect(bar).not.toBeNull();
+  expect(bar.contains(field)).toBe(true);
+  expect(sidebar.contains(field)).toBe(false);
+  // One field, the product's own, not a second bar for the new tab.
+  expect(screen.container.querySelectorAll("[data-astra-address]")).toHaveLength(1);
+});
+
+test("keyboard order runs skip link, the tab column, the address field, then content", async () => {
   await surface.init();
   await tabs.init();
   emitNativeEvent("itemsChanged", boot());
@@ -81,7 +97,9 @@ test("keyboard order runs skip link, address field, tabs, then content", async (
   const firstTab = screen.container.querySelector<HTMLElement>("[data-astra-tab-id] button")!;
   expect(order[0]).toBe(skip);
   expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(skip));
-  expect(order.indexOf(firstTab)).toBeGreaterThan(order.indexOf(address));
+  // The address field lives in the main-page bar, after the column it sits
+  // beside; the tab list is still the first stop inside the window.
+  expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(firstTab));
 
   // The skip link moves focus to the stage, past the whole tab column.
   // Activated from the keyboard, as a keyboard-only person would: the link

@@ -1128,6 +1128,9 @@
     inset: 8px;
     z-index: 2;
     inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 16px);
+    /* The app's main-page bar is 40px tall inside that 8px gutter; the page
+       starts under it, at the top edge of the card the app draws. */
+    inset-block-start: 48px;
     border-radius: 12px;
     overflow: hidden;
     background: transparent;

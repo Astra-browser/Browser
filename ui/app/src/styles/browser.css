@@ -359,6 +359,18 @@
   box-shadow: var(--shadow-card);
 }
 
+/* A panel opened from the main-page bar (the site tray) draws over the page,
+   and the app frame sits under the page surface. While the shell raises the
+   frame for that panel, its own ground steps aside so the page still shows
+   around it — the same reading a context menu gets. */
+:root[data-astra-raised="true"],
+:root[data-astra-raised="true"] body,
+:root[data-astra-raised="true"] #root,
+:root[data-astra-raised="true"] .shell,
+:root[data-astra-raised="true"] .shell[data-caption] {
+  background: transparent !important;
+}
+
 /* The product draws the whole window, so the strip that would have been the
    titlebar is where the window is moved by. Empty space in it drags; every
    control opts out, because a press that starts on a button belongs to the
@@ -1045,4 +1057,14 @@
 .shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > main,
 .shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .internal-stage {
   padding-inline-start: 0;
+}
+
+/* The main-page bar and the card under the stage measure from the same edge
+   as the page: with the column away, that edge is the window gutter. */
+.shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > .content-bar {
+  padding-inline-start: 0;
+}
+
+.shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > .stage-card {
+  inset-inline-start: 0;
 }

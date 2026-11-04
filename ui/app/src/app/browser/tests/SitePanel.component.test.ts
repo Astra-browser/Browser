@@ -1,7 +1,7 @@
 import "$styles/global.css";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import type { BlockerStatusView, SitePermissionsView } from "$shared/ipc/bindings";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, tabFixture } from "$shared/testing/fixtures";
@@ -55,7 +55,11 @@ vi.mock("$shared/ipc/bindings", async () => {
 let clock = 100;
 const stamp = () => revision((clock += 1));
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The field lives in the main-page bar now, so it needs the window a person
+  // actually reads a site panel in; at the default narrow viewport the bar is
+  // all navigation and the panel would be a column of clipped rows.
+  await page.viewport(1100, 800);
   native.extensions = false;
   native.status = {
     protection: "active",
@@ -312,12 +316,27 @@ test("nothing is read until the panel is opened", async () => {
   expect(native.refresh).toHaveBeenCalled();
 });
 
-test("Work has no address field, so no panel", async () => {
+test("the panel raises the frame over the page while it is open", async () => {
+  const screen = await shell();
+  const glyph = screen.getByRole("button", { name: "Site information" });
+  await glyph.click();
+  await expect.element(screen.getByRole("group", { name: "Site information" })).toBeVisible();
+  // The panel is drawn by the app frame, which sits under the page surface;
+  // opening it asks the shell to raise the frame, as a context menu does.
+  expect(document.documentElement.dataset.astraRaised).toBe("true");
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => document.documentElement.dataset.astraRaised).toBeUndefined();
+});
+
+test("Work has no page in front, so the field's tray describes no site", async () => {
   const screen = await shell();
   await expect.element(screen.getByRole("button", { name: "Site information" })).toBeVisible();
   emitNativeEvent("uiCommand", "browser.work");
   await expect.poll(() => screen.container.querySelector("[data-work-stage-stub]")).not.toBeNull();
+  // The bar stays over Work, and its tray stays with the field; with no page
+  // in front there is no site to describe, only the utilities.
   await expect
-    .element(screen.getByRole("button", { name: /Site information|Utilities/u }))
+    .element(screen.getByRole("button", { name: "Site information" }))
     .not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Utilities" })).toBeVisible();
 });
