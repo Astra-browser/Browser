@@ -1,0 +1,1 @@
+export{t as default}from"./AskCard-CMO95H5X.js";

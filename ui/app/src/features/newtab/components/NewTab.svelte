@@ -553,6 +553,23 @@
     background: transparent;
   }
 
+  /* Paper: the light new tab is the warm ground the chrome is built on, not
+     the day sky. The sky asset remains the dark theme's page. */
+  /* stylelint-disable-next-line no-descending-specificity -- the paper tokens
+     deliberately override the day scene after it has been declared. */
+  :global(:root[data-theme="light"]) .newtab {
+    --sky-day-paper: var(--shell-ground);
+    --sky-ink: var(--color-text);
+    --sky-ink-hover: var(--color-label-secondary);
+    --sky-name: var(--color-text);
+    --sky-shadow: transparent;
+    --sky-edge: transparent;
+    --sky-edge-half: transparent;
+    --sky-edge-faint: transparent;
+
+    background: var(--shell-ground);
+  }
+
   .newtab.custom {
     --sky-card: var(--color-field);
     --sky-card-rim: var(--color-border);
@@ -964,5 +981,10 @@
   :global(:root[data-reduce-motion="true"])
     :is(.arriving .sky, .arriving .mark, .arriving .control, .figures) {
     transition: none;
+  }
+
+  /* Paper hides the day sky asset after its own background rules. */
+  :global(:root[data-theme="light"]) .newtab .sky {
+    opacity: 0;
   }
 </style>

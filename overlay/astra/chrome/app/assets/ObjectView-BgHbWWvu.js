@@ -1,1 +1,0 @@
-export{t as default}from"./ObjectView-Bgsv6-3d.js";

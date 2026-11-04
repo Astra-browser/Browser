@@ -347,11 +347,17 @@
   padding-block-start: 0;
 }
 
-/* Paper: the column is a breath of warm white over the wallpaper, so the
-   window ground and the card read as one material. Dark keeps its own
-   material and this rule does not match. */
+/* Paper: the whole window is the warm field, and the column and the page
+   are cards standing on it. Dark keeps its own material and these rules do
+   not match. */
+:root[data-theme="light"] .shell {
+  background: var(--shell-ground);
+}
+
 [data-theme="light"] .browser-sidebar:not([data-hidden]) {
-  background: color-mix(in srgb, #fffdf9 20%, transparent);
+  border-radius: var(--content-radius);
+  background: color-mix(in srgb, #fffdf9 34%, transparent);
+  box-shadow: var(--shadow-card);
 }
 
 /* The card lifts off the wallpaper by one soft drop, not a drawn outline. */
