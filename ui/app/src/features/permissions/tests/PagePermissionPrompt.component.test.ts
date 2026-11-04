@@ -85,6 +85,23 @@ test("a location request names the exact site, scheme and port when not secure",
   expect(native.respond).toHaveBeenLastCalledWith(shown, "always_allow");
 });
 
+test("each non-media permission names its own request", async () => {
+  const cases = [
+    ["notifications", "meet.example wants to send you notifications"],
+    ["persistent-storage", "meet.example wants to store data in this browser"],
+    ["xr", "meet.example wants to use virtual reality devices"],
+    ["loopback-network", "meet.example wants to access services on this device"],
+    ["local-network", "meet.example wants to access your local network"],
+  ] as const;
+  for (const [kind, text] of cases) {
+    const screen = await render(PagePermissionPrompt, {
+      prompt: { ...prompt(true), kinds: [kind] },
+    });
+    await expect.element(screen.getByText(text)).toBeVisible();
+    screen.unmount();
+  }
+});
+
 test("a location request says where to turn location on when macOS refuses it", async () => {
   const off = "Turn on Location Services for Astra in System Settings › Privacy & Security.";
   const location = { ...prompt(true, true), kinds: ["geolocation" as const] };

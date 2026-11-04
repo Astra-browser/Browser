@@ -22,7 +22,9 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Permissions } = await import(path.join(HOST, "Permissions.sys.mjs"));
+const { Permissions, KINDS, KIND_BY_ENGINE_TYPE, ENGINE_PERMISSION_NAME } = await import(
+  path.join(HOST, "Permissions.sys.mjs")
+);
 const { Operations, __resetOperationsForTests } = await import(
   path.join(HOST, "Operations.sys.mjs")
 );
@@ -573,6 +575,54 @@ function fakeBrowser(spec = "https://a.example/") {
       return lastView()?.prompt?.rememberable === false;
     })(),
   );
+}
+
+// --- Kind registry -----------------------------------------------------------
+{
+  reset();
+  // Every engine prompt Astra owns, and the `Services.perms` name it stores.
+  const ENGINE_TYPES = {
+    geolocation: "geolocation",
+    "desktop-notification": "notifications",
+    "persistent-storage": "persistent-storage",
+    xr: "xr",
+    "loopback-network": "loopback-network",
+    "local-network": "local-network",
+  };
+  for (const [engineType, kind] of Object.entries(ENGINE_TYPES)) {
+    check(
+      `${engineType} routes to the ${kind} prompt`,
+      KIND_BY_ENGINE_TYPE[engineType] === kind && KINDS.has(kind),
+    );
+  }
+  // Picker-style and per-request prompts stay native on purpose: a yes/no card
+  // cannot choose a serial port, install a site-permission add-on, pick a
+  // screen source, or answer storage-access (the engine writes no policy and
+  // replies with a per-embedder choice).
+  for (const engineType of ["serial", "midi", "screen", "audioCapture", "storage-access"]) {
+    check(`${engineType} keeps the engine prompt`, KIND_BY_ENGINE_TYPE[engineType] === undefined);
+  }
+  const enumKinds = schema.properties.prompt.properties.kinds.items.enum;
+  check(
+    "the schema enum is exactly the prompt kinds",
+    enumKinds.length === KINDS.size && [...KINDS].every((kind) => enumKinds.includes(kind)),
+  );
+  for (const kind of KINDS) {
+    check(`kind ${kind} has an engine permission name`, typeof ENGINE_PERMISSION_NAME[kind] === "string");
+    Permissions.__resetForTests();
+    const token = Permissions.ask({
+      kind,
+      origin: "https://kinds.example",
+      item_id: "tab-k",
+      profile_id: "default",
+      rememberable: true,
+    });
+    const view = lastView();
+    check(
+      `kind ${kind} publishes a schema-valid prompt`,
+      typeof token === "string" && view?.prompt?.kinds[0] === kind && validView(view),
+    );
+  }
 }
 
 // --- Queue bound -------------------------------------------------------------

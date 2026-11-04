@@ -32,14 +32,35 @@
 import { emit } from "./Events.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
 
-/** The page permissions the Astra prompt renders. Camera and microphone use
- *  Camera/microphone arrive through the WebRTC actor (`askForWebRTC`), not the
- *  `Integration.contentPermission` seam; both settle into this same queue. */
-export const KINDS = new Set(["geolocation", "camera", "microphone"]);
+/** The page permissions the Astra prompt renders. Camera and microphone
+ *  arrive through the WebRTC actor (`askForWebRTC`), not the
+ *  `Integration.contentPermission` seam; both settle into this same queue.
+ *
+ *  Excluded on purpose because the engine prompt is a picker or a
+ *  per-request choice, not a stored yes/no: `serial` (port chooser), `midi`
+ *  (site-permission add-on install), WebRTC screen/audio capture (source
+ *  picker) and `storage-access` (the engine writes no policy and answers with
+ *  a `storage-access` choice for one embedder). Those keep Firefox's UI and
+ *  are recorded as native-surface exceptions, not silently delegated. */
+export const KINDS = new Set([
+  "geolocation",
+  "camera",
+  "microphone",
+  "notifications",
+  "persistent-storage",
+  "xr",
+  "loopback-network",
+  "local-network",
+]);
 
 /** Engine permission type -> Astra kind (the `contentPermission` seam). */
 export const KIND_BY_ENGINE_TYPE = {
   geolocation: "geolocation",
+  "desktop-notification": "notifications",
+  "persistent-storage": "persistent-storage",
+  xr: "xr",
+  "loopback-network": "loopback-network",
+  "local-network": "local-network",
 };
 
 /** Astra kind -> `SitePermissions` / `Services.perms` name. */
@@ -47,6 +68,11 @@ export const ENGINE_PERMISSION_NAME = {
   geolocation: "geo",
   camera: "camera",
   microphone: "microphone",
+  notifications: "desktop-notification",
+  "persistent-storage": "persistent-storage",
+  xr: "xr",
+  "loopback-network": "loopback-network",
+  "local-network": "local-network",
 };
 
 const DECISIONS = new Set([
@@ -854,12 +880,25 @@ function persistPermission(kind, principal, browser, allow, durable) {
       name,
       allow ? SitePermissions.ALLOW : SitePermissions.BLOCK,
       durable ? SitePermissions.SCOPE_PERSISTENT : SitePermissions.SCOPE_TEMPORARY,
-      browser ?? undefined
+      browser ?? undefined,
+      temporaryExpireFor(kind)
     );
     return true;
   } catch {
     return false;
   }
+}
+
+/** Local-network access mirrors the engine's own 24-hour temporary grant. */
+function temporaryExpireFor(kind) {
+  if (kind !== "loopback-network" && kind !== "local-network") return undefined;
+  try {
+    const ms = Services.prefs.getIntPref("network.lna.temporary_permission_expire_time_ms");
+    if (Number.isInteger(ms) && ms > 0) return ms;
+  } catch {
+    // Pref missing: fall through to the engine default.
+  }
+  return 24 * 3600 * 1000;
 }
 
 function removePermission(kind, principal, browser) {
@@ -986,6 +1025,14 @@ function promptForRequest(kind, type, request) {
     return;
   }
 
+  // Local-network prompts tell their channel a prompt is on screen; the
+  // engine's own prompt does this in `onBeforeShow`.
+  try {
+    request.notifyShown?.();
+  } catch {
+    // The request already went away.
+  }
+
   const token = ask({
     kind,
     origin,
@@ -998,11 +1045,13 @@ function promptForRequest(kind, type, request) {
     principal,
     browser,
     allow: () => {
-      setGeoSharing(browser, true);
+      // Only geolocation drives the "sharing" indicator; a notification or
+      // storage grant must not claim the page has the position.
+      if (kind === "geolocation") setGeoSharing(browser, true);
       request.allow();
     },
     cancel: () => {
-      setGeoSharing(browser, false);
+      if (kind === "geolocation") setGeoSharing(browser, false);
       request.cancel();
     },
     persist: (allow, durable) => persistPermission(kind, principal, browser, allow, durable),

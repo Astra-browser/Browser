@@ -323,3 +323,24 @@ recorded here per SCOPE rule 5.
 | `Navigation.hardReload` + event `nav.hard-reload` | Ctrl/Shift reload must bypass proxy and cache (`LOAD_FLAGS_BYPASS_PROXY | BYPASS_CACHE`), not be a soft reload. Keymap `.alt*` ids normalise to the base command. | P2 |
 | Live `stop`/`zoom`/`print` dispatch in `Content` | The model intents now reach `browser.stop()`, `ZoomManager` and `PrintUtils`; no new shape beyond `nav.hard-reload`. | P2 |
 | Print surface blocker | P2 dispatches `PrintUtils.startPrintWindow`, which is Firefox's own print window. P6 owns the Astra print UI; until then this is a recorded native-surface exception. | P2/P6 |
+
+## Owner report: permission prompts + battery (2026-11-04)
+
+A device-diagnostics site (`checkmydevice.app`) reported the Battery API as
+unsupported and camera/microphone permission state as `prompt`. Both were
+**correct**: the page only reads `navigator.permissions.query()` (it never
+requests), and upstream keeps `getBattery()` ChromeOnly. Astra's own prompts
+were re-verified live (geolocation 23/23, getUserMedia 27/27). The owner then
+asked for battery exposure and for Astra to own the remaining permission
+prompts. Decisions: D-39, D-40.
+
+| ID | Fix | Status | Evidence |
+|---|---|---|---|
+| P6b-3 | Notifications, persistent-storage, xr, loopback-network and local-network route through `PagePermissionPrompt` (host kind map + schema enum + generated binding + prompt copy/icon); LNA keeps the engine's 24 h temporary expiry and `notifyShown()` | done | `permissions_prompt.mjs` 119 checks; `PagePermissionPrompt.component.test.ts` 8/8; `permission_kinds_probe.py` 27/27 live (notification allow/deny, storage allow/dismiss, no native doorhanger, `Services.perms` written) |
+| P6b-4 | `serial`, `midi`, WebRTC `screen`/`audioCapture` and `storage-access` keep the engine prompt on purpose (picker / per-request choice); asserted not routed | done | `permissions_prompt.mjs` "keeps the engine prompt" checks; `DIALOGS.md` scope |
+| ASTRA-0011 | `navigator.getBattery()` exposed to web content (drop `ChromeOnly`, keep `dom.battery.enabled`) | done | `battery_probe.py` 7/7 live (promise resolves, level/charging/charge times typed, same manager on second call); `forge lint` clean; incremental `build --jobs 2` 41 s |
+
+Binding note (SCOPE rule 5): `ui/app/src/shared/ipc/bindings.ts` is Tauri
+Specta output and has no generator in this tree, so the
+`PagePermissionKindView` union was extended in place (the file is already the
+sanctioned generated-binding exception in `tools/brand-lint.sh`).

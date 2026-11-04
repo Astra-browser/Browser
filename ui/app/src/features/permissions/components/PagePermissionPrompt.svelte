@@ -1,7 +1,17 @@
 <script lang="ts">
-  import { Camera01Icon, Location01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
+  import {
+    BellIcon,
+    Camera01Icon,
+    DatabaseIcon,
+    Location01Icon,
+    Mic01Icon,
+    NetworkIcon,
+    RouterIcon,
+    VrGlassesIcon,
+  } from "@hugeicons/core-free-icons";
   import { onMount } from "svelte";
   import type {
+    PagePermissionKindView,
     PagePermissionPromptDecisionInput,
     PagePermissionPromptEntryView,
   } from "$shared/ipc/bindings";
@@ -20,24 +30,70 @@
   const shownAt = performance.now();
   let busy = $derived(permissions.busy());
   let failure = $derived(permissions.failure());
-  let camera = $derived(prompt.kinds.includes("camera"));
   let microphone = $derived(prompt.kinds.includes("microphone"));
   let location = $derived(prompt.kinds.includes("geolocation"));
+  // One engine request carries one permission; camera and microphone may
+  // arrive together. Priority mirrors the engine's own prompt classes so a
+  // combined request never falls back to the wrong sentence.
+  const KIND_UI = {
+    geolocation: {
+      title: (site: string) => m.page_permission_title_location({ site }),
+      icon: Location01Icon,
+    },
+    notifications: {
+      title: (site: string) => m.page_permission_title_notifications({ site }),
+      icon: BellIcon,
+    },
+    "persistent-storage": {
+      title: (site: string) => m.page_permission_title_persistent_storage({ site }),
+      icon: DatabaseIcon,
+    },
+    xr: {
+      title: (site: string) => m.page_permission_title_xr({ site }),
+      icon: VrGlassesIcon,
+    },
+    "loopback-network": {
+      title: (site: string) => m.page_permission_title_loopback_network({ site }),
+      icon: RouterIcon,
+    },
+    "local-network": {
+      title: (site: string) => m.page_permission_title_local_network({ site }),
+      icon: NetworkIcon,
+    },
+    camera: {
+      title: (site: string) => m.page_permission_title_camera({ site }),
+      icon: Camera01Icon,
+    },
+    microphone: {
+      title: (site: string) => m.page_permission_title_microphone({ site }),
+      icon: Mic01Icon,
+    },
+  } satisfies Record<
+    PagePermissionKindView,
+    { title: (site: string) => unknown; icon: typeof Camera01Icon }
+  >;
+  const KIND_ORDER: PagePermissionKindView[] = [
+    "geolocation",
+    "notifications",
+    "persistent-storage",
+    "xr",
+    "loopback-network",
+    "local-network",
+    "camera",
+    "microphone",
+  ];
+  let primary = $derived(KIND_ORDER.find((kind) => prompt.kinds.includes(kind)) ?? "microphone");
   // The exact origin names the site, as Chrome does: only a secure scheme
   // goes unsaid; http and any port stay in view.
   let site = $derived(
     prompt.origin.startsWith("https://") ? prompt.origin.slice("https://".length) : prompt.origin,
   );
   let title = $derived(
-    location
-      ? m.page_permission_title_location({ site })
-      : camera && microphone
-        ? m.page_permission_title_both({ site })
-        : camera
-          ? m.page_permission_title_camera({ site })
-          : m.page_permission_title_microphone({ site }),
+    primary === "camera" && microphone
+      ? m.page_permission_title_both({ site })
+      : KIND_UI[primary].title(site),
   );
-  let icon = $derived(location ? Location01Icon : camera ? Camera01Icon : Mic01Icon);
+  let icon = $derived(KIND_UI[primary].icon);
   // macOS gives no position to a browser the person turned it off for.
   let systemOff = $derived(location && prompt.blocked_by_system);
   let described = $derived(

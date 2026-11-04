@@ -152,8 +152,10 @@ Security properties of this path:
   browser (or a closed window) falls back to Firefox's own prompt instead of a
   dead event pump.
 
-Scope today: **geolocation, camera and microphone**. Camera/microphone do not
-use `nsIContentPermissionPrompt`; the WebRTC actor is the seam:
+Scope today: **geolocation, camera, microphone, notifications,
+persistent-storage, xr, loopback-network and local-network** (D-40).
+Camera/microphone do not use `nsIContentPermissionPrompt`; the WebRTC actor is
+the seam:
 
 - `Permissions.install({window})` also publishes `{askForWebRTC, cancelWebRTC}`
   for that window on `Services.astraPermissionWindows`, because the actor runs
@@ -171,4 +173,19 @@ use `nsIContentPermissionPrompt`; the WebRTC actor is the seam:
 - The live probe covers allow-always, deny-always, allow-once (temporary
   scope), dismiss, auto-allow after a persistent grant, and the native
   doorhanger staying absent.
+
+The other owned kinds use `Integration.contentPermission` directly and settle
+through the same queue. Live probe:
+`tools/perf/stress/permission_kinds_probe.py` drives `Notification.requestPermission()`
+(allow/deny) and `navigator.storage.persist()` (allow/dismiss), asserting the
+Astra card, the `Services.perms` write and the page's own observation.
+
+Picker-shaped and per-request prompts deliberately keep the engine UI because
+a yes/no card cannot answer them: `serial` (port chooser), `midi`
+(site-permission add-on install), WebRTC `screen`/`audioCapture` (source
+picker) and `storage-access` (the engine writes no policy and replies with a
+per-embedder `storage-access` choice). They are recorded exceptions under
+SCOPE rule 2, not silent delegation: `KINDS` and `KIND_BY_ENGINE_TYPE` in
+`Permissions.sys.mjs` omit them, and `tests/contract/permissions_prompt.mjs`
+asserts they are not routed.
 
