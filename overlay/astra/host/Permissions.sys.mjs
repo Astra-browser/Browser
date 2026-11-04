@@ -485,10 +485,11 @@ export function askForWebRTC({
 }
 
 /** A page that goes away cancels its pending WebRTC prompt. */
-export function cancelWebRTC(callID) {
+export function cancelWebRTC(callID, browser = null) {
   if (typeof callID !== "string" || callID === "") return false;
   for (const record of [..._records.values()]) {
     if (record.call_id !== callID) continue;
+    if (browser && record.browser && record.browser !== browser) continue;
     detach(record);
     try {
       record.cancel?.();
@@ -531,8 +532,13 @@ export const Permissions = {
     }
     if (!documentIsCurrent(record)) {
       // The page navigated while the prompt was up. A late answer belongs to
-      // a document that is gone.
+      // a document that is gone; settle the engine if the listener did not.
       detach(record);
+      try {
+        record.cancel?.();
+      } catch {
+        // Already cancelled with the document.
+      }
       publish();
       return refuse("invalid_scope");
     }
@@ -683,10 +689,19 @@ export const Permissions = {
       // the actor looks it up by the requesting browser's window.
       const shared = sharedServices();
       if (shared) {
-        if (!(shared.astraPermissionWindows instanceof Map)) {
+        if (typeof shared.astraPermissionWindows?.get !== "function") {
           shared.astraPermissionWindows = new Map();
         }
         shared.astraPermissionWindows.set(win, { askForWebRTC, cancelWebRTC });
+        try {
+          win.addEventListener(
+            "unload",
+            () => void Permissions.uninstall({ window: win }),
+            { once: true }
+          );
+        } catch {
+          // A preview DOM without a window.
+        }
       }
     }
     return true;
@@ -708,6 +723,19 @@ export const Permissions = {
     } catch {
       // Already gone with the window.
     }
+    // Settle this window's engine requests instead of leaving them waiting.
+    for (const record of [..._records.values()]) {
+      const recordWin =
+        record.browser?.ownerDocument?.defaultView ?? record.browser?.ownerGlobal ?? null;
+      if (recordWin !== win) continue;
+      detach(record);
+      try {
+        record.cancel?.();
+      } catch {
+        // Already gone with the window.
+      }
+    }
+    publish();
   },
 
   /** Test-only: reset the prompt queue, revision and sidebar host. */

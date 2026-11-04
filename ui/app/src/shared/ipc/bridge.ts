@@ -28,7 +28,16 @@ import type { Bridge } from "@astra/bridge";
  */
 async function loadHostModules(): Promise<HostModules> {
   try {
-    const services = (window as unknown as { Services?: { astraHost?: HostModules } }).Services;
+    const services = (
+      window as unknown as {
+        Services?: {
+          astraHost?: HostModules;
+          astraHosts?: WeakMap<Window, HostModules>;
+        };
+      }
+    ).Services;
+    const keyed = services?.astraHosts?.get?.(window) ?? services?.astraHosts?.get?.(window.parent);
+    if (keyed) return keyed;
     if (services?.astraHost) return services.astraHost;
   } catch {
     // No Services: fall through to this document's own import.

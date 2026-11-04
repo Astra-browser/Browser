@@ -417,7 +417,8 @@ function fakeBrowser(spec = "https://a.example/") {
     decision: "allow_once",
   });
   check("a late answer for a new document is refused", (await disposition(stale)).reason === "invalid_scope");
-  check("a late answer never allows", allowed === 0 && cancelled === 0);
+  check("a late answer never allows", allowed === 0);
+  check("a late answer settles the engine request", cancelled === 1);
   check("a late answer closes the prompt", lastView().prompt === null);
 }
 

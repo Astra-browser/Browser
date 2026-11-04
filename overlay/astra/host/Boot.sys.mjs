@@ -293,10 +293,18 @@ export const Boot = {
     if (!core?.alive) {
       return { request_id, error: { code: "core_unavailable", message: "the core is not running" } };
     }
+    let timer = 0;
     try {
-      return await core.call(name, payload);
+      return await Promise.race([
+        core.call(name, payload),
+        new Promise((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error("core request timed out")), 8000);
+        }),
+      ]);
     } catch (e) {
       return { request_id, error: { code: "core_failed", message: String(e) } };
+    } finally {
+      clearTimeout(timer);
     }
   },
 

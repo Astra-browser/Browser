@@ -160,6 +160,7 @@ async function settle(
       responding = false;
     } else if (resolution.state === "pending") {
       notice = m.page_permission_still_applying();
+      responding = false;
     } else {
       notice = m.page_permission_unverified();
       responding = false;

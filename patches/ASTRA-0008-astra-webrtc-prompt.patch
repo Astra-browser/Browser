@@ -9,18 +9,18 @@ Verified-On: 153.6.0
 Removal-Plan: drop when the engine exposes a first-class permission-prompt integration point for getUserMedia, or when Astra no longer renders its own prompt
 ---
 diff --git a/browser/actors/WebRTCParent.sys.mjs b/browser/actors/WebRTCParent.sys.mjs
-index d97d92add2..e1db22078b 100644
+index d97d92add2..0eff2425c4 100644
 --- a/browser/actors/WebRTCParent.sys.mjs
 +++ b/browser/actors/WebRTCParent.sys.mjs
 @@ -121,6 +121,7 @@ export class WebRTCParent extends JSWindowActorParent {
          if (browser) {
            removePrompt(browser, aMessage.data);
          }
-+        astraCancelPermission(aMessage.data);
++        astraCancelPermission(aMessage.data, this.getBrowser());
          break;
        }
        case "webrtc:UpdateIndicators": {
-@@ -492,6 +493,34 @@ export class WebRTCParent extends JSWindowActorParent {
+@@ -492,6 +493,31 @@ export class WebRTCParent extends JSWindowActorParent {
    }
  }
  
@@ -38,15 +38,12 @@ index d97d92add2..e1db22078b 100644
 +  }
 +}
 +
-+function astraCancelPermission(aCallID) {
++function astraCancelPermission(aCallID, aBrowser) {
 +  try {
++    const win = aBrowser?.ownerDocument?.defaultView ?? null;
 +    const map = Services.astraPermissionWindows;
-+    if (!map) {
-+      return;
-+    }
-+    for (const entry of map.values()) {
-+      entry.cancelWebRTC?.(aCallID);
-+    }
++    const entry = win && map ? map.get(win) : null;
++    entry?.cancelWebRTC?.(aCallID, aBrowser);
 +  } catch {
 +    // No Astra window: the native path owns this request.
 +  }
@@ -55,7 +52,7 @@ index d97d92add2..e1db22078b 100644
  function prompt(aActor, aBrowser, aRequest) {
    let {
      audioInputDevices,
-@@ -555,6 +584,93 @@ function prompt(aActor, aBrowser, aRequest) {
+@@ -555,6 +581,105 @@ function prompt(aActor, aBrowser, aRequest) {
      }
    }
  
@@ -74,7 +71,7 @@ index d97d92add2..e1db22078b 100644
 +    astraEntry?.askForWebRTC &&
 +    !sharingScreen &&
 +    !sharingAudio &&
-+    !audioOutputDevices.length &&
++    !(audioOutputDevices?.length ?? 0) &&
 +    !aRequest.secondOrigin &&
 +    !principal.addonPolicy &&
 +    aRequest.secure &&
@@ -134,7 +131,19 @@ index d97d92add2..e1db22078b 100644
 +      origin: aRequest.origin,
 +      callID: aRequest.callID,
 +      kinds: astraKinds,
-+      isAllowed: () => aActor.checkRequestAllowed(aRequest, principal),
++      isAllowed: () => {
++        // An already-granted origin must not start capture silently from a
++        // background tab; upstream defers the same check to the doorhanger's
++        // "showing" event, which never runs for an inactive browser.
++        try {
++          const win = aBrowser?.ownerDocument?.defaultView ?? null;
++          if (!win || win.gBrowser?.selectedBrowser !== aBrowser) return false;
++          if (aBrowser.docShell && aBrowser.docShell.isActive !== true) return false;
++        } catch {
++          return false;
++        }
++        return aActor.checkRequestAllowed(aRequest, principal);
++      },
 +      grant,
 +      deny: noOSPermission =>
 +        noOSPermission

@@ -275,6 +275,19 @@ export const Navigation = {
     return ok(request_id, { astra_tab_id: id, ...state });
   },
 
+  /** The app's find bar: the page in front, no tab id on the wire. */
+  async pageFind({ request_id = "", query = "", forward = true } = {}) {
+    const id = __tabsState().selectedId;
+    if (!id) return false;
+    const res = await this.findInPage({
+      request_id,
+      astra_tab_id: id,
+      query,
+      direction: forward === false ? "backward" : "forward",
+    });
+    return !res?.error;
+  },
+
   // Live-binding ingress: merge a real match count from `browser.finder`.
   async setFindResult({ request_id = "", astra_tab_id = "", matchCount = 0, activeMatch = 0 } = {}) {
     const { id, tab } = tabOf(astra_tab_id);

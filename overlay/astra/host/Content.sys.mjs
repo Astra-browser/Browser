@@ -208,12 +208,11 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
         const id = tabIdOf ? tabIdOf(browser) : null;
         const url = location && location.spec ? location.spec : "";
         // A refused certificate is an error page: the engine docshell reports
-        // the failed URI with this flag, before anything is committed.
-        if ((Number(flags) & ERROR_PAGE_FLAG) !== 0) {
-          if (id && typeof onErrorPage === "function") {
-            onErrorPage({ astra_tab_id: id, url, browser });
-          }
-          return;
+        // the failed URI with this flag. Let the normal commit record the
+        // attempted address; the certificate path raises the failure pane if
+        // (and only if) the channel really is a TLS error.
+        if ((Number(flags) & ERROR_PAGE_FLAG) !== 0 && id && typeof onErrorPage === "function") {
+          onErrorPage({ astra_tab_id: id, url, browser });
         }
         if (id && url) {
           // Tell the model whether the browser is still fetching, so the

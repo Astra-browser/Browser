@@ -29,8 +29,10 @@ import { admit, refuse } from "./Operations.sys.mjs";
 import {
   Tabs,
   __setPageRequest,
+  __clearPageRequest,
   __setFailure,
   __setCertificateException,
+  __tabsState,
 } from "./Tabs.sys.mjs";
 
 const AUTH_SCHEMES = new Set(["basic", "digest"]);
@@ -155,8 +157,12 @@ function ensureWatch() {
       _certPending.delete(id);
       clearOverride(id);
     }
-    // The reload after "continue" commits: proceed-once ends here.
-    if (event.type === "nav.committed") clearOverride(id);
+    // The reload after "continue" commits: proceed-once ends here. Any other
+    // navigation also makes a pending certificate challenge stale.
+    if (event.type === "nav.committed") {
+      _certPending.delete(id);
+      clearOverride(id);
+    }
   });
 }
 
@@ -164,7 +170,15 @@ function cancelPending(request, { notifyEngine = true } = {}) {
   const pending = _pending.get(request);
   if (!pending) return false;
   _pending.delete(request);
-  __setPageRequest(pending.tabId, null);
+  __clearPageRequest(pending.tabId, request);
+  if (pending.observer && pending.loadGroup) {
+    try {
+      pending.loadGroup.removeRequestObserver(pending.observer, false);
+    } catch {
+      // The load group is gone with the channel.
+    }
+  }
+  clearTimeout(pending.timer);
   pending.resolve?.(false);
   if (notifyEngine) {
     void Dialogs.respondAuth({
@@ -184,10 +198,19 @@ export const DialogPrompts = {
     if (win) {
       const shared = sharedServices();
       if (shared) {
-        if (!(shared.astraDialogWindows instanceof Map)) {
+        if (typeof shared.astraDialogWindows?.get !== "function") {
           shared.astraDialogWindows = new Map();
         }
         shared.astraDialogWindows.set(win, { promptAuth: DialogPrompts.promptAuth });
+        try {
+          win.addEventListener(
+            "unload",
+            () => void DialogPrompts.uninstall({ window: win }),
+            { once: true }
+          );
+        } catch {
+          // A preview DOM without a window.
+        }
         return true;
       }
     }
@@ -215,7 +238,9 @@ export const DialogPrompts = {
     if (!browser || !channel || !authInfo) return null;
     ensureWatch();
     const tabId = tabIdFor(browser);
-    if (tabId === "") return null;
+    // The window is Astra-owned (this entry exists), so never fall back to
+    // Firefox's dialog for a tab Astra does not model yet.
+    if (tabId === "") return Promise.resolve(false);
     let scheme = "basic";
     try {
       scheme = String(authInfo.authenticationScheme || "basic").toLowerCase();
@@ -264,7 +289,28 @@ export const DialogPrompts = {
         authInfo,
         dialogId: res.dialog?.dialog_id ?? "",
         resolve: null,
+        channel,
+        loadGroup: channel.loadGroup ?? null,
+        observer: null,
+        timer: 0,
       };
+      // A cancelled channel (aborted fetch, destroyed iframe, unload) must
+      // settle the engine prompt instead of leaving it waiting.
+      try {
+        if (pending.loadGroup) {
+          pending.observer = {
+            onStartRequest() {},
+            onStopRequest(_request, status) {
+              if (!Components.isSuccessCode(status)) cancelPending(request);
+            },
+          };
+          pending.loadGroup.addRequestObserver(pending.observer, false);
+        }
+      } catch {
+        pending.observer = null;
+      }
+      // Hard bound for a challenge the person never answers.
+      pending.timer = setTimeout(() => cancelPending(request), 120_000);
       _pending.set(request, pending);
       __setPageRequest(tabId, {
         kind: "http_auth",
@@ -289,7 +335,11 @@ export const DialogPrompts = {
     }
     if (credentials === null || credentials === undefined) {
       _pending.delete(numeric);
-      __setPageRequest(astra_tab_id, null);
+      __clearPageRequest(astra_tab_id, numeric);
+      clearTimeout(pending.timer);
+      if (pending.observer && pending.loadGroup) {
+        try { pending.loadGroup.removeRequestObserver(pending.observer, false); } catch {}
+      }
       await Dialogs.respondAuth({
         request_id: `auth-${numeric}`,
         dialog_id: pending.dialogId,
@@ -303,7 +353,11 @@ export const DialogPrompts = {
     const password = typeof credentials.password === "string" ? credentials.password : "";
     if (username === "") {
       _pending.delete(numeric);
-      __setPageRequest(astra_tab_id, null);
+      __clearPageRequest(astra_tab_id, numeric);
+      clearTimeout(pending.timer);
+      if (pending.observer && pending.loadGroup) {
+        try { pending.loadGroup.removeRequestObserver(pending.observer, false); } catch {}
+      }
       await Dialogs.respondAuth({
         request_id: `auth-${numeric}`,
         dialog_id: pending.dialogId,
@@ -321,7 +375,11 @@ export const DialogPrompts = {
       actor: "chrome",
     });
     _pending.delete(numeric);
-    __setPageRequest(astra_tab_id, null);
+    __clearPageRequest(astra_tab_id, numeric);
+    clearTimeout(pending.timer);
+    if (pending.observer && pending.loadGroup) {
+      try { pending.loadGroup.removeRequestObserver(pending.observer, false); } catch {}
+    }
     if (res?.error) {
       pending.resolve?.(false);
       return refuse("invalid_scope");
@@ -381,6 +439,9 @@ export const DialogPrompts = {
     } catch {
       overridable = false;
     }
+    // Only a TLS error is a certificate interstitial. A DNS/timeout error on
+    // an https URL has no securityInfo and keeps the normal failed-page path.
+    if (!securityInfo) return false;
     const certificate = certificateProblem(code);
     const canContinue = overridable && isLocalHost(host);
     const res = await Dialogs.requestCertError({
@@ -403,6 +464,9 @@ export const DialogPrompts = {
       dialogId,
       host,
       port,
+      origin: uri.prePath ?? `https://${host}:${port}`,
+      url: failedURI,
+      browser,
       originAttributes,
       cert,
       canContinue,
@@ -422,6 +486,12 @@ export const DialogPrompts = {
   async answerCert({ astra_tab_id = "", decision = "proceed-once" } = {}) {
     const pending = _certPending.get(certKey(astra_tab_id));
     if (!pending) return refuse("invalid_scope");
+    // A late "continue" must belong to the failed page still on screen.
+    const tab = __tabsState().tabs.get(astra_tab_id);
+    if (!tab || tab.failure?.url !== pending.url) {
+      _certPending.delete(certKey(astra_tab_id));
+      return refuse("invalid_scope");
+    }
     if (decision !== "proceed-once" && decision !== "cancel") {
       return refuse("invalid_input");
     }
@@ -462,18 +532,9 @@ export const DialogPrompts = {
       applied = false;
     }
     if (!applied) return admit({ outcome: "rejected", reason: "native_dispatch_rejected" });
-    __setCertificateException(astra_tab_id, true);
+    __setCertificateException(astra_tab_id, true, pending.origin);
     try {
-      const browser = (() => {
-        for (const win of Services.wm.getEnumerator("navigator:browser")) {
-          const tab = [...win.gBrowser.tabs].find(
-            (candidate) => candidate.getAttribute("astra-tab-id") === astra_tab_id
-          );
-          if (tab) return tab.linkedBrowser;
-        }
-        return null;
-      })();
-      browser?.reload();
+      pending.browser?.reload();
     } catch {
       // The tab went away; the override clears with it.
     }

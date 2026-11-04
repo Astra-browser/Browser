@@ -231,6 +231,7 @@
       updateNotices.dispose();
       focus.dispose();
       extensions.dispose();
+      webext.dispose();
       pagePermissions.dispose();
       void stopAccess.then((stop) => stop());
       void stopStoreClicks.then((stop) => stop());

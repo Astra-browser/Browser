@@ -116,6 +116,7 @@ const ROUTES: Record<string, Route> = {
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
   page_source: ["PageSource", "pageSource", { id: "tab_id" }],
+  page_find: ["Navigation", "pageFind"],
   browser_open_url: ["Search", "openUrl"],
   newtab_search_context: ["Search", "newtabContext", { tab_id: "tabId" }],
   newtab_search: ["Search", "newtabSearch"],
