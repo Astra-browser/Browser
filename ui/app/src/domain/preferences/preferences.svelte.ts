@@ -4,7 +4,7 @@ import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
 
 const defaults = {
-  appearance: "system",
+  appearance: "light",
   "search.engine": "google",
   "search.custom-url": "",
   "search.suggestions": "true",

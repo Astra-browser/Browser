@@ -95,6 +95,13 @@ button {
   background: var(--color-chrome);
 }
 
+/* Paper paints the window's own field: the warm wallpaper the sidebar and the
+   content card stand on. Dark keeps the existing chrome ground exactly. */
+:root[data-theme="light"] body,
+:root[data-theme="light"]:where([data-material="none"]) body {
+  background: var(--shell-ground);
+}
+
 /* Windows rounds the window and draws its edge itself, in every tier; an edge
    of our own inside it showed as a second, rounder corner in Solid. */
 :root[data-material="none"] .shell[data-caption] {

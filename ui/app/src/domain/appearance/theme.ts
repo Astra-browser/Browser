@@ -29,7 +29,8 @@ export type Customization = {
 };
 
 const media = window.matchMedia("(prefers-color-scheme: light)");
-let appearance: Appearance = "system";
+// The interface ships on its warm light field; dark is the explicit choice.
+let appearance: Appearance = "light";
 let lifecycle = 0;
 let initialized = false;
 let initializing: Promise<void> | null = null;

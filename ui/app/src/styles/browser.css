@@ -347,6 +347,18 @@
   padding-block-start: 0;
 }
 
+/* Paper: the column is a breath of warm white over the wallpaper, so the
+   window ground and the card read as one material. Dark keeps its own
+   material and this rule does not match. */
+[data-theme="light"] .browser-sidebar:not([data-hidden]) {
+  background: color-mix(in srgb, #fffdf9 20%, transparent);
+}
+
+/* The card lifts off the wallpaper by one soft drop, not a drawn outline. */
+.content-pane {
+  box-shadow: var(--shadow-card);
+}
+
 /* The product draws the whole window, so the strip that would have been the
    titlebar is where the window is moved by. Empty space in it drags; every
    control opts out, because a press that starts on a button belongs to the

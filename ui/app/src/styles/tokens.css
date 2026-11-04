@@ -482,6 +482,22 @@
   --row-sidebar: 36px;
   --row-page: 58px;
 
+  /* Interface refresh geometry, named by the surface that owns it. The older
+     row tokens above stay for the surfaces that have not moved yet, so a lane
+     can adopt these without changing an unrelated component. */
+  --window-gutter: 8px;
+  --main-bar-height: 40px;
+  --main-bar-inset: 8px;
+  --rail-width: 44px;
+  --row-tab: 28px;
+  --radius-tab: 8px;
+  --tab-inset: 8px;
+  --tab-gap: 2px;
+
+  /* The window ground. Dark is the existing canvas; the light block paints
+     the warm paper field the interface is designed on. */
+  --shell-ground: var(--color-canvas);
+
   /* One optical axis for the whole chrome column. Every band measures its
      horizontal position from this, so glyphs line up from the address field
      down to the dock instead of each band inventing its own inset. It is
@@ -807,4 +823,85 @@
 
   --favicon-rest-opacity: 0.9;
   --favicon-rest-saturation: 0.92;
+}
+
+:root[data-theme="light"] {
+  /* Paper: the warm light field the interface is designed on. Dark keeps
+     Astra's existing ladder untouched; this block only changes the light
+     reading of the same semantic tokens. The wallpaper stops are sampled from
+     the reference so the chrome, the card and the ground stay one material. */
+  --color-page: #f7f2e8;
+  --color-chrome: #efe8dc;
+  --color-surface: #fffdf9;
+  --color-raised: #fffdf9;
+  --color-float: #fffdf9;
+  --color-menu: color-mix(in srgb, #fffdf9 88%, transparent);
+
+  --color-text: #1d1c1a;
+  --color-label-secondary: #4f4b45;
+  --color-muted: rgb(29 28 26 / 0.64);
+  --color-faint: rgb(29 28 26 / 0.6);
+  --color-border: rgb(29 28 26 / 0.08);
+  --color-border-strong: rgb(29 28 26 / 0.14);
+  --color-menu-separator: rgb(29 28 26 / 0.1);
+
+  --color-fill: rgb(29 28 26 / 0.05);
+  --color-fill-hover: rgb(29 28 26 / 0.08);
+  --color-fill-active: rgb(29 28 26 / 0.08);
+  --color-fill-pressed: rgb(29 28 26 / 0.12);
+  --color-fill-strong: rgb(29 28 26 / 0.18);
+  --color-card: rgb(255 253 249 / 0.9);
+  --color-tile: rgb(255 253 249 / 0.55);
+  --color-tile-hover: rgb(255 253 249 / 0.8);
+  --color-address: rgb(255 253 249 / 0.62);
+  --color-address-hover: rgb(255 253 249 / 0.86);
+  --color-control: #fffdf9;
+  --color-control-hover: #fff;
+  --color-control-pressed: #f2ece2;
+  --color-on-control: #1d1c1a;
+  --color-on-control-strong: #1d1c1a;
+  --color-field: rgb(29 28 26 / 0.06);
+  --color-field-hover: rgb(29 28 26 / 0.09);
+  --color-field-ring: rgb(29 28 26 / 0.16);
+
+  --row-hover: rgb(29 28 26 / 0.05);
+  --row-active: #fffdf9;
+  --row-pressed: rgb(29 28 26 / 0.1);
+  --row-rim: inset 0 0 0 1px rgb(29 28 26 / 0.04);
+  --segment-thumb: #fffdf9;
+  --shadow-segment-thumb: 0 0 0 0.5px rgb(29 28 26 / 0.08), 0 1px 3px rgb(29 28 26 / 0.1);
+  --segment-thumb-card: #fffdf9;
+  --shadow-segment-thumb-card: var(--shadow-segment-thumb);
+
+  --color-lit: #4f5df0;
+  --color-lit-hover: #4050e6;
+  --color-on-lit: #fff;
+  --color-lit-soft: rgb(79 93 240 / 0.14);
+  --color-accent: #4f5df0;
+  --color-accent-hover: #4050e6;
+  --color-on-accent: #fff;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  --color-ring: rgb(79 93 240 / 0.5);
+
+  --shadow-raised: 0 1px 2px rgb(29 28 26 / 0.08), 0 0 0 0.5px rgb(29 28 26 / 0.05);
+  --shadow-float: 0 8px 26px rgb(29 28 26 / 0.14), 0 0 0 0.5px rgb(29 28 26 / 0.08);
+  --shadow-overlay: 0 14px 40px rgb(29 28 26 / 0.16), 0 0 0 0.5px rgb(29 28 26 / 0.09);
+  --shadow-menu: 0 0 0 1px rgb(29 28 26 / 0.08), 0 16px 44px -12px rgb(29 28 26 / 0.2);
+  --shadow-sheet: 0 -10px 40px -20px rgb(29 28 26 / 0.18);
+  --sidebar-card-edge: rgb(29 28 26 / 0.12);
+  --shine: inset 0 1px 0 0 rgb(255 255 255 / 0.55);
+  --shine-top: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
+
+  /* The reference's warm wallpaper, used behind the chrome and the card. */
+  --shell-ground: linear-gradient(
+    135deg,
+    #bcd6fb 0%,
+    #e8d1c4 46%,
+    #fcedc9 78%,
+    #fee1cd 100%
+  );
+  --wallpaper-a: #bcd6fb;
+  --wallpaper-b: #e8d1c4;
+  --wallpaper-c: #fcedc9;
+  --wallpaper-d: #fee1cd;
 }
