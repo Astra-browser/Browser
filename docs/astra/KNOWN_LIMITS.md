@@ -52,20 +52,15 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 
 ## Verification gaps
 
-- **DevTools console noise is upstream.** `No such JSProcessActor
-  'DevToolsProcess'` (bug 2044741) and the `getGrids`/`pagestyle` teardown
-  family (bug 1944477) are ESR 153 platform bugs. They reproduce in stock
-  Firefox with the same open/navigate/close flow, and the toolbox keeps
-  working (inspector follows the page, toggles, closes with its tab). Do not
-  chase them as Astra wiring failures; the probe reports their count as
-  `upstream_noise` and only fails on toolbox behaviour.
-- **`Unable to find target with innerWindowId` is late `network-event`
-  resources.** Navigating with the inspector open delivers up to three
-  `network-event` resources for the page that is going away, after its target
-  was destroyed; the front logs an error and drops them. Measured with the real
-  stage tab (`commands.resourceCommand` wrapped live), so it is not the tab
-  identity. The toolbox is unaffected; the probe counts it as
-  `target_lookup_miss`.
+- **DevTools teardown noise is patched out.** ESR 153 logs `No such
+  JSProcessActor 'DevToolsProcess'` (bug 2044741) and the `getGrids`/`pagestyle`
+  teardown family (bug 1944477) while a toolbox closes, and logs `Unable to find
+  target with innerWindowId` for `network-event` resources that arrive after
+  their document's target died. `patches/ASTRA-0010-devtools-teardown-races.patch`
+  defers the process-actor unregistration to an idle turn, tolerates a destroyed
+  watcher in the process actor, and drops the late-resource error (the resource
+  was already dropped silently). Re-check this patch when the pinned engine is
+  bumped: both bugs are fixed or being fixed upstream (2044741, 2056174).
 - UI-tour screenshots are captured, but the visual baseline still needs a human
   pass for pixel parity.
 - Performance budgets for tab-switch/scroll are proposals (p95 ≤ 100 ms / 32 ms);
