@@ -45,18 +45,19 @@ const SAVE_EVENTS = new Set([
   "tab.space-changed",
   "tab.updated",
   "nav.committed",
-  "window.focused",
   "window.closed",
 ]);
 
-/** Only the focused window persists. Each window owns its own model, so an
- *  unfocused window writing would replace the focused window's organisation
- *  with a stale copy. Unknown focus is allowed; private always refuses. */
-export function shouldPersist({ private: isPrivate = false, windowId = "", focusedWindowId = "" } = {}) {
+/**
+ * One writer per process. Each window owns its own tab model, so two windows
+ * writing the same row would replace each other's organisation. The first
+ * public window claims the owner slot on `Services`; another window leaves the
+ * store alone. When the owner closes it releases the slot and the next window
+ * can take over. Private windows never write.
+ */
+export function ownerAllows({ private: isPrivate = false, owner = null, token = null } = {}) {
   if (isPrivate === true) return false;
-  if (typeof windowId !== "string" || windowId === "") return true;
-  if (typeof focusedWindowId !== "string" || focusedWindowId === "") return true;
-  return focusedWindowId === windowId;
+  return owner === null || owner === token;
 }
 
 const DEFAULT_SPACE = {
@@ -218,8 +219,10 @@ export function planRestore(snapshot, liveTabs = []) {
 
 // --- Chrome wiring -----------------------------------------------------------
 
+const _token = {};
 let _private = false;
 let _windowId = "";
+let _owner = false;
 let _available = false;
 let _restored = false;
 let _snapshot = null;
@@ -262,6 +265,28 @@ function parseSnapshot(raw) {
   }
 }
 
+function sharedServices() {
+  try {
+    return typeof Services !== "undefined" && Services ? Services : null;
+  } catch {
+    return null;
+  }
+}
+
+function claimOwner() {
+  const shared = sharedServices();
+  if (!shared) return true;
+  if (!("astraOrgOwner" in shared) || shared.astraOrgOwner === null) {
+    shared.astraOrgOwner = _token;
+  }
+  return shared.astraOrgOwner === _token;
+}
+
+function ownerToken() {
+  const shared = sharedServices();
+  return shared && "astraOrgOwner" in shared ? shared.astraOrgOwner : null;
+}
+
 async function windowState() {
   const listed = await Windows.list({ request_id: "metadata-windows" });
   if (listed?.error || !Array.isArray(listed?.windows)) return null;
@@ -280,6 +305,7 @@ export const Metadata = {
     // A private window keeps nothing: no spaces restored, nothing written.
     _private = isPrivate === true;
     _windowId = typeof windowId === "string" ? windowId : "";
+    _owner = _private ? false : claimOwner();
     if (_private) {
       _available = false;
       return { state: "private" };
@@ -366,6 +392,9 @@ export const Metadata = {
   async save() {
     resetTimer();
     if (_private) return { saved: false, reason: "private" };
+    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+      return { saved: false, reason: "not_owner" };
+    }
     if (!_available) {
       return { saved: false, reason: "unavailable" };
     }
@@ -374,8 +403,8 @@ export const Metadata = {
       _lastError = "windows_unavailable";
       return { saved: false, reason: "windows_unavailable" };
     }
-    if (!shouldPersist({ private: _private, windowId: _windowId, focusedWindowId: windows.focused_window_id })) {
-      return { saved: false, reason: "not_focused" };
+    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+      return { saved: false, reason: "not_owner" };
     }
     const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
     const { spaces, active_space_id } = __spacesState();
@@ -415,7 +444,11 @@ export const Metadata = {
    */
   async flush() {
     resetTimer();
-    if (_private || !_available) return { saved: false, reason: _private ? "private" : "unavailable" };
+    if (_private) return { saved: false, reason: "private" };
+    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+      return { saved: false, reason: "not_owner" };
+    }
+    if (!_available) return { saved: false, reason: "unavailable" };
     if (_lastSnapshot === null) {
       return this.save();
     }
@@ -437,6 +470,7 @@ export const Metadata = {
   init({ private: isPrivate = _private, window_id: windowId = _windowId } = {}) {
     _private = isPrivate === true;
     _windowId = typeof windowId === "string" ? windowId : _windowId;
+    _owner = _private ? false : claimOwner();
     if (_private) return;
     if (_off !== null) return;
     _off = addEventListener((event) => {
@@ -444,22 +478,33 @@ export const Metadata = {
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
         if (event.type === "nav.committed") Metadata.retryRestore();
       // A newly focused window takes over writing.
-      if (event.type === "window.focused" && event.data?.window_id === _windowId) {
-        scheduleSave();
-      }
+
     });
     scheduleSave();
+  },
+
+  /** Give up the writer slot so another window can persist. */
+  releaseOwner() {
+    const shared = sharedServices();
+    try {
+      if (shared && shared.astraOrgOwner === _token) delete shared.astraOrgOwner;
+    } catch {
+      // A frozen Services object is not worth failing teardown over.
+    }
+    _owner = false;
   },
 
   dispose() {
     resetTimer();
     _off?.();
     _off = null;
+    this.releaseOwner();
     _private = false;
     _windowId = "";
     _available = false;
     _restored = false;
     _snapshot = null;
+    _owner = false;
     _restoreUntil = 0;
     _restoreRetries = 0;
     _remaining = 0;
@@ -473,6 +518,7 @@ export const Metadata = {
   status() {
     return {
       private: _private,
+      owner: _owner || ownerAllows({ private: _private, owner: ownerToken(), token: _token }),
       available: _available,
       restored: _restored,
       pending: _timer !== null,

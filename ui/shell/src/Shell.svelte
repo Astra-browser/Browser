@@ -906,6 +906,7 @@
         // Already gone with the window.
       }
       try {
+        host.Metadata?.releaseOwner?.();
         host.Metadata?.dispose?.();
       } catch {
         // Already torn down with the window.
