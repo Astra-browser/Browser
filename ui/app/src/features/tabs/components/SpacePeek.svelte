@@ -66,10 +66,11 @@
         />
       </li>{/if}
   {:else}
+    {@const steps = Math.min(row.depth, 8) * 13}
     <li
       class="peek-row"
       data-selected={row.tab !== null && row.tab.id === sheet?.active}
-      style:padding-inline-start={`${8 + Math.min(row.depth, 8) * 13}px`}
+      style:padding-inline-start={`calc(var(--tab-inset, 8px) + ${steps}px)`}
     >
       {#if row.tab}
         <FavIcon
@@ -135,29 +136,29 @@
   .peek-list {
     display: flex;
     flex-direction: column;
-    gap: var(--sidebar-row-gap);
-    padding-inline: var(--sidebar-inset);
-    padding-block: 2px;
+    gap: var(--tab-gap);
+    padding-inline: var(--tab-inset);
+    padding-block: var(--tab-gap);
   }
 
   .peek[data-rail] .peek-list {
     align-items: center;
-    padding-block: 4px 8px;
+    padding-block: var(--tab-gap) var(--tab-inset);
   }
 
   .peek-rule {
     height: 1px;
-    margin: 5px calc(var(--sidebar-inset) + 8px);
+    margin: 5px calc(var(--tab-inset) * 2);
     background: var(--color-border);
   }
 
   .peek-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    height: var(--row-sidebar);
+    gap: var(--tab-inset);
+    height: var(--row-tab);
     padding-inline-end: 4px;
-    border-radius: var(--radius-row);
+    border-radius: var(--radius-tab);
     color: var(--color-label-secondary);
     font-size: var(--sidebar-row-text);
     font-weight: var(--sidebar-row-weight);
@@ -167,7 +168,7 @@
   .peek-row[data-selected="true"] {
     background: var(--row-active);
     box-shadow: var(--row-rim);
-    color: var(--color-row-current, var(--color-text));
+    color: var(--color-text);
     font-weight: var(--sidebar-row-weight-current);
   }
 
@@ -182,9 +183,9 @@
   .peek-rail {
     display: grid;
     place-items: center;
-    inline-size: 40px;
-    block-size: var(--row-sidebar);
-    border-radius: var(--radius-row);
+    inline-size: var(--row-tab);
+    block-size: var(--row-tab);
+    border-radius: var(--radius-tab);
   }
 
   .peek-rail[data-selected="true"] {
@@ -208,6 +209,6 @@
   }
 
   .peek-row.peek-hollow {
-    padding-inline-start: 8px;
+    padding-inline-start: var(--tab-inset);
   }
 </style>
