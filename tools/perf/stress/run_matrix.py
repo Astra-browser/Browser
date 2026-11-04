@@ -202,7 +202,8 @@ ASTRA_STATE = """return JSON.stringify((() => {
 })())"""
 
 ACTIVE_BROWSER = """return JSON.stringify((() => {
-  const b = document.querySelector('browser[data-astra-browser]');
+  // The native merge drives gBrowser; the old standalone marker is gone.
+  const b = gBrowser.selectedBrowser;
   if (!b) return { ok: false, why: 'no-active-browser' };
   let uri = ''; let loading = null; let title = null;
   try { uri = b.currentURI.spec; } catch (e) { uri = 'ERR'; }

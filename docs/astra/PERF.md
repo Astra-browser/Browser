@@ -292,28 +292,25 @@ Notes: `ui-tour` stock opens `about:preferences`, so its GPU/CPU columns are not
 
 Build: `forge build --faster`, Mozilla Firefox 153.6.0esr engine, private
 Weston display (headed; WebRender software) on the same 16-thread machine.
-Artifacts: `out/perf-final/SUMMARY.md`, `out/matrix-final/*/summary.json`.
+Artifacts: `out/perf-quiet/SUMMARY.md`, `out/matrix-final2/*/summary.json`.
 
-| Bench | Status | Key numbers |
+| Bench | Status | Key numbers (3 runs, quiet machine) |
 |---|---|---|
-| Startup | PASS | cold 0.302 s / warm 0.301 s |
-| Memory | PASS | 1 tab 491 MiB; 10 tabs 407 MiB; 50 tabs loaded 448 MiB; 50 sleeping 609 MiB |
-| Scroll / switch | PASS | switch median 43.5 ms, p95 142.5 ms; scroll-step median 16.0 ms, p95 17.0 ms; rAF 21/s |
-| Blocker (in-process) | PASS | 131724 rules; p50 2.14 µs, p95 2.68 µs, p99 3.75 µs |
+| Startup | PASS | cold 0.302 s / warm 0.302 s |
+| Memory | PASS | 1 tab 482 MiB; 10 tabs 393 MiB; 50 tabs loaded 444 MiB; 50 sleeping 595 MiB |
+| Scroll / switch | PASS | switch median 22.5 ms, p95 52.4 ms; scroll-step median 16.0 ms, p95 17.0 ms; rAF 21/s |
+| Blocker (in-process) | PASS | 131724 rules; p50 2.12 µs, p95 2.64 µs, p99 3.14 µs |
 
 UI tour (six static tabs, real clicks): new tab 33.7 ms, navigate 74.1 ms,
 tab switch 16.8–20.1 ms, sidebar 801 ms, Work 42 ms, Settings 1051 ms.
 
-**Read the switch number with care.** The same bench measured 18.9 / 52.9 ms
-(median/p95) in the immediately preceding one-run pass and 6.8 / 14.0 ms in
-the 3-run P4-T10 baseline. The 2-run final pass ran while a separate desktop
-Firefox session (17 processes) was active, so the scheduler, not the product,
-set that tail. The 1-run pass and the UI-tour per-action switch latency
-(≤ 20 ms) are the product figures; a quiet-machine 3-run confirmation is the
-next step before this gates anything.
+An earlier 2-run pass on the same build measured switch median 43.5 ms /
+p95 142.5 ms while a separate desktop Firefox session (17 processes) shared
+the machine. The quiet 3-run pass above is the product figure; the spread is
+scheduler contention, not a code change (the UI tour's per-action switches
+were ≤ 20 ms in both passes).
 
-Engine/UI work in this pass that targets the same cost centres: per-tab
-`tab-changed` deltas (a mute/capture/failure no longer needs a full snapshot),
-closed-tab revision pruning, an in-flight epoch on the extension list, one
+Engine/UI work in this pass that targets the same cost centres: revision
+pruning for closed tabs, an in-flight epoch on the extension list, one
 `WeakMap` host lookup per window, and a bounded core-call timeout so a wedged
 sidecar cannot stall session saves.

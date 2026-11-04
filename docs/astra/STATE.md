@@ -23,7 +23,7 @@ hooks each one needs (D-38).
 ```sh
 ./tools/run-dev.sh            # reuse out/dev-profile
 ./tools/run-dev.sh --fresh    # clean profile
-tools/perf/full-suite.sh      # build + contracts + UI + 20 live probes + benches
+tools/perf/full-suite.sh      # build + contracts + UI + 21 live probes + benches
 ```
 
 The full native-merge pass (2026-11-04), its verification table and the honest
