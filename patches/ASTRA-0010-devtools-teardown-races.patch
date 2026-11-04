@@ -1,0 +1,74 @@
+Patch-Id: ASTRA-0010
+Title: Keep the DevTools process actor alive through toolbox teardown
+Tier: P2
+Upstream-Files: devtools/client/fronts/watcher.js, devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs, devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+Intent: DevTools is the product's Inspect surface, and its teardown logs three uncaught errors in ESR 153 that users read as failures: NotFoundError "No such JSProcessActor 'DevToolsProcess'" (bug 2044741), and, once that is deferred, "Tried to send a 'target-destroyed-form' event on an already destroyed actor 'watcher'" / "can't access property 'cancelForwarding', watcherInfo.watcher.conn is null" at quit. The cause is ordering: the process actor is unregistered in the same turn that destroys the watcher, so in-flight requests and late process messages still look the actor up. Defer the unregistration to an idle turn (re-checking that no watcher claimed it), make the process actor tolerate a watcher that is already destroyed, and stop logging an error for a resource whose document died mid-navigation (the resource is dropped either way).
+Risk: low (registration lifetime only; no protocol or target change; Toolbox behaviour is covered by the probe)
+Test: forge lint; `tools/perf/stress/devtools_probe.py` (7/7 behaviour checks; upstream_noise all zero: actor errors 0, teardown 0, late-resource 0, was 6/0/3 before); stock Firefox 159 shows the same actor line without this patch
+Verified-On: 153.6.0
+Removal-Plan: drop when the pinned engine carries the upstream fixes (bug 2044741 and the 155 crash fix in bug 2056174); then the late-resource log line can return as upstream
+---
+diff --git a/devtools/client/fronts/watcher.js b/devtools/client/fronts/watcher.js
+index 69cddc0e7d..99fbb4363d 100644
+--- a/devtools/client/fronts/watcher.js
++++ b/devtools/client/fronts/watcher.js
+@@ -205,7 +205,9 @@ class WatcherFront extends FrontClassWithSpec(watcherSpec) {
+     if (topLevelTarget?.innerWindowId == innerWindowId) {
+       return topLevelTarget;
+     }
+-    console.error("Unable to find target with innerWindowId:" + innerWindowId);
++    // A resource can outlive the document it belongs to: resources emitted
++    // just before a navigation can be handled after the document's target was
++    // destroyed. There is no target to attribute them to, which is expected.
+     return null;
+   }
+ 
+diff --git a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+index 8229bea142..f76c006a12 100644
+--- a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
++++ b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+@@ -243,8 +243,16 @@ export const ParentProcessWatcherRegistry = {
+    */
+   maybeUnregisterJSActors() {
+     if (sessionDataByWatcherActor.size == 0) {
+-      unregisterBrowserToolboxJSProcessActor();
+-      unregisterJSProcessActor();
++      // Unregistering here races the teardown that just removed the watcher:
++      // in-flight requests still ask for the process actor and throw
++      // NotFoundError. Finish the current turn first, then unregister if no
++      // new watcher claimed it in the meantime.
++      Services.tm.idleDispatchToMainThread(() => {
++        if (sessionDataByWatcherActor.size == 0) {
++          unregisterBrowserToolboxJSProcessActor();
++          unregisterJSProcessActor();
++        }
++      });
+     }
+   },
+ 
+diff --git a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+index a57ff614ea..c033076858 100644
+--- a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
++++ b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+@@ -231,7 +231,9 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+     this.#watchers.delete(watcher.watcherConnectionPrefix);
+ 
+     for (const actor of watcherInfo.targetActorForms) {
+-      watcherInfo.watcher.notifyTargetDestroyed(actor, options);
++      if (!watcherInfo.watcher.isDestroyed()) {
++        watcherInfo.watcher.notifyTargetDestroyed(actor, options);
++      }
+     }
+ 
+     let connectionUsedByAnotherWatcher = false;
+@@ -252,7 +254,9 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+       // When cancelling the forwarding, one RDP event is sent to the client to purge all requests
+       // and actors related to a given prefix.
+       // Be careful that any late RDP event would be ignored by the client passed this call.
+-      watcherInfo.watcher.conn.cancelForwarding(forwardingPrefix);
++      if (watcherInfo.watcher.conn) {
++        watcherInfo.watcher.conn.cancelForwarding(forwardingPrefix);
++      }
+     }
+ 
+     if (!this.#watchers.size) {
