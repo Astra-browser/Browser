@@ -113,6 +113,7 @@ export function __resetForTests() {
   __resetOperationsForTests();
   Permissions.__resetForTests();
   __resetPageSourceForTests();
+  Media.__resetForTests();
   DialogPrompts.__resetForTests();
   __resetEventsForTests();
 }
