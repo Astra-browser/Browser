@@ -59,6 +59,13 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
   working (inspector follows the page, toggles, closes with its tab). Do not
   chase them as Astra wiring failures; the probe reports their count as
   `upstream_noise` and only fails on toolbox behaviour.
+- **`Unable to find target with innerWindowId` is late `network-event`
+  resources.** Navigating with the inspector open delivers up to three
+  `network-event` resources for the page that is going away, after its target
+  was destroyed; the front logs an error and drops them. Measured with the real
+  stage tab (`commands.resourceCommand` wrapped live), so it is not the tab
+  identity. The toolbox is unaffected; the probe counts it as
+  `target_lookup_miss`.
 - UI-tour screenshots are captured, but the visual baseline still needs a human
   pass for pixel parity.
 - Performance budgets for tab-switch/scroll are proposals (p95 ≤ 100 ms / 32 ms);
