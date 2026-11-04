@@ -64,9 +64,10 @@
   --color-address-hover: rgb(255 255 255 / 0.095);
   --shadow-tile: none;
 
-  /* A grouped card's edge. On a dark page the luminance step is the edge; on
-     a light one white on pale grey needs a hairline to stay crisp. */
-  --shadow-card: none;
+  /* A grouped card's edge. On a dark page the luminance step is the edge, with
+     one soft drop below it; on a light page white on pale grey needs a warm
+     hairline and a warm shadow to stay crisp. */
+  --shadow-card: 0 10px 30px rgb(0 0 0 / 0.28), 0 0 0 0.5px rgb(255 255 255 / 0.05);
 
   --newtab-image-dim: rgb(0 0 0 / 35%);
   --color-border: rgb(255 255 255 / 0.07);
@@ -494,9 +495,17 @@
   --tab-inset: 8px;
   --tab-gap: 2px;
 
-  /* The window ground. Dark is the existing canvas; the light block paints
-     the warm paper field the interface is designed on. */
-  --shell-ground: var(--color-canvas);
+  /* The window ground. Dark is the same four-stop field as Paper, read as
+     black: a charcoal light at the top-left falling into near-black, so the
+     sidebar card and the page card sit in the field instead of on a flat slab.
+     The light block below swaps the stops for the warm paper field. */
+  --shell-ground: linear-gradient(
+    135deg,
+    #2f2f34 0%,
+    #1e1e21 42%,
+    #111113 72%,
+    #08080a 100%
+  );
 
   /* One optical axis for the whole chrome column. Every band measures its
      horizontal position from this, so glyphs line up from the address field

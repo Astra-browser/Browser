@@ -350,7 +350,7 @@
 /* Paper: the whole window is the warm field, and the column and the page
    are cards standing on it. Dark keeps its own material and these rules do
    not match. */
-:root[data-theme="light"] .shell {
+.shell {
   background: var(--shell-ground);
 }
 
@@ -358,6 +358,21 @@
   border-radius: var(--content-radius);
   background: color-mix(in srgb, #fffdf9 34%, transparent);
   box-shadow: var(--shadow-card);
+}
+
+/* The same card in dark: one step of charcoal over the field, with the same
+   corner and one soft drop. The ladder keeps Astra's neutral scheme; only the
+   card treatment is shared with Paper. */
+:root[data-theme="dark"] .browser-sidebar:not([data-hidden]) {
+  border-radius: var(--content-radius);
+  background: color-mix(in srgb, var(--color-surface) 24%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+/* The hidden card is the same card out over the page: the black field, not
+   the old night-sky frost, so it blends the way the light card does. */
+.browser-sidebar[data-hidden] {
+  background: var(--shell-ground) center / cover;
 }
 
 /* The card lifts off the wallpaper by one soft drop, not a drawn outline. */

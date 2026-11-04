@@ -570,6 +570,18 @@
     background: var(--shell-ground);
   }
 
+  /* stylelint-disable-next-line no-descending-specificity -- the black field
+     deliberately overrides the night scene after it has been declared. */
+  :global(:root[data-theme="dark"]) .newtab {
+    --sky-night-paper: var(--shell-ground);
+    --sky-shadow: transparent;
+    --sky-edge: transparent;
+    --sky-edge-half: transparent;
+    --sky-edge-faint: transparent;
+
+    background: var(--shell-ground);
+  }
+
   .newtab.custom {
     --sky-card: var(--color-field);
     --sky-card-rim: var(--color-border);
@@ -983,8 +995,9 @@
     transition: none;
   }
 
-  /* Paper hides the day sky asset after its own background rules. */
-  :global(:root[data-theme="light"]) .newtab .sky {
+  /* Both themes are fields now: the sky asset only supplies the paper/night
+     tokens, never a painted picture behind them. */
+  .newtab .sky {
     opacity: 0;
   }
 </style>
