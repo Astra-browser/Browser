@@ -104,10 +104,13 @@ recorded below; this list is what is still genuinely unwired.
 - **Container-scoped opening.** The context menu can open a link in a new tab,
   window or private window, but not in a chosen Firefox container; there is no
   container picker in the Astra UI yet.
-- **Guaranteed DevTools.** The shell asks `gDevTools.showToolboxForTab` for a
-  synthetic tab. When the engine refuses a standalone browser, the action
-  reports refusal and opens **no** Firefox window. Making this unconditional
-  likely needs the content stage to be tabbrowser-backed, or an engine hook.
+- **Guaranteed DevTools.** Closed in B-24: the toolbox now attaches to the
+  real `gBrowser` tab the stage already uses (`Content.mountNative`), so the
+  engine finds it, follows the tab's container and lifecycle, and F12 toggles.
+  Live proof: `tools/perf/stress/devtools_probe.py`. The remaining console
+  lines (`No such JSProcessActor 'DevToolsProcess'`, the `getGrids`/`pagestyle`
+  teardown family) are upstream ESR 153 bugs (2044741, 1944477), reproduce in
+  stock Firefox, and do not affect the toolbox — see `KNOWN_LIMITS.md`.
 - **The remaining unrouted command ids.** 200 of the 280 generated commands
   still have no Host route (account, Work models/human/sites, blocker, page
   assist, voice, profiles, import/export, updates, menus, split/drag-drop,
@@ -281,6 +284,7 @@ menu and ran a row end-to-end.
 | B-21 | Bookmarks and history paint the same site icons as tabs | done | `fix/favicons-and-menu-overlay` | live: YouTube + Google marks in tabs, Bookmarks, History |
 | B-22 | Bookmarks are scoped to the active space | done | `feat/space-isolation` | live: space 2 kept YouTube, space 1 kept Google after switching |
 | B-23 | Every space is its own Firefox container (site data, logins) | done | `feat/space-container` | live: space 2 browser reports userContextId 1, space 1 stays 0 |
+| B-24 | DevTools acts on the stage tab: opens on the real tab, toggles from F12, follows navigation, reports the tab's container, closes with the tab | done | `fix/devtools-live-target` | live: `tools/perf/stress/devtools_probe.py` 7/7 (real tab, inspector, nav follow, toggle close, container 2, tab-close teardown) |
 
 **Still deferred after this batch (do not report as fixed):** real split-pane
 content (the split layout is still a single page) and container-scoped link

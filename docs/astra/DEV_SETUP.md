@@ -60,6 +60,7 @@ build does not speak it). Use the in-tree harnesses:
 python3 tools/marionette-probe/headed-probe.py /tmp/p out/shot   # launch + state + screenshot
 python3 tools/marionette-probe/framecheck2.py                    # frame-by-frame boot check (PID-matched)
 python3 tests/contract/shell_app_chrome.py                       # 17 live checks
+python3 tools/perf/stress/devtools_probe.py                      # DevTools: real tab, toggle, container, tab close
 ```
 
 ## Optional Rust core

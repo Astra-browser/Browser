@@ -52,6 +52,13 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 
 ## Verification gaps
 
+- **DevTools console noise is upstream.** `No such JSProcessActor
+  'DevToolsProcess'` (bug 2044741) and the `getGrids`/`pagestyle` teardown
+  family (bug 1944477) are ESR 153 platform bugs. They reproduce in stock
+  Firefox with the same open/navigate/close flow, and the toolbox keeps
+  working (inspector follows the page, toggles, closes with its tab). Do not
+  chase them as Astra wiring failures; the probe reports their count as
+  `upstream_noise` and only fails on toolbox behaviour.
 - UI-tour screenshots are captured, but the visual baseline still needs a human
   pass for pixel parity.
 - Performance budgets for tab-switch/scroll are proposals (p95 ≤ 100 ms / 32 ms);
