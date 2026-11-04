@@ -32,7 +32,7 @@
 | P2 | `merge/p2-native-nav` | Make `nav.stop`, page zoom and `Navigation.print` call the live browser; prune dead/duplicate command ids; hard-reload distinction | P0 | **merged** |
 | P3 | `merge/p3-windows` | Bind `Windows` to `BrowserWindowTracker`/`OpenBrowserWindow`; real focus/close/fullscreen; thin projection keyed by native ids | P0 | **merged** |
 | P4 | `merge/p4-gbrowser` | **Complete.** Native `gBrowser` tabs, model projection, mute/pin/discard/space/adoption, native-only shell; legacy standalone mount deleted. | P1–P3 | **merged** |
-| P5 | `merge/p5-session` | Firefox `SessionStore` is live; restored native tabs are adopted, the bootstrap blank tab is dropped. Astra metadata (space/folder/pin/sync) in the Rust store is P5b. | P4 | **P5a merged; P5b merged (spaces/pins); sync + folders open** |
+| P5 | `merge/p5-session` | Firefox `SessionStore` is live; restored native tabs are adopted. Astra spaces/pins persist in the Rust store; the JS `Session` shadow model is retired. | P4 | **P5a+P5b merged; folders + sync open** |
 | P6 | `merge/p6-dialogs` | Native permission/auth/cert/download decisions with Astra UI on top; no content resolution | P1 | **P6a merged (store); P6b-1 merged (geolocation prompt); camera/mic prompt seam open** |
 | P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | **merged** |
 | P8 | `merge/p8-resources` | Split `Resources`: tasks/notes/media → Rust; page source → native browser; delete the in-memory task store; retire `Panes` | P1 | planned |
@@ -192,7 +192,7 @@ restore, UI parity screenshots, `containers_isolation`, `session_restore`.
 |---|---|
 | Host contract | `node tests/contract/hostapi_v1.mjs` |
 | Commands | `node tests/contract/commands_model.mjs` |
-| Session | `node tests/contract/session_restore.mjs` |
+| Session | `cargo test -p astra-core` (Rust `SessionSnapshot`) + `node tests/contract/metadata_restore.mjs` |
 | Tab lifecycle | `node tests/contract/tab_lifecycle.mjs` + `python3 tests/contract/tab_lifecycle.py` |
 | Live shell/UI | `python3 tests/contract/shell_app_chrome.py` |
 | Bridge | `(cd ui/packages/bridge && bun test)` |

@@ -23,7 +23,6 @@ import { Boot, __resetBootForTests } from "./Boot.sys.mjs";
 import { HOST_API_VERSION, Tabs, __resetTabsForTests, __spacesState } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
 import { Windows, __bindCurrentWindow, __resetWindowsForTests } from "./Windows.sys.mjs";
-import { Session, __resetSessionForTests } from "./Session.sys.mjs";
 import { History, __resetHistoryForTests } from "./History.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
 import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
@@ -56,7 +55,6 @@ export {
   Boot,
   Windows,
   __bindCurrentWindow,
-  Session,
   History,
   Tabs,
   Navigation,
@@ -99,7 +97,6 @@ export function __resetForTests() {
   __resetTabsForTests();
   __resetNavigationForTests();
   __resetWindowsForTests();
-  __resetSessionForTests();
   __resetHistoryForTests();
   __resetPanesForTests();
   __resetContainersForTests();
