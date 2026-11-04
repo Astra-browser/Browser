@@ -128,13 +128,34 @@ function buildItems(menu, browser) {
   return items;
 }
 
-/** One real XUL tab per content browser, kept for the toolbox's lifetime.
- *  DevTools attaches listeners to the tab element and resolves the browser
- *  through `linkedBrowser`; a plain object made it throw at the first
- *  `addEventListener`. */
+/** Stand-in tabs for browsers the tab strip does not own (one per browser,
+ *  kept for the toolbox's lifetime). DevTools attaches listeners to the tab
+ *  element and resolves the browser through `linkedBrowser`; a plain object
+ *  made it throw at the first `addEventListener`. */
 const _devTabs = new WeakMap();
 
-function devTabFor(win, browser) {
+/**
+ * The tab DevTools attaches to.
+ *
+ * The content stage is a real `gBrowser` tab (`Content.mountNative`), so the
+ * toolbox gets that tab: it carries the tab's own container (`userContextId`),
+ * panel, window and the tab events the toolbox listens for. A browser the tab
+ * strip does not own yet (a window before the first mount) gets a stand-in.
+ *
+ * @param {Window} win the browser window
+ * @param {Element} browser the content browser DevTools acts on
+ * @returns {Element} a tabbrowser tab or a stand-in that quacks like one
+ */
+export function devTabFor(win, browser) {
+  try {
+    const tab = win.gBrowser?.getTabForBrowser?.(browser);
+    if (tab) {
+      return tab;
+    }
+  } catch {
+    // No tab strip in this window; the stand-in below still has what the
+    // toolbox reads.
+  }
   let tab = _devTabs.get(browser);
   if (!tab) {
     tab = win.document.createXULElement("tab");
@@ -164,11 +185,17 @@ function devTabFor(win, browser) {
   return tab;
 }
 
-/** Open DevTools for an Astra content browser. `DevToolsShim` is the supported
- *  entry point (it initialises the toolbox lazily); the toolbox gets a window
- *  of its own because the native tabbox that hosts a bottom toolbox is hidden
- *  in this shell. */
-async function showDevTools(win, browser, toolId) {
+/** Open or close DevTools for an Astra content browser.
+ *
+ *  `DevToolsShim` is the supported entry point: it initialises DevTools lazily
+ *  and works whether or not the toolbox has been opened before. The toolbox
+ *  gets a window of its own because the native tabbox that hosts a docked
+ *  toolbox is hidden in this shell.
+ *
+ *  `toolId` names a tool (the page menu's Inspect): the toolbox opens — or is
+ *  raised — on that tool. Without a tool (F12, Ctrl+Shift+I from the product
+ *  keymap) the command toggles, the way the browser's own DevTools key does. */
+export async function showDevTools(win, browser, toolId, { reason = "ContextMenu" } = {}) {
   if (!browser) {
     return { accepted: false };
   }
@@ -179,13 +206,24 @@ async function showDevTools(win, browser, toolId) {
     if (!DevToolsShim?.isEnabled?.()) {
       return { accepted: false };
     }
-    await DevToolsShim.showToolboxForTab(devTabFor(win, browser), {
+    const tab = devTabFor(win, browser);
+    if (toolId === undefined) {
+      const open = DevToolsShim.getToolboxForTab?.(tab);
+      if (open) {
+        await open.destroy();
+        return { accepted: true, closed: true };
+      }
+    }
+    await DevToolsShim.showToolboxForTab(tab, {
       toolId,
       hostType: "window",
-      reason: "contextmenu",
+      reason,
     });
     return { accepted: true };
-  } catch {
+  } catch (error) {
+    // The caller reports "accepted: false" to the app, so a refusal must
+    // leave a trace here or a dead control looks like a working one.
+    console.error("astra: DevTools did not open", error);
     return { accepted: false };
   }
 }
@@ -495,7 +533,7 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
     }
     case "page.devtools":
     case "page.devtools.alt":
-      return showDevTools(win, browser, undefined);
+      return showDevTools(win, browser, undefined, { reason: "KeyShortcut" });
     case "page.save":
       try {
         if (!browser) return { accepted: false };
