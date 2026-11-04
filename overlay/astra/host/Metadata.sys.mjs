@@ -27,6 +27,10 @@ import { Windows } from "./Windows.sys.mjs";
 const NAME = "organisation";
 const SNAPSHOT_VERSION = 1;
 const SAVE_DELAY_MS = 600;
+/** SessionStore restores tabs lazily, so their URL can arrive after the mount.
+ *  Keep retrying the restore for this long after the first attempt. */
+const RESTORE_RETRY_MS = 60_000;
+const RESTORE_MAX_RETRIES = 40;
 
 /** Events that change organisation. `items-changed` is the catch-all the
  *  model already emits after a space or pin mutation. */
@@ -151,7 +155,13 @@ export function planRestore(snapshot, liveTabs = []) {
       theme: null,
     }));
   if (spaces.length === 0) {
-    return { spaces: [{ ...DEFAULT_SPACE }], activeSpaceId: DEFAULT_SPACE.id, assignments: [], active: null };
+    return {
+      spaces: [{ ...DEFAULT_SPACE }],
+      activeSpaceId: DEFAULT_SPACE.id,
+      assignments: [],
+      active: null,
+      remaining: 0,
+    };
   }
   const known = new Set(spaces.map((space) => space.id));
 
@@ -184,7 +194,15 @@ export function planRestore(snapshot, liveTabs = []) {
 
   const activeSpaceId =
     assignments.find((entry) => entry.astra_tab_id === active)?.space_id ?? spaces[0].id;
-  return { spaces, activeSpaceId, assignments, active };
+  const savedPersistable = savedTabs.filter((tab) => isPersistableUrl(tab?.url)).length;
+  return {
+    spaces,
+    activeSpaceId,
+    assignments,
+    active,
+    // Saved entries with no live match yet (e.g. a lazy SessionStore tab).
+    remaining: Math.max(0, savedPersistable - assignments.length),
+  };
 }
 
 // --- Chrome wiring -----------------------------------------------------------
@@ -193,6 +211,10 @@ let _private = false;
 let _available = false;
 let _restored = false;
 let _snapshot = null;
+let _restoreUntil = 0;
+let _restoreRetries = 0;
+let _remaining = 0;
+let _retryTimer = null;
 let _timer = null;
 let _off = null;
 let _lastSavedAt = null;
@@ -298,12 +320,30 @@ export const Metadata = {
         pinned += 1;
       }
     }
-    if (plan.activeSpaceId) {
+    const first = _restoreUntil === 0;
+    // Bring the saved active space forward once; a later retry only places a
+    // tab that just committed and must not yank the person elsewhere.
+    if (first && plan.activeSpaceId) {
       await Tabs.switchSpace({ request_id: "metadata-restore-space", space: plan.activeSpaceId });
     }
     _restored = true;
-    _snapshot = null;
+    _remaining = first ? plan.remaining : Math.max(0, _remaining - moved - pinned);
+    if (first) _restoreUntil = Date.now() + RESTORE_RETRY_MS;
+    // Keep the snapshot: a tab that was still lazy when this ran gets another
+    // chance when its URL commits.
     return { restored: true, spaces: plan.spaces.length, moved, pinned };
+  },
+
+  /** Re-run the restore after a navigation, while the retry window is open. */
+  retryRestore() {
+    if (_private || !_available || _snapshot === null || _remaining <= 0) return;
+    if (Date.now() > _restoreUntil || _restoreRetries >= RESTORE_MAX_RETRIES) return;
+    _restoreRetries += 1;
+    if (_retryTimer !== null) return;
+    _retryTimer = setTimeout(() => {
+      _retryTimer = null;
+      void this.restore().catch(() => {});
+    }, 0);
   },
 
   /** Write the current organisation. Never called before `prepare`. */
@@ -380,9 +420,9 @@ export const Metadata = {
     if (_private) return;
     if (_off !== null) return;
     _off = addEventListener((event) => {
-      if (typeof event?.type === "string" && SAVE_EVENTS.has(event.type)) {
-        scheduleSave();
-      }
+      if (typeof event?.type !== "string") return;
+      if (SAVE_EVENTS.has(event.type)) scheduleSave();
+      if (event.type === "nav.committed") Metadata.retryRestore();
     });
     scheduleSave();
   },
@@ -395,6 +435,11 @@ export const Metadata = {
     _available = false;
     _restored = false;
     _snapshot = null;
+    _restoreUntil = 0;
+    _restoreRetries = 0;
+    _remaining = 0;
+    if (_retryTimer !== null) clearTimeout(_retryTimer);
+    _retryTimer = null;
     _lastSavedAt = null;
     _lastError = null;
     _lastSnapshot = null;
@@ -414,6 +459,20 @@ export const Metadata = {
   // Test seam: exact-input capture/plan without the chrome stores.
   capture: buildSnapshot,
   plan: planRestore,
+
+  /** Test seam: install a snapshot without a running sidecar. */
+  __setSnapshotForTests(snapshot) {
+    if (!snapshot || snapshot.version !== SNAPSHOT_VERSION) return false;
+    _snapshot = snapshot;
+    _available = true;
+    _restored = false;
+    _restoreUntil = Date.now() + RESTORE_RETRY_MS;
+    _restoreRetries = 0;
+    _remaining = 0;
+    const plan = planRestore(_snapshot, []);
+    __applySpaces(plan.spaces, plan.activeSpaceId);
+    return true;
+  },
 
   __resetForTests() {
     Metadata.dispose();

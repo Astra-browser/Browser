@@ -19,6 +19,9 @@ const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Metadata, buildSnapshot, planRestore, isPersistableUrl } = await import(
   path.join(HOST, "Metadata.sys.mjs")
 );
+const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(
+  path.join(HOST, "Tabs.sys.mjs")
+);
 
 let passed = 0;
 let failed = 0;
@@ -219,6 +222,38 @@ function tab(overrides) {
   check("round trip keeps two assignments", plan.assignments.length === 2);
   check("round trip keeps the Work space", plan.spaces.some((s) => s.name === "Work"));
   check("round trip keeps the pin", plan.assignments.some((a) => a.pinned === true));
+}
+
+// --- Deferred (lazy) restore ------------------------------------------------
+{
+  Metadata.__resetForTests();
+  __resetTabs();
+  await Tabs.bootstrap({ request_id: "lazy-boot" });
+  const made = await Tabs.create({ request_id: "lazy-create", url: "about:blank" });
+  const snapshot = buildSnapshot({
+    spaces: [spaceA, spaceB],
+    tabs: [
+      tab({ astra_tab_id: "old", url: "https://lazy.example/", space_id: "space-2", pinned: true }),
+    ],
+    windows: [{ window_id: "win-1", private: false, focused: true, title: "" }],
+  });
+  check("the test snapshot installs", Metadata.__setSnapshotForTests(snapshot) === true);
+  const first = await Metadata.restore();
+  check("a lazy tab is not assigned yet", first.moved === 0 && first.pinned === 0);
+  // SessionStore commits the real URL later.
+  __applyExternalUpdate(made.astra_tab_id, { url: "https://lazy.example/" });
+  const second = await Metadata.restore();
+  check("the committed tab is placed", second.moved === 1 && second.pinned === 1);
+  const stored = (await Tabs.list({ request_id: "lazy-list" })).tabs.find(
+    (entry) => entry.astra_tab_id === made.astra_tab_id,
+  );
+  check("the deferred tab lands in Work", stored?.space_id === "space-2");
+  check("the deferred tab is pinned", stored?.pinned === true);
+  const third = await Metadata.restore();
+  check("restore is idempotent", third.moved === 0 && third.pinned === 0);
+  check("a completed restore has nothing pending", (await Metadata.plan(snapshot, [])).remaining === 1);
+  Metadata.__resetForTests();
+  __resetTabs();
 }
 
 // --- Private windows write nothing ------------------------------------------
