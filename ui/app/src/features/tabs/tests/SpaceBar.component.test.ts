@@ -93,10 +93,40 @@ afterEach(() => {
 test("the row names the space and its plus opens a tab, with no pager beside them", async () => {
   const screen = await mount();
   await expect.element(screen.getByRole("button", { name: "Spaces — Home" })).toBeVisible();
-  await screen.getByRole("button", { name: "New tab", exact: true }).click();
+  screen.container.querySelector<HTMLButtonElement>(".space-new-tab")!.click();
   expect(native.open).toHaveBeenCalledOnce();
   expect(screen.container.querySelector(".space-dots, .space-dot")).toBeNull();
   expect(screen.container.querySelectorAll(".space-bar button")).toHaveLength(2);
+});
+
+test("the open list ends with a New Tab row on the row's own geometry", async () => {
+  const screen = await mount();
+  const rows = screen.container.querySelectorAll<HTMLElement>(".new-tab-row");
+  expect(rows).toHaveLength(1);
+  // It is the last thing in the scroller, below every open tab.
+  const scroller = screen.container.querySelector<HTMLElement>(".tab-scroller")!;
+  expect(scroller.lastElementChild).toBe(rows[0]);
+  const style = getComputedStyle(rows[0]!);
+  expect(style.height).toBe("28px");
+  expect(style.borderRadius).toBe("8px");
+  await userEvent.click(rows[0]!);
+  expect(native.open).toHaveBeenCalledOnce();
+});
+
+test("a row and its section label carry the refresh geometry", async () => {
+  const screen = await mount();
+  const row = screen.container.querySelector<HTMLElement>(".browse-tab")!;
+  const rowStyle = getComputedStyle(row);
+  expect(rowStyle.height).toBe("28px");
+  expect(rowStyle.borderRadius).toBe("8px");
+  // Pinned is empty here, so its nav is hidden; the open section is last.
+  const section = [...screen.container.querySelectorAll<HTMLElement>(".tab-section")].at(-1)!;
+  expect(section.textContent).toBe("Open tabs");
+  const sectionStyle = getComputedStyle(section);
+  expect(sectionStyle.fontSize).toBe("11px");
+  expect(sectionStyle.fontWeight).toBe("600");
+  expect(sectionStyle.textTransform).toBe("uppercase");
+  expect(sectionStyle.letterSpacing).toBe("0.44px");
 });
 
 test("the switcher lists every space, checks the one shown and moves to another", async () => {
@@ -233,7 +263,7 @@ test("a space with nothing listed draws no empty state; the row's plus still ope
   const screen = await mount(true);
   await expect.element(screen.getByRole("button", { name: "Spaces — Home" })).toBeVisible();
   expect(screen.container.textContent).not.toContain("Nothing open");
-  await screen.getByRole("button", { name: "New tab", exact: true }).click();
+  screen.container.querySelector<HTMLButtonElement>(".space-new-tab")!.click();
   expect(native.open).toHaveBeenCalledOnce();
 });
 

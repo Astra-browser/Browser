@@ -140,14 +140,14 @@
   </header>
 {:else}
   <header
-    class="flex shrink-0 items-center gap-px pe-1.5"
+    class="flex shrink-0 items-center gap-px pe-2"
     data-drag-region
     style:height="var(--titlebar-height)"
     style:padding-inline-start={lights
       ? "var(--traffic-light-inset)"
       : launcher && IS_WINDOWS
         ? "0"
-        : "6px"}
+        : "var(--tab-inset)"}
     aria-label={m.ui_navigation()}
   >
     <!-- Beside a tool panel the panel's own close button already gives the
