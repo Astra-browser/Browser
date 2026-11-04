@@ -386,6 +386,15 @@
   min-height: 0;
   gap: 8px;
 }
+/* The column beside the utility rail: the rail runs the full height of the
+   card, while the head, list and foot keep their own vertical layout here. */
+.sidebar-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .sidebar-browser-column {
   display: flex;
   flex: 1;
@@ -701,11 +710,11 @@
 }
 /* Width only: the column still fills the sidebar's height, or the dock at
    its foot rides up under the tabs for the length of the change. */
-.browser-sidebar[data-reshaping="true"] > .sidebar-columns {
+.browser-sidebar[data-reshaping="true"] > .sidebar-main > .sidebar-columns {
   width: var(--sidebar-width);
 }
 /* The header is one shape or the other, never both; the new one fades in. */
-.browser-sidebar[data-header-fresh="true"] > header {
+.browser-sidebar[data-header-fresh="true"] > .sidebar-main > header {
   animation: interface-fade var(--motion-slow) var(--ease-out) both;
 }
 
