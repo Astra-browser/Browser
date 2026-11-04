@@ -237,8 +237,8 @@
     flex: none;
     flex-direction: column;
     align-items: center;
-    gap: var(--sidebar-row-gap);
-    padding-block: 0 2px;
+    gap: var(--tab-gap);
+    padding-block: 0 var(--tab-gap);
   }
 
   .rail-stage {
@@ -265,7 +265,7 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding-block: 4px 8px;
+    padding-block: var(--tab-gap) var(--tab-inset);
   }
 
   /* The expanded list's own pitch, row for row, so a tab sits at the same
@@ -274,7 +274,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sidebar-row-gap);
+    gap: var(--tab-gap);
   }
 
   /* The expanded row with its label taken away: the same plate, corner, rim
@@ -282,10 +282,10 @@
   :global(.rail-item) {
     display: grid;
     place-items: center;
-    width: var(--row-sidebar);
-    height: var(--row-sidebar);
+    width: var(--row-tab);
+    height: var(--row-tab);
     border: 0;
-    border-radius: var(--radius-row);
+    border-radius: var(--radius-tab);
     background: transparent;
     color: var(--color-faint);
     cursor: default;
