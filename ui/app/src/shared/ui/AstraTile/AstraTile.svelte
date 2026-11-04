@@ -6,8 +6,8 @@
 
 <img
   class="astra-tile"
-  src="/astra-icon.png"
-  srcset="/astra-icon.png 128w, /astra-icon@2x.png 256w"
+  src="astra-icon.png"
+  srcset="astra-icon.png 128w, astra-icon@2x.png 256w"
   sizes={`${size}px`}
   width={size}
   height={size}

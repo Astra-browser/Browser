@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-CxexqAh1.js";var n=((n={},r={})=>(r.locale??t(),e(2069,n)??`Open`));export{n as t};

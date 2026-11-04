@@ -178,6 +178,7 @@ try {
     "operation-processed": "astra:operation-processed",
     "page-permission-prompt-changed": "astra:page-permission-prompt",
     "nav.find-result": "astra:find",
+    "tab-changed": "astra:tab",
     "runtime-status-changed": "astra:runtime-status",
     "blocker-status-changed": "astra:blocker-status",
     "focus-changed": "astra:focus",

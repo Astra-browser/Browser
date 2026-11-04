@@ -1,11 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "resource://astra/host/schemas/events.json",
-  "title": "Host API v1 — events (envelope per plan §5.4 / Appendix C)",
+  "title": "Host API v1 \u2014 events (envelope per plan \u00a75.4 / Appendix C)",
   "description": "Every event is { event_seq, type, data }. event_seq is monotonic per session so the core can detect gaps and resync via eventsSince (ring buffer, cap 500) or a full snapshot.",
   "type": "object",
   "properties": {
-    "event_seq": { "type": "integer", "minimum": 1 },
+    "event_seq": {
+      "type": "integer",
+      "minimum": 1
+    },
     "type": {
       "type": "string",
       "enum": [
@@ -44,11 +47,19 @@
         "sidebar.changed",
         "ui-command",
         "operation-processed",
-        "page-permission-prompt-changed"
+        "page-permission-prompt-changed",
+        "tab-changed",
+        "page.request-answered"
       ]
     },
-    "data": { "type": "object" }
+    "data": {
+      "type": "object"
+    }
   },
-  "required": ["event_seq", "type", "data"],
+  "required": [
+    "event_seq",
+    "type",
+    "data"
+  ],
   "additionalProperties": false
 }

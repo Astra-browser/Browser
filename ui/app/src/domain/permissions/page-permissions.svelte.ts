@@ -105,6 +105,12 @@ export function init(): Promise<void> {
 
 export function dispose() {
   lifecycle += 1;
+  if (hostRetry !== null) {
+    clearTimeout(hostRetry);
+    hostRetry = null;
+  }
+  sidebarHosts = 0;
+  reportedHost = null;
   initialized = false;
   initializing = null;
   unlisten?.();
@@ -175,6 +181,7 @@ async function settle(
 
 let sidebarHosts = 0;
 let reportedHost: boolean | null = null;
+let hostRetry: ReturnType<typeof setTimeout> | null = null;
 
 function reportHost() {
   // One report per task, so a remount does not flap the layout.
@@ -184,6 +191,13 @@ function reportHost() {
     reportedHost = next;
     void commands.pagePermissionCardHost(next).catch(() => {
       reportedHost = null;
+      // Keep trying while the layout still wants a card: a remount can race
+      // the host bootstrap, and a stale flag misplaces every later prompt.
+      if (hostRetry !== null) return;
+      hostRetry = setTimeout(() => {
+        hostRetry = null;
+        if (sidebarHosts > 0 !== (reportedHost ?? false)) reportHost();
+      }, 1500);
     });
   });
 }

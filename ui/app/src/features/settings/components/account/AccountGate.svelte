@@ -55,7 +55,7 @@
   <div class="stage">
     <img
       class="mark"
-      src="/astra-icon@2x.png"
+      src="astra-icon@2x.png"
       width="64"
       height="64"
       alt="Astra"

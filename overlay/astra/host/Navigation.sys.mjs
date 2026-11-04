@@ -16,7 +16,13 @@
 import { emit } from "./Events.sys.mjs";
 import { emitItemsChanged } from "./Tabs.sys.mjs";
 import { resolve as resolveInput } from "./Search.sys.mjs";
-import { HOST_API_VERSION, __historyFor, __pushHistory, __tabsState } from "./Tabs.sys.mjs";
+import {
+  HOST_API_VERSION,
+  __historyFor,
+  __pushHistory,
+  __tabsState,
+  emitTabChanged,
+} from "./Tabs.sys.mjs";
 
 export const MIN_ZOOM = 0.3;
 export const MAX_ZOOM = 3.0;
@@ -95,6 +101,7 @@ function commit(id, url, extra = {}) {
         : true;
   const h = __historyFor(id);
   emit("nav.committed", { astra_tab_id: id, url, ...extra });
+  emitTabChanged(id);
   emit("tab.updated", {
     astra_tab_id: id,
     url,
@@ -134,6 +141,7 @@ export const Navigation = {
     const loadingTab = tabs.get(id);
     if (loadingTab) loadingTab.loading = true;
     emit("nav.started", { astra_tab_id: id, url });
+    emitTabChanged(id);
     emit("tab.updated", { astra_tab_id: id, url, loading: true });
     // Pressing Enter on the address already in the bar is a reload, not a
     // second visit: a duplicated entry makes Back look like it does nothing.
@@ -196,6 +204,7 @@ export const Navigation = {
     tab.loading = true;
     emit("nav.hard-reload", { astra_tab_id: id, url: tab.url });
     const h = __historyFor(id);
+    emitTabChanged(id);
     emit("tab.updated", {
       astra_tab_id: id,
       url: tab.url,
@@ -219,6 +228,7 @@ export const Navigation = {
     tab.loading = false;
     const h = __historyFor(id);
     emit("nav.stopped", { astra_tab_id: id, url: tab.url });
+    emitTabChanged(id);
     emit("tab.updated", {
       astra_tab_id: id,
       url: tab.url,

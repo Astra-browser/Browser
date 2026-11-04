@@ -112,9 +112,12 @@ export function dispose() {
   unlisten = null;
 }
 
-export const open = () => void commands.tabsOpen();
-export const activate = (id: string) => void commands.tabsActivate(id);
-export const close = (id: string) => void commands.tabsClose(id);
+/** Fire-and-forget native intent; a refusal is not an unhandled rejection. */
+const fire = (task: Promise<unknown> | undefined) => void task?.catch?.(() => {});
+
+export const open = () => fire(commands.tabsOpen());
+export const activate = (id: string) => fire(commands.tabsActivate(id));
+export const close = (id: string) => fire(commands.tabsClose(id));
 /** The window's one tab, with nothing open in it yet. Closing it would only
  *  put another empty tab in its place, so it offers no close. */
 export const loneNewTab = (id: string) => {
@@ -122,7 +125,7 @@ export const loneNewTab = (id: string) => {
   const tab = all.length === 1 ? all[0] : undefined;
   return tab?.id === id && !tab.url && !tab.failure && (tab.content ?? "web") === "web";
 };
-export const navigate = (id: string, input: string) => void commands.tabsNavigate(id, input);
+export const navigate = (id: string, input: string) => fire(commands.tabsNavigate(id, input));
 
 const onActive = (fn: (id: string) => void) => () => {
   const id = state.active;
@@ -131,14 +134,14 @@ const onActive = (fn: (id: string) => void) => () => {
 
 /** Mutes or unmutes a tab; the projected tab says what native applied. */
 export const setMuted = (id: string, muted: boolean) => settle(commands.tabSetMuted(id, muted));
-export const reloadActive = onActive((id) => void commands.tabsReload(id));
-export const backActive = onActive((id) => void commands.tabsBack(id));
-export const forwardActive = onActive((id) => void commands.tabsForward(id));
-export const split = (other: string) => void commands.tabsSplit(other);
-export const unsplit = () => void commands.tabsUnsplit();
+export const reloadActive = onActive((id) => fire(commands.tabsReload(id)));
+export const backActive = onActive((id) => fire(commands.tabsBack(id)));
+export const forwardActive = onActive((id) => fire(commands.tabsForward(id)));
+export const split = (other: string) => fire(commands.tabsSplit(other));
+export const unsplit = () => fire(commands.tabsUnsplit());
 export const inSplit = (id: string) => state.split_group?.members.includes(id) ?? false;
-export const dragOver = (x: number, y: number) => void commands.tabDragOver(x, y);
-export const dropTab = (id: string, x: number, y: number) => void commands.tabDrop(id, x, y);
+export const dragOver = (x: number, y: number) => fire(commands.tabDragOver(x, y));
+export const dropTab = (id: string, x: number, y: number) => fire(commands.tabDrop(id, x, y));
 /** Keeps one of onboarding's catalog sites in Essentials, named by its id;
  *  native owns the address. Settles on native's answer, never assumed. */
 export const keepSite = (site: string) => settle(commands.essentialsKeep(site));
@@ -182,19 +185,19 @@ function tabMenuContext(id: string, mediaOnly = false): TabMenuContext {
 
 export function openTabMenu(id: string, x: number, y: number) {
   menuTarget = id;
-  void commands.tabMenuPopup(id, x, y, tabMenuContext(id));
+  fire(commands.tabMenuPopup(id, x, y, tabMenuContext(id)));
 }
 
 /** What can be done about a tab's camera, microphone and sound, opened from
  *  its in-use indicator. */
 export function openMediaMenu(id: string, x: number, y: number) {
   menuTarget = id;
-  void commands.tabMenuPopup(id, x, y, tabMenuContext(id, true));
+  fire(commands.tabMenuPopup(id, x, y, tabMenuContext(id, true)));
 }
 
 /** The browser interface's own menu; `page` says a web page is in front. */
 export function openChromeMenu(x: number, y: number, page: boolean) {
-  void commands.chromeMenuPopup(x, y, page, canSplitActive());
+  fire(commands.chromeMenuPopup(x, y, page, canSplitActive()));
 }
 
 export function copyMenuTargetLink(): Promise<boolean> {

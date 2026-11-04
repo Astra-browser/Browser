@@ -29,6 +29,13 @@ const chromeEntry = await readFile(
   path.join(UI, "app", "chrome-entry", "browser-chrome.ts"),
   "utf8",
 );
+const proto = await readFile(
+  path.join(UI, "packages", "bridge", "src", "proto.ts"),
+  "utf8",
+);
+const baseline = JSON.parse(
+  await readFile(path.join(ROOT, "tests", "contract", "wire_baseline.json"), "utf8"),
+);
 
 let passed = 0;
 let failed = 0;
@@ -104,6 +111,42 @@ for (const name of [
 ]) {
   check(`${name} is routed`, routes.some((route) => route.name === name));
 }
+
+// No new gap: every command without a route, and every declared channel
+// without a forwarder, must already be in the recorded baseline. Adding a
+// control that calls an unrouted command now fails this guard.
+const commands = [
+  ...proto
+    .split("export const COMMANDS: readonly CommandName[] = [")[1]
+    .split("];")[0]
+    .matchAll(/"([a-z0-9_]+)"/gu),
+].map((match) => match[1]);
+const routed = new Set(routes.map((route) => route.name));
+const knownUnrouted = new Set(baseline.unrouted ?? []);
+const newGaps = commands.filter(
+  (name) => !routed.has(name) && !knownUnrouted.has(name),
+);
+check(
+  `no new unrouted command (${newGaps.length} new, ${knownUnrouted.size} known)`,
+  newGaps.length === 0,
+);
+for (const name of newGaps) console.error(`  ${name} has no route`);
+
+const channels = [
+  ...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu),
+].map((match) => match[1]);
+const forwardedChannels = new Set(
+  [...chromeEntry.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
+);
+const knownUnforwarded = new Set(baseline.unforwarded ?? []);
+const newChannels = [...new Set(channels)].filter(
+  (name) => !forwardedChannels.has(name) && !knownUnforwarded.has(name),
+);
+check(
+  `no new unforwarded channel (${newChannels.length} new, ${knownUnforwarded.size} known)`,
+  newChannels.length === 0,
+);
+for (const name of newChannels) console.error(`  ${name} is never forwarded`);
 
 console.log(
   `\nwire coverage: ${failed === 0 ? "PASS" : "FAIL"} (${passed} checks, ${failed} failed)`,

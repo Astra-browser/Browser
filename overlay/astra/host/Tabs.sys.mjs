@@ -98,6 +98,7 @@ function selectInternal(id) {
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap, selected: true });
+  emitTabChanged(id);
   return snap;
 }
 
@@ -131,6 +132,7 @@ export function __setFailure(astra_tab_id, failure = null) {
   if (!tab) return false;
   tab.failure = failure;
   emit("tab.updated", { astra_tab_id, failure });
+  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -142,6 +144,7 @@ export function __setCertificateException(astra_tab_id, accepted = false, origin
   tab.certificate_exception = accepted === true;
   tab.certificate_exception_origin = accepted === true ? origin : "";
   emit("tab.updated", { astra_tab_id, certificate_exception: tab.certificate_exception });
+  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -152,6 +155,7 @@ export function __setPageRequest(astra_tab_id, request = null) {
   if (!tab) return false;
   tab.page_request = request;
   emit("tab.updated", { astra_tab_id, page_request: request });
+  emitTabChanged(astra_tab_id);
   emitItemsChanged();
   return true;
 }
@@ -292,6 +296,7 @@ export function __applyExternalUpdate(id, patch = {}) {
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap });
+  emitTabChanged(id);
   emitItemsChanged();
   return snap;
 }
@@ -411,6 +416,12 @@ function tabView(id) {
     certificate_exception: tab.certificate_exception === true,
     audio: tab.muted ? { muted: true, can_mute: true } : null,
   };
+}
+
+/** Emit the per-tab delta on the contract channel (`tab-changed`). */
+export function emitTabChanged(astra_tab_id) {
+  const view = tabView(astra_tab_id);
+  if (view) emit("tab-changed", view);
 }
 
 /** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
@@ -821,6 +832,41 @@ export const Tabs = {
     return admitted(request_id, { astra_tab_id, discarded: false, url: tab.url });
   },
 
+  /**
+   * Answer the card standing in front of a tab: a blocked pop-up, an external
+   * app, or a page that stopped responding. Sign-in has its own route because
+   * it carries credentials.
+   */
+  async answerPageRequest({ request_id = "", astra_tab_id = "", answer = "" } = {}) {
+    const tab = _tabs.get(astra_tab_id);
+    if (!tab) {
+      return { ...err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`), accepted: false };
+    }
+    const request = tab.page_request;
+    if (!request || request.kind === "http_auth") {
+      // Already answered, or the wrong route for a sign-in card.
+      return {
+        request_id,
+        host_api_version: HOST_API_VERSION,
+        operation_id: null,
+        accepted: false,
+      };
+    }
+    if (answer !== "allow" && answer !== "always_allow" && answer !== "dismiss") {
+      return { ...err(request_id, "invalid_answer", "answer must be allow, always_allow or dismiss"), accepted: false };
+    }
+    // "Wait" is simply closing the card; the page keeps loading. "Reload" is
+    // allow on a hung page, and the content binding performs it.
+    __setPageRequest(astra_tab_id, null);
+    emit("page.request-answered", {
+      astra_tab_id,
+      kind: request.kind,
+      answer,
+      site: request.kind === "popup" || request.kind === "external_app" ? request.site : null,
+    });
+    return admitted(request_id, { astra_tab_id, answer });
+  },
+
   // Title updates from live progress listeners (Content binding) or the
   // core (session restore) flow through here so `tab.updated` fires.
   async setTitle({ request_id = "", astra_tab_id = "", title = "" } = {}) {
@@ -834,6 +880,7 @@ export const Tabs = {
     tab.title = title;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
+    emitTabChanged(astra_tab_id);
     // Live progress listeners land here. The sidebar and the window title are
     // painted from the projection, so a title the page reports has to reach
     // it or the row keeps saying "New Tab" for the life of the tab.
@@ -849,6 +896,8 @@ export const Tabs = {
     tab.muted = muted === true;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
+    emitTabChanged(astra_tab_id);
+    emitItemsChanged();
     // `settle()` needs an admission; Content applies the native mute. Keep the
     // standard envelope fields so the Host API v1 contract still holds.
     return {

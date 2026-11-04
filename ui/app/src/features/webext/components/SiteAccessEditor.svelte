@@ -11,6 +11,7 @@
   // svelte-ignore state_referenced_locally
   let sites = $state(extension.access === "sites" ? [...extension.sites] : []);
   let draft = $state("");
+  let pending = $state(false);
   let field = $state<HTMLInputElement>();
 
   onMount(() => field?.focus());
@@ -24,9 +25,16 @@
   }
 
   async function done() {
+    if (pending) return;
     if (draft.trim()) add();
-    await webext.setAccess(extension.id, "sites", sites);
-    onclose();
+    pending = true;
+    try {
+      await webext.setAccess(extension.id, "sites", sites);
+    } finally {
+      // A refused change must still close the editor, not strand it open.
+      pending = false;
+      onclose();
+    }
   }
 </script>
 
@@ -73,7 +81,9 @@
       }}
     />
     <Button size="compact" variant="secondary" type="submit">{m.webext_sites_add()}</Button>
-    <Button size="compact" variant="primary" onclick={() => void done()}>{m.webext_done()}</Button>
+    <Button size="compact" variant="primary" {pending} onclick={() => void done()}
+      >{m.webext_done()}</Button
+    >
   </form>
 </div>
 

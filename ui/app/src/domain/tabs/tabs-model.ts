@@ -89,12 +89,19 @@ export class TabProjectionModel {
     // Settings, then a new tab opened) still brings its tab up to date, but
     // the snapshot's choice of tab stands.
     const current = tab.projection_revision > this.#appliedGlobalRevision;
+    const index = this.#state.tabs.findIndex((candidate) => candidate.id === tab.id);
+    // The snapshot owns membership; a presentation for a tab it no longer
+    // holds is stale, and adopting it would strand a revision with no row.
+    if (index === -1) return false;
     if (!this.#admitTabRevision(tab)) return false;
 
-    const index = this.#state.tabs.findIndex((candidate) => candidate.id === tab.id);
     const tabs = this.#state.tabs.slice();
-    if (index !== -1) tabs[index] = tab;
-    this.#state = { ...this.#state, tabs, active: current ? active : this.#state.active };
+    tabs[index] = tab;
+    const nextActive =
+      current && (active === null || tabs.some((entry) => entry.id === active))
+        ? active
+        : this.#state.active;
+    this.#state = { ...this.#state, tabs, active: nextActive };
     return true;
   }
 

@@ -894,6 +894,16 @@ export const Content = {
         } catch {}
         return;
       }
+      if (event.type === "page.request-answered" && id) {
+        // "Reload" on a page that stopped responding; the other kinds are
+        // opened by the caller that raised them.
+        if (event.data?.kind === "unresponsive" && event.data?.answer !== "dismiss") {
+          try {
+            tabOf.get(id)?.linkedBrowser?.reload();
+          } catch {}
+        }
+        return;
+      }
       if (event.type === "nav.stopped" && id) {
         try { tabOf.get(id)?.linkedBrowser?.stop(); } catch {}
         return;

@@ -11,8 +11,31 @@
 // empty list and refuses actions, which is the honest "no engine" path.
 // Nothing here fabricates an extension or a state.
 
+import { __tabsState } from "./Tabs.sys.mjs";
+
 const REVIEWS = new Map();
 let _nextReview = 0;
+// The person's pinned toolbar actions. A pref, not a file: it is a view
+// preference, not extension state.
+const PINNED_PREF = "astra.webext.pinned";
+
+function pinnedIds() {
+  try {
+    const raw = Services.prefs.getStringPref(PINNED_PREF, "[]");
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function savePinnedIds(ids) {
+  try {
+    Services.prefs.setStringPref(PINNED_PREF, JSON.stringify([...ids]));
+  } catch {
+    // No profile prefs (Node tests).
+  }
+}
 
 async function fileUtils() {
   try {
@@ -64,7 +87,7 @@ function hasSiteAccess(addon) {
 }
 
 /** Pure mapper, exported for the contract test. */
-export function viewForAddon(addon, { profileId = "default" } = {}) {
+export function viewForAddon(addon, { profileId = "default", pinned = false } = {}) {
   if (!addon) return null;
   const disabled = addon.userDisabled === true;
   const failed = addon.appDisabled === true || addon.isActive !== true;
@@ -87,7 +110,7 @@ export function viewForAddon(addon, { profileId = "default" } = {}) {
     has_options: typeof addon.optionsURL === "string" && addon.optionsURL !== "",
     held_update: addon.pendingUpgrade?.version ?? null,
     sideloaded: addon.foreignInstall === true,
-    pinned: false,
+    pinned: pinned === true,
   };
 }
 
@@ -114,6 +137,7 @@ export const WebExtensions = {
     if (!manager) return [];
     try {
       const addons = await manager.getAddonsByTypes(["extension"]);
+      const pinned = pinnedIds();
       return addons
         .filter(
           (addon) =>
@@ -123,7 +147,7 @@ export const WebExtensions = {
             addon.hidden !== true &&
             typeof addon.id === "string"
         )
-        .map((addon) => viewForAddon(addon))
+        .map((addon) => viewForAddon(addon, { pinned: pinned.has(addon.id) }))
         .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch {
@@ -233,6 +257,146 @@ export const WebExtensions = {
       // Already cancelled or installed.
     }
     return undefined;
+  },
+
+  /** Pin or unpin an extension's toolbar action. */
+  async setPinned({ id = "", pinned = false } = {}) {
+    if (typeof id !== "string" || id === "") throw fail("no such extension");
+    const ids = pinnedIds();
+    if (pinned === true) ids.add(id);
+    else ids.delete(id);
+    if (ids.size > 3) throw fail("at most three actions can be pinned");
+    savePinnedIds(ids);
+    return null;
+  },
+
+  /** Reload a failed extension, which re-runs its startup. */
+  async retry({ installId = "", id = "" } = {}) {
+    const addon = await findAddon(installId || id);
+    if (!addon) throw fail("no such extension");
+    try {
+      await addon.reload();
+      return null;
+    } catch {
+      throw fail("the engine could not restart the extension");
+    }
+  },
+
+  /**
+   * Change what an extension may reach. Only permissions the extension
+   * declared as optional can be granted or revoked; a manifest grant is fixed
+   * and the engine refuses, which is reported rather than hidden.
+   */
+  async setAccess({ id = "", mode = "", sites = [] } = {}) {
+    const addon = await findAddon(id);
+    if (!addon) throw fail("no such extension");
+    let permissions = null;
+    try {
+      permissions = ChromeUtils.importESModule(
+        "resource://gre/modules/ExtensionPermissions.sys.mjs"
+      ).ExtensionPermissions;
+    } catch {
+      permissions = null;
+    }
+    if (!permissions) throw fail("the engine cannot change site access");
+    const origins = Array.isArray(sites) ? sites.filter((site) => typeof site === "string") : [];
+    try {
+      if (mode === "all") {
+        await permissions.add(id, { permissions: ["<all_urls>"], origins: ["<all_urls>"] });
+      } else if (mode === "sites" && origins.length > 0) {
+        await permissions.add(id, { permissions: [], origins });
+      } else {
+        const current = await permissions.get(id);
+        const revoke = [...(current?.origins ?? []), ...origins];
+        if (revoke.length > 0) {
+          await permissions.remove(id, { permissions: [], origins: revoke });
+        }
+      }
+      return null;
+    } catch {
+      throw fail("this extension's site access is fixed by its manifest");
+    }
+  },
+
+  /**
+   * The store listing's own button is drawn by Astra's chrome, so the host has
+   * nothing to move; answering `true` keeps the caller honest about delivery.
+   */
+  async storeButton() {
+    return true;
+  },
+
+  /** The access prompt is Astra's own; accepting it needs no native step. */
+  async answerAccess() {
+    return null;
+  },
+
+  /**
+   * Review the extension a store listing in `tabId` offers. Chrome Web Store
+   * packages (CRX) are not installable by this engine; AMO listings resolve to
+   * their signed XPI.
+   */
+  async prepare({ tabId = "" } = {}) {
+    const { tabs } = __tabsState();
+    const tab = tabs.get(String(tabId));
+    const url = tab?.url ?? "";
+    let parsed = null;
+    try {
+      parsed = new URL(url);
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.protocol !== "https:") throw fail("this page is not an extension listing");
+    const manager = await addonManager();
+    if (!manager) throw fail("the engine cannot install extensions");
+    let xpi = "";
+    if (
+      parsed.hostname === "addons.mozilla.org" ||
+      parsed.hostname === "addons-dev.allizom.org"
+    ) {
+      const slug = /^\/(?:[^/]+\/)?(?:firefox\/)?addon\/([^/]+)/.exec(parsed.pathname)?.[1] ?? "";
+      if (slug === "") throw fail("this page is not an extension listing");
+      xpi = `${parsed.origin}/firefox/downloads/latest/${slug}/latest.xpi`;
+    } else if (
+      parsed.hostname === "chromewebstore.google.com" ||
+      parsed.hostname === "chrome.google.com"
+    ) {
+      throw fail("Chrome Web Store packages cannot be installed in this browser");
+    } else {
+      throw fail("this page is not an extension listing");
+    }
+    let install = null;
+    try {
+      install = await manager.getInstallForURL(xpi, {});
+    } catch {
+      install = null;
+    }
+    if (!install) throw fail("the listing's package could not be read");
+    _nextReview += 1;
+    const reviewId = `ext-review-${_nextReview}`;
+    const review = reviewFor(reviewId, install, false);
+    REVIEWS.set(reviewId, { install, review });
+    return review;
+  },
+
+  /** Review a pending update for an installed extension. */
+  async reviewUpdate({ id = "" } = {}) {
+    const addon = await findAddon(id);
+    if (!addon) throw fail("no such extension");
+    const pending = addon.pendingUpgrade ?? null;
+    if (!pending) throw fail("this extension has no update waiting");
+    _nextReview += 1;
+    const reviewId = `ext-review-${_nextReview}`;
+    const review = {
+      ...reviewFor(reviewId, { addon: pending }, false),
+      id: String(addon.id ?? ""),
+      update: true,
+    };
+    REVIEWS.set(reviewId, {
+      install: { install: () => pending.install?.() ?? Promise.resolve() },
+      review,
+    });
+    return review;
   },
 
   /** Native picker: a folder (temporary add-on) or an .xpi file to review. */
