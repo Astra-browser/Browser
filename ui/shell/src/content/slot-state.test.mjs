@@ -89,6 +89,25 @@ describe("slotStateFor", () => {
     );
   });
 
+  it("hides the engine panel behind a failed page", () => {
+    assert.deepEqual(
+      slotStateFor({
+        type: "items-changed",
+        data: {
+          active: "t1",
+          tabs: [
+            {
+              id: "t1",
+              url: "https://bad.example/",
+              failure: { url: "https://bad.example/", reason: "insecure", covers_page: true },
+            },
+          ],
+        },
+      }),
+      { hasPage: false, loading: false },
+    );
+  });
+
   it("ignores navigation in a tab that is not in front", () => {
     const activeId = "tab-2";
     // A restoring background tab must not hide the page being read.

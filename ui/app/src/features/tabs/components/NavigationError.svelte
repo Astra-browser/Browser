@@ -45,7 +45,7 @@
   says what was wrong with it; only a host on the person's own network has a
   way past, behind details and a warning.
 -->
-<div class="failed-page" role="alert">
+<div class="failed-page" role="alert" data-astra-navigation-error>
   <h1>
     {failure.reason === "insecure"
       ? m.navigation_error_insecure_title({ host })

@@ -53,6 +53,31 @@ Live probe: `tools/perf/stress/http_auth_probe.py` — real 401, wrong password
 returns retry, right password loads the page, cancel clears, and no
 `commonDialog.xhtml` window ever appears.
 
+## Certificate errors (P6c-2)
+
+A refused certificate is an error-page navigation, not a permission request:
+
+- `Content.makeProgressListener` sees `LOCATION_CHANGE_ERROR_PAGE` and calls
+  `DialogPrompts.certErrorFor`, which reads the failed channel and its
+  `securityInfo` directly. Nothing page-controlled reaches the event.
+- The tab carries `failure: {url, reason:"insecure", certificate, can_continue,
+  covers_page}`; the shell drops `data-has-page` so the engine's error panel
+  never covers the app's interstitial.
+- `can_continue` is true only for an overridable error on the person's own
+  network (loopback, link-local, RFC1918, `*.local`, single-label hosts). A
+  public name is never continuable.
+- `tabs_continue_past_certificate` writes a **temporary**
+  `nsICertOverrideService` override, reloads, marks the tab
+  `certificate_exception`, and clears the override on the next commit — a true
+  one-load exception. Cancel writes nothing and keeps the failed page.
+- `mozilla.cfg` sets `security.certerror.hideAddException` and
+  `security.certerrors.permanentOverride=false` so the engine page cannot grant
+  a permanent override behind Astra's.
+
+Live probe: `tools/perf/stress/certificate_probe.py` — self-signed loopback
+TLS, app interstitial, continue loads the page and clears the override, cancel
+writes nothing.
+
 ## SECURITY — trust boundary
 
 Web content is an **untrusted principal**. A page that could grant itself

@@ -76,13 +76,18 @@ const done = arguments[arguments.length - 1];
     const answer = async (user, password) => {
       const card = await waitCard();
       if (card) {
-        const inputs = [...card.querySelectorAll("input")];
-        if (inputs.length >= 2) {
-          typeInto(inputs[0], user);
-          typeInto(inputs[1], password);
-          await wait(100);
-          const button = [...card.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes("Sign In"));
-          if (button) { button.click(); return "ui"; }
+        if (password === null) {
+          const cancelButton = [...card.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes("Cancel"));
+          if (cancelButton) { cancelButton.click(); return "ui"; }
+        } else {
+          const inputs = [...card.querySelectorAll("input")];
+          if (inputs.length >= 2) {
+            typeInto(inputs[0], user);
+            typeInto(inputs[1], password);
+            await wait(100);
+            const button = [...card.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes("Sign In"));
+            if (button) { button.click(); return "ui"; }
+          }
         }
       }
       const pending = host.DialogPrompts.pending()[0];

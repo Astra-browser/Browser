@@ -72,8 +72,11 @@ function snapshot(id) {
     // another origin (typed address, `Navigation.commit`) must never keep the
     // old site's reference in a projection.
     icon: tab.icon && originOf(tab.url) === tab.icon.origin ? tab.icon : null,
-    // P6c: the sign-in card the app renders under the address field.
+    // P6c: the sign-in card the app renders under the address field, and the
+    // failure an error page stands in front of.
     page_request: tab.page_request ?? null,
+    failure: tab.failure ?? null,
+    certificate_exception: tab.certificate_exception === true,
     index: _order.indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
@@ -107,6 +110,26 @@ export function __markPrivate(astra_tab_id, isPrivate) {
   const tab = _tabs.get(astra_tab_id);
   if (!tab) return false;
   tab.private = isPrivate === true;
+  return true;
+}
+
+/** The failed-page standing in front of a tab (P6c). `null` clears it. */
+export function __setFailure(astra_tab_id, failure = null) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return false;
+  tab.failure = failure;
+  emit("tab.updated", { astra_tab_id, failure });
+  emitItemsChanged();
+  return true;
+}
+
+/** Mark a page shown past a certificate the person accepted. */
+export function __setCertificateException(astra_tab_id, accepted = false) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return false;
+  tab.certificate_exception = accepted === true;
+  emit("tab.updated", { astra_tab_id, certificate_exception: tab.certificate_exception });
+  emitItemsChanged();
   return true;
 }
 
@@ -224,8 +247,10 @@ export function __applyExternalUpdate(id, patch = {}) {
     tab.title = patch.title;
   }
   if (typeof patch.url === "string" && patch.url !== "") {
-    // A navigation ends any sign-in prompt from the previous document.
+    // A navigation ends any sign-in prompt and failed page from the previous
+    // document.
     tab.page_request = null;
+    tab.failure = null;
     // An icon belongs to the site that produced it. Landing on another origin
     // (typed address, link, redirect) must clear it at once, or the old site's
     // mark stays on the new page until its own icon arrives.
@@ -361,6 +386,11 @@ function tabView(id) {
     // from another origin is a stale mark and is not projected.
     icon:
       tab.icon && originOf(tab.url) === tab.icon.origin ? tab.icon : null,
+    // P6c: the sign-in card and the failed page are part of the projection
+    // the app renders, not just the list/get view.
+    page_request: tab.page_request ?? null,
+    failure: tab.failure ?? null,
+    certificate_exception: tab.certificate_exception === true,
   };
 }
 

@@ -81,6 +81,8 @@ function commit(id, url, extra = {}) {
   const { tabs } = __tabsState();
   const tab = tabs.get(id);
   tab.url = url;
+  // Any real commit replaces the failed page standing in front of the tab.
+  tab.failure = null;
   // A commit is not the end of the load: the model commits the address the
   // moment the person asks for it, and the content binding keeps it loading
   // until the document lands. An external commit passes the browser's own
