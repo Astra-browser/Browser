@@ -326,10 +326,10 @@
     box-sizing: border-box;
     height: 32px;
     padding: 0 12px 6px;
-    color: var(--color-faint);
-    font-size: var(--text-label);
+    color: var(--color-muted);
+    font-size: var(--text-caption);
     font-weight: 600;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.02em;
   }
 
   [data-density="page"] .note-section {
@@ -395,10 +395,10 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 13.5px;
+    font-size: var(--text-body);
     font-weight: 600;
-    line-height: 19px;
-    letter-spacing: -0.008em;
+    line-height: 18px;
+    letter-spacing: -0.006em;
   }
 
   .note-row-title :global(svg) {
@@ -407,16 +407,15 @@
   }
 
   [data-density="page"] .note-row-title {
-    font-size: 14px;
-    line-height: 20px;
+    line-height: 19px;
   }
 
   .note-row-meta {
     display: flex;
     gap: 8px;
     color: var(--color-muted);
-    font-size: 12px;
-    line-height: 16px;
+    font-size: var(--text-caption);
+    line-height: 15px;
   }
 
   .note-row-meta time {
@@ -481,7 +480,7 @@
   .note-trash-hint {
     margin: 12px 20px 20px;
     color: var(--color-faint);
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     line-height: 16px;
     text-align: center;
   }

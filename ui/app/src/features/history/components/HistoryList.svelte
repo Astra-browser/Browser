@@ -199,7 +199,7 @@
 
   .scroller[data-density="page"] {
     padding-inline: max(var(--library-gutter), calc((100% - var(--library-column)) / 2));
-    padding-block-end: 24px;
+    padding-block-end: 32px;
   }
 
   .scroller[data-density="panel"] {
@@ -212,9 +212,9 @@
     gap: 8px;
     margin: 0;
     padding: 0 10px 6px;
-    font-size: var(--text-label);
-    font-weight: 550;
-    letter-spacing: 0.01em;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--color-muted);
     position: sticky;
     top: 0;
@@ -278,13 +278,13 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     text-align: end;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     color: var(--color-faint);
   }
 
   time {
     text-align: end;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     font-variant-numeric: tabular-nums;
     color: var(--color-faint);
   }
@@ -315,7 +315,7 @@
     padding: 10px;
     border: 0;
     background: none;
-    font-size: 12px;
+    font-size: var(--text-caption);
     color: var(--color-muted);
     text-align: center;
   }

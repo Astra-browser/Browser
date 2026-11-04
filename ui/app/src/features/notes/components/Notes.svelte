@@ -169,7 +169,8 @@
     background: transparent;
     color: var(--color-muted);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--text-body);
+    font-weight: 500;
     text-align: start;
     cursor: default;
     outline: none;
@@ -218,7 +219,7 @@
   .notes-empty h3 {
     margin: 0;
     color: var(--color-text);
-    font-size: 14px;
+    font-size: var(--text-body);
     font-weight: 600;
   }
 
@@ -227,8 +228,8 @@
     text-wrap: balance;
     margin: 0;
     color: var(--color-muted);
-    font-size: var(--text-body);
-    line-height: 19px;
+    font-size: var(--text-label);
+    line-height: 18px;
   }
 
   .empty-action {

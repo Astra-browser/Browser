@@ -264,7 +264,7 @@
 
   .note-blocked h3 {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--text-page-title);
     font-weight: 600;
   }
 
@@ -286,8 +286,9 @@
   .note-backlinks h4 {
     margin: 0 0 6px;
     color: var(--color-faint);
-    font-size: var(--text-label);
-    font-weight: 550;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .note-backlinks ul {

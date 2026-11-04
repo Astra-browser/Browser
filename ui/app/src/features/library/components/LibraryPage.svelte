@@ -33,3 +33,28 @@
         >{/key}{/if}
   </div>
 </section>
+
+<style>
+  /* The paper's gutters: 48px beside a wide column, 24px in a narrow one. */
+  .library-content {
+    padding: 40px clamp(24px, 5vw, 48px);
+  }
+
+  .library-content .settings-page-heading h1 {
+    font-size: var(--text-headline);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  @media (width <= 820px) {
+    .library-content {
+      padding: 28px 24px 40px;
+    }
+  }
+
+  @media (width <= 760px) {
+    .library-content {
+      padding: 24px 20px 40px;
+    }
+  }
+</style>

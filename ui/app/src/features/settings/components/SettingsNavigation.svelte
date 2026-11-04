@@ -74,3 +74,20 @@
       </div>{/each}
   </div>
 </nav>
+
+<style>
+  /* The rail keeps the page's typography: a quiet caption over the groups,
+     and rows set at the interface's own body size. The material, padding and
+     plates belong to the sidebar composition; only the type is stated here. */
+  .settings-sidebar-navigation .settings-nav-group h2 {
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .settings-sidebar-navigation .settings-nav-item {
+    min-block-size: 30px;
+    font-size: var(--text-body);
+    font-weight: 500;
+  }
+</style>

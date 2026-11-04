@@ -172,6 +172,18 @@
 </section>
 
 <style>
+  /* The paper's gutters: 48px beside a wide column, 24px in a narrow one. The
+     page never runs its groups into the edge of the card. */
+  .settings-page {
+    padding: 48px clamp(24px, 5cqi, 48px) 64px;
+  }
+
+  .settings-page-heading h1 {
+    font-size: var(--text-headline);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
   /* The rail's stand-in for a window too narrow to hold one. It is absent at
      every width that shows the sections panel, so the page keeps its single
      heading and nothing is offered twice. */
@@ -241,6 +253,19 @@
     .settings-compact-search {
       order: 2;
       flex-basis: 100%;
+    }
+  }
+
+  /* Narrow: the page keeps 24px, then 20px, of paper beside its column. */
+  @media (width <= 820px) {
+    .settings-page {
+      padding: 28px 24px 48px;
+    }
+  }
+
+  @media (width <= 760px) {
+    .settings-page {
+      padding: 24px 20px 44px;
     }
   }
 </style>
