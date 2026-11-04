@@ -26,6 +26,7 @@
     ontoggle,
     pageControls = true,
     launcher = false,
+    rail = false,
   }: {
     compact: boolean;
     ontoggle: () => void;
@@ -33,6 +34,8 @@
     pageControls?: boolean;
     /** Beside a tool panel, search stands where the shape toggle would. */
     launcher?: boolean;
+    /** The utility rail already holds the window's leading corner. */
+    rail?: boolean;
   } = $props();
 
   let active = $derived(tabs.activeTab());
@@ -144,7 +147,9 @@
     data-drag-region
     style:height="var(--titlebar-height)"
     style:padding-inline-start={lights
-      ? "var(--traffic-light-inset)"
+      ? rail
+        ? "max(0px, calc(var(--traffic-light-inset) - var(--rail-width)))"
+        : "var(--traffic-light-inset)"
       : launcher && IS_WINDOWS
         ? "0"
         : "var(--tab-inset)"}

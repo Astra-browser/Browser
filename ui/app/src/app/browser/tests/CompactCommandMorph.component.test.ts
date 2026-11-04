@@ -33,7 +33,7 @@ afterEach(() => {
 const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
 
 test("going to the rail and back carries the kept sites both ways", async () => {
-  await page.viewport(268, 700);
+  await page.viewport(312, 700);
   launch.dispose();
   await surface.init();
   await tabs.init();
@@ -68,14 +68,14 @@ test("going to the rail and back carries the kept sites both ways", async () => 
   await frame();
   expect(kept().getAnimations().length).toBeGreaterThan(0);
   // Native narrows the view after the change; the flights keep going.
-  await page.viewport(64, 700);
+  await page.viewport(108, 700);
   await new Promise((resolve) => setTimeout(resolve, 600));
 
   sidebar.setMode("default");
   await frame();
   await frame();
   expect(kept().getAnimations().length).toBeGreaterThan(0);
-  await page.viewport(268, 700);
+  await page.viewport(312, 700);
   await frame();
   await frame();
   expect(kept().getAnimations()[0]?.playState).toBe("running");
