@@ -301,8 +301,10 @@ Artifacts: `out/perf-quiet/SUMMARY.md`, `out/matrix-final2/*/summary.json`.
 | Scroll / switch | PASS | switch median 22.5 ms, p95 52.4 ms; scroll-step median 16.0 ms, p95 17.0 ms; rAF 21/s |
 | Blocker (in-process) | PASS | 131724 rules; p50 2.12 µs, p95 2.64 µs, p99 3.14 µs |
 
-UI tour (six static tabs, real clicks): new tab 33.7 ms, navigate 74.1 ms,
-tab switch 16.8–20.1 ms, sidebar 801 ms, Work 42 ms, Settings 1051 ms.
+UI tour (six static tabs, real clicks): new tab 29.4 ms, navigate 58.6 ms,
+tab switch 16.9–24.7 ms, sidebar 802 ms, Work 26 ms, Settings 1068 ms.
+The mixed-8 workload (2 video, 2 WebGL, 2 JS-burn, 2 static) passed every
+behaviour check on the same build.
 
 An earlier 2-run pass on the same build measured switch median 43.5 ms /
 p95 142.5 ms while a separate desktop Firefox session (17 processes) shared
