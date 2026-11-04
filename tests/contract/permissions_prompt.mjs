@@ -421,6 +421,61 @@ function fakeBrowser(spec = "https://a.example/") {
   check("a late answer closes the prompt", lastView().prompt === null);
 }
 
+// --- WebRTC (camera + microphone) -------------------------------------------
+{
+  reset();
+  let allowCalls = 0;
+  let cancelCalls = 0;
+  const persisted = [];
+  const token = Permissions.ask({
+    kinds: ["camera", "microphone"],
+    call_id: "call-1",
+    origin: "https://a.example",
+    item_id: "tab-1",
+    profile_id: "default",
+    rememberable: true,
+    allow: () => { allowCalls += 1; },
+    cancel: () => { cancelCalls += 1; },
+    persist: (allow, durable) => { persisted.push({ allow, durable }); return true; },
+  });
+  check("a WebRTC prompt carries both kinds", lastView().prompt.kinds.join(",") === "camera,microphone");
+  check("the schema accepts both kinds", validView(lastView()));
+  const admission = await Permissions.respond({
+    prompt_id: token,
+    profile_id: "default",
+    item_id: "tab-1",
+    decision: "allow_once",
+  });
+  check("one decision resolves a two-kind request", (await disposition(admission)).outcome === "applied");
+  check("allow runs once for the request", allowCalls === 1 && cancelCalls === 0);
+  check("persist sees the one-shot decision", persisted.length === 1 && persisted[0].durable === false);
+
+  const bad = Permissions.ask({
+    kinds: ["camera", "telepathy"],
+    origin: "https://a.example",
+    item_id: "tab-1",
+  });
+  check("an unknown kind in a list is refused", bad === null);
+}
+
+{
+  // A page that goes away cancels its pending WebRTC prompt.
+  reset();
+  let cancelled = 0;
+  Permissions.ask({
+    kinds: ["camera"],
+    call_id: "call-2",
+    origin: "https://a.example",
+    item_id: "tab-1",
+    cancel: () => { cancelled += 1; },
+  });
+  check("the WebRTC record is queued", Permissions.pending().length === 1);
+  check("cancelWebRTC finds the call", Permissions.cancelWebRTC("call-2") === true);
+  check("cancelWebRTC closes the prompt", lastView().prompt === null);
+  check("cancelWebRTC cancels the engine request", cancelled === 1);
+  check("an unknown call is a no-op", Permissions.cancelWebRTC("call-3") === false);
+}
+
 // --- Invalid descriptors -----------------------------------------------------
 {
   reset();

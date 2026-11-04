@@ -1,0 +1,151 @@
+Patch-Id: ASTRA-0008
+Title: Surface the Astra camera/microphone prompt from the WebRTC actor
+Tier: P2
+Upstream-Files: browser/actors/WebRTCParent.sys.mjs
+Intent: let Astra's own page-permission prompt answer camera/microphone requests for Astra tabs, instead of Firefox's webRTC-shareDevices doorhanger; the shell publishes one entry per window on Services, the actor hands the request to it and keeps the engine's grant/deny wiring
+Risk: medium (only Astra tabs whose window registered an entry are intercepted; screen share, audio capture, speaker picker, add-on prompts, unsafe delegation, insecure and non-http(s) requests, and the browser-chrome test harness keep the native prompt; the actor still owns device choice, OS permission, MediaManagerVideo, activateDevicePerm and webrtc:Allow/Deny)
+Test: forge lint; `tools/perf/stress/webrtc_permission_probe.py` (real getUserMedia over loopback: allow/deny/dismiss/auto-allow, Services.perms, sharing state, FakeDevice stream); engine browser-chrome WebRTC suite must still see the native doorhanger
+Verified-On: 153.6.0
+Removal-Plan: drop when the engine exposes a first-class permission-prompt integration point for getUserMedia, or when Astra no longer renders its own prompt
+---
+diff --git a/browser/actors/WebRTCParent.sys.mjs b/browser/actors/WebRTCParent.sys.mjs
+index d97d92add2..e1db22078b 100644
+--- a/browser/actors/WebRTCParent.sys.mjs
++++ b/browser/actors/WebRTCParent.sys.mjs
+@@ -121,6 +121,7 @@ export class WebRTCParent extends JSWindowActorParent {
+         if (browser) {
+           removePrompt(browser, aMessage.data);
+         }
++        astraCancelPermission(aMessage.data);
+         break;
+       }
+       case "webrtc:UpdateIndicators": {
+@@ -492,6 +493,34 @@ export class WebRTCParent extends JSWindowActorParent {
+   }
+ }
+ 
++// Astra owns the page-permission prompt for its own tabs. The shell publishes
++// one entry per window on Services (the actor runs in the shared parent module
++// loader, so it cannot import the shell's per-window module instance).
++function astraPermissionEntry(aBrowser) {
++  try {
++    const win =
++      aBrowser?.ownerDocument?.defaultView ?? aBrowser?.ownerGlobal ?? null;
++    const map = Services.astraPermissionWindows;
++    return win && map ? map.get(win) ?? null : null;
++  } catch {
++    return null;
++  }
++}
++
++function astraCancelPermission(aCallID) {
++  try {
++    const map = Services.astraPermissionWindows;
++    if (!map) {
++      return;
++    }
++    for (const entry of map.values()) {
++      entry.cancelWebRTC?.(aCallID);
++    }
++  } catch {
++    // No Astra window: the native path owns this request.
++  }
++}
++
+ function prompt(aActor, aBrowser, aRequest) {
+   let {
+     audioInputDevices,
+@@ -555,6 +584,93 @@ function prompt(aActor, aBrowser, aRequest) {
+     }
+   }
+ 
++  // Astra prompt (P6b-2): camera/microphone for an Astra tab. Screen sharing,
++  // audio capture, speaker selection, add-on prompts and unsafe delegation keep
++  // the native prompt because they need pickers/previews or show two origins.
++  const astraKinds = [];
++  if (requestTypes.includes("Camera")) {
++    astraKinds.push("camera");
++  }
++  if (requestTypes.includes("Microphone")) {
++    astraKinds.push("microphone");
++  }
++  const astraEntry = astraKinds.length > 0 ? astraPermissionEntry(aBrowser) : null;
++  if (
++    astraEntry?.askForWebRTC &&
++    !sharingScreen &&
++    !sharingAudio &&
++    !audioOutputDevices.length &&
++    !aRequest.secondOrigin &&
++    !principal.addonPolicy &&
++    aRequest.secure &&
++    (principal.schemeIs("http") || principal.schemeIs("https")) &&
++    !Services.prefs.getBoolPref("testing.browserTestHarness.running", false)
++  ) {
++    const grantedDevices = [];
++    const grant = async () => {
++      const camera = videoInputDevices[0] ?? null;
++      const microphone = audioInputDevices[0] ?? null;
++      if (camera) {
++        grantedDevices.push(camera.deviceIndex);
++        // Session permission so camera capture is allowed for this stream.
++        Services.perms.addFromPrincipal(
++          principal,
++          "MediaManagerVideo",
++          Services.perms.ALLOW_ACTION,
++          Services.perms.EXPIRE_SESSION
++        );
++        aActor.activateDevicePerm(
++          aRequest.windowID,
++          camera.mediaSource,
++          camera.rawId
++        );
++      }
++      if (microphone) {
++        grantedDevices.push(microphone.deviceIndex);
++        aActor.activateDevicePerm(
++          aRequest.windowID,
++          microphone.mediaSource,
++          microphone.rawId
++        );
++      }
++      if (!grantedDevices.length) {
++        aActor.denyRequest(aRequest);
++        return;
++      }
++      const havePermission = await aActor.checkOSPermission(
++        !!camera,
++        !!microphone,
++        false
++      );
++      if (!havePermission) {
++        aActor.denyRequestNoPermission(aRequest);
++        return;
++      }
++      aActor.sendAsyncMessage("webrtc:Allow", {
++        callID: aRequest.callID,
++        windowID: aRequest.windowID,
++        devices: grantedDevices,
++        suppressNotifications: false,
++      });
++    };
++    const owned = astraEntry.askForWebRTC({
++      browser: aBrowser,
++      principal,
++      origin: aRequest.origin,
++      callID: aRequest.callID,
++      kinds: astraKinds,
++      isAllowed: () => aActor.checkRequestAllowed(aRequest, principal),
++      grant,
++      deny: noOSPermission =>
++        noOSPermission
++          ? aActor.denyRequestNoPermission(aRequest)
++          : aActor.denyRequest(aRequest),
++    });
++    if (owned) {
++      return;
++    }
++  }
++
+   // If aBrowser is sidebar browser, its ownerDocument is sidebar panel document.
+   // We need top chrome window's document to access notification elements.
+   let chromeDoc = aBrowser.browsingContext.topChromeWindow?.document;

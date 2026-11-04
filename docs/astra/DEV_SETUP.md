@@ -85,8 +85,10 @@ no standalone fallback. The geometry probe is
 
 ## P6b permission prompt
 
-A page geolocation request shows the app's own `PagePermissionPrompt`. The live
-proof is `tools/perf/stress/permission_prompt_probe.py`: it serves two loopback
-origins, waits for the rendered prompt, clicks the real button, and asserts
-`Services.perms` plus the page's own `permissions.query` state. Camera and
-microphone still use Firefox's WebRTC prompt.
+A page geolocation request shows the app's own `PagePermissionPrompt`; camera
+and microphone requests reach the same prompt through
+`patches/ASTRA-0008-astra-webrtc-prompt.patch` (WebRTC actor). Live proofs:
+`tools/perf/stress/permission_prompt_probe.py` (geolocation, `Services.perms`,
+the page's own `permissions.query`) and
+`tools/perf/stress/webrtc_permission_probe.py` (getUserMedia with fake devices:
+allow/deny/once/dismiss/auto-allow, real stream or `NotAllowedError`).
