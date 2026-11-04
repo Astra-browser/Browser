@@ -107,10 +107,12 @@
   }
 
   /* The page menu is a menu, so it is drawn with the same recipe as every
-     other menu in the product: 22px panel, 34px rows and the same insets.
+     other menu in the product: 12px panel, 34px rows and the same insets.
      It stays solid (`--color-float`), like a Select's pop-up, because it
      floats over a web page the chrome cannot see through; the chrome's own
-     menus are the only ones that can afford glass. */
+     menus are the only ones that can afford glass. In the paper theme
+     `--color-float` is the same warm white, so the solid tier still reads as
+     the same material. */
   .shell-menu {
     position: fixed;
     box-sizing: border-box;
@@ -120,10 +122,12 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--menu-pad);
-    border-radius: var(--radius-menu);
+    border-radius: var(--radius-row);
     background: var(--color-float);
     color: var(--color-text);
-    box-shadow: var(--shadow-menu), var(--shine-top);
+
+    /* One rim and one soft drop, matching the shared menu surface. */
+    box-shadow: var(--shadow-menu);
     outline: none;
     animation:
       shell-menu-fade var(--motion-fast) var(--ease-out),
@@ -152,7 +156,7 @@
     min-height: var(--menu-row);
     padding: 6px var(--menu-item-inset);
     border: 0;
-    border-radius: calc(var(--radius-menu) - var(--menu-pad));
+    border-radius: var(--radius-inset);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -168,12 +172,12 @@
   }
 
   .shell-menu-item:disabled {
-    opacity: 0.45;
+    color: var(--color-faint);
   }
 
   .shell-menu-item:focus-visible,
   .shell-menu-item:hover:not(:disabled) {
-    background: var(--row-active);
+    background: var(--row-hover);
     outline: none;
   }
 
@@ -183,6 +187,12 @@
 
   .shell-menu-item[data-danger] {
     color: var(--color-danger);
+  }
+
+  /* An unavailable row is quiet even when it is destructive: the action cannot
+     be taken, so its colour must not read as available. */
+  .shell-menu-item[data-danger]:disabled {
+    color: var(--color-faint);
   }
 
   .shell-menu-item[data-danger]:focus-visible,
@@ -200,6 +210,10 @@
     color: var(--color-muted);
   }
 
+  .shell-menu-item:disabled .shell-menu-icon {
+    color: var(--color-faint);
+  }
+
   .shell-menu-label {
     flex: 1 1 auto;
     min-width: 0;
@@ -213,7 +227,7 @@
     margin-inline-start: auto;
     padding-inline-start: 28px;
     color: var(--color-faint);
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     font-variant-numeric: tabular-nums;
   }
 
@@ -226,7 +240,7 @@
      row rather than as a break in the list. */
   .shell-menu-separator {
     height: 1px;
-    margin: 5px calc(var(--menu-pad) * -1);
+    margin: 4px calc(var(--menu-pad) * -1);
     background: var(--color-menu-separator);
   }
 

@@ -104,4 +104,12 @@
       scale: 0.97;
     }
   }
+
+  /* The sheet still arrives, it just does not travel: the fade is the whole
+     motion when the person has asked for less. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      animation: interface-fade var(--motion-instant) linear both;
+    }
+  }
 </style>
