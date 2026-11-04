@@ -831,7 +831,6 @@
      reading of the same semantic tokens. The wallpaper stops are sampled from
      the reference so the chrome, the card and the ground stay one material. */
   --color-page: #f7f2e8;
-  --color-chrome: #efe8dc;
   --color-surface: #fffdf9;
   --color-raised: #fffdf9;
   --color-float: #fffdf9;
