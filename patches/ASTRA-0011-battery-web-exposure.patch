@@ -1,0 +1,26 @@
+Patch-Id: ASTRA-0011
+Title: Expose the Battery Status API to web content
+Tier: P2
+Upstream-Files: dom/webidl/Navigator.webidl
+Intent: let a page read charge level and charging state through navigator.getBattery(), which the owner asked for after a device-diagnostics site reported the API as unsupported; every other binding, the `dom.battery.enabled` pref (default true) and the platform HAL implementation stay untouched
+Risk: medium (fingerprinting surface: upstream marks getBattery ChromeOnly precisely because charge level and charging state are a weak but real device signal; the value is a browser hint, never battery health, and the API is pref-gated so a future default can disable it again without reverting this patch)
+Test: forge lint; `tools/perf/stress/battery_probe.py` (real page reads navigator.getBattery(): the promise resolves, `charging`/`level` are numbers in range, and the object is the engine's BatteryManager); `dom/battery/test` engine suite must still pass
+Verified-On: 153.6.0
+Removal-Plan: drop when upstream exposes getBattery to content again, or when the owner reverses D-39 and wants battery status hidden from pages
+---
+diff --git a/dom/webidl/Navigator.webidl b/dom/webidl/Navigator.webidl
+index d586dc5e43..822fc840c0 100644
+--- a/dom/webidl/Navigator.webidl
++++ b/dom/webidl/Navigator.webidl
+@@ -133,8 +133,9 @@ Navigator includes NavigatorGeolocation;
+ 
+ // http://www.w3.org/TR/battery-status/#navigatorbattery-interface
+ partial interface Navigator {
+-  // ChromeOnly to prevent web content from fingerprinting users' batteries.
+-  [Throws, ChromeOnly, Pref="dom.battery.enabled"]
++  // Astra: exposed to web content at the owner's request (decision D-39).
++  // Upstream keeps this ChromeOnly to stop battery-status fingerprinting.
++  [Throws, Pref="dom.battery.enabled"]
+   Promise<BatteryManager> getBattery();
+ };
+ 
