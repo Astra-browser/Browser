@@ -658,6 +658,8 @@
         Navigation: host.Navigation,
         Panes: host.Panes,
         Windows: host.Windows,
+        Metadata: host.Metadata,
+        __spacesState: host.__spacesState,
         Frame: Frame
           ? {
               version: Frame.FRAME_VERSION,
