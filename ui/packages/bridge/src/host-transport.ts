@@ -69,6 +69,7 @@ const ROUTES: Record<string, Route> = {
   tabs_close: ["Tabs", "close", TAB_ARG],
   tabs_activate: ["Tabs", "select", TAB_ARG],
   tabs_answer_sign_in: ["DialogPrompts", "answerAuth", TAB_ARG],
+  tabs_continue_past_certificate: ["DialogPrompts", "answerCert", TAB_ARG],
   tabs_navigate: ["Navigation", "loadURL", { ...TAB_ARG, input: "url" }],
   tabs_back: ["Navigation", "goBack", TAB_ARG],
   tabs_forward: ["Navigation", "goForward", TAB_ARG],

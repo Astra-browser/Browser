@@ -56,6 +56,11 @@ export function slotStateFor(event, { activeId = null } = {}) {
     // last tab just closed). Nothing of the space we came from belongs on
     // the stage, so this is a New Tab, not "leave it as it was".
     const active = data.active ? tabs.find((tab) => tab?.id === data.active) : null;
+    // A failed page stands in place of the page: the engine's own error panel
+    // must not cover the app's interstitial.
+    if (active?.failure?.covers_page === true) {
+      return NO_PAGE;
+    }
     if (!active || !isPageUrl(active.url)) {
       return NO_PAGE;
     }

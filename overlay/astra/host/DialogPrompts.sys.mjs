@@ -26,7 +26,12 @@
 import { addEventListener } from "./Events.sys.mjs";
 import { Dialogs } from "./Dialogs.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
-import { Tabs, __setPageRequest } from "./Tabs.sys.mjs";
+import {
+  Tabs,
+  __setPageRequest,
+  __setFailure,
+  __setCertificateException,
+} from "./Tabs.sys.mjs";
 
 const AUTH_SCHEMES = new Set(["basic", "digest"]);
 
@@ -38,8 +43,61 @@ const PREVIOUS_FAILED =
   typeof Ci !== "undefined" ? Ci.nsIAuthInformation.PREVIOUS_FAILED : 16;
 
 const _pending = new Map(); // numeric request -> pending record
+const _certPending = new Map(); // astra_tab_id -> certificate challenge
+const _certOverrides = new Map(); // astra_tab_id -> {host, port, originAttributes}
 let _nextRequest = 0;
 let _off = null;
+
+const CERT_OVERRIDE_SERVICE = "@mozilla.org/security/certoverride;1";
+const NSS_ERRORS_SERVICE = "@mozilla.org/nss_errors_service;1";
+
+function certificateProblem(code) {
+  const text = String(code ?? "").toUpperCase();
+  if (text.includes("EXPIRED")) return "expired";
+  if (text.includes("REVOKED")) return "revoked";
+  if (text.includes("DOMAIN") || text.includes("NAME")) return "name_mismatch";
+  if (text.includes("UNKNOWN_ISSUER") || text.includes("SELF_SIGNED")) return "untrusted";
+  return "other";
+}
+
+/** The person's own network: loopback, link-local, private ranges, and
+ *  single-label hosts. A public name is never continuable. */
+export function isLocalHost(host) {
+  const name = String(host ?? "").toLowerCase();
+  if (name === "") return false;
+  if (name === "localhost" || name.endsWith(".localhost") || name.endsWith(".local")) {
+    return true;
+  }
+  if (name === "::1" || name.startsWith("fe80:")) return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(name);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 127 || a === 10) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+  // A single-label intranet name has no public suffix.
+  return !name.includes(".");
+}
+
+function certKey(tabId) {
+  return typeof tabId === "string" ? tabId : "";
+}
+
+function clearOverride(tabId) {
+  const entry = _certOverrides.get(tabId);
+  if (!entry) return false;
+  _certOverrides.delete(tabId);
+  try {
+    const service = Cc[CERT_OVERRIDE_SERVICE].getService(Ci.nsICertOverrideService);
+    service.clearValidityOverride(entry.host, entry.port, entry.originAttributes);
+  } catch {
+    // The service or the override is already gone.
+  }
+  return true;
+}
 
 function sharedServices() {
   try {
@@ -93,6 +151,12 @@ function ensureWatch() {
         if (_pending.get(request)?.tabId === id) cancelPending(request);
       }
     }
+    if (event.type === "tab.closed") {
+      _certPending.delete(id);
+      clearOverride(id);
+    }
+    // The reload after "continue" commits: proceed-once ends here.
+    if (event.type === "nav.committed") clearOverride(id);
   });
 }
 
@@ -279,6 +343,143 @@ export const DialogPrompts = {
     return admit({ outcome: "applied", reason: "mutation_applied" });
   },
 
+  /**
+   * A certificate error page. Chrome derives every fact from the failed
+   * channel at this moment; the event/projection never carries engine text.
+   */
+  async certErrorFor({ browser = null, failedURI = "", tabId = "" } = {}) {
+    if (!browser || typeof failedURI !== "string" || failedURI === "") return false;
+    if (typeof tabId !== "string" || tabId === "") return false;
+    let uri = null;
+    let channel = null;
+    let securityInfo = null;
+    try {
+      uri = Services.io.newURI(failedURI);
+      if (!uri.schemeIs("https")) return false;
+      const global = browser.browsingContext?.currentWindowGlobal ?? null;
+      channel = global?.failedChannel ?? null;
+      securityInfo = channel?.securityInfo ?? null;
+    } catch {
+      return false;
+    }
+    if (!uri || !channel) return false;
+    const host = uri.host ?? "";
+    if (host === "") return false;
+    const port = uri.port > 0 ? uri.port : 443;
+    let originAttributes = {};
+    try {
+      originAttributes = channel.loadInfo?.originAttributes ?? {};
+    } catch {
+      originAttributes = {};
+    }
+    let code = "";
+    let overridable = false;
+    try {
+      code = securityInfo?.errorCodeString ?? "";
+      const nss = Cc[NSS_ERRORS_SERVICE].getService(Ci.nsINSSErrorsService);
+      overridable = nss.isErrorOverridable(channel.status) === true;
+    } catch {
+      overridable = false;
+    }
+    const certificate = certificateProblem(code);
+    const canContinue = overridable && isLocalHost(host);
+    const res = await Dialogs.requestCertError({
+      request_id: `cert-${tabId}`,
+      astra_tab_id: tabId,
+      url: failedURI,
+      code: code || certificate,
+      actor: "chrome",
+    });
+    if (res?.error) return false;
+    const dialogId = res.dialog?.dialog_id ?? "";
+    const cert = (() => {
+      try {
+        return securityInfo?.serverCert ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    _certPending.set(tabId, {
+      dialogId,
+      host,
+      port,
+      originAttributes,
+      cert,
+      canContinue,
+    });
+    __setFailure(tabId, {
+      url: failedURI,
+      reason: "insecure",
+      certificate,
+      can_continue: canContinue,
+      covers_page: true,
+    });
+    __setCertificateException(tabId, false);
+    return true;
+  },
+
+  /** Route target for `tabs_continue_past_certificate`. */
+  async answerCert({ astra_tab_id = "", decision = "proceed-once" } = {}) {
+    const pending = _certPending.get(certKey(astra_tab_id));
+    if (!pending) return refuse("invalid_scope");
+    if (decision !== "proceed-once" && decision !== "cancel") {
+      return refuse("invalid_input");
+    }
+    const res = await Dialogs.decideCert({
+      request_id: `cert-${astra_tab_id}`,
+      dialog_id: pending.dialogId,
+      decision,
+      actor: "chrome",
+    });
+    if (res?.error) return refuse("invalid_scope");
+    _certPending.delete(astra_tab_id);
+    if (decision === "cancel") {
+      return admit({ outcome: "no_op", reason: "state_unchanged" });
+    }
+    if (!pending.canContinue) {
+      // The engine refused the override; keep the failed page.
+      return admit({ outcome: "rejected", reason: "invalid_scope" });
+    }
+    let applied = false;
+    try {
+      const service = Cc[CERT_OVERRIDE_SERVICE].getService(Ci.nsICertOverrideService);
+      const cert = pending.cert;
+      if (!cert) return admit({ outcome: "rejected", reason: "native_dispatch_rejected" });
+      service.rememberValidityOverride(
+        pending.host,
+        pending.port,
+        pending.originAttributes,
+        cert,
+        true
+      );
+      _certOverrides.set(astra_tab_id, {
+        host: pending.host,
+        port: pending.port,
+        originAttributes: pending.originAttributes,
+      });
+      applied = true;
+    } catch {
+      applied = false;
+    }
+    if (!applied) return admit({ outcome: "rejected", reason: "native_dispatch_rejected" });
+    __setCertificateException(astra_tab_id, true);
+    try {
+      const browser = (() => {
+        for (const win of Services.wm.getEnumerator("navigator:browser")) {
+          const tab = [...win.gBrowser.tabs].find(
+            (candidate) => candidate.getAttribute("astra-tab-id") === astra_tab_id
+          );
+          if (tab) return tab.linkedBrowser;
+        }
+        return null;
+      })();
+      browser?.reload();
+    } catch {
+      // The tab went away; the override clears with it.
+    }
+    return admit({ outcome: "applied", reason: "mutation_applied" });
+  },
+
   /** Diagnostics/tests: what is waiting, without any credentials. */
   pending() {
     return [..._pending.values()].map((entry) => ({
@@ -290,6 +491,8 @@ export const DialogPrompts = {
 
   __resetForTests() {
     for (const request of [..._pending.keys()]) cancelPending(request, { notifyEngine: false });
+    for (const tabId of [..._certOverrides.keys()]) clearOverride(tabId);
+    _certPending.clear();
     _pending.clear();
     _nextRequest = 0;
     _off?.();

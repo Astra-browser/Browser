@@ -27,6 +27,7 @@ import {
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { releaseSpaceContext, userContextForSpace } from "./Containers.sys.mjs";
 import {
   ContentHide,
@@ -191,10 +192,13 @@ export function allowGlobalHistory(browser) {
 // contract tests can drive it with fakes and the live binding passes the
 // real tabbrowser mapping. `tabIdOf(browser)` maps a `<browser>` element
 // to its `astra_tab_id` (null when untracked).
-export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTitle } = {}) {
+const ERROR_PAGE_FLAG =
+  typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE : 0x2;
+
+export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTitle, onErrorPage } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
-    onLocationChange(browser, progress, _request, location) {
+    onLocationChange(browser, progress, _request, location, flags) {
       try {
         // Subframe navigations are not the tab's address; committing them
         // would rewrite the model URL/history on every ad or embed iframe.
@@ -203,6 +207,14 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
         }
         const id = tabIdOf ? tabIdOf(browser) : null;
         const url = location && location.spec ? location.spec : "";
+        // A refused certificate is an error page: the engine docshell reports
+        // the failed URI with this flag, before anything is committed.
+        if ((Number(flags) & ERROR_PAGE_FLAG) !== 0) {
+          if (id && typeof onErrorPage === "function") {
+            onErrorPage({ astra_tab_id: id, url, browser });
+          }
+          return;
+        }
         if (id && url) {
           // Tell the model whether the browser is still fetching, so the
           // stage's skeleton and the row's spinner survive an early commit.
@@ -717,6 +729,9 @@ export const Content = {
     };
     const progress = makeProgressListener({
       tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
+      onErrorPage: ({ astra_tab_id, url, browser }) => {
+        void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id });
+      },
     });
     gb.addTabsProgressListener(progress);
     gb.tabContainer.addEventListener("TabSelect", onSelect);
