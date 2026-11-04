@@ -173,6 +173,23 @@ def main():
             if st.get("title") == "FAST PAGE" and st.get("loading") is False:
                 break
             time.sleep(0.1)
+        # The engine publishes a page title as the native tab's `label`
+        # attribute (ESR 153 has no onTitleChange progress callback); the
+        # model must pick it up or every sidebar row stays blank.
+        model_title = None
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            listed = json.loads(m.execute_async(LIST)).get("tabs") or []
+            model_title = next(
+                (t.get("title") for t in listed if t.get("astra_tab_id") == tab["astra_tab_id"]),
+                None,
+            )
+            if model_title == "FAST PAGE":
+                break
+            time.sleep(0.15)
+        out["model_title"] = model_title
+        out["title_worked"] = model_title == "FAST PAGE"
+
         out["before_zoom"] = json.loads(m.execute(STATE))
         out["zoom_result"] = json.loads(m.execute_async(ZOOM, [tab["astra_tab_id"], 1.5]))
         time.sleep(0.7)
@@ -237,7 +254,8 @@ def main():
         shutil.rmtree(profile, ignore_errors=True)
     print(json.dumps(out, indent=2))
     ok = (
-        out.get("stop_worked")
+        out.get("title_worked")
+        and out.get("stop_worked")
         and out.get("stop_model_cleared")
         and out.get("zoom_worked")
         and out.get("hard_reload_worked")

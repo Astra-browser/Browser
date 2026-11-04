@@ -49,6 +49,9 @@ STAGE = """return JSON.stringify((() => {
   const slot = document.querySelector('[data-astra-content]');
   const tabbox = document.getElementById('tabbrowser-tabbox');
   const toolbox = document.getElementById('navigator-toolbox');
+  // The page itself must fill the stage. A block-laid-out tabbox makes the
+  // browser 25px tall while the tabbox rect still looks perfect.
+  const browser = (() => { try { return gBrowser.selectedBrowser; } catch (e) { return null; } })();
   const rect = (el) => {
     try {
       const r = el.getBoundingClientRect();
@@ -70,6 +73,7 @@ STAGE = """return JSON.stringify((() => {
     },
     slot: rect(slot),
     tabbox: rect(tabbox),
+    browser: rect(browser),
     tabboxStyle: style(tabbox),
     toolboxStyle: style(toolbox),
   };
@@ -141,6 +145,15 @@ def main():
                 if (st.get("slot") or {}).get("w"):
                     break
                 time.sleep(0.1)
+        # Wait for the page to fill the stage, then record it.
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            st = json.loads(m.execute(STAGE))
+            b = st.get("browser") or {}
+            t = st.get("tabbox") or {}
+            if (b.get("h") or 0) > 0 and abs((b.get("h") or 0) - (t.get("h") or 0)) <= 2:
+                break
+            time.sleep(0.15)
         out["stage"] = json.loads(m.execute(STAGE))
     finally:
         try:
@@ -158,6 +171,7 @@ def main():
     st = out.get("stage") or {}
     slot = st.get("slot") or {}
     tab = st.get("tabbox") or {}
+    browser = st.get("browser") or {}
     ok = (
         st.get("gbrowser") == "true"
         and st.get("mounted") == "true"
@@ -169,6 +183,10 @@ def main():
         and abs((slot.get("h") or 0) - (tab.get("h") or 0)) <= 2
         and (slot.get("w") or 0) > 0
         and (slot.get("h") or 0) > 0
+        # The page fills the stage, not a 25px strip at its top.
+        and abs((browser.get("w") or 0) - (tab.get("w") or 0)) <= 2
+        and abs((browser.get("h") or 0) - (tab.get("h") or 0)) <= 2
+        and (browser.get("h") or 0) > 0
     )
     return 0 if ok else 1
 

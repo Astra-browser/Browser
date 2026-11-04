@@ -1154,7 +1154,12 @@
     background: transparent;
   }
   :global(:root[data-astra-gbrowser="true"] #tabbrowser-tabbox) {
-    display: block !important;
+    /* The tabbox is the root of a flex chain (tabbox -> tabpanels ->
+       browserSidebarContainer -> browserContainer -> browserStack). Forcing
+       `block` collapses that chain: tabpanels computes 0 height and the page
+       paints in a 25px strip at the top of the stage. */
+    display: flex !important;
+    flex-direction: column;
     position: absolute;
     left: var(--astra-stage-x, 0px);
     top: var(--astra-stage-y, 0px);

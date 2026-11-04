@@ -687,6 +687,19 @@ export const Content = {
         __applyExternalUpdate(id, { loading: false });
         refreshIcon(id);
       }
+      // ESR 153 no longer calls `onTitleChange` on tab progress listeners; the
+      // engine publishes the title as the native tab's `label` attribute.
+      if (changed.includes("label")) {
+        let title = "";
+        try {
+          title = tab.label || tab.linkedBrowser?.contentTitle || "";
+        } catch {
+          title = "";
+        }
+        if (typeof title === "string" && title !== "") {
+          void Tabs.setTitle({ astra_tab_id: id, title });
+        }
+      }
     };
     gb.tabContainer.addEventListener("TabAttrModified", onAttr);
     const onSelect = () => {
