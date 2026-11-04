@@ -779,7 +779,7 @@
           // P5b: install the saved spaces before any tab exists, so a tab
           // adopted from SessionStore lands in a space that already exists.
           try {
-            await host.Metadata?.prepare?.({ private: privateWindow });
+            await host.Metadata?.prepare?.({ private: privateWindow, window_id: ownWindowId });
           } catch {
             // No core or no snapshot: the browser keeps its default space.
           }
@@ -796,8 +796,8 @@
           // Re-apply each restored tab's space and pin now that the native
           // mount adopted them, then keep the store current.
           try {
-            await host.Metadata?.restore?.({ private: privateWindow });
-            host.Metadata?.init?.({ private: privateWindow });
+            await host.Metadata?.restore?.();
+            host.Metadata?.init?.({ private: privateWindow, window_id: ownWindowId });
           } catch {
             // A failed restore leaves the tabs where the engine put them.
           }

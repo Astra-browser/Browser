@@ -45,8 +45,19 @@ const SAVE_EVENTS = new Set([
   "tab.space-changed",
   "tab.updated",
   "nav.committed",
+  "window.focused",
   "window.closed",
 ]);
+
+/** Only the focused window persists. Each window owns its own model, so an
+ *  unfocused window writing would replace the focused window's organisation
+ *  with a stale copy. Unknown focus is allowed; private always refuses. */
+export function shouldPersist({ private: isPrivate = false, windowId = "", focusedWindowId = "" } = {}) {
+  if (isPrivate === true) return false;
+  if (typeof windowId !== "string" || windowId === "") return true;
+  if (typeof focusedWindowId !== "string" || focusedWindowId === "") return true;
+  return focusedWindowId === windowId;
+}
 
 const DEFAULT_SPACE = {
   id: "space-1",
@@ -208,6 +219,7 @@ export function planRestore(snapshot, liveTabs = []) {
 // --- Chrome wiring -----------------------------------------------------------
 
 let _private = false;
+let _windowId = "";
 let _available = false;
 let _restored = false;
 let _snapshot = null;
@@ -253,7 +265,10 @@ function parseSnapshot(raw) {
 async function windowState() {
   const listed = await Windows.list({ request_id: "metadata-windows" });
   if (listed?.error || !Array.isArray(listed?.windows)) return null;
-  return listed.windows;
+  return {
+    windows: listed.windows,
+    focused_window_id: typeof listed.focused_window_id === "string" ? listed.focused_window_id : "",
+  };
 }
 
 export const Metadata = {
@@ -261,9 +276,10 @@ export const Metadata = {
    * Load the organisation snapshot and install the spaces before the model
    * bootstraps, so adopted native tabs land in an existing space.
    */
-  async prepare({ private: isPrivate = false } = {}) {
+  async prepare({ private: isPrivate = false, window_id: windowId = "" } = {}) {
     // A private window keeps nothing: no spaces restored, nothing written.
     _private = isPrivate === true;
+    _windowId = typeof windowId === "string" ? windowId : "";
     if (_private) {
       _available = false;
       return { state: "private" };
@@ -358,13 +374,16 @@ export const Metadata = {
       _lastError = "windows_unavailable";
       return { saved: false, reason: "windows_unavailable" };
     }
+    if (!shouldPersist({ private: _private, windowId: _windowId, focusedWindowId: windows.focused_window_id })) {
+      return { saved: false, reason: "not_focused" };
+    }
     const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
     const { spaces, active_space_id } = __spacesState();
     const snapshot = buildSnapshot({
       spaces,
       active_space_id,
       tabs: Array.isArray(listed?.tabs) ? listed.tabs : [],
-      windows,
+      windows: windows.windows,
       selected_tab_id: listed?.selected_tab_id ?? "",
     });
     // Nothing persistable yet: SessionStore may not have restored or loaded a
@@ -415,14 +434,19 @@ export const Metadata = {
   },
 
   /** Subscribe once and keep the store current after every organisation change. */
-  init({ private: isPrivate = _private } = {}) {
+  init({ private: isPrivate = _private, window_id: windowId = _windowId } = {}) {
     _private = isPrivate === true;
+    _windowId = typeof windowId === "string" ? windowId : _windowId;
     if (_private) return;
     if (_off !== null) return;
     _off = addEventListener((event) => {
       if (typeof event?.type !== "string") return;
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
-      if (event.type === "nav.committed") Metadata.retryRestore();
+        if (event.type === "nav.committed") Metadata.retryRestore();
+      // A newly focused window takes over writing.
+      if (event.type === "window.focused" && event.data?.window_id === _windowId) {
+        scheduleSave();
+      }
     });
     scheduleSave();
   },
@@ -432,6 +456,7 @@ export const Metadata = {
     _off?.();
     _off = null;
     _private = false;
+    _windowId = "";
     _available = false;
     _restored = false;
     _snapshot = null;
