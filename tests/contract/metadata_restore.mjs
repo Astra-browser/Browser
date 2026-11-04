@@ -16,7 +16,7 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Metadata, buildSnapshot, planRestore, isPersistableUrl } = await import(
+const { Metadata, buildSnapshot, planRestore, isPersistableUrl, shouldPersist } = await import(
   path.join(HOST, "Metadata.sys.mjs")
 );
 const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(
@@ -222,6 +222,15 @@ function tab(overrides) {
   check("round trip keeps two assignments", plan.assignments.length === 2);
   check("round trip keeps the Work space", plan.spaces.some((s) => s.name === "Work"));
   check("round trip keeps the pin", plan.assignments.some((a) => a.pinned === true));
+}
+
+// --- One writer: the focused window -----------------------------------------
+{
+  check("a focused public window persists", shouldPersist({ windowId: "win-1", focusedWindowId: "win-1" }) === true);
+  check("an unfocused window does not persist", shouldPersist({ windowId: "win-1", focusedWindowId: "win-2" }) === false);
+  check("a private window never persists", shouldPersist({ private: true, windowId: "win-1", focusedWindowId: "win-1" }) === false);
+  check("unknown focus does not block a save", shouldPersist({ windowId: "win-1", focusedWindowId: "" }) === true);
+  check("an unbound window id does not block a save", shouldPersist({ windowId: "", focusedWindowId: "win-2" }) === true);
 }
 
 // --- Deferred (lazy) restore ------------------------------------------------
