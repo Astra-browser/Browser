@@ -66,10 +66,11 @@ python3 tests/contract/shell_app_chrome.py                       # 17 live check
 
 The shell calls `Boot.launchCore` on mount with `astra.core.command`. It is
 empty by default, so the browser runs without a core and answers
-`unavailable`. For a dev core, point it at the binary in the profile
-(`user_pref("astra.core.command", "/absolute/path/to/astra-core");`) and
-restart. The `out/sidecar-stub` harness is the current test double; there is
-no packaged core binary yet.
+`unavailable`. For a dev core, point it at the built binary
+(`user_pref("astra.core.command", "/absolute/path/to/target/debug/astra-core");`)
+and restart. The browser passes `--db <profile>/astra/core.sqlite`; override it
+with `astra.core.database`. Build with `cargo build -p astra-core`; the probe is
+`tools/perf/stress/metadata_restore_probe.py`. See `docs/astra/CORE_STORE.md`.
 
 ## P4 stage dock
 

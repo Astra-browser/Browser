@@ -39,6 +39,7 @@ astra.jar:
   content/astra/res/host/Dialogs.sys.mjs (host/Dialogs.sys.mjs)
   content/astra/res/host/Permissions.sys.mjs (host/Permissions.sys.mjs)
   content/astra/res/host/Operations.sys.mjs (host/Operations.sys.mjs)
+  content/astra/res/host/Metadata.sys.mjs (host/Metadata.sys.mjs)
   content/astra/res/host/Helpers.sys.mjs (host/Helpers.sys.mjs)
   content/astra/res/host/Sidebar.sys.mjs (host/Sidebar.sys.mjs)
   content/astra/res/host/WebExtensions.sys.mjs (host/WebExtensions.sys.mjs)

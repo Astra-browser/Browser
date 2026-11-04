@@ -61,12 +61,12 @@ export class SidecarFrame {
  * itself so Node tests can construct one with a stub.
  */
 export class BootSidecar {
-  static async launch(command, { stderr = "ignore", subprocess = null } = {}) {
+  static async launch(command, { stderr = "ignore", subprocess = null, arguments: args = [] } = {}) {
     // Lazy: a Node import of this module must not resolve resource://.
     // `subprocess` is a test seam; production resolves the native module.
     const Subprocess =
       subprocess ?? (await import("resource://gre/modules/Subprocess.sys.mjs")).Subprocess;
-    const proc = await Subprocess.call({ command, stderr });
+    const proc = await Subprocess.call({ command, arguments: args, stderr });
     const sidecar = new BootSidecar(proc);
     try {
       let timer = 0;
@@ -162,13 +162,52 @@ let _corePromise = null;
 let _launchCore = null;
 let _shuttingDown = false;
 
+/**
+ * The sidecar is a process resource, but `resource://` modules are per
+ * document, so every window would otherwise launch its own core against the
+ * same SQLite file. The first window publishes the handle on `Services`;
+ * later windows share it. Node tests have no `Services` and keep module
+ * state.
+ */
+function sharedServices() {
+  try {
+    return typeof Services !== "undefined" && Services ? Services : null;
+  } catch {
+    return null;
+  }
+}
+
+function currentCore() {
+  const shared = sharedServices();
+  if (shared && "astraCore" in shared) return shared.astraCore;
+  return _core;
+}
+
+function setCore(core) {
+  _core = core;
+  const shared = sharedServices();
+  if (shared) shared.astraCore = core;
+}
+
+function currentLaunch() {
+  const shared = sharedServices();
+  if (shared && "astraCoreLaunch" in shared) return shared.astraCoreLaunch;
+  return _corePromise;
+}
+
+function setLaunch(promise) {
+  _corePromise = promise;
+  const shared = sharedServices();
+  if (shared) shared.astraCoreLaunch = promise;
+}
+
 /** Test seam: replace the native launcher with a handle factory. */
 export function __setCoreLauncherForTests(launcher) {
   _launchCore = typeof launcher === "function" ? launcher : null;
 }
 
-async function launchCoreHandle(command) {
-  return (_launchCore ?? BootSidecar.launch)(command);
+async function launchCoreHandle(command, args = []) {
+  return (_launchCore ?? BootSidecar.launch)(command, { arguments: args });
 }
 
 export const Boot = {
@@ -198,15 +237,15 @@ export const Boot = {
    * binary or dev build); without one the answer is an honest unavailable.
    * Concurrent callers share one launch; a dead handle is discarded.
    */
-  async launchCore({ request_id = "boot-core", command = "" } = {}) {
+  async launchCore({ request_id = "boot-core", command = "", arguments: args = [] } = {}) {
     if (_shuttingDown) {
       return err(request_id, "core_shutting_down", "the core is shutting down");
     }
-    if (_core?.alive) {
+    if (currentCore()?.alive) {
       return ok(request_id, { state: "running" });
     }
-    if (_core && !_core.alive) {
-      _core = null;
+    if (currentCore() && !currentCore().alive) {
+      setCore(null);
     }
     if (typeof command !== "string" || command.trim() === "") {
       return ok(request_id, {
@@ -214,30 +253,50 @@ export const Boot = {
         reason: "no core command configured",
       });
     }
-    if (!_corePromise) {
-      _corePromise = launchCoreHandle(command.trim())
-        .then((handle) => {
-          if (_shuttingDown) {
-            void handle.shutdown();
-            throw new Error("core shut down during launch");
-          }
-          _core = handle;
-          return handle;
-        })
-        .finally(() => {
-          _corePromise = null;
-        });
+    if (!currentLaunch()) {
+      setLaunch(
+        launchCoreHandle(command.trim(), Array.isArray(args) ? args : [])
+          .then((handle) => {
+            if (_shuttingDown) {
+              void handle.shutdown();
+              throw new Error("core shut down during launch");
+            }
+            setCore(handle);
+            return handle;
+          })
+          .finally(() => {
+            setLaunch(null);
+          }),
+      );
     }
     try {
-      await _corePromise;
-      if (!_core?.alive) {
-        _core = null;
+      await currentLaunch();
+      const core = currentCore();
+      if (!core?.alive) {
+        setCore(null);
         return err(request_id, "core_launch_failed", "core exited during startup");
       }
       return ok(request_id, { state: "running" });
     } catch (e) {
-      _core = null;
+      setCore(null);
       return err(request_id, "core_launch_failed", String(e));
+    }
+  },
+
+  /**
+   * One request to the launched core (P5b). Returns the raw reply envelope,
+   * or a `core_unavailable` error when no core is running; callers must treat
+   * a missing core as "unavailable", never as success.
+   */
+  async coreCall({ request_id = "", name = "", payload = {} } = {}) {
+    const core = currentCore();
+    if (!core?.alive) {
+      return { request_id, error: { code: "core_unavailable", message: "the core is not running" } };
+    }
+    try {
+      return await core.call(name, payload);
+    } catch (e) {
+      return { request_id, error: { code: "core_failed", message: String(e) } };
     }
   },
 
@@ -255,17 +314,17 @@ export const Boot = {
     try {
       // A launch in flight must settle (or time out) before we decide there
       // is no core. A hung handshake must not block quit forever.
-      if (_corePromise) {
+      if (currentLaunch()) {
         try {
           await Promise.race([
-            _corePromise,
+            currentLaunch(),
             new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
           ]);
         } catch {
           // Launch failure already cleared the handle.
         }
       }
-      const core = _core;
+      const core = currentCore();
       if (core) {
         try {
           await core.shutdown();
@@ -274,7 +333,7 @@ export const Boot = {
           // The process is gone or refused; shutdown still proceeds.
         }
       }
-      _core = null;
+      setCore(null);
     } finally {
       _shuttingDown = false;
     }
@@ -285,9 +344,9 @@ export const Boot = {
 
 // Test-only reset. A live core is stopped, not abandoned.
 export function __resetBootForTests() {
-  const core = _core;
-  _core = null;
-  _corePromise = null;
+  const core = currentCore();
+  setCore(null);
+  setLaunch(null);
   _launchCore = null;
   _shuttingDown = false;
   if (core) {
