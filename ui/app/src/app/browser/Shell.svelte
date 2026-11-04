@@ -630,33 +630,35 @@
     <!-- The page's own bar: navigation and the one address field, above the
          stage and never in the sidebar. The field is composed here, with the
          tray that acts on the page it names, and the bar only places it. -->
-    <ContentBar>
-      {#snippet field()}
-        <AddressField>
-          {#snippet trailing(page)}
-            <UtilityTray
-              label={page === null
-                ? m.utilities()
-                : page.warning
-                  ? m.site_info_label_status({ status: page.warning })
-                  : m.site_info_label()}
-              warning={page?.warning}
-              onopen={() => raiseForTray(true)}
-              onclose={() => raiseForTray(false)}
-            >
-              {#snippet children(open)}
-                {#snippet siteHead(name: string | null, control?: Snippet)}
-                  <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+    {#if !newTabShown}
+      <ContentBar>
+        {#snippet field()}
+          <AddressField>
+            {#snippet trailing(page)}
+              <UtilityTray
+                label={page === null
+                  ? m.utilities()
+                  : page.warning
+                    ? m.site_info_label_status({ status: page.warning })
+                    : m.site_info_label()}
+                warning={page?.warning}
+                onopen={() => raiseForTray(true)}
+                onclose={() => raiseForTray(false)}
+              >
+                {#snippet children(open)}
+                  {#snippet siteHead(name: string | null, control?: Snippet)}
+                    <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+                  {/snippet}
+                  <BlockerShield {open} head={page ? siteHead : undefined} />
+                  <ExtensionsSection />
+                  <SiteDetails {page} {open} />
                 {/snippet}
-                <BlockerShield {open} head={page ? siteHead : undefined} />
-                <ExtensionsSection />
-                <SiteDetails {page} {open} />
-              {/snippet}
-            </UtilityTray>
-          {/snippet}
-        </AddressField>
-      {/snippet}
-    </ContentBar>
+              </UtilityTray>
+            {/snippet}
+          </AddressField>
+        {/snippet}
+      </ContentBar>
+    {/if}
     {#if stageCard}<div class="stage-card" aria-hidden="true"></div>{/if}
     {#if browserPage.navigationFailed()}<div class="navigation-error" role="alert">
         {m.browser_nav_failed()}

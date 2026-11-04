@@ -280,20 +280,14 @@ test("a certificate the person continued past is not secure either", async () =>
     .toBeVisible();
 });
 
-test("a new tab has the panel too, for its extensions, with no site and no blocking to switch", async () => {
+test("a new tab keeps its own search bar and no address tray", async () => {
   native.extensions = true;
   const screen = await shell({ url: null });
-  await screen.getByRole("button", { name: "Utilities" }).click();
-  const panel = screen.getByRole("group", { name: "Utilities" });
-  await expect.element(panel.getByRole("button", { name: "Manage extensions" })).toBeVisible();
-  await expect.element(panel.getByRole("switch")).not.toBeInTheDocument();
-  await expect.element(panel.getByRole("img")).not.toBeInTheDocument();
-  await expect
-    .element(panel.getByRole("button", { name: "Clear data for this site…" }))
-    .not.toBeInTheDocument();
-  expect(panel.element().textContent).not.toMatch(/\b42\b/u);
-  expect(native.list).not.toHaveBeenCalled();
-  expect(native.stats).not.toHaveBeenCalled();
+  // The main-page bar is the new tab's own frozen search field; the shell
+  // address form is not rendered over it.
+  expect(screen.container.querySelector("[data-astra-address]")).toBeNull();
+  expect(screen.container.querySelector("[data-content-bar]")).toBeNull();
+  expect(screen.container.querySelector("main#astra-stage")).not.toBeNull();
 });
 
 test("Escape closes the panel and returns to the glyph", async () => {
