@@ -191,6 +191,13 @@
       // Without the integration the engine keeps its own prompt; nothing is
       // silently granted because of this failure.
     }
+    // P6c: HTTP auth becomes the app's sign-in card. Without this the engine
+    // dialog would answer, which the product forbids.
+    try {
+      await host.DialogPrompts?.install?.({ window: win });
+    } catch {
+      // No dialog bridge: the engine keeps its own prompt.
+    }
 
     // P4: the native tabbrowser deck is the product path. The stage follows
     // the Astra content slot; mountNative marks it mounted once gBrowser owns
@@ -900,6 +907,11 @@
       // another tab's permission prompt.
       try {
         void host.Permissions?.uninstall?.({ window: win });
+      } catch {
+        // Already gone with the window.
+      }
+      try {
+        void host.DialogPrompts?.uninstall?.({ window: win });
       } catch {
         // Already gone with the window.
       }

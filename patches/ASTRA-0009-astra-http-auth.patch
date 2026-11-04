@@ -1,0 +1,56 @@
+Patch-Id: ASTRA-0009
+Title: Let Astra answer HTTP auth for its own tabs
+Tier: P2
+Upstream-Files: toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
+Intent: replace the engine's tab-modal auth dialog with Astra's sign-in card for Astra tabs; the shell publishes one entry per window on Services, and a non-Astra tab keeps the engine prompt
+Risk: medium (one call site; saved-login prefill, retry bookkeeping and the save-password prompt stay upstream; unsupported NTLM/Negotiate challenges are cancelled by Astra rather than shown natively)
+Test: forge lint; `tools/perf/stress/http_auth_probe.py` (real 401 over loopback: card appears, wrong password retries, right password loads the page, cancel clears, no commonDialog window); `dialog_prompts_auth.mjs` contract
+Verified-On: 153.6.0
+Removal-Plan: drop when the engine exposes a first-class HTTP-auth prompt integration point, or when Astra stops rendering its own sign-in card
+---
+diff --git a/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs b/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
+index 0522aec971..d922fe30ff 100644
+--- a/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
++++ b/toolkit/components/passwordmgr/LoginManagerAuthPrompter.sys.mjs
+@@ -735,13 +735,34 @@ LoginManagerAuthPrompter.prototype = {
+         );
+       }
+ 
+-      ok = await Services.prompt.asyncPromptAuth(
+-        this._browser?.browsingContext,
+-        Ci.nsIPrompt.MODAL_TYPE_TAB,
+-        aChannel,
+-        aLevel,
+-        aAuthInfo
+-      );
++      // Astra owns the sign-in UI for its own tabs. The shell publishes one
++      // entry per window on Services; a non-Astra tab (or an Astra window with
++      // no entry) keeps the engine prompt.
++      let astraEntry = null;
++      try {
++        const astraWindow = this._browser?.ownerDocument?.defaultView ?? null;
++        astraEntry = astraWindow
++          ? Services.astraDialogWindows?.get(astraWindow) ?? null
++          : null;
++      } catch (e) {
++        astraEntry = null;
++      }
++      const astraOwned = astraEntry
++        ? astraEntry.promptAuth({
++            browser: this._browser,
++            channel: aChannel,
++            authInfo: aAuthInfo,
++          })
++        : null;
++      ok = astraOwned
++        ? await astraOwned
++        : await Services.prompt.asyncPromptAuth(
++            this._browser?.browsingContext,
++            Ci.nsIPrompt.MODAL_TYPE_TAB,
++            aChannel,
++            aLevel,
++            aAuthInfo
++          );
+     }
+ 
+     let [username, password] = this._GetAuthInfo(aAuthInfo);
