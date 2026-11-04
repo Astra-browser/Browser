@@ -165,8 +165,19 @@
     // the instance travels there rather than through a cross-compartment
     // expando.
     try {
-      const services = (frameRoot?.ownerDocument?.defaultView ?? null)?.Services;
-      if (services) services.astraHost = host;
+      const chromeWindow = frameRoot?.ownerDocument?.defaultView ?? null;
+      const services = chromeWindow?.Services;
+      if (services) {
+        services.astraHost = host;
+        // The process-wide slot alone would let a late frame bind to another
+        // window's model. Keep the exact window's instance too.
+        let hosts = services.astraHosts;
+        if (typeof hosts?.get !== "function") {
+          hosts = new WeakMap();
+          services.astraHosts = hosts;
+        }
+        if (chromeWindow) hosts.set(chromeWindow, host);
+      }
     } catch {
       // No Services in a preview DOM: the app falls back to its own import.
     }
@@ -213,6 +224,8 @@
     // shape and bounds; the shell supplies the document read.
     try {
       host.PageSource?.setDriver?.(async (tabId) => {
+        // Never read a private window's page from chrome.
+        if (privateWindow) return null;
         const list = await host.Tabs.list({ request_id: newRequestId() });
         const tab = (list.tabs ?? []).find((t) => t.astra_tab_id === tabId);
         if (!tab) return null;

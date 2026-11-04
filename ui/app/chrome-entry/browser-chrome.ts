@@ -177,6 +177,7 @@ try {
     "ui-command": "astra:ui-command",
     "operation-processed": "astra:operation-processed",
     "page-permission-prompt-changed": "astra:page-permission-prompt",
+    "nav.find-result": "astra:find",
     "runtime-status-changed": "astra:runtime-status",
     "blocker-status-changed": "astra:blocker-status",
     "focus-changed": "astra:focus",
@@ -196,7 +197,16 @@ try {
   };
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {
-      window.dispatchEvent(new CustomEvent(dom, { detail: event.payload }));
+      const payload = event.payload as Record<string, unknown> | null;
+      const detail =
+        wire === "nav.find-result" && payload
+          ? {
+              query: payload.query,
+              matches: payload.matchCount,
+              active: payload.activeMatch ? payload.activeMatch : null,
+            }
+          : event.payload;
+      window.dispatchEvent(new CustomEvent(dom, { detail }));
       if (wire === "items-changed" && !revealed) {
         waitForStablePaint();
       }

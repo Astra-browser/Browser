@@ -80,14 +80,23 @@ export async function answerAccess(allowed: boolean): Promise<void> {
   const current = accessQueue[0];
   if (current === undefined || answering) return;
   answering = true;
-  const result = await commands.webExtensionAnswerAccess(current, allowed);
-  answering = false;
-  accessQueue = accessQueue.slice(1);
-  if (result.status !== "ok") failure = result.error;
+  try {
+    const result = await commands.webExtensionAnswerAccess(current, allowed);
+    if (result.status !== "ok") failure = result.error;
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  } finally {
+    accessQueue = accessQueue.slice(1);
+    answering = false;
+  }
 }
 
+let listed = 0;
+
 export async function refresh(): Promise<void> {
+  const epoch = ++listed;
   const result = await commands.webExtensionList();
+  if (epoch !== listed) return;
   if (result.status === "ok") {
     available = true;
     installed = Array.isArray(result.data) ? result.data : [];
@@ -142,17 +151,24 @@ export async function confirm(reviewId: string): Promise<void> {
   const current = pendingReview;
   if (current === null || current.review_id !== reviewId || confirming) return;
   confirming = true;
-  const result = await commands.webExtensionConfirm(current.id, current.review_id);
-  confirming = false;
-  if (result.status === "ok") {
-    if (pendingReview?.review_id === current.review_id) {
-      pendingReview = null;
-      failure = null;
+  try {
+    const result = await commands.webExtensionConfirm(current.id, current.review_id);
+    if (result.status === "ok") {
+      if (pendingReview?.review_id === current.review_id) {
+        pendingReview = null;
+        failure = null;
+      }
+      settling = current.id;
+      await refresh();
+    } else if (pendingReview?.review_id === current.review_id) {
+      failure = result.error;
     }
-    settling = current.id;
-    await refresh();
-  } else if (pendingReview?.review_id === current.review_id) {
-    failure = result.error;
+  } catch (error) {
+    if (pendingReview?.review_id === current.review_id) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+  } finally {
+    confirming = false;
   }
 }
 
@@ -202,4 +218,23 @@ export async function uninstall(id: string): Promise<void> {
   const result = await commands.webExtensionUninstall(id);
   failure = result.status === "ok" ? null : result.error;
   await refresh();
+}
+
+/** Clear timers and transient flags; the window is going away or remounting. */
+export function dispose(): void {
+  listed += 1;
+  clearTimeout(refreshTimer);
+  clearTimeout(removalTimer);
+  refreshTimer = undefined;
+  removalTimer = undefined;
+  accessQueue = [];
+  preparing = false;
+  confirming = false;
+  answering = false;
+  settling = null;
+  pendingReview = null;
+  failure = null;
+  available = null;
+  installed = [];
+  removalAsked = null;
 }

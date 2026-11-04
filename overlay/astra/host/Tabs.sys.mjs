@@ -53,6 +53,10 @@ function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
 }
 
+function admitted(request_id, data = {}) {
+  return { request_id, host_api_version: HOST_API_VERSION, operation_id: null, accepted: true, ...data };
+}
+
 function err(request_id, code, message) {
   return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
@@ -113,6 +117,14 @@ export function __markPrivate(astra_tab_id, isPrivate) {
   return true;
 }
 
+/** Clear a card only if it still belongs to `request` (stale answer safety). */
+export function __clearPageRequest(astra_tab_id, request) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return false;
+  if (tab.page_request?.request !== request) return false;
+  return __setPageRequest(astra_tab_id, null);
+}
+
 /** The failed-page standing in front of a tab (P6c). `null` clears it. */
 export function __setFailure(astra_tab_id, failure = null) {
   const tab = _tabs.get(astra_tab_id);
@@ -124,10 +136,11 @@ export function __setFailure(astra_tab_id, failure = null) {
 }
 
 /** Mark a page shown past a certificate the person accepted. */
-export function __setCertificateException(astra_tab_id, accepted = false) {
+export function __setCertificateException(astra_tab_id, accepted = false, origin = "") {
   const tab = _tabs.get(astra_tab_id);
   if (!tab) return false;
   tab.certificate_exception = accepted === true;
+  tab.certificate_exception_origin = accepted === true ? origin : "";
   emit("tab.updated", { astra_tab_id, certificate_exception: tab.certificate_exception });
   emitItemsChanged();
   return true;
@@ -251,6 +264,11 @@ export function __applyExternalUpdate(id, patch = {}) {
     // document.
     tab.page_request = null;
     tab.failure = null;
+    // An accepted bad certificate belongs to the origin it was accepted for.
+    if (tab.certificate_exception && originOf(patch.url) !== tab.certificate_exception_origin) {
+      tab.certificate_exception = false;
+      tab.certificate_exception_origin = "";
+    }
     // An icon belongs to the site that produced it. Landing on another origin
     // (typed address, link, redirect) must clear it at once, or the old site's
     // mark stays on the new page until its own icon arrives.
@@ -391,6 +409,7 @@ function tabView(id) {
     page_request: tab.page_request ?? null,
     failure: tab.failure ?? null,
     certificate_exception: tab.certificate_exception === true,
+    audio: tab.muted ? { muted: true, can_mute: true } : null,
   };
 }
 
@@ -483,7 +502,7 @@ export const Tabs = {
       selectInternal(astra_tab_id);
     }
     emitItemsChanged();
-    return ok(request_id, { astra_tab_id, url, window_id });
+    return admitted(request_id, { astra_tab_id, url, window_id });
   },
 
   async select({ request_id = "", astra_tab_id = "" } = {}) {
@@ -499,7 +518,7 @@ export const Tabs = {
     }
     const snap = selectInternal(astra_tab_id);
     emitItemsChanged();
-    return ok(request_id, { astra_tab_id, url: snap.url, window_id: snap.window_id });
+    return admitted(request_id, { astra_tab_id, url: snap.url, window_id: snap.window_id });
   },
 
   async close({ request_id = "", astra_tab_id = "" } = {}) {
@@ -535,7 +554,7 @@ export const Tabs = {
       }
     }
     emitItemsChanged();
-    return ok(request_id, { closed: existed });
+    return admitted(request_id, { closed: existed });
   },
 
   // --- Spaces -------------------------------------------------------------
@@ -583,7 +602,7 @@ export const Tabs = {
       _history.delete(id);
       const i = _order.indexOf(id);
       if (i >= 0) _order.splice(i, 1);
-      emit("tab.closed", { astra_tab_id: id, window_id: DEFAULT_WINDOW_ID });
+      emit("tab.closed", { astra_tab_id: id, window_id: _tabs.get(id)?.window_id ?? DEFAULT_WINDOW_ID });
     }
     _spaces.splice(at, 1);
     emit("space.deleted", { space });
@@ -707,7 +726,7 @@ export const Tabs = {
     emit("tab.moved", { astra_tab_id, from_index: from, to_index: clamped });
     // The projection owns sidebar order, so a moved row has to reach it.
     emitItemsChanged();
-    return ok(request_id, { astra_tab_id, index: clamped });
+    return admitted(request_id, { astra_tab_id, index: clamped });
   },
 
   // Fork a tab: same URL/history, new id, placed next to the source.
@@ -745,7 +764,11 @@ export const Tabs = {
     // `create` announced the fork before the title/history were copied; the
     // sidebar would otherwise show the new row as an untitled blank.
     emitItemsChanged();
-    return ok(request_id, { astra_tab_id: dupId, url: src.url, source_tab_id: astra_tab_id });
+    return admitted(request_id, {
+      astra_tab_id: dupId,
+      url: src.url,
+      source_tab_id: astra_tab_id,
+    });
   },
 
   async pin({ request_id = "", astra_tab_id = "" } = {}) {
@@ -755,7 +778,7 @@ export const Tabs = {
     }
     tab.pinned = true;
     emit("tab.pinned", { astra_tab_id });
-    return ok(request_id, { astra_tab_id, pinned: true });
+    return admitted(request_id, { astra_tab_id, pinned: true });
   },
 
   async unpin({ request_id = "", astra_tab_id = "" } = {}) {
@@ -765,7 +788,7 @@ export const Tabs = {
     }
     tab.pinned = false;
     emit("tab.unpinned", { astra_tab_id });
-    return ok(request_id, { astra_tab_id, pinned: false });
+    return admitted(request_id, { astra_tab_id, pinned: false });
   },
 
   // Sleep a tab (live: `gBrowser.discardBrowser`). Keeps history +
@@ -777,7 +800,7 @@ export const Tabs = {
     }
     tab.discarded = true;
     emit("tab.discarded", { astra_tab_id });
-    return ok(request_id, { astra_tab_id, discarded: true });
+    return admitted(request_id, { astra_tab_id, discarded: true });
   },
 
   async wakeup({ request_id = "", astra_tab_id = "" } = {}) {
@@ -787,7 +810,7 @@ export const Tabs = {
     }
     tab.discarded = false;
     emit("tab.restored", { astra_tab_id, url: tab.url });
-    return ok(request_id, { astra_tab_id, discarded: false, url: tab.url });
+    return admitted(request_id, { astra_tab_id, discarded: false, url: tab.url });
   },
 
   // Title updates from live progress listeners (Content binding) or the

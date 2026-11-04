@@ -146,10 +146,21 @@ export const WebExtensions = {
   async uninstall({ id = "" } = {}) {
     const addon = await findAddon(id);
     if (!addon) throw fail("no such extension");
+    const manager = await addonManager();
+    let timer = 0;
     const removed = new Promise((resolve) => {
+      const finish = (value) => {
+        clearTimeout(timer);
+        try {
+          manager?.removeAddonListener?.(listener);
+        } catch {
+          // Already gone.
+        }
+        resolve(value);
+      };
       const listener = {
         onUninstalled(uninstalled) {
-          if (uninstalled?.id === id) resolve(true);
+          if (uninstalled?.id === id) finish(true);
         },
         onUninstalling() {},
         onInstalling() {},
@@ -160,11 +171,11 @@ export const WebExtensions = {
         onDisabled() {},
       };
       try {
-        addon.manager?.addAddonListener?.(listener);
+        manager?.addAddonListener?.(listener);
       } catch {
         // The manager may not expose listeners in this build.
       }
-      setTimeout(() => resolve(false), 5000);
+      timer = setTimeout(() => finish(false), 5000);
     });
     try {
       await addon.uninstall();
@@ -196,13 +207,13 @@ export const WebExtensions = {
   },
 
   /** Install the package the review named. */
-  async confirm({ id = "", reviewId = "" } = {}) {
-    const entry = REVIEWS.get(reviewId);
+  async confirm({ id = "", review_id = "", reviewId = "" } = {}) {
+    const entry = REVIEWS.get(review_id || reviewId);
     if (!entry) throw fail("this review is no longer available");
     if (id !== "" && entry.review.id !== "" && id !== entry.review.id) {
       throw fail("the package does not match the review");
     }
-    REVIEWS.delete(reviewId);
+    REVIEWS.delete(review_id || reviewId);
     try {
       await entry.install.install();
       return null;
@@ -212,10 +223,10 @@ export const WebExtensions = {
   },
 
   /** Drop a review without installing. */
-  async cancel({ reviewId = "" } = {}) {
-    const entry = REVIEWS.get(reviewId);
+  async cancel({ review_id = "", reviewId = "" } = {}) {
+    const entry = REVIEWS.get(review_id || reviewId);
     if (!entry) return undefined;
-    REVIEWS.delete(reviewId);
+    REVIEWS.delete(review_id || reviewId);
     try {
       entry.install.cancel();
     } catch {

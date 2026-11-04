@@ -29,7 +29,7 @@ export function position(now: number): number {
 export function init(): Promise<void> {
   if (initializing) return initializing;
   const generation = ++lifecycle;
-  initializing = events.mediaPlayerChanged
+  const task = events.mediaPlayerChanged
     .listen((event) => {
       if (generation === lifecycle)
         held = event.payload ? { view: event.payload, at: performance.now() } : null;
@@ -38,7 +38,14 @@ export function init(): Promise<void> {
       if (generation === lifecycle) unlisten = stop;
       else stop();
     });
-  return initializing;
+  initializing = task;
+  void task
+    .finally(() => {
+      // A failed listen must not poison every later init.
+      if (initializing === task) initializing = null;
+    })
+    .catch(() => {});
+  return task;
 }
 
 export function dispose() {

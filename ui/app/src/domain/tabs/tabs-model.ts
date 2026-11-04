@@ -49,6 +49,11 @@ export class TabProjectionModel {
     if (candidate.projection_revision <= this.#appliedGlobalRevision) return false;
 
     this.#appliedGlobalRevision = candidate.projection_revision;
+    // Closed tabs must not keep a revision forever.
+    const liveIds = new Set(candidate.tabs.map((tab) => tab.id));
+    for (const id of this.#appliedTabRevisions.keys()) {
+      if (!liveIds.has(id)) this.#appliedTabRevisions.delete(id);
+    }
     for (const tab of candidate.tabs) {
       const previous = this.#appliedTabRevisions.get(tab.id);
       if (previous === undefined || tab.projection_revision > previous) {
@@ -67,14 +72,14 @@ export class TabProjectionModel {
   }
 
   applyTab(tab: TabView): boolean {
-    if (!this.#admitTabRevision(tab)) return false;
-
     const index = this.#state.tabs.findIndex((candidate) => candidate.id === tab.id);
-    if (index !== -1) {
-      const tabs = this.#state.tabs.slice();
-      tabs[index] = tab;
-      this.#state = { ...this.#state, tabs };
-    }
+    // A delta for a tab the snapshot does not hold is stale; the snapshot is
+    // the owner of membership.
+    if (index === -1) return false;
+    if (!this.#admitTabRevision(tab)) return false;
+    const tabs = this.#state.tabs.slice();
+    tabs[index] = tab;
+    this.#state = { ...this.#state, tabs };
     return true;
   }
 

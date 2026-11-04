@@ -22,10 +22,9 @@
 
   function signIn() {
     if (!auth || !username) return;
-    const credentials = { username, password };
-    username = "";
-    password = "";
-    void commands.tabsAnswerSignIn(tab, auth.request, credentials).catch(() => {});
+    // Keep the typed values until the card closes: a refused answer must
+    // leave them in place, not blank the form.
+    void commands.tabsAnswerSignIn(tab, auth.request, { username, password }).catch(() => {});
   }
 
   function cancelSignIn() {

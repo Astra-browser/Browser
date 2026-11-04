@@ -99,7 +99,7 @@ const done = arguments[arguments.length - 1];
 catch (e) { done(JSON.stringify({error:String(e)})); } })();"""
 
 STATE = """return JSON.stringify((() => {
-  const b = document.querySelector('browser[data-astra-browser]');
+  const b = gBrowser.selectedBrowser;
   let zoom = null, fullZoom = null;
   try { zoom = window.ZoomManager?.getZoomForBrowser?.(b) ?? null; } catch (e) {}
   try { fullZoom = b?.fullZoom ?? null; } catch (e) {}

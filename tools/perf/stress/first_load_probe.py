@@ -82,7 +82,7 @@ NAV = """const url = arguments[0]; const done = arguments[arguments.length - 1];
 (async () => { try { const r = await window.__astraHost.Navigation.loadURL({request_id:'p',url}); done(JSON.stringify(r)); } catch(e){ done(JSON.stringify({error:String(e)})); } })();"""
 
 STATE = """return JSON.stringify((() => {
-  const b=document.querySelector('browser[data-astra-browser]');
+  const b=gBrowser.selectedBrowser;
   let uri=null, title=null, loading=null;
   try{uri=b?.currentURI?.spec??null}catch(e){}
   try{title=b?.contentTitle??null}catch(e){}

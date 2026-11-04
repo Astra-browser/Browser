@@ -1,1 +1,0 @@
-export{t as default}from"./AskCard-DBO15l55.js";
