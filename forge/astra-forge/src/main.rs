@@ -1265,7 +1265,48 @@ fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String
     if !st.success() {
         return Err("mach build failed (see output above)".into());
     }
+    if let Err(e) = install_core_binary(root) {
+        // A missing sidecar must not fail a browser build; the shell answers
+        // `unavailable` when no core sits beside the binary.
+        println!("core: WARNING {e}");
+    }
     println!("build: done");
+    Ok(())
+}
+
+/// Build and install the Rust sidecar next to the browser binary (P5b).
+/// `ASTRA_CORE_SKIP=1` opts out; `ASTRA_CORE_PROFILE=debug` builds the debug
+/// profile instead of release.
+fn install_core_binary(root: &Path) -> Result<(), String> {
+    if std::env::var("ASTRA_CORE_SKIP").ok().as_deref() == Some("1") {
+        println!("core: skipped (ASTRA_CORE_SKIP=1)");
+        return Ok(());
+    }
+    let profile = std::env::var("ASTRA_CORE_PROFILE").unwrap_or_else(|_| "release".into());
+    let mut cmd = Command::new("cargo");
+    cmd.args(["build", "-p", "astra-core", "--bin", "astra-core"]);
+    if profile == "release" {
+        cmd.arg("--release");
+    }
+    cmd.current_dir(root);
+    let st = cmd.status().map_err(|e| format!("spawn cargo: {e}"))?;
+    if !st.success() {
+        return Err("astra-core build failed".into());
+    }
+    let src = root.join("target").join(&profile).join("astra-core");
+    let dist = root.join("engine/obj-astra-linux/dist/bin");
+    if !dist.exists() {
+        println!("core: no dist/bin yet; skipping install");
+        return Ok(());
+    }
+    let dest = dist.join("astra-core");
+    std::fs::copy(&src, &dest).map_err(|e| format!("copy core: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755));
+    }
+    println!("core: installed {}", dest.display());
     Ok(())
 }
 

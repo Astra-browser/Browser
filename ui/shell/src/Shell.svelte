@@ -120,14 +120,25 @@
     // the browser works without it while the Rust backend is pending.
     try {
       const services = frameRoot?.ownerDocument?.defaultView?.Services;
-      const command = services?.prefs?.getStringPref("astra.core.command", "") ?? "";
+      const chromeWin = frameRoot?.ownerDocument?.defaultView ?? null;
+      const ifile = chromeWin?.Ci?.nsIFile ?? (typeof Ci !== "undefined" ? Ci.nsIFile : null);
+      let command = services?.prefs?.getStringPref("astra.core.command", "") ?? "";
+      // Empty means "look beside the browser binary": a packaged build ships
+      // `astra-core` in dist/bin, and a dev build can install it the same way.
+      if (command === "" && services && ifile) {
+        try {
+          const beside = services.dirsvc.get("GreD", ifile).clone();
+          beside.append("astra-core");
+          if (beside.exists()) command = beside.path;
+        } catch {
+          command = "";
+        }
+      }
       // The organisation store lives beside the profile, never in a shared
       // location: a database is per profile, like cookies and history.
       let database = services?.prefs?.getStringPref("astra.core.database", "") ?? "";
       if (command !== "" && database === "") {
         try {
-          const chromeWin = frameRoot?.ownerDocument?.defaultView ?? null;
-          const ifile = chromeWin?.Ci?.nsIFile ?? (typeof Ci !== "undefined" ? Ci.nsIFile : null);
           const file = ifile ? services.dirsvc.get("ProfD", ifile) : null;
           database = file?.path ? `${file.path}/astra/core.sqlite` : "";
         } catch {

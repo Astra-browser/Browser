@@ -222,7 +222,8 @@ def main():
     with open(os.path.join(profile, "user.js"), "w") as fh:
         fh.write(f'user_pref("marionette.port", {MPORT});\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
-        fh.write(f'user_pref("astra.core.command", "{CORE}");\n')
+        if os.environ.get("ASTRA_METADATA_AUTODETECT") != "1":
+            fh.write(f'user_pref("astra.core.command", "{CORE}");\n')
     out = {"phase_a": {}, "phase_b": {}, "db": {}}
     try:
         proc, log = launch(profile)
