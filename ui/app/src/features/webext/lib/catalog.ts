@@ -369,4 +369,12 @@ export const catalog: CatalogGroup[] = [
   },
 ];
 
-export const storeListing = (id: string) => `https://chromewebstore.google.com/detail/${id}`;
+import { GALLERY, installUrl } from "$domain/extensions";
+
+/** The curated entry's real install page: AMO when mapped, else the archive. */
+export const storeListing = (id: string) => {
+  const entry = GALLERY.find((candidate) => candidate.chromeStoreId === id);
+  return entry
+    ? installUrl(entry)
+    : `https://addons.mozilla.org/firefox/search/?q=${encodeURIComponent(id)}`;
+};

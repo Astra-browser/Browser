@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-VXWdbFEY.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1191,n)??`Today`)),r=((n={},r={})=>(r.locale??e(),t(1192,n)??`Yesterday`));export{n,r as t};

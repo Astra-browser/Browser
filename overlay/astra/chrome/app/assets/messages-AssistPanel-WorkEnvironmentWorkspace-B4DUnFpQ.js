@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-BUU56ktx.js";var n=((n={},r={})=>(r.locale??t(),e(2813,n)??`Dictate`));export{n as t};
