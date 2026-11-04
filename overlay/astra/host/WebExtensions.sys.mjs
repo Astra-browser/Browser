@@ -11,7 +11,32 @@
 // empty list and refuses actions, which is the honest "no engine" path.
 // Nothing here fabricates an extension or a state.
 
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+const REVIEWS = new Map();
+let _nextReview = 0;
+
+async function fileUtils() {
+  try {
+    return ChromeUtils.importESModule("resource://gre/modules/FileUtils.sys.mjs").FileUtils;
+  } catch {
+    return null;
+  }
+}
+
+function reviewFor(id, install, fromFile) {
+  const addon = install?.addon ?? {};
+  return {
+    review_id: id,
+    id: String(addon.id ?? install?.id ?? ""),
+    name: String(addon.name ?? install?.name ?? ""),
+    version: String(addon.version ?? install?.version ?? ""),
+    description: String(addon.description ?? ""),
+    warnings: [],
+    limitations: [],
+    icon: typeof addon.iconURL === "string" && addon.iconURL !== "" ? addon.iconURL : null,
+    update: false,
+    from_file: fromFile === true,
+  };
+}
 
 async function addonManager() {
   try {
@@ -148,6 +173,81 @@ export const WebExtensions = {
     }
     await removed;
     return null;
+  },
+
+  /** Review an extension package on disk without installing it yet. */
+  async prepareFile({ path = "" } = {}) {
+    if (typeof path !== "string" || path === "") throw fail("no package selected");
+    const manager = await addonManager();
+    const FileUtils = await fileUtils();
+    if (!manager || !FileUtils) throw fail("the engine cannot install extensions");
+    let install = null;
+    try {
+      install = await manager.getInstallForFile(new FileUtils.File(path), null);
+    } catch {
+      install = null;
+    }
+    if (!install) throw fail("the package could not be read");
+    _nextReview += 1;
+    const reviewId = `ext-review-${_nextReview}`;
+    const review = reviewFor(reviewId, install, true);
+    REVIEWS.set(reviewId, { install, review });
+    return review;
+  },
+
+  /** Install the package the review named. */
+  async confirm({ id = "", reviewId = "" } = {}) {
+    const entry = REVIEWS.get(reviewId);
+    if (!entry) throw fail("this review is no longer available");
+    if (id !== "" && entry.review.id !== "" && id !== entry.review.id) {
+      throw fail("the package does not match the review");
+    }
+    REVIEWS.delete(reviewId);
+    try {
+      await entry.install.install();
+      return null;
+    } catch {
+      throw fail("the engine refused the install");
+    }
+  },
+
+  /** Drop a review without installing. */
+  async cancel({ reviewId = "" } = {}) {
+    const entry = REVIEWS.get(reviewId);
+    if (!entry) return undefined;
+    REVIEWS.delete(reviewId);
+    try {
+      entry.install.cancel();
+    } catch {
+      // Already cancelled or installed.
+    }
+    return undefined;
+  },
+
+  /** Native picker: a folder (temporary add-on) or an .xpi file to review. */
+  async chooseFile({ folder = false } = {}) {
+    const manager = await addonManager();
+    if (!manager) throw fail("the engine cannot install extensions");
+    try {
+      const picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+      const win = Services.wm.getMostRecentWindow("navigator:browser");
+      picker.init(
+        win,
+        folder ? "Choose extension folder" : "Choose extension package",
+        folder ? Ci.nsIFilePicker.modeGetFolder : Ci.nsIFilePicker.modeOpen
+      );
+      if (!folder) picker.appendFilter("Extensions", "*.xpi");
+      const result = await new Promise((resolve) => picker.open(resolve));
+      if (result !== Ci.nsIFilePicker.returnOK) return null;
+      if (folder === true) {
+        await manager.installTemporaryAddon(picker.file);
+        return null;
+      }
+      return await WebExtensions.prepareFile({ path: picker.file.path });
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      throw fail("the picker could not open");
+    }
   },
 
   async openOptions({ id = "" } = {}) {

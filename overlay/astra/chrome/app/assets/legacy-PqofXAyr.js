@@ -1,1 +1,0 @@
-import{pn as e}from"./chrome-shared-BUU56ktx.js";e();
