@@ -150,7 +150,7 @@
     </button>
 
     {#if space}
-      <RailSpaces active={space} />
+      <RailSpaces active={space} label={m.browse_spaces_all()} />
     {/if}
 
     <Disclosure

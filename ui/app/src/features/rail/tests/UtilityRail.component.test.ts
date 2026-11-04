@@ -136,7 +136,7 @@ test("at rail width its panels are the narrow glyph stack", async () => {
 
 test("every utility entry is named, and each opens its own surface", async () => {
   const screen = await rail();
-  for (const name of ["Media", "Downloads", "Notes", "Spaces — Home", "Sleeping tabs", "Profile"]) {
+  for (const name of ["Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs", "Profile"]) {
     await expect.element(screen.getByRole("button", { name, exact: true })).toBeVisible();
   }
 
@@ -211,7 +211,7 @@ test("sleeping tabs lists native's sleeping pages, and selecting one wakes it", 
 
 test("the spaces entry switches the window's space", async () => {
   const screen = await rail();
-  await screen.getByRole("button", { name: "Spaces — Home", exact: true }).click();
+  await screen.getByRole("button", { name: "All Spaces", exact: true }).click();
   await expect
     .element(screen.getByRole("menuitem", { name: "Home", exact: true }))
     .toHaveAttribute("aria-current", "true");
