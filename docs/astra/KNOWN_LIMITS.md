@@ -15,7 +15,9 @@ has an owner phase; none is a silent fallback.
 
 ## Features with no backend yet
 
-`Work` author/query/execute, human takeover, model providers, accounts, voice,
+Popup blocking and external-protocol cards have no producer yet, so the
+PageRequestCard only appears for HTTP auth; `Tabs.answerPageRequest` is wired
+and refuses an answer for a card that is not on screen. `Work` author/query/execute, human takeover, model providers, accounts, voice,
 page assist, blocker, browser import/export, updates, profiles, downloads
 manager, resource media, notes `reveal`, and the tasks/notes Rust store. The
 wiring inventory is in the audit report; the next phase (P8/P10) owns them.
@@ -39,6 +41,14 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 - **WebRTC:** screen share, audio capture, speaker selection, add-on prompts,
   unsafe delegation and non-web/insecure origins keep the native prompt on
   purpose. NTLM/Negotiate/password-only auth is cancelled, never shown natively.
+
+## Known placeholder assets
+
+- `astra-icon.png`, `astra-icon@2x.png` and `astra-wordmark.svg` are the
+  deliberate placeholders described in `OWNER_QUESTIONS.md` Q1 (the icon is a
+  flat square). They now load (the Settings/Callout paths used an absolute
+  `chrome://astra/` URL that does not exist); replacing the art is an owner
+  task, not a wiring gap.
 
 ## Verification gaps
 

@@ -17,7 +17,7 @@ tools/perf/full-suite.sh --skip-perf  # skip the benchmark pass
 | `node --test ui/shell/src` | Shell pure logic (slot state, stage rect, host model) |
 | `bun run --filter @astra/frame check` | Svelte/TS types, lint, 1200+ unit/component tests |
 | `tests/contract/shell_app_chrome.py` | The packaged chrome window boots, app frame host mode, no legacy paths |
-| `tools/perf/stress/*_probe.py` | Real browser behaviour: tabs, spaces, containers, session, permissions, auth, certs, extensions, metadata, page source, media |
+| `tools/perf/stress/*_probe.py` | Real browser behaviour: tabs, spaces, containers, session, permissions, auth, certs, extensions (list + file install), metadata, page source, media, and a real-web load (`first_load_probe.py`, needs network) |
 | `tools/perf/stress/run_matrix.py` | Workload matrix (baseline, tabs, video, 3D, memory, UI tour) with screenshots and CPU/RAM samples |
 | `tools/perf/run_all.py` | Startup, memory, scroll/switch and blocker benchmarks |
 

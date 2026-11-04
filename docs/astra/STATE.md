@@ -11,7 +11,7 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
-## Where things stand (2026-11-03 — read this first, next agent)
+## Where things stand (2026-11-04 — read this first, next agent)
 
 The browser builds, boots, and **the product UI is the window's chrome** (not a
 page painted over Firefox). Phases 0–6 are done; the active lane is the
@@ -23,7 +23,12 @@ hooks each one needs (D-38).
 ```sh
 ./tools/run-dev.sh            # reuse out/dev-profile
 ./tools/run-dev.sh --fresh    # clean profile
+tools/perf/full-suite.sh      # build + contracts + UI + 20 live probes + benches
 ```
+
+The full native-merge pass (2026-11-04), its verification table and the honest
+open list are in `docs/astra/REPORT-2026-11-04.md`; remaining product gaps are
+in `docs/astra/KNOWN_LIMITS.md`.
 
 **Rebuild after a change**
 
@@ -103,11 +108,19 @@ recorded below; this list is what is still genuinely unwired.
   synthetic tab. When the engine refuses a standalone browser, the action
   reports refusal and opens **no** Firefox window. Making this unconditional
   likely needs the content stage to be tabbrowser-backed, or an engine hook.
-- **The remaining unrouted command ids.** Most of the 267 commands still have
-  no Host route. Add them only with a UI caller, a route-table entry, a
-  contract test and a live probe.
+- **The remaining unrouted command ids.** 200 of the 280 generated commands
+  still have no Host route (account, Work models/human/sites, blocker, page
+  assist, voice, profiles, import/export, updates, menus, split/drag-drop,
+  downloads manager, media import). They are recorded in
+  `tests/contract/wire_baseline.json`; `wire_coverage` fails on any new gap.
+  Add each with a UI caller, a route-table entry, a contract test and a live
+  probe.
 - **Host projection ownership.** `overlay/astra/host/Tabs.sys.mjs` still derives
   the projection; `astra-core` ownership is plan §5.4 work.
+- **Popup / external-protocol cards.** `Tabs.answerPageRequest` is routed and
+  refuses a card that is not on screen, but no producer raises those cards yet.
+- **Multi-window organisation.** One writer per process; a second window's
+  spaces/pins are not merged into the store (P5b-3).
 - **Real page surface under split/work panes.** The content stage has only
   been exercised with one page; multi-pane and Work pane relayout remain
   unverified.

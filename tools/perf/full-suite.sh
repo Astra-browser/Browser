@@ -69,6 +69,8 @@ PROBES=(
   "certificate:tools/perf/stress/certificate_probe.py"
   "http_auth:tools/perf/stress/http_auth_probe.py"
   "media:tools/perf/stress/media_player_probe.py"
+  "webext:tools/perf/stress/webext_probe.py"
+  "first_load:tools/perf/stress/first_load_probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"
