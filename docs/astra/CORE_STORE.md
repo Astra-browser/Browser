@@ -76,11 +76,15 @@ with a pinned tab, saves, opens a private window (which must refuse to save),
 checks the SQLite row has no private URL, quits cleanly, relaunches, and
 re-applies the saved organisation to a tab at the saved URL.
 
+`tools/perf/stress/metadata_owner_probe.py` opens two normal windows and checks
+the single-writer rule: the second window reports `owner: false` and refuses to
+save (`not_owner`), while the first keeps writing and survives the other
+window closing.
+
 ## Known limits
 
-- **Multi-window:** each window's `Metadata` writes its own model, so the last
-  writer wins. A single-window profile is correct; a multi-window merge is
-  P5b-3.
+- **Multi-window:** one window is the writer (see above). A second window's
+  spaces are not persisted yet; merging per-window organisation is P5b-3.
 - **Folders:** the UI's tab folders still live in `localStorage`; the store
   schema and `SessionSnapshot.folders` are ready, but the host has no folder
   model to capture yet.
