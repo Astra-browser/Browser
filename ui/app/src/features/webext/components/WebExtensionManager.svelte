@@ -46,7 +46,7 @@
     <button
       type="button"
       class="toolbar-action"
-      onclick={() => openInTab("https://chromewebstore.google.com/")}
+      onclick={() => openInTab("https://addons.mozilla.org/firefox/")}
       >{m.webext_open_store()}</button
     >
   </header>

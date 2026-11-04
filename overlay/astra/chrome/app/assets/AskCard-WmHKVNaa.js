@@ -1,1 +1,0 @@
-export{t as default}from"./AskCard-C2Z6Bbym.js";
