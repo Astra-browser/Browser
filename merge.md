@@ -37,7 +37,7 @@
 | P7 | `merge/p7-containers` | Native `ContextualIdentityService` per space; delete clears data; move re-isolates; private never persists | P4 | **merged** |
 | P8 | `merge/p8-resources` | Split `Resources`: tasks/notes/media → Rust; page source → native browser; delete the in-memory task store; retire `Panes` | P1 | **P8-1a merged (PageSource module); Rust store next** |
 | P9 | `merge/p9-media-ext` | Bind `Media` to the native media controller and `WebExtensions` to `AddonManager`, or remove both surfaces | P4 | **P9-media + P9-extensions merged (list/install-from-file/enable/uninstall/options); toolbar actions open** |
-| P10 | `merge/p10-cleanup` | Remove dead routes/models, shrink `HostAPI`, update docs and the audit, final regression pass | all | planned |
+| P10 | `merge/p10-cleanup` | Remove dead routes/models, shrink `HostAPI`, update docs and the audit, final regression pass | all | **inventory done (`docs/astra/KNOWN_LIMITS.md`); cleanup pending** |
 
 ### Dependency graph
 
