@@ -37,17 +37,73 @@ describe("slotStateFor", () => {
   });
 
   it("paints a committed page without the spinner", () => {
-    assert.deepEqual(slotStateFor({ type: "nav.committed", data: { url: "https://a.example/" } }), {
-      hasPage: true,
-      loading: false,
-    });
+    assert.deepEqual(
+      slotStateFor({ type: "nav.committed", data: { url: "https://a.example/", external: true } }),
+      { hasPage: true, loading: false },
+    );
+  });
+
+  it("keeps the cover on the model's own commit, not just a new address", () => {
+    // `Navigation.loadURL` commits the address into the model immediately
+    // (no `external`) so the address field and the tab row show the target at
+    // once. The document is not in front yet, so the skeleton must stay.
+    assert.equal(
+      slotStateFor({ type: "nav.committed", data: { astra_tab_id: "t1", url: "https://a.example/" } }),
+      null,
+    );
   });
 
   it("hands the stage back on a commit to about:blank", () => {
-    assert.deepEqual(slotStateFor({ type: "nav.committed", data: { url: "about:blank" } }), {
-      hasPage: false,
+    assert.deepEqual(
+      slotStateFor({ type: "nav.committed", data: { url: "about:blank", external: true } }),
+      { hasPage: false, loading: false },
+    );
+  });
+
+  it("stops covering the page at the commit, not at the end of the load", () => {
+    const committedUrl = "https://a.example/";
+    const event = (tab) => ({
+      type: "items-changed",
+      data: { active: tab?.id ?? null, tabs: tab ? [tab] : [] },
+    });
+    // The document committed and is painting; images, fonts or analytics are
+    // still arriving. The tab's own loading flag stays true, the stage's cover
+    // does not come back — this is the "page arrives, then vanishes behind the
+    // skeleton until load end" bug.
+    assert.deepEqual(slotStateFor(event(page("t1", committedUrl, true)), { committedUrl }), {
+      hasPage: true,
       loading: false,
     });
+    // A different address that is still loading is a page the person has not
+    // seen yet: cover it.
+    assert.deepEqual(
+      slotStateFor(event(page("t1", "https://b.example/", true)), { committedUrl }),
+      { hasPage: true, loading: true },
+    );
+    // A projection that names the committed address but no longer loads is
+    // still the page.
+    assert.deepEqual(slotStateFor(event(page("t1", committedUrl, false)), { committedUrl }), {
+      hasPage: true,
+      loading: false,
+    });
+    // The cover belongs up again the moment a new address starts.
+    assert.deepEqual(
+      slotStateFor(
+        { type: "nav.started", data: { astra_tab_id: "t1", url: "https://b.example/" } },
+        { activeId: "t1", committedUrl },
+      ),
+      { hasPage: true, loading: true },
+    );
+    // The commit belongs to one tab: another tab loading the same address has
+    // not been seen yet.
+    assert.deepEqual(
+      slotStateFor(event(page("t2", committedUrl, true)), { committedId: "t1", committedUrl }),
+      { hasPage: true, loading: true },
+    );
+    assert.deepEqual(
+      slotStateFor(event(page("t1", committedUrl, true)), { committedId: "t1", committedUrl }),
+      { hasPage: true, loading: false },
+    );
   });
 
   it("follows the active tab's address and load flag", () => {

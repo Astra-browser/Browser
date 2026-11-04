@@ -54,6 +54,12 @@
   let appApi = null;
   /** The tab the stage shows, as the last projection named it. */
   let activeTabId = "";
+  /** The tab and address the stage has already put in front (a real document
+   *  commit, not the model's optimistic one). The cover (skeleton + spinner)
+   *  ends here, not at the end of the load: the document is painting while its
+   *  subresources may still be arriving. */
+  let committedTabId = "";
+  let committedUrl = "";
 
   const SIDEBAR_ITEMS = [
     { id: "tabs", label: "Tabs" },
@@ -764,8 +770,23 @@
         if (event.type === "items-changed") {
           activeTabId = typeof event.data?.active === "string" ? event.data.active : "";
         }
-        const next = slotStateFor(event, { activeId: activeTabId });
+        const next = slotStateFor(event, {
+          activeId: activeTabId,
+          committedId: committedTabId,
+          committedUrl,
+        });
         if (next !== null) {
+          if (event.type === "nav.committed" && event.data?.external === true) {
+            // A real document commit: the page is in front and paints from
+            // here. The rest of the load must not put the cover back over it.
+            committedTabId =
+              typeof event.data?.astra_tab_id === "string" ? event.data.astra_tab_id : activeTabId;
+            committedUrl = typeof event.data?.url === "string" ? event.data.url : "";
+          } else if (event.type === "nav.started") {
+            // A new address has not committed yet: the cover belongs up.
+            committedTabId = "";
+            committedUrl = "";
+          }
           if (next.hasPage) {
             slot.dataset.hasPage = "true";
           } else {

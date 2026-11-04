@@ -23,6 +23,14 @@ manager, resource media, notes `reveal`, and the tasks/notes Rust store. The
 wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 `unknown_command` for any of these is a product gap, not a deferral to ship.
 
+## Page loading
+
+- **The cover ends at the document commit**, not at true first paint. The
+  commit is the earliest reliable signal the chrome process gets; paint timing
+  lives in the content process, so a document that commits and then renders
+  slowly shows the stage ground for that gap (Firefox behaves the same). The
+  tab row's spinner keeps running until the document actually finishes.
+
 ## Data and contexts
 
 - **Multi-window organisation:** one window is the writer (`Metadata` owner);

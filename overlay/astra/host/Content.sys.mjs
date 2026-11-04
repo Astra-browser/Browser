@@ -675,14 +675,21 @@ export const Content = {
     const selected = modelTabs.find((t) => t.selected) ?? modelTabs[0];
     if (selected) activate(selected.astra_tab_id);
 
-    // Native -> model: selection, close and the end of a document load
-    // (`busy` clears when the native browser has finished). The progress
-    // listener keeps the title/URL side; this keeps the loading flag honest.
+    // Native -> model: selection, close and both edges of a document load
+    // (`busy` is raised when the browser starts fetching and cleared when it
+    // has finished). The progress listener keeps the title/URL side; this
+    // keeps the loading flag honest, including loads the model never asked
+    // for itself: a tab created straight on an address, a link click, a
+    // redirect. Without the raised edge such a tab sat on a blank stage with
+    // no cover until the document landed.
     const onAttr = (event) => {
       const tab = event.target;
       const id = idOfTab(tab);
       if (!id) return;
       const changed = event.detail?.changed ?? [];
+      if (changed.includes("busy") && tab.hasAttribute("busy")) {
+        __applyExternalUpdate(id, { loading: true });
+      }
       if (changed.includes("busy") && !tab.hasAttribute("busy")) {
         __applyExternalUpdate(id, { loading: false });
         refreshIcon(id);

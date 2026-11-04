@@ -344,3 +344,38 @@ Binding note (SCOPE rule 5): `ui/app/src/shared/ipc/bindings.ts` is Tauri
 Specta output and has no generator in this tree, so the
 `PagePermissionKindView` union was extended in place (the file is already the
 sanctioned generated-binding exception in `tools/brand-lint.sh`).
+
+## Owner report: a committed page must not wait behind the skeleton (2026-11-04)
+
+"Loading a page is taking more time." The skeleton was covering pages that had
+already arrived: the cover only came down when the whole document finished, so
+one slow image, font or analytics hit hid a finished page for seconds.
+
+| ID | Fix | Status | Evidence |
+|---|---|---|---|
+| D-42a | The slot's cover (`data-loading` + skeleton pill) ended at the *end of the load*, because the projection's `loading` flag (honest: it is what the tab row spins on) was the only input. `slot-state.js` now takes the committed tab/address and keeps the cover down for a projection that is still loading a document already in front | done | `slot-state.test.mjs` 13/13 (commit-stops-cover, different address still covered, per-tab commit, model commit vs real commit) |
+| D-42b | `nav.committed` fires twice per navigation: the model commits the address at request time (no `external`) and the content binding reports the real document commit (`external: true`, progress listener). The shell treated the first as a reveal and the follow-up projection as a re-cover, so a typed load flickered and a link click skated. Only `external: true` reveals now; the model's own commit says nothing about the cover | done | `hostapi_v1.mjs` 324 checks (external flag still pinned); live probe below |
+| D-42c | `tests/contract/load_state.py` measured a `browser[data-astra-browser]` inside the content slot — an element the native-deck merge removed (the stage is `gBrowser.selectedBrowser` in the docked tabbox), so it read `uri: null` and crashed. It reads the docked browser and the deck's visibility now, and pins the reveal-at-commit budget | done | `load_state.py` PASS; the same probe on `HEAD`'s bundle FAILs at 2026 ms for a page committed at 30 ms |
+| D-42d | A tab opened straight on an address (a link in a new tab, `Tabs.create({url})`) sat on a blank `about:blank` stage until the document landed: the model only knew about loads it started itself, so `loading` stayed false. The content binding now raises the flag on the native tab's `busy` edge (and clears it on the same edge as before), so the cover follows the engine rather than one code path | done | `load_state.py` "a tab opened on an address" case: cover up at 120 ms, revealed at 486 ms on a 600 ms-stall fixture |
+
+Live proof (packaged dev build, Marionette, throwaway profile,
+`tools/perf/hidden-display.sh python3 tests/contract/load_state.py`):
+
+| Case | Cover ends | Notes |
+|---|---|---|
+| loopback page | 44–74 ms | commit + load end together |
+| server delays first byte 600 ms | 487–497 ms | skeleton stays for the whole wait, ends at commit |
+| page commits, one image delayed 2 s | **24–33 ms** (was **2026 ms**) | `isLoadingDocument` is still true, tab row still spins, stage shows the page |
+| tab opened straight on a 600 ms address | 486 ms | cover up at 120 ms on a stage that used to be blank; row spinner was already honest |
+
+`gbrowser_stage_probe.py` now waits for `data-app-booted` before measuring, so
+it reports `stage: page` with a visible deck instead of `app` and a hidden
+tabbox (geometry was already correct). Shell unit tests 72/72, `hostapi_v1`
+324, `shell_assembly`, `frame_model`, `shell_app_chrome` 17, state-check and
+brand-lint clean.
+
+Deferred: the reveal is the engine's **document commit** — the earliest
+reliable chrome-side signal. True first-paint timing lives in the content
+process (`PerformancePaintTiming`); wiring it would need a JSWindowActor and a
+new event. A document that commits and then paints slowly therefore shows the
+stage's ground for that gap, which is what Firefox does.

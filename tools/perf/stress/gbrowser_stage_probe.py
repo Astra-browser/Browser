@@ -128,6 +128,20 @@ def main():
             except Exception:
                 pass
             time.sleep(0.1)
+        # The deck can only dock once the app owns the window (`data-app-booted`
+        # flips on the app's own ready handshake). Measuring before that reads
+        # `stage: "app"` and a hidden tabbox even though the geometry is right.
+        boot = time.time() + 60
+        while time.time() < boot:
+            try:
+                if m.execute(
+                    "return document.querySelector('[data-astra-frame]')"
+                    "?.getAttribute('data-app-booted') === 'true'"
+                ):
+                    break
+            except Exception:
+                pass
+            time.sleep(0.1)
         deadline = time.time() + 15
         while time.time() < deadline:
             st = json.loads(m.execute(STAGE))
