@@ -3,13 +3,16 @@
    portalled menu does not: the eager graph should carry the surface and the
    item, not the viewport, the separator and the shortcut. */
 .ui-menu {
+  /* The reference's compact menu is 12px: one step inside a full sheet, which
+     keeps --radius-menu free for panels that genuinely are sheets. Rows take
+     the 8px row corner, so a highlighted row curves inside the panel rather
+     than cutting across its corner. */
+  --menu-radius: var(--radius-row);
+
   z-index: 50;
   box-sizing: border-box;
   padding: var(--menu-pad);
-
-  /* Concentric with its rows: 10px row + 6px padding. Anything else leaves a
-     crescent of panel in each corner. */
-  border-radius: var(--radius-menu);
+  border-radius: var(--menu-radius);
   background: var(--color-menu);
 
   /* The one blur in the chrome, and the one surface that is translucent at
@@ -20,7 +23,11 @@
      white, but this panel is graphite by design, and all a boost does here is
      pull whatever hue the wallpaper happens to have up into it. */
   backdrop-filter: blur(24px);
-  box-shadow: var(--shadow-menu), var(--shine-top);
+
+  /* One rim and one soft drop, both from the shared floating recipe. No
+     second inset highlight on top: two edges read as weight, and the paper
+     surface only needs the one it already has. */
+  box-shadow: var(--shadow-menu);
   outline: none;
   overflow: hidden;
 }
@@ -32,9 +39,10 @@
   backdrop-filter: none;
 }
 
-/* A panel rather than a list: its contents own their own spacing. */
+/* A panel rather than a list. Its contents own their spacing, but the panel
+   keeps the same 6px inset as a menu so the two read as one material. */
 .ui-popover {
-  padding: 10px;
+  padding: var(--menu-pad);
 }
 
 /* The non-portalled variant: anchored under its own trigger, and animated by
@@ -87,11 +95,7 @@
   box-sizing: border-box;
   min-height: var(--menu-row);
   padding: 6px var(--menu-item-inset);
-
-  /* Concentric with the panel by construction: the row's corner plus the
-     padding around it is exactly the panel's corner, which is the only way a
-     highlighted row's curve can sit parallel to the one outside it. */
-  border-radius: calc(var(--radius-menu) - var(--menu-pad));
+  border-radius: var(--radius-inset);
   color: var(--color-text);
   font-size: var(--text-body);
   font-weight: 450;
@@ -122,9 +126,10 @@
    as well draws a second edge a few pixels inside the first, and the highlight
    stops reading as the row lighting up and starts reading as a chip sitting on
    top of it. The sidebar's rows keep their rim because nothing else bounds
-   them — here the menu does. */
+   them — here the menu does. Hover is the quiet wash; pressed is one step up,
+   so a click is felt rather than announced. */
 .ui-menu-item[data-highlighted] {
-  background: var(--row-active);
+  background: var(--row-hover);
 }
 
 .ui-menu-item[data-highlighted]:active {
@@ -132,7 +137,7 @@
 }
 
 .ui-menu-item[data-disabled] {
-  opacity: 0.45;
+  color: var(--color-faint);
 }
 
 .ui-menu-icon {
@@ -142,6 +147,10 @@
   width: 16px;
   color: var(--color-muted);
   transition: color var(--motion-instant) var(--ease-smooth);
+}
+
+.ui-menu-item[data-disabled] .ui-menu-icon {
+  color: var(--color-faint);
 }
 
 /* Destructive rows carry their colour into the highlight instead of losing it
@@ -158,6 +167,13 @@
 
 .ui-menu-item[data-danger="true"][data-highlighted] {
   background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+/* An unavailable row is quiet even when it is destructive: the action cannot
+   be taken, so its colour must not read as available. */
+.ui-menu-item[data-disabled][data-danger="true"],
+.ui-menu-item[data-disabled][data-danger="true"] .ui-menu-icon {
+  color: var(--color-faint);
 }
 
 @media (forced-colors: active) {
