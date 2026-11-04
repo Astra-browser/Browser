@@ -38,6 +38,7 @@ export interface HostModules {
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
@@ -103,7 +104,7 @@ const ROUTES: Record<string, Route> = {
   login_item_status: ["System", "loginItemStatus"],
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
-  page_source: ["Resources", "pageSource"],
+  page_source: ["PageSource", "pageSource", { id: "tab_id" }],
   browser_open_url: ["Search", "openUrl"],
   newtab_search_context: ["Search", "newtabContext", { tab_id: "tabId" }],
   newtab_search: ["Search", "newtabSearch"],

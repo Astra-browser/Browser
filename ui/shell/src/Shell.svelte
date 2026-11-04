@@ -202,6 +202,23 @@
         // No stale user override to clear.
       }
     }
+    // P8: the Source page's engine read. The host module owns the request
+    // shape and bounds; the shell supplies the document read.
+    try {
+      host.PageSource?.setDriver?.(async (tabId) => {
+        const list = await host.Tabs.list({ request_id: newRequestId() });
+        const tab = (list.tabs ?? []).find((t) => t.astra_tab_id === tabId);
+        if (!tab) return null;
+        const url = typeof tab.url === "string" ? tab.url : "";
+        if (!/^https?:/i.test(url)) return { url, text: "", truncated: false };
+        const response = await fetch(url, { credentials: "include" });
+        const text = await response.text();
+        const cap = 2_000_000;
+        return { url, text: text.slice(0, cap), truncated: text.length > cap };
+      });
+    } catch {
+      // No host module: the Source page shows "no document".
+    }
     let stageObserver = null;
     let stageMutation = null;
     let onStageResize = null;
@@ -489,28 +506,7 @@
       // A private window has no history and no bookmarks to show or write.
       // Answer in the caller's own shape so the surface renders its private
       // state instead of an error (and never reads the normal profile).
-      guardCall: async (moduleName, methodName, args) => {
-        // The app's Source page asks for the text of the page in front. The
-        // host model keeps no document, so read the address it names with the
-        // chrome's own privileged fetch (no page's script runs here).
-        if (moduleName === "Resources" && methodName === "pageSource") {
-          const tabId = typeof args?.tab_id === "string" ? args.tab_id : "";
-          try {
-            const list = await host.Tabs.list({ request_id: newRequestId() });
-            const tabs = list.tabs ?? [];
-            const tab = tabs.find((t) => t.astra_tab_id === tabId) ?? tabs.find((t) => t.selected);
-            const url = typeof tab?.url === "string" ? tab.url : "";
-            if (!/^https?:/i.test(url)) return { payload: { url, text: "", truncated: false } };
-            const response = await fetch(url, { credentials: "include" });
-            const text = await response.text();
-            const cap = 2_000_000;
-            return {
-              payload: { url, text: text.slice(0, cap), truncated: text.length > cap },
-            };
-          } catch {
-            return { payload: { url: "", text: "", truncated: false } };
-          }
-        }
+      guardCall: async (moduleName, methodName) => {
         if (!privateWindow) return null;
         if (moduleName === "Bookmarks" && methodName === "call") {
           return { payload: { kind: "error", error: "unavailable", profile: "incognito" } };
@@ -904,6 +900,11 @@
       // another tab's permission prompt.
       try {
         void host.Permissions?.uninstall?.({ window: win });
+      } catch {
+        // Already gone with the window.
+      }
+      try {
+        host.PageSource?.setDriver?.(null);
       } catch {
         // Already gone with the window.
       }
