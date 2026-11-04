@@ -47,9 +47,11 @@ independent, version gate, EOF exit.
 
 `Metadata.sys.mjs` owns the browser side:
 
-- The shell launches the sidecar when `astra.core.command` names a binary, with
-  `--db <profile>/astra/core.sqlite` (or the `astra.core.database` override).
-  No command is an honest `unavailable`; nothing is faked.
+- `forge build` builds `astra-core` (release by default) and installs it in
+  `dist/bin`. The shell uses `astra.core.command` when set, otherwise it looks
+  for `astra-core` next to the browser binary; with neither it answers an
+  honest `unavailable`. The database is `<profile>/astra/core.sqlite` (or the
+  `astra.core.database` override).
 - Before `Tabs.bootstrap`, `prepare()` loads the snapshot and installs the saved
   spaces, so a tab adopted from SessionStore lands in a space that exists.
 - After `Content.mountNative`, `restore()` matches saved tabs to live tabs by
