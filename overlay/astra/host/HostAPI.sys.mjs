@@ -47,6 +47,7 @@ import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
+import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
@@ -82,6 +83,7 @@ export {
   Permissions,
   Operations,
   Metadata,
+  PageSource,
   addEventListener,
   emit,
   eventSeq,
@@ -108,5 +110,6 @@ export function __resetForTests() {
   __resetFaviconsForTests();
   __resetOperationsForTests();
   Permissions.__resetForTests();
+  __resetPageSourceForTests();
   __resetEventsForTests();
 }
