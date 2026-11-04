@@ -10,7 +10,7 @@
   import { spaceKeys } from "../lib/space-keys";
   import * as requests from "../lib/space-requests.svelte";
 
-  let { active }: { active: SpaceView } = $props();
+  let { active, label }: { active: SpaceView; label?: string } = $props();
   const spaces = $derived(tabs.spaces());
 
   // Holding Control names the key of every row in place of its mark.
@@ -36,7 +36,7 @@
   in, so switching happens here and anything larger opens the column in place.
 -->
 <Disclosure
-  label={m.space_open_switcher({ name: active.name })}
+  label={label ?? m.space_open_switcher({ name: active.name })}
   triggerTitle={active.name}
   menu
   triggerClass="rail-item rail-spaces"

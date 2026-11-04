@@ -42,7 +42,7 @@
 <li
   data-motion-key={motionKey}
   class={[
-    "overflow-hidden rounded-row transition-[box-shadow] duration-[var(--motion-fast)]",
+    "split-group overflow-hidden transition-[box-shadow] duration-[var(--motion-fast)]",
     className,
   ]}
   class:bg-fill={!holdsActive}
@@ -68,3 +68,10 @@
     {/each}
   </ul>
 </li>
+
+<style>
+  /* One enclosure for the pair, at the row's own corner. */
+  li.split-group {
+    border-radius: var(--radius-tab);
+  }
+</style>

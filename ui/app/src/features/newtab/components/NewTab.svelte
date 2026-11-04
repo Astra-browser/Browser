@@ -553,6 +553,23 @@
     background: transparent;
   }
 
+  /* Paper: the light new tab is the warm ground the chrome is built on, not
+     the day sky. The sky asset remains the dark theme's page. */
+  /* stylelint-disable-next-line no-descending-specificity -- the paper tokens
+     deliberately override the day scene after it has been declared. */
+  :global(:root[data-theme="light"]) .newtab {
+    --sky-day-paper: var(--shell-ground);
+    --sky-ink: var(--color-text);
+    --sky-ink-hover: var(--color-label-secondary);
+    --sky-name: var(--color-text);
+    --sky-shadow: transparent;
+    --sky-edge: transparent;
+    --sky-edge-half: transparent;
+    --sky-edge-faint: transparent;
+
+    background: var(--shell-ground);
+  }
+
   .newtab.custom {
     --sky-card: var(--color-field);
     --sky-card-rim: var(--color-border);
@@ -658,12 +675,12 @@
   }
 
   .greeting {
-    font-size: 11.5px;
+    font-size: var(--text-caption);
     font-weight: 600;
-    line-height: 16px;
-    letter-spacing: 0.18em;
+    line-height: 15px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    opacity: 0.86;
+    opacity: 0.82;
   }
 
   /* One line under the name: the time set firm, the date beside it a step
@@ -691,8 +708,9 @@
   }
 
   .date {
+    font-size: var(--text-body);
     font-weight: 400;
-    opacity: 0.86;
+    opacity: 0.82;
   }
 
   .date::before {
@@ -737,7 +755,7 @@
     margin: 0 auto;
     padding-inline: 24px;
     color: var(--color-faint);
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     line-height: 1.5;
     text-align: center;
   }
@@ -771,6 +789,8 @@
     opacity: 0;
   }
 
+  /* A quiet paper card on the sky: the same material as a grouped card,
+     small enough to sit beside its neighbours without drawing a row. */
   .figure {
     display: flex;
     align-items: center;
@@ -778,11 +798,12 @@
     block-size: 34px;
     padding: 0 14px 0 12px;
     border: 0;
-    border-radius: var(--radius-capsule);
-    background: color-mix(in srgb, var(--color-text) 5%, transparent);
+    border-radius: var(--radius-control);
+    background: var(--color-card);
+    box-shadow: var(--shadow-card);
     color: var(--color-muted);
     font: inherit;
-    font-size: 12.5px;
+    font-size: var(--text-body);
     font-weight: 500;
     white-space: nowrap;
     animation: arrive var(--motion-page) var(--ease-emphasized) 80ms backwards;
@@ -802,7 +823,7 @@
   }
 
   button.figure:hover {
-    background: color-mix(in srgb, var(--color-text) 9%, transparent);
+    background: var(--color-control);
   }
 
   button.figure:active {
@@ -823,6 +844,7 @@
 
   .foot {
     color: var(--color-faint);
+    font-size: var(--text-caption);
   }
 
   .foot.late {
@@ -853,6 +875,8 @@
     --sky-ink: var(--color-text);
   }
 
+  /* Over a photograph the card has to stay opaque: a wash would let the
+     picture read through the figures' own labels. */
   .custom .figure {
     background: var(--color-surface);
   }
@@ -957,5 +981,10 @@
   :global(:root[data-reduce-motion="true"])
     :is(.arriving .sky, .arriving .mark, .arriving .control, .figures) {
     transition: none;
+  }
+
+  /* Paper hides the day sky asset after its own background rules. */
+  :global(:root[data-theme="light"]) .newtab .sky {
+    opacity: 0;
   }
 </style>

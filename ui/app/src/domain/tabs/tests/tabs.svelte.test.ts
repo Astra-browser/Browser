@@ -148,30 +148,6 @@ describe("Svelte tab state lifecycle", () => {
     state.dispose();
   });
 
-  it("hands the address of the tab a menu was opened on to its command once", async () => {
-    const state = await import("../tabs.svelte");
-    await state.init();
-    expect(state.takeMenuTargetUrl()).toBeNull();
-
-    harness.listeners.items?.({
-      payload: {
-        projection_revision: revision(2),
-        profile: { id: "profile-a", name: "Personal", kind: "default" },
-        spaces: [spaceFixture("space-a", "Main")],
-        active_space_id: "space-a",
-        nodes: [],
-        tabs: [tab("a", 2), tab("b", 2)],
-        active: "a",
-        split_group: null,
-      },
-    });
-    state.openTabMenu("b", 10, 20);
-
-    expect(state.takeMenuTargetUrl()).toBe("https://b.example/");
-    expect(state.takeMenuTargetUrl()).toBeNull();
-    state.dispose();
-  });
-
   it("publishes presentation state inside the synchronous Svelte flush", async () => {
     const state = await import("../tabs.svelte");
     await state.init();

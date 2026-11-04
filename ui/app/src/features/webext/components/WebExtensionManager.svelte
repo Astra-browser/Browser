@@ -121,68 +121,71 @@
 
   /* The same reading column as History, so the destinations line up. */
   .content {
-    --library-gutter: clamp(16px, 4vw, 48px);
+    --library-gutter: clamp(20px, 4vw, 48px);
     --library-column: 720px;
 
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     padding-inline: max(var(--library-gutter), calc((100% - var(--library-column)) / 2));
-    padding-block: 8px 32px;
+    padding-block: 12px 40px;
   }
 
   .failure {
     margin: 0 0 12px;
-    font-size: var(--text-label);
+    font-size: var(--text-caption);
     color: var(--color-danger);
   }
 
+  /* A section title, in the page's own voice: ink at the size a group is
+     named at, not a caption over it. */
   .heading {
     display: flex;
-    align-items: flex-end;
+    align-items: baseline;
     gap: 8px;
-    margin: 18px 0 8px;
-    padding-inline: 10px;
-    font-size: var(--text-label);
-    font-weight: 550;
-    letter-spacing: 0.01em;
-    color: var(--color-muted);
+    margin: 22px 0 10px;
+    font-size: var(--text-page-title);
+    font-weight: 600;
+    letter-spacing: -0.006em;
+    color: var(--color-text);
   }
 
   .heading:first-child,
   .failure + .heading {
-    margin-block-start: 4px;
+    margin-block-start: 6px;
   }
 
   .count {
-    font-weight: 400;
+    font-size: var(--text-caption);
+    font-weight: 500;
     color: var(--color-faint);
   }
 
   .group {
     margin: 0;
     padding: 0;
+    overflow: hidden;
     list-style: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-panel);
-    background: var(--color-raised);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    box-shadow: var(--shadow-card);
   }
 
   .catalog {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 8px;
+    gap: 10px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .group-title {
-    margin: 14px 0 6px;
-    padding-inline: 10px;
-    font-size: var(--text-label);
-    font-weight: 450;
-    color: var(--color-faint);
+    margin: 16px 0 8px;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-muted);
   }
 
   .heading + .group-title {
@@ -190,10 +193,9 @@
   }
 
   .note {
-    margin: 18px 0 0;
-    padding-inline: 10px;
-    font-size: var(--text-label);
-    line-height: 1.45;
+    margin: 22px 0 0;
+    font-size: var(--text-caption);
+    line-height: 1.5;
     color: var(--color-faint);
   }
 

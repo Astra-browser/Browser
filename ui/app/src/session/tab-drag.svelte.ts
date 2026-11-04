@@ -5,12 +5,10 @@ let id = $state<string | null>(null);
 let over = $state(false);
 let failed = $state(false);
 let pending = false;
-let gesture = 0;
 export const draggedId = () => id;
 export const overEssentials = () => over;
 export const moveFailed = () => failed;
 export function begin(value: string) {
-  gesture++;
   id = value;
   failed = false;
 }
@@ -28,13 +26,12 @@ export function hover(x: number, y: number) {
 }
 export function end() {
   const active = id !== null;
-  const generation = ++gesture;
   id = null;
   over = false;
-  if (active)
-    void commands.tabDragOver(null, null).catch(() => {
-      if (generation === gesture) failed = true;
-    });
+  // Releasing the native hover hint is not a placement: its refusal (the hint
+  // is not wired yet, or the window is already gone) must never be reported as
+  // "could not move this tab". Only `move`/`leaveSplit` settle a placement.
+  if (active) void commands.tabDragOver(null, null).catch(() => {});
 }
 /** Takes a tab out of the split it is in, then places it as `move` would. */
 export async function leaveSplit(

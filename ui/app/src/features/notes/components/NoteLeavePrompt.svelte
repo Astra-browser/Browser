@@ -59,20 +59,30 @@
     display: grid;
     place-items: center;
     padding: 24px;
-    background: color-mix(in srgb, var(--color-chrome) 62%, transparent);
+    background: var(--overlay-scrim);
     backdrop-filter: blur(2px);
   }
 
   .sheet {
+    box-sizing: border-box;
     display: grid;
     gap: 10px;
-    inline-size: min(360px, 100%);
-    padding: 18px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-panel);
-    background: var(--color-raised);
-    box-shadow: var(--shadow-menu), var(--shine-top);
+    inline-size: min(380px, 100%);
+    padding: var(--overlay-pad);
+    border-radius: var(--overlay-radius);
+    background: var(--overlay-ground);
+    box-shadow: var(--overlay-shadow);
     outline: none;
+  }
+
+  @media (width <= 520px) {
+    .scrim {
+      padding: 16px;
+    }
+
+    .sheet {
+      padding: 16px;
+    }
   }
 
   h2 {

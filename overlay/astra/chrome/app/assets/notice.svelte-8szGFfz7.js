@@ -1,1 +1,0 @@
-import{Jt as e,Kt as t,Ot as n}from"./chrome-shared-Diuh21aB.js";var r=e(null),i=0,a=()=>n(r);function o(e,n=`link`){i+=1,t(r,{id:i,text:e,kind:n})}function s(e){n(r)?.id===e&&t(r,null)}export{a as n,o as r,s as t};

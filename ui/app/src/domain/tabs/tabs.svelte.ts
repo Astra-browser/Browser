@@ -1,7 +1,7 @@
 import { listenAll } from "$shared/lib/lifecycle";
 import { forgetDrafts } from "$shared/lib/drafts";
 import { flushSync } from "svelte";
-import type { ItemsState, SpaceLookInputV1, TabMenuContext, TabView } from "$shared/ipc/bindings";
+import type { ItemsState, SpaceLookInputV1, TabView } from "$shared/ipc/bindings";
 import { settle } from "$domain/operations";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
@@ -157,61 +157,43 @@ export const canSplitWith = (id: string) =>
 /** A new tab has nothing to pair, so split stays unavailable until it loads. */
 export const canSplitActive = () => state.tabs.length > 1 && (activeTab()?.url ?? null) !== null;
 
-// Native holds the authoritative menu target; this mirror exists only so the
-// clipboard action can resolve a URL privileged chrome already projects.
-let menuTarget: string | null = null;
+/** The window draws a tab's menu; the domain only says which tab and where.
+ *  Native had no `tab_menu_popup` route in this build, so that call never
+ *  opened anything. One presenter is registered per document. */
+type TabMenuPresenter = (id: string, x: number, y: number, mediaOnly: boolean) => void;
+let menuPresenter: TabMenuPresenter | null = null;
 
-/** What the tab menu can offer for one tab; native checks each action again. */
-function tabMenuContext(id: string, mediaOnly = false): TabMenuContext {
-  const tab = state.tabs.find((candidate) => candidate.id === id);
-  const tabOf = (node: ItemsState["nodes"][number]) =>
-    node.kind.type === "tab" ? node.kind.tab_id : null;
-  const open = state.nodes
-    .filter((node) => node.section === "today" && node.parent_id === null)
-    .map(tabOf)
-    .filter((candidate) => candidate !== null);
-  const at = open.indexOf(id);
-  return {
-    page: (tab?.content ?? "web") === "web" && (tab?.url ?? null) !== null,
-    can_split: canSplitWith(id),
-    essential: state.nodes.some((node) => tabOf(node) === id && node.section === "favorites"),
-    others: open.some((candidate) => candidate !== id),
-    below: at >= 0 && at < open.length - 1,
-    muted: tab?.audio?.muted ?? false,
-    capture: tab?.capture?.navigation_id ?? null,
-    media_only: mediaOnly,
+export function installTabMenu(presenter: TabMenuPresenter): () => void {
+  menuPresenter = presenter;
+  return () => {
+    if (menuPresenter === presenter) menuPresenter = null;
   };
 }
 
+/** The full menu for a tab, or only what its in-use indicator offers. */
 export function openTabMenu(id: string, x: number, y: number) {
-  menuTarget = id;
-  fire(commands.tabMenuPopup(id, x, y, tabMenuContext(id)));
+  menuPresenter?.(id, x, y, false);
 }
 
-/** What can be done about a tab's camera, microphone and sound, opened from
- *  its in-use indicator. */
 export function openMediaMenu(id: string, x: number, y: number) {
-  menuTarget = id;
-  fire(commands.tabMenuPopup(id, x, y, tabMenuContext(id, true)));
+  menuPresenter?.(id, x, y, true);
 }
+
+/** Whether a tab is kept in the essentials dock. */
+export const isKept = (id: string) =>
+  state.nodes.some(
+    (node) => node.section === "favorites" && node.kind.type === "tab" && node.kind.tab_id === id,
+  );
+
+/** What can be done about one tab; the menu is drawn by the interface. */
+export const reloadTab = (id: string) => fire(commands.tabsReload(id));
+export const setKept = (id: string, kept: boolean) =>
+  settle(commands.tabsSetEssential(id, kept, null));
+export const copyLinkFor = (id: string) => copyLink(state.tabs.find((tab) => tab.id === id)?.url);
 
 /** The browser interface's own menu; `page` says a web page is in front. */
 export function openChromeMenu(x: number, y: number, page: boolean) {
   fire(commands.chromeMenuPopup(x, y, page, canSplitActive()));
-}
-
-export function copyMenuTargetLink(): Promise<boolean> {
-  const id = menuTarget;
-  menuTarget = null;
-  if (id === null) return Promise.resolve(false);
-  return copyLink(state.tabs.find((tab) => tab.id === id)?.url);
-}
-
-/** The address of the tab the menu was opened on, taken once. */
-export function takeMenuTargetUrl(): string | null {
-  const id = menuTarget;
-  menuTarget = null;
-  return id === null ? null : (state.tabs.find((tab) => tab.id === id)?.url ?? null);
 }
 
 /** Copies the address of the page in front, for the Copy Link command. */

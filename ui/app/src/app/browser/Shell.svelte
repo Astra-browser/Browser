@@ -74,9 +74,11 @@
     SidebarNotice,
     UtilityTray,
   } from "$features/sidebar";
+  import { ContentBar } from "$features/toolbar";
   import { IS_WINDOWS } from "$shared/platform";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
   import { ContextMenu, install as installShellMenu, openAt } from "$features/menus";
+  import { installTabMenuPresenter } from "./tab-menu";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
   /** New Note, from the menu or its shortcut: a note starts where notes are open. */
@@ -102,17 +104,22 @@
     handleNativeSection("settings.section.about");
     void browserPage.open("settings");
   }
-  // The sidebar's own menu stands where the engine would offer Reload. The
-  // page's menu arrives from the shell (see `installShellMenu`), so both are
-  // drawn by the app and neither is a Firefox menu.
+  // Astra's own menu stands wherever the engine would offer a browser menu.
+  // The page's menu arrives from the shell (see `installShellMenu`), so both
+  // are drawn by the app and neither is a Firefox menu. Anything in the app
+  // that does not own a menu of its own — the sidebar's empty space, the new
+  // tab, settings, lists — gets this one; a tab, a kept site or a folder has
+  // already handled the event (and marked it), so it is not overridden.
   onMount(() => {
     const stopShellMenu = installShellMenu();
+    const stopTabMenu = installTabMenuPresenter();
     const stopChromeMenu = installChromeMenu((event) => {
-      if (!(event.target instanceof Element) || !event.target.closest(".browser-sidebar")) return;
+      if (!(event.target instanceof Element)) return;
       openChromeContextMenu(event);
     });
     return () => {
       stopChromeMenu();
+      stopTabMenu();
       stopShellMenu();
     };
   });
@@ -297,6 +304,43 @@
     if (copied) notices.show(m.notice_link_copied());
   }
 
+  // The field's tray opens over the page, and the app frame sits under the
+  // page surface. While the tray is open, raise the frame the way a context
+  // menu does and let its ground step aside, so the panel is visible and the
+  // page still shows around it. The shell owns the stacking; this only asks.
+  let trayRaised = false;
+  function raiseForTray(open: boolean) {
+    trayRaised = open;
+    try {
+      if (open) document.documentElement.dataset.astraRaised = "true";
+      else
+        requestAnimationFrame(() => {
+          // Lowered first, then the ground comes back: the shell needs one
+          // turn to put the frame under the page again.
+          if (!trayRaised) delete document.documentElement.dataset.astraRaised;
+        });
+    } catch {
+      // No document marker outside the chrome.
+    }
+    try {
+      window.parent.postMessage(
+        { ns: "astra-shell", kind: open ? "menu-open" : "menu-close" },
+        "*",
+      );
+    } catch {
+      // No shell: the panel is drawn in this document.
+    }
+  }
+  $effect(() => () => {
+    if (!trayRaised) return;
+    trayRaised = false;
+    try {
+      delete document.documentElement.dataset.astraRaised;
+    } catch {
+      // The document is already gone with the window.
+    }
+  });
+
   // Loaded when a command first asks to clear a site's data, then kept: the
   // dialog closes itself, and a native modal must never be removed while open.
   let ClearSiteData = $state.raw<Component | null>(null);
@@ -312,9 +356,7 @@
     handledCommand = command.seq;
     untrack(() => {
       if (command.id === "split.choose") splitting = true;
-      if (command.id === "tab.copyLink") void tabs.copyMenuTargetLink().then(linkCopied);
       if (command.id === "page.copyLink") void tabs.copyActiveLink().then(linkCopied);
-      if (command.id === "tab.clearSiteData") clearRequest.ask(tabs.takeMenuTargetUrl());
       if (command.id === "page.clearSiteData") clearRequest.ask(tabs.activeTab()?.url);
       if (command.id === "find.show") findInPage.show(tabs.activeId());
       if (command.id === "find.next") findInPage.step(true, tabs.activeId());
@@ -347,6 +389,22 @@
   // Beside a new tab the window, whatever it is made of, takes on the
   // sky's light; it gives it back as a page arrives.
   let skyShown = $derived(newTabShown && newTabImage() === null);
+  // The card a page stands on. A native page cannot paint its own drop, and
+  // the internal stages paint only their ground, so the column draws the card
+  // behind them. The new tab and the failure pane draw a pane of their own and
+  // keep its shadow; a card under them would double the edge.
+  let stageCard = $derived.by(() => {
+    const tab = tabs.activeTab();
+    if (focus.cover() !== null && browserPage.currentPage() === null) return true;
+    if (tab && failedPane(tab) && browserPage.currentPage() === null) return false;
+    if (newTabShown) return false;
+    if (
+      tab?.availability?.state === "waiting_for_capacity" ||
+      tab?.availability?.state === "blocked_by_capacity"
+    )
+      return browserPage.currentPage() === null;
+    return browserPage.currentPage() !== null || (tab?.url ?? null) !== null;
+  });
 
   $effect(() => {
     const tab = tabs.activeTab();
@@ -450,12 +508,12 @@
   <Sidebar
     >{#snippet browserBody(compact)}
       {#if compact && (inWork || paneled)}
-        {#if !inWork}<AddressField {compact} /><StoreInstallRail />{/if}
+        {#if !inWork}<StoreInstallRail />{/if}
         {#if paneled && IS_WINDOWS}
           {#if browserPage.currentPage() === "settings"}<ModeTabs compact standalone />{/if}
           <div class="rail-search"><SidebarSearch /></div>
         {:else if paneled}<ModeTabs compact standalone />{/if}
-      {:else if compact}<AddressField {compact} /><StoreInstallRail />
+      {:else if compact}<StoreInstallRail />
       {:else if !incognito && preferences.enabled("work")}<div class="sidebar-head">
           <ModeTabs />
         </div>{/if}
@@ -466,32 +524,10 @@
             <TabRail entries={railTabs} closable={railClosable} onSelect={selectTab} />
           {:else}
             <!--
-            The switch sits above the address field because it governs the
-            whole column, field included; the tray rides the field itself,
-            because everything in it acts on the page the field names.
+            The address field belongs to the main page now, in the bar above
+            the stage; the column starts at the list. Work floats its page
+            over the whole window, sidebar included.
           -->
-            <AddressField {compact}>
-              {#snippet trailing(page)}
-                <UtilityTray
-                  label={page === null
-                    ? m.utilities()
-                    : page.warning
-                      ? m.site_info_label_status({ status: page.warning })
-                      : m.site_info_label()}
-                  warning={page?.warning}
-                >
-                  {#snippet children(open)}
-                    {#snippet siteHead(name: string | null, control?: Snippet)}
-                      <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
-                    {/snippet}
-                    <BlockerShield {open} head={page ? siteHead : undefined} />
-                    <ExtensionsSection />
-                    <SiteDetails {page} {open} />
-                  {/snippet}
-                </UtilityTray>
-              {/snippet}
-            </AddressField>
-            <!-- Work floats its page over the whole window, sidebar included. -->
             {#if !inWork}<SidebarPagePermission />{/if}
 
             <HidingBar />
@@ -591,6 +627,39 @@
       >{/snippet}</Sidebar
   >
   <div class="stage-column">
+    <!-- The page's own bar: navigation and the one address field, above the
+         stage and never in the sidebar. The field is composed here, with the
+         tray that acts on the page it names, and the bar only places it. -->
+    {#if !newTabShown}
+      <ContentBar>
+        {#snippet field()}
+          <AddressField>
+            {#snippet trailing(page)}
+              <UtilityTray
+                label={page === null
+                  ? m.utilities()
+                  : page.warning
+                    ? m.site_info_label_status({ status: page.warning })
+                    : m.site_info_label()}
+                warning={page?.warning}
+                onopen={() => raiseForTray(true)}
+                onclose={() => raiseForTray(false)}
+              >
+                {#snippet children(open)}
+                  {#snippet siteHead(name: string | null, control?: Snippet)}
+                    <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+                  {/snippet}
+                  <BlockerShield {open} head={page ? siteHead : undefined} />
+                  <ExtensionsSection />
+                  <SiteDetails {page} {open} />
+                {/snippet}
+              </UtilityTray>
+            {/snippet}
+          </AddressField>
+        {/snippet}
+      </ContentBar>
+    {/if}
+    {#if stageCard}<div class="stage-card" aria-hidden="true"></div>{/if}
     {#if browserPage.navigationFailed()}<div class="navigation-error" role="alert">
         {m.browser_nav_failed()}
       </div>{/if}
@@ -827,11 +896,25 @@
   }
 
   .stage-column {
+    position: relative;
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+  }
+
+  /* The card the page stands on. A native page is rounded by the shell but
+     cannot paint its own drop, and an internal stage paints only its ground,
+     so the column draws the card under both. It is transparent and takes no
+     pointer: only the drop outside the page's own rectangle shows. */
+  .stage-card {
+    position: absolute;
+    inset-block: var(--main-bar-height) 0;
+    inset-inline: var(--main-bar-inset) 0;
+    border-radius: var(--content-radius);
+    box-shadow: var(--shadow-card);
+    pointer-events: none;
   }
 
   .stage-column > :global(main) {

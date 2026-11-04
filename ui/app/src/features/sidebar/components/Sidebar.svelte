@@ -11,6 +11,7 @@
   import {
     COMPACT_WIDTH,
     PANEL_GAP,
+    RAIL_WIDTH,
     effectiveWidth,
     hasPanel,
     holdShown,
@@ -29,6 +30,7 @@
   import * as shapeMorph from "../lib/shape-morph";
   import { duration, reducedMotion } from "$shared/lib/motion";
   import SidebarResizeHandle from "./SidebarResizeHandle.svelte";
+  import { UtilityRail } from "$features/rail";
 
   let {
     settingsNavigation,
@@ -43,6 +45,23 @@
   } = $props();
   let settings = $derived(browserPage.currentPage() === "settings");
   const SETTINGS_PANEL = 264;
+  // Below this width the sections rail costs the reading page more than it
+  // gives it. The column keeps only its dots and the section picker moves
+  // into the page itself (Settings.svelte).
+  const NARROW_WINDOW = "(max-width: 760px)";
+  // Read at construction, not only in the effect: opening Settings in a
+  // narrow window must not paint the full rail for the first frame.
+  let narrowWindow = $state(
+    typeof window === "undefined" ? false : window.matchMedia(NARROW_WINDOW).matches,
+  );
+  $effect(() => {
+    const media = window.matchMedia(NARROW_WINDOW);
+    const sync = () => (narrowWindow = media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  });
+  const settingsExtent = $derived(narrowWindow ? 0 : SETTINGS_PANEL);
   let taskPage = $derived(
     browserPage.currentPage() === "tasks" || browserPage.currentPage() === "notes",
   );
@@ -415,31 +434,40 @@
       shown = next;
     });
   });
-  let width = $derived(
+  let columnWidth = $derived(
     navigating
-      ? COMPACT_WIDTH + PANEL_GAP + SETTINGS_PANEL
+      ? COMPACT_WIDTH + (settingsExtent > 0 ? PANEL_GAP + settingsExtent : 0)
       : railPage && tools.activeTool() === null
         ? COMPACT_WIDTH
         : effectiveWidth(),
   );
+  // The card holds the rail and the column: what native insets the page by
+  // is both together, while the resize handle still moves only the column.
+  let width = $derived(RAIL_WIDTH + columnWidth);
   // Settings' sections are as much a part of the column as the rail beside
   // them, so the width the shell insets the page by has to carry the panel
   // too: otherwise the page stands under the settings panel and the inset
   // snaps only when the panel closes. The panel a page replaced (a tool, say)
-  // is published again on the way out.
+  // is published again on the way out. The extent follows the window shape,
+  // so narrowing while Settings is open folds the panel and widens the page
+  // without the page being laid out twice.
   let inSettings = false;
   let settingsRestore = 0;
   $effect(() => {
     const open = navigating;
-    if (open === inSettings) return;
-    inSettings = open;
+    const extent = settingsExtent;
     untrack(() => {
       if (!open) {
+        if (!inSettings) return;
+        inSettings = false;
         setPanelExtent(settingsRestore);
         return;
       }
-      settingsRestore = hasPanel() ? effectiveWidth() - COMPACT_WIDTH - PANEL_GAP : 0;
-      setPanelExtent(SETTINGS_PANEL);
+      if (!inSettings) {
+        inSettings = true;
+        settingsRestore = hasPanel() ? effectiveWidth() - COMPACT_WIDTH - PANEL_GAP : 0;
+      }
+      setPanelExtent(extent);
     });
   });
 
@@ -517,7 +545,7 @@
   data-tauri-drag-region="deep"
   aria-label={m.ui_browser_sidebar()}
   style:width={`${width}px`}
-  style:--sidebar-width={`${width}px`}
+  style:--sidebar-width={`${columnWidth}px`}
   data-menu-material={IS_WINDOWS && !settings ? "opaque" : undefined}
   data-reshaping={reshaping}
   data-sidebar-resize-settling={resizeSettling}
@@ -533,37 +561,41 @@
     pointerIn = false;
     if (away && peeking) release();
   }}
-  class="browser-sidebar relative flex shrink-0 flex-col text-text select-none"
+  class="browser-sidebar relative flex shrink-0 flex-row text-text select-none"
 >
-  {#if !navigating && !railPage && tools.activeTool() === null}<SidebarResizeHandle
-      {width}
-      disabled={reshaping || hidden}
-    />{/if}
-  <!-- Settings stands beside the rail with no head: its panel runs the full
-       height and the rail keeps only the lights' row. A tool keeps the head,
-       with search and the page's own controls. -->
-  {#if !settings}<SidebarHeader
-      compact={headerCompact}
-      launcher={paneled}
-      ontoggle={toggleShape}
-      pageControls={!inWork}
-    />{/if}
-  <div
-    bind:this={columns}
-    class="sidebar-columns"
-    data-glide-host
-    data-launch={motion.launchState()}
-  >
-    {#key compact}<div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
-        {#if settings && IS_MAC}<div class="sidebar-lights" aria-hidden="true"></div>{/if}
-        {@render browserBody(compact)}
-        {@render dock(compact)}
-      </div>{/key}
-    {#if settings}<div class="sidebar-tool-host">
-        {@render settingsNavigation()}
-      </div>{:else if tools.activeTool() !== null}<div class="sidebar-tool-host">
-        {@render toolPanel(tools.activeTool()!)}
-      </div>{/if}
+  <UtilityRail {compact} />
+  <div class="sidebar-main">
+    {#if !navigating && !railPage && tools.activeTool() === null}<SidebarResizeHandle
+        width={columnWidth}
+        disabled={reshaping || hidden}
+      />{/if}
+    <!-- Settings stands beside the rail with no head: its panel runs the full
+         height and the rail keeps only the lights' row. A tool keeps the head,
+         with search and the page's own controls. -->
+    {#if !settings}<SidebarHeader
+        compact={headerCompact}
+        launcher={paneled}
+        ontoggle={toggleShape}
+        pageControls={!inWork}
+        rail
+      />{/if}
+    <div
+      bind:this={columns}
+      class="sidebar-columns"
+      data-glide-host
+      data-launch={motion.launchState()}
+    >
+      {#key compact}<div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
+          {#if settings && IS_MAC}<div class="sidebar-lights" aria-hidden="true"></div>{/if}
+          {@render browserBody(compact)}
+          {@render dock(compact)}
+        </div>{/key}
+      {#if settings && settingsExtent > 0}<div class="sidebar-tool-host">
+          {@render settingsNavigation()}
+        </div>{:else if tools.activeTool() !== null}<div class="sidebar-tool-host">
+          {@render toolPanel(tools.activeTool()!)}
+        </div>{/if}
+    </div>
   </div>
 </aside>
 

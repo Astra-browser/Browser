@@ -283,12 +283,21 @@
   margin-inline: auto;
   padding: 40px clamp(24px, 6vw, 72px);
 }
-@container (max-width: 450px) {
+@container (max-width: 560px) {
   .settings-page .ui-settings-row {
     flex-wrap: wrap;
+    align-items: flex-start;
     gap: 12px;
   }
+  /* A control that keeps sharing the line with its label at this width
+     squeezes the label into a column of single words. It takes its own line
+     and the row's full measure instead. */
   .settings-page .ui-settings-control {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+  .settings-page .ui-settings-control > .ui-select,
+  .settings-page .ui-settings-control > .ui-button {
     max-width: 100%;
   }
 }
@@ -338,6 +347,36 @@
   padding-block-start: 0;
 }
 
+/* Paper: the whole window is the warm field, and the column and the page
+   are cards standing on it. Dark keeps its own material and these rules do
+   not match. */
+:root[data-theme="light"] .shell {
+  background: var(--shell-ground);
+}
+
+[data-theme="light"] .browser-sidebar:not([data-hidden]) {
+  border-radius: var(--content-radius);
+  background: color-mix(in srgb, #fffdf9 34%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+/* The card lifts off the wallpaper by one soft drop, not a drawn outline. */
+.content-pane {
+  box-shadow: var(--shadow-card);
+}
+
+/* A panel opened from the main-page bar (the site tray) draws over the page,
+   and the app frame sits under the page surface. While the shell raises the
+   frame for that panel, its own ground steps aside so the page still shows
+   around it — the same reading a context menu gets. */
+:root[data-astra-raised="true"],
+:root[data-astra-raised="true"] body,
+:root[data-astra-raised="true"] #root,
+:root[data-astra-raised="true"] .shell,
+:root[data-astra-raised="true"] .shell[data-caption] {
+  background: transparent !important;
+}
+
 /* The product draws the whole window, so the strip that would have been the
    titlebar is where the window is moved by. Empty space in it drags; every
    control opts out, because a press that starts on a button belongs to the
@@ -364,6 +403,15 @@
   flex: 1;
   min-height: 0;
   gap: 8px;
+}
+/* The column beside the utility rail: the rail runs the full height of the
+   card, while the head, list and foot keep their own vertical layout here. */
+.sidebar-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 .sidebar-browser-column {
   display: flex;
@@ -565,16 +613,21 @@
   border-radius: var(--radius-control);
   margin-bottom: 26px;
 }
+/* Every dialog shares one recipe: the same ground, corner, edge and scrim as
+   a prompt sheet or the account dialog, so a dialog never looks like it came
+   from a different build than the menu that opened it. */
 .settings-dialog-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgb(0 0 0 / 0.3);
+  background: var(--overlay-scrim);
+  backdrop-filter: blur(2px);
   animation: interface-fade var(--motion-base) var(--ease-out);
 }
 /* The same dimming behind a native modal dialog in Settings. */
 .settings-modal::backdrop {
-  background: rgb(0 0 0 / 0.3);
+  background: var(--overlay-scrim);
+  backdrop-filter: blur(2px);
 }
 .settings-dialog {
   position: fixed;
@@ -582,15 +635,16 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(480px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   overflow-y: auto;
-  border-radius: var(--radius-card);
-  padding: 26px;
+  overscroll-behavior: contain;
+  border-radius: var(--overlay-radius);
+  padding: 24px;
   color: var(--color-text);
-  background: var(--color-raised);
-  box-shadow: var(--shadow-overlay);
-  border: 1px solid var(--color-border-strong);
+  background: var(--overlay-ground);
+  box-shadow: var(--overlay-shadow);
   outline: none;
   animation: interface-fade var(--motion-base) var(--ease-out);
 }
@@ -639,6 +693,25 @@
     gap: 4px;
   }
 }
+/* A narrow window gets the whole reading column: the section rail folds to
+   its dots above the page (see Settings.svelte), and the sheet only has to
+   keep its own margins from the edges. */
+@media (max-width: 760px) {
+  .settings-page {
+    padding: 26px 18px 44px;
+  }
+  .settings-page-heading {
+    margin-block-end: 24px;
+  }
+  .settings-page-heading h1 {
+    font-size: 23px;
+  }
+  .settings-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    padding: 18px;
+  }
+}
 @media (forced-colors: active) {
   .settings-dialog {
     border: 1px solid CanvasText;
@@ -655,11 +728,11 @@
 }
 /* Width only: the column still fills the sidebar's height, or the dock at
    its foot rides up under the tabs for the length of the change. */
-.browser-sidebar[data-reshaping="true"] > .sidebar-columns {
+.browser-sidebar[data-reshaping="true"] > .sidebar-main > .sidebar-columns {
   width: var(--sidebar-width);
 }
 /* The header is one shape or the other, never both; the new one fades in. */
-.browser-sidebar[data-header-fresh="true"] > header {
+.browser-sidebar[data-header-fresh="true"] > .sidebar-main > header {
   animation: interface-fade var(--motion-slow) var(--ease-out) both;
 }
 
@@ -868,14 +941,18 @@
   color: var(--color-faint);
   margin-bottom: 6px;
 }
-@container (max-width:520px) {
+@container (max-width: 480px) {
   .settings-callout {
     flex-wrap: wrap;
+    align-items: flex-start;
     padding: 18px;
     gap: 12px;
   }
   .settings-callout > .ui-button {
-    margin-inline-start: 60px;
+    margin-inline-start: 0;
+  }
+  .settings-action-control {
+    justify-content: flex-start;
   }
 }
 :root[data-density="compact"] .browser-sidebar {
@@ -986,4 +1063,14 @@
 .shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > main,
 .shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .internal-stage {
   padding-inline-start: 0;
+}
+
+/* The main-page bar and the card under the stage measure from the same edge
+   as the page: with the column away, that edge is the window gutter. */
+.shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > .content-bar {
+  padding-inline-start: 0;
+}
+
+.shell:has(> .browser-sidebar:is([data-hidden], [data-leaving])) .stage-column > .stage-card {
+  inset-inline-start: 0;
 }

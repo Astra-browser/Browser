@@ -3,6 +3,7 @@
   import { onDestroy } from "svelte";
   import {
     COMPACT_WIDTH,
+    RAIL_WIDTH,
     effectiveWidth,
     expandBriefly,
     hasPanel,
@@ -46,7 +47,7 @@
     }
   }
 
-  let left = $derived(beside ? COMPACT_WIDTH + INSET : INSET);
+  let left = $derived(RAIL_WIDTH + (beside ? COMPACT_WIDTH + INSET : INSET));
 </script>
 
 <svelte:window {onkeydown} />
@@ -59,7 +60,7 @@
   aria-describedby={describedby}
   class="sheet prompt-sheet"
   style:left={`${left}px`}
-  style:width={`${Math.max(effectiveWidth() - left - INSET, 220)}px`}
+  style:width={`${Math.max(RAIL_WIDTH + effectiveWidth() - left - INSET, 220)}px`}
 >
   {@render children()}
 </div>
@@ -82,19 +83,34 @@
     box-sizing: border-box;
     max-height: calc(100vh - 56px);
     overflow-y: auto;
-    padding: 16px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-panel);
-    background: var(--color-raised);
-    box-shadow: var(--shadow-overlay);
+    overscroll-behavior: contain;
+    padding: var(--overlay-pad);
+    border-radius: var(--overlay-radius);
+    background: var(--overlay-ground);
+    box-shadow: var(--overlay-shadow);
     text-align: start;
     animation: sheet-in var(--motion-slow) var(--ease-out) both;
+  }
+
+  @media (width <= 520px) {
+    .sheet {
+      padding: 14px;
+      max-height: calc(100vh - 32px);
+    }
   }
 
   @keyframes sheet-in {
     from {
       opacity: 0;
       scale: 0.97;
+    }
+  }
+
+  /* The sheet still arrives, it just does not travel: the fade is the whole
+     motion when the person has asked for less. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      animation: interface-fade var(--motion-instant) linear both;
     }
   }
 </style>

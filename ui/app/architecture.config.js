@@ -43,6 +43,16 @@ export const architecture = {
         default: "disallow",
         policies: [
           ...downward,
+          // The sidebar composes the utility rail as its leading edge.
+          {
+            from: { element: { type: "features", captured: { module: "sidebar" } } },
+            allow: { to: { element: { type: "features", captured: { module: "rail" } } } },
+          },
+          // The rail opens the existing space switcher through its public API.
+          {
+            from: { element: { type: "features", captured: { module: "rail" } } },
+            allow: { to: { element: { type: "features", captured: { module: "tabs" } } } },
+          },
           // The existing utility host composes real entity views through public APIs.
           {
             from: { element: { type: "features", captured: { module: "tools" } } },

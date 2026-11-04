@@ -92,7 +92,7 @@ test("a larger serif interface keeps every row's height", async () => {
   await settle();
   await shoot("paper-light-serif-15-sidebar");
   const row = screen.container.querySelector<HTMLElement>(".browse-tab")!;
-  expect(row.getBoundingClientRect().height).toBe(36);
+  expect(row.getBoundingClientRect().height).toBe(28);
   emitNativeEvent("uiCommand", "browser.settings");
   await page.getByRole("button", { name: "General", exact: true }).click();
   await settle();

@@ -1,6 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { tabFixture } from "$shared/testing/fixtures";
+import { tabs } from "$domain/tabs";
 import favicon from "../../../styles/favicon.css?raw";
 import TabRow from "../components/TabRow.svelte";
 
@@ -94,16 +95,22 @@ test("the camera indicator offers its own tab's media menu without selecting it"
     capture: { navigation_id: "000000000000002a", camera: "active", microphone: "none" },
   });
   const onSelect = vi.fn();
+  const presented = vi.fn();
   const screen = await row(tab, onSelect);
-  await screen.getByRole("button", { name: `Camera and microphone for ${tab.url}` }).click();
-  await expect.poll(() => native.menu.mock.calls.length).toBe(1);
-  const [id, x, y, context] = native.menu.mock.calls[0]!;
-  expect(id).toBe(tab.id);
-  expect(typeof x).toBe("number");
-  expect(typeof y).toBe("number");
-  expect(context).toMatchObject({ media_only: true });
-  expect(onSelect).not.toHaveBeenCalled();
-  expect(native.mute).not.toHaveBeenCalled();
+  const stop = tabs.installTabMenu(presented);
+  try {
+    await screen.getByRole("button", { name: `Camera and microphone for ${tab.url}` }).click();
+    await expect.poll(() => presented.mock.calls.length).toBe(1);
+    const [id, x, y, mediaOnly] = presented.mock.calls[0]!;
+    expect(id).toBe(tab.id);
+    expect(typeof x).toBe("number");
+    expect(typeof y).toBe("number");
+    expect(mediaOnly).toBe(true);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(native.mute).not.toHaveBeenCalled();
+  } finally {
+    stop();
+  }
 });
 
 // Sampled over the length of the transitions: a hover that lets go and takes

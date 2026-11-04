@@ -140,7 +140,7 @@
      rows they act on have to sit on the same two edges, and the list makes its
      column out of the scroller's padding rather than a wrapper. */
   .content {
-    --library-gutter: clamp(16px, 4vw, 48px);
+    --library-gutter: clamp(20px, 4vw, 48px);
     --library-column: 820px;
 
     display: flex;
@@ -164,7 +164,7 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    padding-block: 4px 14px;
+    padding-block: 8px 16px;
   }
 
   .bar :global(.ui-search) {

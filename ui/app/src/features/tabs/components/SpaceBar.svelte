@@ -132,9 +132,9 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 4px;
-    padding-inline: var(--sidebar-inset);
-    padding-block: 2px calc(var(--sidebar-row-gap) + 2px);
+    gap: var(--tab-gap);
+    padding-inline: var(--tab-inset);
+    padding-block: var(--tab-gap);
   }
 
   .space-chip {
@@ -144,9 +144,9 @@
     gap: 8px;
     min-width: 0;
     height: 30px;
-    padding-inline: 10px 7px;
+    padding-inline: var(--tab-inset) 6px;
     border: 0;
-    border-radius: var(--radius-row);
+    border-radius: var(--radius-tab);
     background: transparent;
     color: var(--color-label-secondary);
     font: inherit;
@@ -195,15 +195,15 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 2px;
+    gap: var(--tab-gap);
     margin-inline-start: auto;
   }
 
   .space-new-tab {
     display: grid;
     flex: none;
-    width: 30px;
-    height: 30px;
+    width: var(--control-height);
+    height: var(--control-height);
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -230,7 +230,7 @@
 
   /* Opens out of the chip it hangs from. */
   .space-panel {
-    inset-inline: var(--sidebar-inset);
+    inset-inline: var(--tab-inset);
     min-width: 0;
     padding: 0;
     transform-origin: 44px -10px;

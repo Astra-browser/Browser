@@ -19,6 +19,7 @@ const {
   COMPACT_WIDTH,
   MAX_EXPANDED_WIDTH,
   MIN_EXPANDED_WIDTH,
+  RAIL_WIDTH,
   SNAP_THRESHOLD,
   applyDragWidth,
   adoptResizeWidth,
@@ -26,10 +27,12 @@ const {
   finishSidebarResize,
   cancelSidebarResize,
   expanded,
+  publishedWidth,
   resolveDragWidth,
   adoptMode,
   holdShown,
   setPanelExtent,
+  setMode,
   sidebarMode,
   toggleMode,
 } = await import("../sidebar-mode.svelte");
@@ -67,6 +70,7 @@ describe("resolveDragWidth", () => {
 
 describe("which width changes the page travels with", () => {
   const last = () => native.width.mock.calls.at(-1)?.slice(0, 2) as unknown as [number, boolean];
+  const total = (column: number) => RAIL_WIDTH + column;
 
   const hidden = () => native.hidden.mock.calls.at(-1)?.[0];
 
@@ -74,24 +78,37 @@ describe("which width changes the page travels with", () => {
     const width = expanded();
     toggleMode();
     // Hidden, the column keeps its width for when it comes over the page.
-    expect(last()).toEqual([width, true]);
+    expect(last()).toEqual([total(width), true]);
     expect(hidden()).toBe(true);
     toggleMode();
     expect(last()[1]).toBe(true);
     expect(hidden()).toBe(false);
 
     applyDragWidth(300);
-    expect(last()).toEqual([300, false]);
+    expect(last()).toEqual([total(300), false]);
     applyDragWidth(310);
-    expect(last()).toEqual([310, false]);
+    expect(last()).toEqual([total(310), false]);
 
     // Crossing the snap point is a change of shape, however it was reached.
     applyDragWidth(SNAP_THRESHOLD - 1);
-    expect(last()).toEqual([310, true]);
+    expect(last()).toEqual([total(310), true]);
     expect(hidden()).toBe(true);
     applyDragWidth(SNAP_THRESHOLD + 40);
     expect(last()[1]).toBe(true);
     expect(hidden()).toBe(false);
+  });
+
+  it("publishes the rail beside the column, and the panel beside both", () => {
+    expect(publishedWidth()).toBe(total(expanded()));
+    setPanelExtent(336);
+    expect(publishedWidth()).toBe(total(COMPACT_WIDTH + 8 + 336));
+    setPanelExtent(0);
+  });
+
+  it("keeps the rail at compact width too", () => {
+    setMode("compact");
+    expect(publishedWidth()).toBe(total(COMPACT_WIDTH));
+    setMode("default");
   });
 
   it("keeps a hidden column out while a rail destination holds it", () => {
@@ -130,7 +147,7 @@ describe("which width changes the page travels with", () => {
     expect(native.width.mock.calls.length).toBe(before);
     finishSidebarResize(315);
     expect(native.width.mock.calls.length).toBe(before + 1);
-    expect(last()).toEqual([315, true]);
+    expect(last()).toEqual([total(315), true]);
   });
 
   it("cancellation leaves the original shape untouched and emits no layout", () => {
@@ -150,7 +167,7 @@ describe("which width changes the page travels with", () => {
     beginSidebarResize();
     finishSidebarResize(MAX_EXPANDED_WIDTH + 200);
     expect(expanded()).toBe(MAX_EXPANDED_WIDTH);
-    expect(last()).toEqual([MAX_EXPANDED_WIDTH, true]);
+    expect(last()).toEqual([total(MAX_EXPANDED_WIDTH), true]);
     beginSidebarResize();
     finishSidebarResize(315);
   });

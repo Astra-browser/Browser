@@ -77,9 +77,9 @@
   h2 {
     margin: 0;
     padding: 0 10px 6px;
-    font-size: var(--text-label);
-    font-weight: 550;
-    letter-spacing: 0.01em;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--color-muted);
   }
 
@@ -103,7 +103,7 @@
     background: none;
     color: var(--color-text);
     font: inherit;
-    font-size: var(--text-label);
+    font-size: var(--text-body);
     text-align: start;
     cursor: default;
     transition: background-color var(--motion-instant) var(--ease-smooth);

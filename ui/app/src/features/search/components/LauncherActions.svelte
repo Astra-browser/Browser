@@ -79,6 +79,9 @@
 </div>
 
 <style>
+  /* The launcher's action sheet is a menu, so it takes the menu's own
+     geometry and solid material: the same 22px panel, 34px rows and insets
+     as the chrome's dropdowns, which it is usually mistaken for. */
   .sheet {
     position: absolute;
     inset-block-end: 48px;
@@ -87,13 +90,15 @@
     display: flex;
     flex-direction: column;
     min-width: 248px;
-    padding: 6px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-card);
-    background: var(--color-raised);
-    box-shadow: var(--shadow-popover);
+    max-width: min(340px, calc(100vw - 24px));
+    box-sizing: border-box;
+    padding: var(--menu-pad);
+    border-radius: var(--radius-menu);
+    background: var(--color-float);
+    box-shadow: var(--shadow-menu), var(--shine-top);
     transform-origin: bottom right;
     animation: sheet-in var(--motion-fast) var(--ease-out);
+    overflow: hidden;
   }
 
   button {
@@ -101,18 +106,23 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    height: 32px;
-    padding: 0 6px 0 10px;
+    min-height: var(--menu-row);
+    padding: 6px var(--menu-item-inset);
     border: 0;
-    border-radius: var(--radius-inset);
+    border-radius: calc(var(--radius-menu) - var(--menu-pad));
     background: transparent;
     color: var(--color-text);
-    font-size: 13px;
+    font-size: var(--text-body);
+    font-weight: 450;
     text-align: start;
   }
 
   button.active {
-    background: var(--color-fill-active);
+    background: var(--row-active);
+  }
+
+  button:active {
+    background: var(--row-pressed);
   }
 
   @keyframes sheet-in {

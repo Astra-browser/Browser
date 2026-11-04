@@ -54,6 +54,6 @@
   /* In the column the switch is one more band of it, so it takes the corner
      every band there shares rather than a free-standing control's. */
   .modes :global(.segmented[data-size="regular"]) {
-    --seg-radius: var(--radius-row);
+    --seg-radius: var(--radius-tab);
   }
 </style>

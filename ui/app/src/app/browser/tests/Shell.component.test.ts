@@ -1,5 +1,5 @@
 import "$styles/global.css";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
@@ -18,6 +18,11 @@ vi.mock("$shared/ipc/bindings", async () => {
     sidebarSetHidden: async () => {},
     sidebarSetWidth: async () => {},
   });
+});
+// A window wide enough to hold the settings rail; below 760px the rail folds
+// into the page by design and this suite is about the rail.
+beforeEach(async () => {
+  await page.viewport(1100, 800);
 });
 afterEach(() => {
   surface.dispose();
@@ -77,7 +82,7 @@ test("Work keeps the column as the rail of tabs, and a tab chosen there opens ov
   expect(screen.container.querySelector(".shelf")).not.toBeNull();
 
   emitNativeEvent("uiCommand", "browser.work");
-  await expect.poll(() => column.style.width).toBe("56px");
+  await expect.poll(() => column.style.width).toBe("100px");
   await expect.poll(() => screen.container.querySelector("[data-work-stage-stub]")).not.toBeNull();
   // The account closes the rail, where Browse keeps its tools.
   await expect.element(screen.getByRole("button", { name: "Account" })).toBeVisible();
@@ -136,7 +141,7 @@ test("leaving Work or Settings gives back the column the window had", async () =
 
   for (let round = 0; round < 2; round++) {
     emitNativeEvent("uiCommand", "browser.work");
-    await expect.poll(() => column.style.width).toBe("56px");
+    await expect.poll(() => column.style.width).toBe("100px");
     emitNativeEvent("uiCommand", "browser.return");
     await expect.poll(shown).toEqual(browse);
   }

@@ -9,6 +9,8 @@ const PUT_AWAY: SidebarMode = "hidden";
 
 /** The rail width. Native admits it as a real sidebar width, not a mode flag. */
 export const COMPACT_WIDTH = 56;
+/** The utility rail always stands left of the column, in every shape. */
+export const RAIL_WIDTH = 44;
 export const MIN_EXPANDED_WIDTH = 180;
 export const MAX_EXPANDED_WIDTH = 460;
 
@@ -55,6 +57,8 @@ export const expanded = () => expandedWidth;
 export const PANEL_GAP = 8;
 let panelExtent = $state.raw(0);
 
+/** The column's own width, beside the rail: what the resize handle moves and
+ *  what the tool and settings panels add to. */
 export const effectiveWidth = () =>
   panelExtent > 0
     ? COMPACT_WIDTH + PANEL_GAP + panelExtent
@@ -62,6 +66,9 @@ export const effectiveWidth = () =>
       ? COMPACT_WIDTH
       : // Hidden keeps its width: it comes back over the page at that width.
         expandedWidth;
+
+/** What native insets the page by: the rail and the column together. */
+export const publishedWidth = () => RAIL_WIDTH + effectiveWidth();
 
 export const hasPanel = () => panelExtent > 0;
 
@@ -93,7 +100,7 @@ export function resolveDragWidth(value: number): { mode: SidebarMode; expanded: 
 function publish(travel = false) {
   resizeRevision++;
   if (drag) cancelSidebarResize();
-  const width = effectiveWidth();
+  const width = publishedWidth();
   void commands.sidebarSetWidth(width, travel, resizeRevision);
   void commands.sidebarSetHidden(isHidden());
 }
@@ -124,7 +131,7 @@ export function finishSidebarResize(value: number) {
   drag = null;
   adoptResizeWidth(value);
   // The page travels to the new edge, as it does from the native guide.
-  void commands.sidebarSetWidth(effectiveWidth(), true, resizeRevision);
+  void commands.sidebarSetWidth(publishedWidth(), true, resizeRevision);
 }
 
 export function cancelSidebarResize() {

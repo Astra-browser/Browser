@@ -69,18 +69,18 @@
   The only scrolling region in the chrome. Everything above it is pinned so a
   long tab list can never push a scrollbar up alongside the navigation row.
 
-  Pinned tabs are separated by a rule rather than a heading: the rule says
-  "these stay" without spending a row on a word, and the rows themselves carry
-  the difference by having no close control.
+  Pinned tabs are named by their section label, and their rows carry the
+  difference themselves by having no close control.
 -->
-<!-- Opening a tab never scrolls away with the tabs it adds to. -->
-{#if spaced}<SpaceBar {extras} />{:else}<div class="new-tab-slot" data-cascade style:--cascade={0}>
-    <button type="button" class="new-tab" onclick={tabs.open}>
-      <Icon icon={Add01Icon} size={16} />
-      <span>{m.new_tab()}</span>
-    </button>
-    {@render extras?.()}
-  </div>{/if}
+{#if spaced}
+  <SpaceBar {extras} />
+{:else if extras}
+  <!-- A window with one space has no space row, so pinned extensions keep the
+       slot the row would have given them. -->
+  <div class="new-tab-slot" data-cascade style:--cascade={0}>
+    {@render extras()}
+  </div>
+{/if}
 
 <div
   bind:this={stage}
@@ -107,7 +107,7 @@
       />
 
       {#if pinned.length > 0}
-        <div class="tab-divider" aria-hidden="true"></div>
+        <div class="tab-section-gap" aria-hidden="true"></div>
       {/if}
 
       <TabList
@@ -118,6 +118,18 @@
         {splitting}
         {onSelect}
       />
+
+      <!-- The list ends with the way to add to it, at the row's own pitch. -->
+      <button
+        type="button"
+        class="new-tab-row"
+        data-cascade
+        style:--cascade={pinned.length + today.length + 1}
+        onclick={tabs.open}
+      >
+        <Icon icon={Add01Icon} size={16} />
+        <span>{m.new_tab()}</span>
+      </button>
     </div>
     {#if peeking && after}<SpacePeek space={after} side="next" />{/if}
   </div>
@@ -150,32 +162,34 @@
     padding-block-end: 4px;
   }
 
-  .tab-divider {
-    height: 1px;
-    margin: 5px calc(var(--sidebar-inset) + 8px);
-    background: var(--color-border);
+  /* The sections are named, so the gap only has to hold them apart. */
+  .tab-section-gap {
+    block-size: var(--tab-inset);
   }
 
   .new-tab-slot {
     display: flex;
     flex: none;
     align-items: center;
-    gap: 2px;
-    padding-inline: var(--sidebar-inset);
-    padding-block: 2px calc(var(--sidebar-row-gap) + 2px);
+    gap: var(--tab-gap);
+    padding-inline: var(--tab-inset);
+    padding-block: var(--tab-gap);
   }
 
-  .new-tab {
+  /* The last row of the open list, at the same pitch as every row above it:
+     it is a way to add to the list, so it belongs in it. */
+  .new-tab-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    height: var(--row-sidebar);
-    padding-inline: 8px;
+    gap: var(--tab-inset);
+    block-size: var(--row-tab);
+    margin-inline: var(--tab-inset);
+    margin-block-start: var(--tab-gap);
+    padding-inline: var(--tab-inset);
     border: 0;
-    border-radius: var(--radius-row);
+    border-radius: var(--radius-tab);
     background: transparent;
-    color: var(--color-muted);
+    color: var(--color-label-secondary);
     font: inherit;
     font-size: var(--sidebar-row-text);
     font-weight: var(--sidebar-row-weight);
@@ -188,8 +202,12 @@
       color var(--motion-fast) var(--ease-out);
   }
 
-  .new-tab:hover {
+  .new-tab-row:hover {
     background: var(--row-hover);
-    color: var(--color-label-secondary);
+    color: var(--color-text);
+  }
+
+  .new-tab-row:focus-visible {
+    box-shadow: var(--row-rim);
   }
 </style>

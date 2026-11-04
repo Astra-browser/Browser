@@ -146,6 +146,11 @@
   hidden={entries.length === 0}
   data-close-buttons={preferences.value("tabs.close-button")}
 >
+  <!-- The column reads as sections rather than as one unbroken stack; the
+       label is visual only, because the nav already carries this name. -->
+  {#if variant === "list"}
+    <p class="tab-section" aria-hidden="true">{label}</p>
+  {/if}
   <ul
     bind:this={list}
     class:flex={variant === "list"}
@@ -237,8 +242,20 @@
 
 <style>
   .tab-list {
-    padding-inline: var(--sidebar-inset);
-    padding-block: 2px;
+    padding-inline: var(--tab-inset);
+    padding-block: var(--tab-gap);
+  }
+
+  .tab-section {
+    margin: 0;
+    padding-inline: var(--tab-inset);
+    padding-block-end: var(--tab-gap);
+    color: var(--color-faint);
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    text-transform: uppercase;
   }
 
   /* The dock owns the band's inset, so its site row adds none of its own. */
@@ -270,6 +287,6 @@
 
   /* One pixel between rows read as a stack of stripes rather than a list. */
   .tab-list-rows {
-    gap: var(--sidebar-row-gap);
+    gap: var(--tab-gap);
   }
 </style>

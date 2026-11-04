@@ -60,7 +60,11 @@
   // A tab with no page yet is a different thing from a page whose site simply
   // supplies no icon, and the row should say which.
   let fallback = $derived(tabFallbackIcon(tab.content));
-  let indent = $derived(grouped ? 8 : 8 + Math.min(depth, 8) * 13);
+  // Depth steps the label in; the row's own inset is a token, so only the
+  // steps are arithmetic. `indent` keeps the numeric form the audio control
+  // positions itself with.
+  let steps = $derived(grouped ? 0 : Math.min(depth, 8) * 13);
+  let indent = $derived(8 + steps);
 </script>
 
 <li
@@ -79,7 +83,7 @@
   <button
     type="button"
     class="tab-open"
-    style:padding-inline-start={`${indent}px`}
+    style:padding-inline-start={`calc(var(--tab-inset, 8px) + ${steps}px)`}
     aria-current={active ? "page" : undefined}
     aria-label={tab.title || m.untitled_tab()}
     oncontextmenu={(event) => onContextMenu(event, tab)}
@@ -142,8 +146,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    height: var(--row-sidebar);
-    border-radius: var(--radius-row);
+    height: var(--row-tab);
+    border-radius: var(--radius-tab);
     color: var(--color-label-secondary);
     font-size: var(--sidebar-row-text);
     font-weight: var(--sidebar-row-weight);
@@ -167,7 +171,7 @@
      the column. The rest sit a step back so the list reads as one surface. */
   .browse-tab[data-selected="true"] {
     background: var(--row-active);
-    color: var(--color-row-current, var(--color-text));
+    color: var(--color-text);
     font-weight: var(--sidebar-row-weight-current);
   }
 
@@ -184,7 +188,7 @@
     flex: 1;
     align-items: center;
     align-self: stretch;
-    gap: 10px;
+    gap: var(--tab-inset);
     min-width: 0;
     padding-inline-end: 4px;
     border: 0;
@@ -225,7 +229,7 @@
      running underneath it. */
   .browse-tab:is(:hover, :focus-within) .tab-label,
   :global([data-close-buttons="always"]) .browse-tab:has(.tab-close) .tab-label {
-    margin-inline-end: 22px;
+    margin-inline-end: 20px;
   }
 
   .tab-status {
@@ -237,14 +241,14 @@
 
   .tab-close {
     position: absolute;
-    inset-inline-end: 5px;
+    inset-inline-end: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 21px;
-    height: 21px;
+    width: 20px;
+    height: 20px;
     border: 0;
-    border-radius: var(--radius-inset);
+    border-radius: var(--radius-capsule);
     background: transparent;
     color: var(--color-faint);
     opacity: 0;

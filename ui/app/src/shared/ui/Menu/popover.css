@@ -70,8 +70,9 @@
   height: 1px;
 
   /* Full bleed, because a divider that stops short of the edge reads as a
-     misaligned row rather than as a break in the list. */
-  margin: 5px calc(var(--menu-pad) * -1);
+     misaligned row rather than as a break in the list. 4px either side is the
+     reference's break: enough to separate, not enough to open a gap. */
+  margin: 4px calc(var(--menu-pad) * -1);
   background: var(--color-menu-separator);
 }
 
@@ -85,12 +86,13 @@
 }
 
 /* A shortcut is a caption on the row it belongs to, not a key to press here.
-   Keycaps are for the launcher, where the keys are the interface. */
+   Keycaps are for the launcher, where the keys are the interface. 11px keeps
+   it reading as a hint beside the 13px label, not as a second label. */
 .ui-menu-hint {
   margin-inline-start: auto;
   padding-inline-start: 28px;
   color: var(--color-faint);
-  font-size: var(--text-label);
+  font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
   transition: color var(--motion-instant) var(--ease-smooth);
 }

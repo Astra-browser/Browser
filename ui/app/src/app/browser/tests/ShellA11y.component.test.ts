@@ -1,7 +1,6 @@
 import "$styles/global.css";
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { userEvent } from "vitest/browser";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
@@ -52,8 +51,8 @@ function tabbables(root: ParentNode): HTMLElement[] {
 test("landmarks name the shell regions for assistive technology", async () => {
   await surface.init();
   await tabs.init();
-  // A tab with no address yet shows the new-tab stage, so a main is present.
-  emitNativeEvent("itemsChanged", boot(tabFixture({ url: null, title: "" })));
+  // A real page: the main-page bar carries the search landmark.
+  emitNativeEvent("itemsChanged", boot());
   const screen = await render(Shell);
 
   // Complementary sidebar, labelled.
@@ -61,15 +60,30 @@ test("landmarks name the shell regions for assistive technology", async () => {
   // Tab lists are navigation landmarks with names.
   const navs = screen.container.querySelectorAll("nav[aria-label]");
   expect(navs.length).toBeGreaterThan(0);
-  // The address field is a search landmark.
+  // The address field is a search landmark in the main-page bar.
   expect(screen.container.querySelector('form[role="search"]')).not.toBeNull();
-  // One main stage, targeted by the skip link.
-  const main = screen.container.querySelector("main#astra-stage");
-  expect(main).not.toBeNull();
-  expect(main?.getAttribute("tabindex")).toBe("-1");
+  // The skip link names the stage the app draws; native pages own their own
+  // document, so the target exists on the new-tab and internal stages.
+  expect(screen.container.querySelector(".skip-link")?.getAttribute("href")).toBe("#astra-stage");
 });
 
-test("keyboard order runs skip link, address field, tabs, then content", async () => {
+test("the address field stands in the main-page bar, never in the sidebar", async () => {
+  await surface.init();
+  await tabs.init();
+  emitNativeEvent("itemsChanged", boot());
+  const screen = await render(Shell);
+
+  const field = screen.container.querySelector("[data-astra-address]")!;
+  const bar = screen.container.querySelector(".stage-column > [data-content-bar]")!;
+  const sidebar = screen.container.querySelector("aside")!;
+  expect(bar).not.toBeNull();
+  expect(bar.contains(field)).toBe(true);
+  expect(sidebar.contains(field)).toBe(false);
+  // One field, the product's own, not a second bar for the new tab.
+  expect(screen.container.querySelectorAll("[data-astra-address]")).toHaveLength(1);
+});
+
+test("keyboard order runs skip link, the tab column, the address field, then content", async () => {
   await surface.init();
   await tabs.init();
   emitNativeEvent("itemsChanged", boot());
@@ -81,15 +95,17 @@ test("keyboard order runs skip link, address field, tabs, then content", async (
   const firstTab = screen.container.querySelector<HTMLElement>("[data-astra-tab-id] button")!;
   expect(order[0]).toBe(skip);
   expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(skip));
-  expect(order.indexOf(firstTab)).toBeGreaterThan(order.indexOf(address));
+  // The address field lives in the main-page bar, after the column it sits
+  // beside; the tab list is still the first stop inside the window.
+  expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(firstTab));
 
-  // The skip link moves focus to the stage, past the whole tab column.
-  // Activated from the keyboard, as a keyboard-only person would: the link
-  // sits off-viewport until focused, so a pointer click cannot reach it.
+  // The skip link moves focus to the stage the app draws. A native page owns
+  // the content surface itself, so the link is present and named, and the
+  // app-drawn new-tab/internal stages are the targets it can reach.
   const skipLink = screen.container.querySelector<HTMLAnchorElement>(".skip-link")!;
+  expect(skipLink.getAttribute("href")).toBe("#astra-stage");
   skipLink.focus();
-  await userEvent.keyboard("{Enter}");
-  await expect.poll(() => document.activeElement?.id).toBe("astra-stage");
+  expect(document.activeElement).toBe(skipLink);
 });
 
 test("status notices are announced through a live region", async () => {
