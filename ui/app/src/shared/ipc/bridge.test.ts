@@ -133,6 +133,7 @@ describe("bridge wiring", () => {
       Resources: {},
       Search: {},
       PageSource: {},
+      DialogPrompts: {},
       Permissions: {},
       Operations: {},
       addEventListener: () => () => {},

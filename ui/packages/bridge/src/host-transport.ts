@@ -93,6 +93,7 @@ const ROUTES: Record<string, Route> = {
   download_call: ["Downloads", "call"],
   download_open_access_settings: ["Downloads", "openAccessSettings"],
   media_player: ["Media", "player"],
+  tab_set_muted: ["Tabs", "setMuted", TAB_ARG],
   note_call: ["Notes", "call"],
   bookmark_call: ["Bookmarks", "call"],
   time_call: ["Time", "call"],

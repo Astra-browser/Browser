@@ -788,7 +788,16 @@ export const Tabs = {
     tab.muted = muted === true;
     const snap = snapshot(astra_tab_id);
     emit("tab.updated", { ...snap });
-    return ok(request_id, { astra_tab_id, muted: tab.muted });
+    // `settle()` needs an admission; Content applies the native mute. Keep the
+    // standard envelope fields so the Host API v1 contract still holds.
+    return {
+      request_id,
+      host_api_version: HOST_API_VERSION,
+      operation_id: null,
+      accepted: true,
+      astra_tab_id,
+      muted: tab.muted,
+    };
   },
 };
 

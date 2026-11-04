@@ -26,6 +26,7 @@ import {
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
+import { Media } from "./Media.sys.mjs";
 import { releaseSpaceContext, userContextForSpace } from "./Containers.sys.mjs";
 import {
   ContentHide,
@@ -341,6 +342,7 @@ export const Content = {
       const browser = tab.linkedBrowser ?? null;
       if (browser) {
         browsers.set(id, { browser, tab });
+        attachMedia(id, browser);
         // A remote browser inherits the chrome window's false
         // useGlobalHistory; the native tab needs the same fix as mount().
         allowGlobalHistory(browser);
@@ -359,6 +361,174 @@ export const Content = {
         }
       }
     };
+    // --- media player projection (P9) -----------------------------------
+    // The sidebar player belongs to the tab playing behind the page in front.
+    // The engine controller lives per browser; a private window projects
+    // nothing. Position/duration arrive only when the page publishes them.
+    const mediaStates = new Map(); // astra_tab_id -> state
+    const mediaView = (id) => {
+      const state = mediaStates.get(id);
+      if (!state) return null;
+      const controller = state.controller;
+      let active = false;
+      try {
+        active = controller.isActive === true;
+      } catch {
+        active = false;
+      }
+      if (!active) return null;
+      let metadata = null;
+      try {
+        metadata = controller.getMetadata?.() ?? null;
+      } catch {
+        metadata = null;
+      }
+      const tab = tabOf.get(id);
+      const title = String(metadata?.title || tab?.label || state.browser.contentTitle || "").trim();
+      if (title === "") return null;
+      let site = "";
+      try {
+        site = state.browser.currentURI?.host ?? "";
+      } catch {
+        site = "";
+      }
+      return {
+        tab_id: id,
+        title,
+        artist: String(metadata?.artist || site || ""),
+        icon: null,
+        duration: state.duration ?? null,
+        position: state.position ?? null,
+        rate: state.rate ?? null,
+        playing: controller.isPlaying === true,
+        waiting: false,
+        can_pip: false,
+        in_pip: false,
+        muted: state.browser.audioMuted === true,
+        can_mute: true,
+      };
+    };
+    const projectMedia = (id) => {
+      const selected = (() => {
+        try {
+          return __tabsState().selectedId;
+        } catch {
+          return "";
+        }
+      })();
+      if (isPrivateWindow(win) || id === selected) {
+        Media.__projectMedia(id, null);
+        return;
+      }
+      Media.__projectMedia(id, mediaView(id));
+    };
+    const detachMedia = (id) => {
+      const state = mediaStates.get(id);
+      if (state) {
+        for (const [type, fn] of state.listeners) {
+          try {
+            state.controller.removeEventListener(type, fn);
+          } catch {
+            // The browser went away with the controller.
+          }
+        }
+        mediaStates.delete(id);
+      }
+      Media.__projectMedia(id, null);
+    };
+    const attachMedia = (id, browser) => {
+      detachMedia(id);
+      if (!browser || isPrivateWindow(win)) return;
+      let controller = null;
+      try {
+        controller = browser.browsingContext?.mediaController ?? null;
+      } catch {
+        controller = null;
+      }
+      if (!controller || typeof controller.addEventListener !== "function") return;
+      const state = {
+        browser,
+        controller,
+        position: null,
+        duration: null,
+        rate: null,
+        listeners: [],
+      };
+      const refresh = () => projectMedia(id);
+      for (const type of [
+        "activated",
+        "deactivated",
+        "playbackstatechange",
+        "metadatachange",
+        "supportedkeyschange",
+        "audiblechange",
+      ]) {
+        const fn = () => refresh();
+        try {
+          controller.addEventListener(type, fn);
+          state.listeners.push([type, fn]);
+        } catch {
+          // A controller without that event.
+        }
+      }
+      const onPosition = (event) => {
+        state.position = Number.isFinite(event.position) ? event.position : null;
+        state.duration = Number.isFinite(event.duration) ? event.duration : null;
+        state.rate = Number.isFinite(event.playbackRate) ? event.playbackRate : null;
+        refresh();
+      };
+      try {
+        controller.addEventListener("positionstatechange", onPosition);
+        state.listeners.push(["positionstatechange", onPosition]);
+      } catch {
+        // No position state on this engine.
+      }
+      mediaStates.set(id, state);
+      refresh();
+    };
+    Media.__setEngine({
+      dispatch: (id, action) => {
+        const state = mediaStates.get(id);
+        const controller = state?.controller ?? null;
+        switch (action.kind) {
+          case "play":
+            if (!controller) return false;
+            try {
+              controller.play();
+            } catch {
+              return false;
+            }
+            projectMedia(id);
+            return true;
+          case "pause":
+            if (!controller) return false;
+            try {
+              controller.pause();
+            } catch {
+              return false;
+            }
+            projectMedia(id);
+            return true;
+          case "seek":
+            if (!controller || !Number.isFinite(action.seconds)) return false;
+            try {
+              controller.seekTo(action.seconds, false);
+            } catch {
+              return false;
+            }
+            projectMedia(id);
+            return true;
+          case "show":
+            void Tabs.select({ request_id: `media-show-${id}`, astra_tab_id: id });
+            return true;
+          case "close":
+            Media.__projectMedia(id, null);
+            return true;
+          default:
+            return false;
+        }
+      },
+    });
     const refreshIcon = (id) => {
       const tab = tabOf.get(id);
       const browser = tab?.linkedBrowser;
@@ -385,6 +555,7 @@ export const Content = {
         idOf.delete(tab);
         tab.removeAttribute("astra-tab-id");
       }
+      detachMedia(id);
       tabOf.delete(id);
       browsers.delete(id);
       pending.delete(id);
@@ -518,6 +689,8 @@ export const Content = {
         const selected = __tabsState().selectedId;
         if (selected) activate(selected);
       }
+      // The player follows the tab behind the page in front.
+      for (const id of [...mediaStates.keys()]) projectMedia(id);
     };
     const onClose = (event) => {
       if (applying) return;
@@ -686,6 +859,7 @@ export const Content = {
           } catch {
             // A tab torn down mid-toggle.
           }
+          projectMedia(id);
         }
         return;
       }
@@ -783,6 +957,8 @@ export const Content = {
       browsers,
       detach() {
         off();
+        Media.__setEngine(null);
+        for (const id of [...mediaStates.keys()]) detachMedia(id);
         try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
         try { gb.tabContainer.removeEventListener("TabOpen", onOpen); } catch {}

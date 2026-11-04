@@ -112,6 +112,51 @@ for (const action of ACTIONS) {
   check("view() takes no arguments and still reports none", (await Media.view(TAB)) === null);
 }
 
+// === A bound engine (P9) ====================================================
+{
+  const VIEW = {
+    tab_id: TAB,
+    title: "Tone",
+    artist: "example.test",
+    icon: null,
+    duration: 12,
+    position: 3,
+    rate: 1,
+    playing: true,
+    waiting: false,
+    can_pip: false,
+    in_pip: false,
+    muted: false,
+    can_mute: true,
+  };
+  const dispatched = [];
+  Media.__setEngine({
+    dispatch(id, action) {
+      dispatched.push(`${id}:${action.kind}`);
+      return id === TAB;
+    },
+  });
+  const play = await Media.player({ id: TAB, action: { kind: "play" } });
+  check("a bound transport action is applied", play.accepted === true);
+  check("a bound action reaches the engine", dispatched.at(-1) === `${TAB}:play`);
+  const other = await Media.player({ id: "tab-other", action: { kind: "play" } });
+  check("an unknown tab is still refused by the engine", other.accepted === false);
+  check("an unknown action never reaches the engine", (await Media.player({ id: TAB, action: { kind: "mute" } })).accepted === false);
+  check("a non-finite seek is refused", (await Media.player({ id: TAB, action: { kind: "seek", seconds: NaN } })).accepted === false);
+
+  const before = seen.length;
+  check("a projection is accepted", Media.__projectMedia(TAB, VIEW) === true);
+  check("a projection is emitted", seen.length === before + 1 && seen.at(-1).type === "media-player-changed");
+  check("the view reads back", Media.view()?.tab_id === TAB && Media.view()?.playing === true);
+  check("a duplicate projection is not emitted", Media.__projectMedia(TAB, { ...VIEW }) === false);
+  check("a changed field is emitted", Media.__projectMedia(TAB, { ...VIEW, playing: false }) === true && seen.length === before + 2);
+  check("a mismatched tab is rejected", Media.__projectMedia("tab-other", VIEW) === false);
+  check("clearing emits once", Media.__projectMedia(TAB, null) === true && Media.view() === null);
+
+  Media.__resetForTests();
+  check("reset clears the engine", (await Media.player({ id: TAB, action: { kind: "play" } })).accepted === false);
+}
+
 off();
-console.log(`\nmedia_model: ${passed} passed, ${failed} failed`);
+console.log(`\nmedia model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

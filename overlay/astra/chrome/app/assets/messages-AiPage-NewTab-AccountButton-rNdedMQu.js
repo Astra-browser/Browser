@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-B5nKvvR-.js";var n=((n,r={})=>(r.locale??t(),e(2541,n)??`${n?.percent}% used`));export{n as t};
