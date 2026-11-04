@@ -103,9 +103,23 @@ Security properties of this path:
   browser (or a closed window) falls back to Firefox's own prompt instead of a
   dead event pump.
 
-Scope today: **geolocation**. Camera and microphone use Firefox's separate
-`webrtcUI`/`WebRTCParent` prompt, which is not intercepted yet; the Astra
-prompt renders them, but the engine will still show its own prompt until that
-seam is wired (P6b follow-up). The live probe covers allow, deny, navigate
-away, tab close, and the location-sharing state.
+Scope today: **geolocation, camera and microphone**. Camera/microphone do not
+use `nsIContentPermissionPrompt`; the WebRTC actor is the seam:
+
+- `Permissions.install({window})` also publishes `{askForWebRTC, cancelWebRTC}`
+  for that window on `Services.astraPermissionWindows`, because the actor runs
+  in the shared parent module loader and cannot import the shell's per-window
+  instance.
+- `patches/ASTRA-0008-astra-webrtc-prompt.patch` hands a `getUserMedia` request
+  to that entry after the engine's own `BLOCK` check. Astra publishes one
+  prompt with both kinds; the actor still chooses the default devices, writes
+  `MediaManagerVideo`, calls `activateDevicePerm`, checks the OS permission and
+  sends `webrtc:Allow`/`webrtc:Deny`. Screen share, audio capture, speaker
+  selection, add-on prompts, unsafe delegation, insecure/non-web URLs and the
+  browser-chrome test harness keep the native prompt.
+- A page that navigates or closes sends `webrtc:CancelRequest`, which cancels
+  the Astra record too.
+- The live probe covers allow-always, deny-always, allow-once (temporary
+  scope), dismiss, auto-allow after a persistent grant, and the native
+  doorhanger staying absent.
 

@@ -33,12 +33,11 @@ import { emit } from "./Events.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
 
 /** The page permissions the Astra prompt renders. Camera and microphone use
- *  Firefox's separate WebRTC prompt (P6b follow-up); claiming them here would
- *  intercept a request whose `allow()` needs device choices this prompt does
- *  not collect, so only geolocation is mapped for now. */
-export const KINDS = new Set(["geolocation"]);
+ *  Camera/microphone arrive through the WebRTC actor (`askForWebRTC`), not the
+ *  `Integration.contentPermission` seam; both settle into this same queue. */
+export const KINDS = new Set(["geolocation", "camera", "microphone"]);
 
-/** Engine permission type -> Astra kind. */
+/** Engine permission type -> Astra kind (the `contentPermission` seam). */
 export const KIND_BY_ENGINE_TYPE = {
   geolocation: "geolocation",
 };
@@ -46,6 +45,8 @@ export const KIND_BY_ENGINE_TYPE = {
 /** Astra kind -> `SitePermissions` / `Services.perms` name. */
 export const ENGINE_PERMISSION_NAME = {
   geolocation: "geo",
+  camera: "camera",
+  microphone: "microphone",
 };
 
 const DECISIONS = new Set([
@@ -229,6 +230,8 @@ function watchDocument(record, browser) {
  */
 export function ask({
   kind = "",
+  kinds = null,
+  call_id = "",
   origin = "",
   item_id = "",
   profile_id = "default",
@@ -241,7 +244,10 @@ export function ask({
   browser = null,
   blocked_by_system = false,
 } = {}) {
-  if (!KINDS.has(kind)) return null;
+  const list =
+    Array.isArray(kinds) && kinds.length > 0 ? kinds.slice() : kind ? [kind] : [];
+  if (list.length === 0) return null;
+  if (list.some((entry) => !KINDS.has(entry))) return null;
   if (typeof origin !== "string" || origin === "") return null;
   if (typeof item_id !== "string" || item_id === "") return null;
   if (_queue.length >= MAX_QUEUE) {
@@ -250,13 +256,14 @@ export function ask({
   }
   const record = {
     prompt_id: mintPromptId(),
-    kind,
+    kind: list[0],
+    kinds: list,
+    call_id: typeof call_id === "string" ? call_id : "",
     origin,
     item_id,
     profile_id: typeof profile_id === "string" && profile_id !== "" ? profile_id : "default",
     rememberable: rememberable === true,
     blocked_by_system: blocked_by_system === true,
-    kinds: [kind],
     allow,
     cancel,
     persist,
@@ -293,8 +300,211 @@ function documentIsCurrent(record) {
   }
 }
 
+function sharedServices() {
+  try {
+    return typeof Services !== "undefined" && Services ? Services : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Restorable view of each kind's current policy, before an Astra write. */
+function capturePermissionStates(kinds, principal, browser) {
+  const SitePermissions = lazyModule(
+    "resource:///modules/SitePermissions.sys.mjs",
+    "SitePermissions"
+  );
+  if (!SitePermissions) return null;
+  const states = [];
+  for (const kind of kinds) {
+    const name = ENGINE_PERMISSION_NAME[kind];
+    if (!name) return null;
+    try {
+      const { state, scope } = SitePermissions.getForPrincipal(principal, name, browser);
+      states.push({ principal, browser, name, state, scope });
+    } catch {
+      return null;
+    }
+  }
+  return states;
+}
+
+function writePermissionStates(states, allow, durable) {
+  const SitePermissions = lazyModule(
+    "resource:///modules/SitePermissions.sys.mjs",
+    "SitePermissions"
+  );
+  if (!SitePermissions) return false;
+  const state = allow ? SitePermissions.ALLOW : SitePermissions.BLOCK;
+  const scope = durable ? SitePermissions.SCOPE_PERSISTENT : SitePermissions.SCOPE_TEMPORARY;
+  try {
+    for (const entry of states) {
+      SitePermissions.setForPrincipal(
+        entry.principal,
+        entry.name,
+        state,
+        scope,
+        entry.browser
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function restorePermissionStates(states) {
+  const SitePermissions = lazyModule(
+    "resource:///modules/SitePermissions.sys.mjs",
+    "SitePermissions"
+  );
+  if (!SitePermissions) return;
+  for (const entry of states) {
+    try {
+      if (entry.state === SitePermissions.ALLOW || entry.state === SitePermissions.BLOCK) {
+        SitePermissions.setForPrincipal(
+          entry.principal,
+          entry.name,
+          entry.state,
+          entry.scope ?? SitePermissions.SCOPE_PERSISTENT,
+          entry.browser
+        );
+      } else {
+        SitePermissions.removeFromPrincipal(entry.principal, entry.name, entry.browser);
+      }
+    } catch {
+      // Best effort: the request is already settled either way.
+    }
+  }
+}
+
+/**
+ * WebRTC entry point (P6b-2). The engine actor owns device selection and the
+ * actual `webrtc:Allow`/`webrtc:Deny`; this publishes the Astra prompt and
+ * hands the decision back through `grant`/`deny`.
+ *
+ * Returns true when Astra owns the request, false when the engine should keep
+ * its own prompt.
+ */
+export function askForWebRTC({
+  browser = null,
+  principal = null,
+  origin = "",
+  callID = "",
+  kinds = [],
+  isAllowed = null,
+  grant = null,
+  deny = null,
+} = {}) {
+  const list = Array.isArray(kinds) ? kinds.filter((kind) => KINDS.has(kind)) : [];
+  if (!browser || !principal || list.length === 0) return false;
+  if (typeof origin !== "string" || origin === "") return false;
+  try {
+    if (!(principal.URI instanceof Ci.nsIStandardURL)) return false;
+    if (!principal.schemeIs("http") && !principal.schemeIs("https")) return false;
+    if (principal.addonPolicy) return false;
+  } catch {
+    return false;
+  }
+  const win =
+    browser.ownerDocument?.defaultView ?? browser.ownerGlobal ?? null;
+  if (!win) return false;
+  let tabId = "";
+  try {
+    tabId =
+      win.gBrowser?.getTabForBrowser?.(browser)?.getAttribute?.("astra-tab-id") ?? "";
+  } catch {
+    tabId = "";
+  }
+  // Only Astra's own tabs: an engine-internal browser keeps Firefox's prompt.
+  if (tabId === "") return false;
+  if (typeof isAllowed === "function") {
+    try {
+      if (isAllowed() === true) return true;
+    } catch {
+      // Fall through to Astra's prompt.
+    }
+  }
+
+  let prior = null;
+  let settled = false;
+  const denyOnce = (noOSPermission = false) => {
+    if (settled) return;
+    settled = true;
+    try {
+      deny?.(noOSPermission === true);
+    } catch {
+      // The request already went away.
+    }
+  };
+  const persist = (allow, durable) => {
+    if (prior === null) {
+      prior = capturePermissionStates(list, principal, browser);
+    }
+    if (prior === null) return false;
+    const ok = writePermissionStates(prior, allow, durable);
+    if (!ok) restorePermissionStates(prior);
+    return ok;
+  };
+  const rollback = () => {
+    if (prior !== null) restorePermissionStates(prior);
+  };
+
+  const token = ask({
+    kind: list[0],
+    kinds: list,
+    call_id: callID,
+    origin,
+    item_id: tabId,
+    profile_id: profileForWindow(win),
+    rememberable: !isPrivateWindow(win),
+    principal,
+    browser,
+    persist,
+    rollback,
+    allow: () => {
+      if (settled) return;
+      settled = true;
+      Promise.resolve()
+        .then(() => grant?.())
+        .catch(() => {
+          try {
+            deny?.(false);
+          } catch {
+            // Already gone.
+          }
+        });
+    },
+    cancel: () => denyOnce(false),
+  });
+  if (token === null) {
+    // Never fall back to the native prompt once Astra owns the request.
+    denyOnce(false);
+  }
+  return true;
+}
+
+/** A page that goes away cancels its pending WebRTC prompt. */
+export function cancelWebRTC(callID) {
+  if (typeof callID !== "string" || callID === "") return false;
+  for (const record of [..._records.values()]) {
+    if (record.call_id !== callID) continue;
+    detach(record);
+    try {
+      record.cancel?.();
+    } catch {
+      // Already cancelled with the document.
+    }
+    publish();
+    return true;
+  }
+  return false;
+}
+
 export const Permissions = {
   ask,
+  askForWebRTC,
+  cancelWebRTC,
 
   /**
    * Answer the prompt on screen. Returns an OperationAdmission; the terminal
@@ -468,6 +678,16 @@ export const Permissions = {
     }
     if (win) {
       point[REGISTRY].set(win, { promptForRequest });
+      // The WebRTC actor runs in the shared parent module loader, so it cannot
+      // import this per-window instance. Publish the window's entry instead;
+      // the actor looks it up by the requesting browser's window.
+      const shared = sharedServices();
+      if (shared) {
+        if (!(shared.astraPermissionWindows instanceof Map)) {
+          shared.astraPermissionWindows = new Map();
+        }
+        shared.astraPermissionWindows.set(win, { askForWebRTC, cancelWebRTC });
+      }
     }
     return true;
   },
@@ -483,12 +703,22 @@ export const Permissions = {
     } catch {
       // The process is already gone.
     }
+    try {
+      sharedServices()?.astraPermissionWindows?.delete(win);
+    } catch {
+      // Already gone with the window.
+    }
   },
 
   /** Test-only: reset the prompt queue, revision and sidebar host. */
   __resetForTests() {
     for (const record of [..._records.values()]) {
       detach(record);
+    }
+    try {
+      sharedServices()?.astraPermissionWindows?.clear();
+    } catch {
+      // No shared Services in a Node test.
     }
     _records.clear();
     _queue.length = 0;
