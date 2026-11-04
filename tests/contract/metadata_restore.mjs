@@ -16,7 +16,7 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Metadata, buildSnapshot, planRestore, isPersistableUrl, shouldPersist } = await import(
+const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows } = await import(
   path.join(HOST, "Metadata.sys.mjs")
 );
 const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(
@@ -224,13 +224,15 @@ function tab(overrides) {
   check("round trip keeps the pin", plan.assignments.some((a) => a.pinned === true));
 }
 
-// --- One writer: the focused window -----------------------------------------
+// --- One writer per process -------------------------------------------------
 {
-  check("a focused public window persists", shouldPersist({ windowId: "win-1", focusedWindowId: "win-1" }) === true);
-  check("an unfocused window does not persist", shouldPersist({ windowId: "win-1", focusedWindowId: "win-2" }) === false);
-  check("a private window never persists", shouldPersist({ private: true, windowId: "win-1", focusedWindowId: "win-1" }) === false);
-  check("unknown focus does not block a save", shouldPersist({ windowId: "win-1", focusedWindowId: "" }) === true);
-  check("an unbound window id does not block a save", shouldPersist({ windowId: "", focusedWindowId: "win-2" }) === true);
+  const a = { id: "a" };
+  const b = { id: "b" };
+  check("the unclaimed slot admits the first window", ownerAllows({ owner: null, token: a }) === true);
+  check("the owner may write", ownerAllows({ owner: a, token: a }) === true);
+  check("a non-owner may not write", ownerAllows({ owner: a, token: b }) === false);
+  check("a private window never writes", ownerAllows({ private: true, owner: a, token: a }) === false);
+  check("a private window never writes even unclaimed", ownerAllows({ private: true, owner: null, token: a }) === false);
 }
 
 // --- Deferred (lazy) restore ------------------------------------------------
@@ -275,6 +277,7 @@ function tab(overrides) {
   const restored = await Metadata.restore({ private: true });
   check("a private window does not restore", restored.restored === false && restored.reason === "private");
   check("status reports the private window", Metadata.status().private === true);
+  check("a private window is not the owner", Metadata.status().owner === false);
   Metadata.__resetForTests();
   check("reset clears the private flag", Metadata.status().private === false);
 }
