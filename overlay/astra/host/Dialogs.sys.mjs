@@ -242,7 +242,18 @@ export const Dialogs = {
 
   // --- HTTP auth ---
 
-  async requestAuth({ request_id = "", astra_tab_id = "", host = "", realm = "", scheme = "basic", actor = "" } = {}) {
+  async requestAuth({
+    request_id = "",
+    astra_tab_id = "",
+    host = "",
+    realm = "",
+    scheme = "basic",
+    proxy = false,
+    insecure = false,
+    retry = false,
+    only_password = false,
+    actor = "",
+  } = {}) {
     const gate = requireChrome(request_id, actor);
     if (gate) {
       return gate;
@@ -256,8 +267,27 @@ export const Dialogs = {
     if (scheme !== undefined && scheme !== "" && !AUTH_SCHEMES.has(scheme)) {
       return err(request_id, "invalid_scheme", `unknown auth scheme ${scheme}`);
     }
-    const record = mint("auth", { astra_tab_id, host, realm, scheme });
-    emit("auth.required", { dialog_id: record.dialog_id, astra_tab_id, host, realm, scheme });
+    const record = mint("auth", {
+      astra_tab_id,
+      host,
+      realm,
+      scheme,
+      proxy: proxy === true,
+      insecure: insecure === true,
+      retry: retry === true,
+      only_password: only_password === true,
+    });
+    emit("auth.required", {
+      dialog_id: record.dialog_id,
+      astra_tab_id,
+      host,
+      realm,
+      scheme,
+      proxy: record.proxy,
+      insecure: record.insecure,
+      retry: record.retry,
+      only_password: record.only_password,
+    });
     return ok(request_id, { dialog: snapshot(record) });
   },
 

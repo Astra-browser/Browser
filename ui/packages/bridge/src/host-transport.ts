@@ -39,6 +39,7 @@ export interface HostModules {
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
@@ -67,6 +68,7 @@ const ROUTES: Record<string, Route> = {
   tabs_bootstrap: ["Tabs", "bootstrap"],
   tabs_close: ["Tabs", "close", TAB_ARG],
   tabs_activate: ["Tabs", "select", TAB_ARG],
+  tabs_answer_sign_in: ["DialogPrompts", "answerAuth", TAB_ARG],
   tabs_navigate: ["Navigation", "loadURL", { ...TAB_ARG, input: "url" }],
   tabs_back: ["Navigation", "goBack", TAB_ARG],
   tabs_forward: ["Navigation", "goForward", TAB_ARG],

@@ -56,7 +56,11 @@
         "astra_tab_id": { "type": "string" },
         "host": { "type": "string" },
         "realm": { "type": "string" },
-        "scheme": { "type": "string", "enum": ["basic", "digest", "ntlm", "negotiate"] }
+        "scheme": { "type": "string", "enum": ["basic", "digest", "ntlm", "negotiate"] },
+        "proxy": { "type": "boolean" },
+        "insecure": { "type": "boolean" },
+        "retry": { "type": "boolean" },
+        "only_password": { "type": "boolean" }
       },
       "required": ["dialog_id", "astra_tab_id", "host"],
       "additionalProperties": false

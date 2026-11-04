@@ -29,6 +29,30 @@ Every dialog has a `dialog_id` (`dlg-N`), a `kind`, and a `status`
 resolving twice returns `already_resolved`. `get` / `list` (optional
 `status` filter) introspect pending dialogs, e.g. to re-render after restart.
 
+## HTTP auth (P6c-1)
+
+`DialogPrompts.sys.mjs` turns a real 401 into the app's existing sign-in card:
+
+- `patches/ASTRA-0009-astra-http-auth.patch` calls the window's entry from
+  `LoginManagerAuthPrompter` instead of `Services.prompt.asyncPromptAuth`, so
+  the engine dialog never opens for an Astra tab. A non-Astra tab keeps the
+  engine prompt.
+- `Dialogs.requestAuth` mints the record; the tab projection carries
+  `page_request: {kind:"http_auth", request, host, insecure, proxy, retry}`;
+  the app answers with `tabs_answer_sign_in`.
+- Credentials live only in the `DialogPrompts` closure. They never enter an
+  event, the projection, the operation ledger or a log; the engine's `authInfo`
+  is set immediately before the promise resolves.
+- A response must match the exact tab and request token. A stale answer is
+  refused (`invalid_scope`), and a navigation or tab close resolves the engine
+  prompt false and clears the card.
+- Only `basic`/`digest` are owned. NTLM/Negotiate and password-only challenges
+  are cancelled rather than shown in Firefox's dialog (recorded limitation).
+
+Live probe: `tools/perf/stress/http_auth_probe.py` — real 401, wrong password
+returns retry, right password loads the page, cancel clears, and no
+`commonDialog.xhtml` window ever appears.
+
 ## SECURITY — trust boundary
 
 Web content is an **untrusted principal**. A page that could grant itself

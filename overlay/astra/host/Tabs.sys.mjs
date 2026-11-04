@@ -72,6 +72,8 @@ function snapshot(id) {
     // another origin (typed address, `Navigation.commit`) must never keep the
     // old site's reference in a projection.
     icon: tab.icon && originOf(tab.url) === tab.icon.origin ? tab.icon : null,
+    // P6c: the sign-in card the app renders under the address field.
+    page_request: tab.page_request ?? null,
     index: _order.indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
@@ -105,6 +107,16 @@ export function __markPrivate(astra_tab_id, isPrivate) {
   const tab = _tabs.get(astra_tab_id);
   if (!tab) return false;
   tab.private = isPrivate === true;
+  return true;
+}
+
+/** The sign-in card for one tab (P6c). `null` closes it. */
+export function __setPageRequest(astra_tab_id, request = null) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return false;
+  tab.page_request = request;
+  emit("tab.updated", { astra_tab_id, page_request: request });
+  emitItemsChanged();
   return true;
 }
 
@@ -212,6 +224,8 @@ export function __applyExternalUpdate(id, patch = {}) {
     tab.title = patch.title;
   }
   if (typeof patch.url === "string" && patch.url !== "") {
+    // A navigation ends any sign-in prompt from the previous document.
+    tab.page_request = null;
     // An icon belongs to the site that produced it. Landing on another origin
     // (typed address, link, redirect) must clear it at once, or the old site's
     // mark stays on the new page until its own icon arrives.

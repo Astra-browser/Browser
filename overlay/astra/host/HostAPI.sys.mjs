@@ -48,6 +48,7 @@ import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
 import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
+import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
@@ -84,6 +85,7 @@ export {
   Operations,
   Metadata,
   PageSource,
+  DialogPrompts,
   addEventListener,
   emit,
   eventSeq,
@@ -111,5 +113,6 @@ export function __resetForTests() {
   __resetOperationsForTests();
   Permissions.__resetForTests();
   __resetPageSourceForTests();
+  DialogPrompts.__resetForTests();
   __resetEventsForTests();
 }
