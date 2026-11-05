@@ -62,14 +62,24 @@ export function getEngine(id: string): SearchEngine | null {
   return SEARCH_ENGINES.find((engine) => engine.id === id) ?? null;
 }
 
+/** Both spellings the host accepts, normalised to the token the built-in
+ *  table uses. A template with no placeholder, two placeholders, or a mix of
+ *  the two is ambiguous and returns `null`. */
+function normaliseSearchTemplate(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 2048) return null;
+  const tokens = trimmed.match(/\{searchTerms\}|%s/gu) ?? [];
+  if (tokens.length !== 1) return null;
+  return trimmed.replace("%s", SEARCH_TEMPLATE_TOKEN);
+}
+
 /** Feedback only, mirroring `astra_core::search::valid_template` and the
  *  settings UI's inline check. The store remains the authority. */
 export function isValidSearchTemplate(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 2048) return false;
-  if (trimmed.split(SEARCH_TEMPLATE_TOKEN).length !== 2) return false;
+  const normalised = normaliseSearchTemplate(value);
+  if (normalised === null) return false;
   try {
-    const url = new URL(trimmed.replace(SEARCH_TEMPLATE_TOKEN, "astra-query"));
+    const url = new URL(normalised.replace(SEARCH_TEMPLATE_TOKEN, "astra-query"));
     return (
       url.protocol === "https:" &&
       url.search.includes("astra-query") &&
@@ -83,8 +93,9 @@ export function isValidSearchTemplate(value: string): boolean {
 /** Fill a validated template with the encoded query. Returns `null` when the
  *  template is invalid, so callers never navigate to a half-built URL. */
 export function fillSearchTemplate(template: string, query: string): string | null {
-  if (!isValidSearchTemplate(template)) return null;
-  return template.replace(SEARCH_TEMPLATE_TOKEN, encodeURIComponent(query));
+  const normalised = normaliseSearchTemplate(template);
+  if (normalised === null || !isValidSearchTemplate(template)) return null;
+  return normalised.replace(SEARCH_TEMPLATE_TOKEN, encodeURIComponent(query));
 }
 
 /** The address the omnibox navigates to for `query` on `engine`. A custom
@@ -103,5 +114,7 @@ export function buildSearchUrl(
  *  none. Fetching stays with the native provider; the UI only builds URLs. */
 export function buildSuggestUrl(engine: SearchEngine | null, query: string): string | null {
   if (!engine?.suggestUrl || !query.trim()) return null;
-  return engine.suggestUrl.replace(SEARCH_TEMPLATE_TOKEN, encodeURIComponent(query.trim()));
+  const normalised = normaliseSearchTemplate(engine.suggestUrl);
+  if (normalised === null) return null;
+  return normalised.replace(SEARCH_TEMPLATE_TOKEN, encodeURIComponent(query.trim()));
 }

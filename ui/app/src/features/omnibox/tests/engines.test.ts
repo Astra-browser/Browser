@@ -64,8 +64,12 @@ describe("url building", () => {
 });
 
 describe("template validation", () => {
-  it("accepts one token in the query string", () => {
+  it("accepts one token in the query string, in either spelling", () => {
     expect(isValidSearchTemplate("https://example.com/search?q={searchTerms}")).toBe(true);
+    expect(isValidSearchTemplate("https://example.com/search?q=%s")).toBe(true);
+    expect(fillSearchTemplate("https://example.com/search?q=%s", "tea")).toBe(
+      "https://example.com/search?q=tea",
+    );
   });
 
   it("rejects missing, doubled, http, or host tokens", () => {
@@ -73,6 +77,8 @@ describe("template validation", () => {
     expect(isValidSearchTemplate("https://example.com/?a={searchTerms}&b={searchTerms}")).toBe(
       false,
     );
+    expect(isValidSearchTemplate("https://example.com/?a=%s&b=%s")).toBe(false);
+    expect(isValidSearchTemplate("https://example.com/?a=%s&b={searchTerms}")).toBe(false);
     expect(isValidSearchTemplate("http://example.com/search?q={searchTerms}")).toBe(false);
     expect(isValidSearchTemplate("https://{searchTerms}.example.com/?q=x")).toBe(false);
     expect(isValidSearchTemplate("not a url {searchTerms}")).toBe(false);
