@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { docshellState } = await import(
+const { docshellState, applyBrowserActivation, applyTabActivation } = await import(
   path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")
 );
 
@@ -52,6 +52,42 @@ check("only a literal true activates", docshellState("tab-1"), {
   docShellIsActive: false,
   preserveLayers: false,
 });
+
+// The switch path has to write that state into the real browser. Hiding the
+// tabbox is not enough: both documents stay visible and automatic PiP never
+// sees VideoTabHidden.
+function fakeBrowser() {
+  return {
+    docShellIsActive: true,
+    layers: [],
+    preserveLayers(value) {
+      this.layers.push(value);
+    },
+  };
+}
+
+const incoming = fakeBrowser();
+const outgoing = fakeBrowser();
+check("activation writes the docshell state", applyBrowserActivation(incoming, true), true);
+check("the incoming browser is active", incoming.docShellIsActive, true);
+check("the incoming browser does not keep a layer cache", incoming.layers, [false]);
+check("parking writes the docshell state", applyBrowserActivation(outgoing, false), true);
+check("the outgoing browser is inactive", outgoing.docShellIsActive, false);
+check("the outgoing browser releases its layer", outgoing.layers, [false]);
+
+const browsers = new Map([
+  ["tab-a", { browser: fakeBrowser() }],
+  ["tab-b", { browser: fakeBrowser() }],
+]);
+check("a tab switch activates one browser and parks the rest", applyTabActivation(browsers, "tab-b"), 2);
+check(
+  "only the selected browser stays active",
+  [...browsers.entries()].map(([id, entry]) => [id, entry.browser.docShellIsActive]),
+  [
+    ["tab-a", false],
+    ["tab-b", true],
+  ],
+);
 
 if (!process.exitCode) {
   console.log(`tab_lifecycle: PASS (${passed} checks)`);

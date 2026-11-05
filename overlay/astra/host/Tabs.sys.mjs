@@ -14,10 +14,119 @@
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
+import { Settings } from "./Settings.sys.mjs";
 
 export const HOST_API_VERSION = 1;
 
 export const DEFAULT_WINDOW_ID = "win-1";
+
+// Close placement has no Firefox preference: `next`/`previous` are display
+// order, and `recent` is the tab last looked at. The recent stack is per
+// window and bounded, because it is a navigation affordance, not a history.
+const MRU_CAP = 25;
+const _mruByWindow = new Map(); // window_id -> [astra_tab_id] most recent first
+
+// Archive is Astra's own reader of `tabs.archive`. It closes *idle open*
+// (Today) tabs; Places history is not touched, so the page is still in
+// History after its tab is gone. Every window owns its timer and teardown.
+const ARCHIVE_INTERVAL_MS = 5 * 60 * 1000;
+const ARCHIVE_AGE_MS = {
+  "12h": 12 * 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+};
+const _archiveTimers = new Map(); // window_id -> { handle, clearIntervalFn }
+let _archiveNow = () => Date.now();
+
+function clockNow() {
+  try {
+    const value = _archiveNow();
+    return Number.isFinite(value) ? value : Date.now();
+  } catch {
+    return Date.now();
+  }
+}
+
+/** The open-tab placement this browser would use for a new page. */
+function newTabPosition() {
+  return Settings.current("tabs.new-position") === "after-current"
+    ? "after-current"
+    : "end";
+}
+
+/**
+ * Where a link from another application lands. `new-tab` is not a placement
+ * of its own: it defers to `tabs.new-position`. Recomputed on every call so a
+ * settings change applies to the next open instead of a stale cached value.
+ */
+export function resolveExternalPosition() {
+  const external = Settings.current("tabs.external-position") ?? "new-tab";
+  const placement = external === "new-tab" ? newTabPosition() : external;
+  return placement === "after-current" ? "after-current" : "end";
+}
+
+function touchMru(astra_tab_id) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return;
+  const list = _mruByWindow.get(tab.window_id) ?? [];
+  const at = list.indexOf(astra_tab_id);
+  if (at >= 0) {
+    list.splice(at, 1);
+  }
+  list.unshift(astra_tab_id);
+  if (list.length > MRU_CAP) {
+    list.length = MRU_CAP;
+  }
+  _mruByWindow.set(tab.window_id, list);
+}
+
+function forgetMru(astra_tab_id, window_id) {
+  const id = window_id || _tabs.get(astra_tab_id)?.window_id;
+  if (!id) return;
+  const list = _mruByWindow.get(id);
+  if (!list) return;
+  const at = list.indexOf(astra_tab_id);
+  if (at >= 0) list.splice(at, 1);
+  if (list.length === 0) _mruByWindow.delete(id);
+}
+
+/** The most recently looked-at tab in the same window and space. */
+function recentTabFor(tab) {
+  if (!tab) return null;
+  for (const id of _mruByWindow.get(tab.window_id) ?? []) {
+    const candidate = _tabs.get(id);
+    if (candidate && candidate.space_id === tab.space_id && id !== tab.astra_tab_id) {
+      return id;
+    }
+  }
+  return null;
+}
+
+/** Position among the tabs of one window, which is what gb.addTab indexes. */
+function windowIndexOf(astra_tab_id) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab) return -1;
+  return _order.filter((id) => _tabs.get(id)?.window_id === tab.window_id).indexOf(astra_tab_id);
+}
+
+/**
+ * `Tabs.create` insertion. An explicit index still wins (duplicate and the
+ * history stack callers use it). Otherwise `after-current` puts the new row
+ * immediately after the selected tab; `end` keeps the old append behaviour.
+ */
+function insertionIndexFor({ index, window_id, space_id }) {
+  if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
+    return index;
+  }
+  if (newTabPosition() !== "after-current" || !_selectedId) {
+    return _order.length;
+  }
+  const selected = _tabs.get(_selectedId);
+  if (!selected || selected.window_id !== window_id || selected.space_id !== space_id) {
+    return _order.length;
+  }
+  return _order.indexOf(_selectedId) + 1;
+}
 
 // Schemes a tab may carry. The content binding loads under the system
 // principal and refuses everything but http(s), so an address the stage can
@@ -95,6 +204,9 @@ function selectInternal(id) {
   const tab = _tabs.get(id);
   if (tab) {
     _selectedBySpace.set(tab.space_id, id);
+    // An idle timer measures time since the person last looked at the tab.
+    tab.last_active_at = clockNow();
+    touchMru(id);
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap, selected: true });
@@ -197,6 +309,7 @@ export function __applySpaces(spaces, active_space_id = "") {
 
 // Test-only + Windows.close: close every tab in a window.
 export function __closeTabsInWindow(window_id) {
+  __forgetWindow(window_id);
   const ids = [..._order].filter((id) => _tabs.get(id)?.window_id === window_id);
   for (const id of ids) {
     _tabs.delete(id);
@@ -508,9 +621,11 @@ export const Tabs = {
         pinned: false,
         discarded: false,
         muted: false,
+        last_active_at: clockNow(),
       });
       _order.push(astra_tab_id);
       _selectedId = astra_tab_id;
+      touchMru(astra_tab_id);
     }
     emitItemsChanged();
     return ok(request_id, { bootstrapped: true, selected_tab_id: _selectedId });
@@ -522,30 +637,36 @@ export const Tabs = {
     }
     url = safeTabUrl(url);
     const astra_tab_id = `tab-${_nextId++}`;
+    const space_id = _activeSpaceId;
     _tabs.set(astra_tab_id, {
       astra_tab_id,
       url,
       title: "",
       selected: false,
       window_id,
-      space_id: _activeSpaceId,
+      space_id,
       pinned: false,
       discarded: false,
       muted: false,
       private: false,
+      last_active_at: clockNow(),
     });
-    if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
-      _order.splice(index, 0, astra_tab_id);
-    } else {
-      _order.push(astra_tab_id);
-    }
+    const at = insertionIndexFor({ index, window_id, space_id });
+    _order.splice(at, 0, astra_tab_id);
     __pushHistory(astra_tab_id, url);
-    emit("tab.created", { astra_tab_id, url, window_id });
+    emit("tab.created", {
+      astra_tab_id,
+      url,
+      window_id,
+      // The index the native tab should take in gb.tabs: the projection's
+      // order and the engine's tab strip must be the same list.
+      index: windowIndexOf(astra_tab_id),
+    });
     if (!background || _selectedId === "") {
       selectInternal(astra_tab_id);
     }
     emitItemsChanged();
-    return admitted(request_id, { astra_tab_id, url, window_id });
+    return admitted(request_id, { astra_tab_id, url, window_id, index: at });
   },
 
   async select({ request_id = "", astra_tab_id = "" } = {}) {
@@ -568,6 +689,8 @@ export const Tabs = {
     const tab = _tabs.get(astra_tab_id);
     // Where it sat in the space that is on screen, before it leaves the order.
     const closedAt = activeOrder().indexOf(astra_tab_id);
+    const strategy = Settings.current("tabs.after-close") ?? "next";
+    forgetMru(astra_tab_id, tab?.window_id);
     const existed = _tabs.delete(astra_tab_id);
     _history.delete(astra_tab_id);
     const i = _order.indexOf(astra_tab_id);
@@ -582,14 +705,26 @@ export const Tabs = {
       }
       if (_selectedId === astra_tab_id) {
         _selectedId = "";
-        // The tab that took its place, then the one before it; only inside
-        // the space being looked at. A native browser does not jump to the
-        // first tab on every close.
-        const at = closedAt;
         const after = activeOrder();
-        const next =
-          after[Math.min(Math.max(at, 0), after.length - 1)] ?? after[after.length - 1];
-        if (next !== undefined) {
+        let next;
+        if (strategy === "recent") {
+          // The tab last looked at, not the tab whose owner opened this one:
+          // `browser.tabs.selectOwnerOnClose` is a different question and is
+          // deliberately not mapped onto this setting.
+          next = recentTabFor(tab);
+        }
+        if (next === null || next === undefined) {
+          if (strategy === "previous") {
+            // At the first row there is no left neighbour; the new first row
+            // is the sensible fallback, not the far end of the strip.
+            next = after[closedAt - 1] ?? after[closedAt] ?? after[after.length - 1];
+          } else {
+            // `next` (the row that took its place), and the same fallback a
+            // native browser uses at either end of the strip.
+            next = after[closedAt] ?? after[after.length - 1];
+          }
+        }
+        if (next !== undefined && next !== null) {
           selectInternal(next);
         } else {
           await ensureTabInActiveSpace(request_id);
@@ -995,6 +1130,9 @@ export function __adoptNative({
   window_id = DEFAULT_WINDOW_ID,
   space_id = _activeSpaceId,
   private: privateWindow = false,
+  index = null,
+  after = "",
+  before = "",
 } = {}) {
   const astra_tab_id = `tab-${_nextId++}`;
   _tabs.set(astra_tab_id, {
@@ -1008,8 +1146,29 @@ export function __adoptNative({
     discarded: false,
     muted: false,
     private: privateWindow === true,
+    last_active_at: clockNow(),
   });
-  _order.push(astra_tab_id);
+  // Native is the truth for where the engine put this tab. The caller passes
+  // the nearest bound neighbours from gb.tabs, so the model splices at that
+  // position instead of appending every adopted tab to the end. With no
+  // bound neighbour (a fresh window, a test, a first adoption), the external
+  // placement setting decides: `new-tab` defers to `tabs.new-position`.
+  let at = Number.isInteger(index) && index >= 0 && index <= _order.length ? index : -1;
+  if (at < 0 && after && _order.includes(after)) {
+    at = _order.indexOf(after) + 1;
+  }
+  if (at < 0 && before && _order.includes(before)) {
+    at = _order.indexOf(before);
+  }
+  if (at < 0) {
+    if (resolveExternalPosition() === "after-current" && _selectedId && _tabs.has(_selectedId)) {
+      at = _order.indexOf(_selectedId) + 1;
+    } else {
+      at = _order.length;
+    }
+  }
+  if (at < 0 || at > _order.length) at = _order.length;
+  _order.splice(at, 0, astra_tab_id);
   __pushHistory(astra_tab_id, safeTabUrl(url));
   if (selected) {
     _selectedId = astra_tab_id;
@@ -1035,8 +1194,106 @@ export function __announceAdopted(astra_tab_id, { selected = false } = {}) {
   return snapshot(astra_tab_id);
 }
 
+// --- Archive --------------------------------------------------------------
+// `tabs.archive` closes a Today tab after it has gone unused for the chosen
+// age. Only the tab is closed: the page's visit already lives in Places, so
+// History keeps it. Pinned/essential tabs are never archived, and neither is
+// the tab currently in front (the person is looking at it).
+
+/** The configured idle age, or 0 for "never". */
+export function __archiveAgeMs(value = Settings.current("tabs.archive")) {
+  return ARCHIVE_AGE_MS[value] ?? 0;
+}
+
+/** One sweep. Kept as its own entry point so tests can drive it with a clock. */
+export async function __archiveSweep({ window_id = "", now = clockNow() } = {}) {
+  const age = __archiveAgeMs();
+  if (age <= 0) {
+    return { archived: [], age_ms: 0 };
+  }
+  const archived = [];
+  for (const id of [..._order]) {
+    const tab = _tabs.get(id);
+    if (!tab || tab.pinned === true || tab.selected === true) continue;
+    if (window_id && tab.window_id !== window_id) continue;
+    if (!Number.isFinite(tab.last_active_at)) continue;
+    if (now - tab.last_active_at < age) continue;
+    archived.push(id);
+  }
+  for (const id of archived) {
+    await Tabs.close({ request_id: `archive-${id}`, astra_tab_id: id });
+  }
+  return { archived, age_ms: age };
+}
+
+/**
+ * Start one archive timer per window. `now`/`setIntervalFn`/`clearIntervalFn`
+ * are injectable so the contract test can advance the clock without waiting
+ * twelve hours. Replacing a window's timer is idempotent.
+ */
+export function __startArchiveScheduler({
+  window_id = DEFAULT_WINDOW_ID,
+  now = _archiveNow,
+  setIntervalFn = (fn, ms) => globalThis.setInterval(fn, ms),
+  clearIntervalFn = (handle) => globalThis.clearInterval(handle),
+  intervalMs = ARCHIVE_INTERVAL_MS,
+} = {}) {
+  __stopArchiveScheduler(window_id);
+  const clock = typeof now === "function" ? now : () => now;
+  const handle = setIntervalFn(() => {
+    void __archiveSweep({ window_id, now: Number.isFinite(clock()) ? clock() : clockNow() });
+  }, intervalMs);
+  if (handle === undefined || handle === null) return null;
+  _archiveTimers.set(window_id, { handle, clearIntervalFn });
+  return handle;
+}
+
+export function __stopArchiveScheduler(window_id = DEFAULT_WINDOW_ID) {
+  const timer = _archiveTimers.get(window_id);
+  if (!timer) return false;
+  _archiveTimers.delete(window_id);
+  try {
+    timer.clearIntervalFn(timer.handle);
+  } catch {
+    // A window already torn down.
+  }
+  return true;
+}
+
+/** Release the tab/window-owned state (MRU stack and archive timer). */
+export function __forgetWindow(window_id) {
+  if (!window_id) return;
+  __stopArchiveScheduler(window_id);
+  _mruByWindow.delete(window_id);
+}
+
+/** Move every window's timer and stack to a predictable starting point. */
+export function __setArchiveClockForTests(now) {
+  _archiveNow = typeof now === "function" ? now : () => Date.now();
+}
+
+export function __setTabLastActiveForTests(astra_tab_id, at) {
+  const tab = _tabs.get(astra_tab_id);
+  if (!tab || !Number.isFinite(at)) return false;
+  tab.last_active_at = at;
+  return true;
+}
+
+export function __mruForTests(window_id = DEFAULT_WINDOW_ID) {
+  return [...(_mruByWindow.get(window_id) ?? [])];
+}
+
+export function __archiveSchedulerActiveForTests(window_id = DEFAULT_WINDOW_ID) {
+  return _archiveTimers.has(window_id);
+}
+
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.
 export function __resetTabsForTests() {
+  for (const window_id of [..._archiveTimers.keys()]) {
+    __stopArchiveScheduler(window_id);
+  }
+  _mruByWindow.clear();
+  _archiveNow = () => Date.now();
   _tabs.clear();
   _order.length = 0;
   _history.clear();

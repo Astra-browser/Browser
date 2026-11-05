@@ -16,10 +16,13 @@
 
 import { addEventListener, emit } from "./Events.sys.mjs";
 import {
+  DEFAULT_WINDOW_ID,
   Tabs,
   __adoptNative,
   __announceAdopted,
   __applyExternalUpdate,
+  __forgetWindow,
+  __startArchiveScheduler,
   __markPrivate,
   __spaceUserContextId,
   __tabsState,
@@ -95,6 +98,45 @@ export function docshellState(isActive) {
   // tabbrowser's wake order). Parking clears preserve first, so the layer can
   // actually be released before the docshell goes inactive.
   return { docShellIsActive: active, preserveLayers: false };
+}
+
+/**
+ * Apply the docshell state to one live `<browser>`. This is the step that
+ * makes a tab switch real to the page: the outgoing document goes
+ * `visibilityState = "hidden"`, which is what the engine's automatic
+ * picture-in-picture watches (`VideoTabHidden`). Merely hiding the tabbox
+ * leaves both documents visible and the video never becomes eligible.
+ *
+ * `preserveLayers` is always false: parking exists to give the layer back.
+ * Exported so the contract test can pin the write order without a build.
+ */
+export function applyBrowserActivation(browser, isActive) {
+  if (!browser) return false;
+  const state = docshellState(isActive);
+  try {
+    browser.docShellIsActive = state.docShellIsActive;
+    if (typeof browser.preserveLayers === "function") {
+      browser.preserveLayers(state.preserveLayers);
+    }
+    return true;
+  } catch {
+    // A browser torn down mid-switch.
+    return false;
+  }
+}
+
+/** Activate exactly `activeId`'s browser and park every other entry. */
+export function applyTabActivation(browsers, activeId) {
+  if (!browsers) return 0;
+  const entries =
+    browsers instanceof Map ? browsers.entries() : Object.entries(browsers);
+  let applied = 0;
+  for (const [id, entry] of entries) {
+    const browser =
+      entry && typeof entry === "object" && "browser" in entry ? entry.browser : entry;
+    if (applyBrowserActivation(browser, id === activeId)) applied += 1;
+  }
+  return applied;
 }
 
 // Schemes the content stage will load. A tab's address can come from a
@@ -582,7 +624,7 @@ export const Content = {
       }
       return 0;
     };
-    const ensureTab = (id, url) => {
+    const ensureTab = (id, url, tabIndex = -1) => {
       let tab = tabOf.get(id);
       if (tab) return tab;
       applying = true;
@@ -605,14 +647,27 @@ export const Content = {
         if (free) {
           tab = free;
           bindTab(id, tab);
+          if (Number.isInteger(tabIndex) && tabIndex >= 0) {
+            try {
+              gb.moveTabTo(tab, { tabIndex });
+            } catch {
+              // A tab not yet in the container keeps its place.
+            }
+          }
           if (isLoadableUrl(url)) pending.set(id, url);
           return tab;
         }
-        tab = gb.addTab("about:blank", {
+        const options = {
           triggeringPrincipal: principal,
           inBackground: true,
           userContextId: wanted,
-        });
+        };
+        // The model already decided the display position; give the engine the
+        // same index so the native strip and the sidebar cannot disagree.
+        if (Number.isInteger(tabIndex) && tabIndex >= 0) {
+          options.tabIndex = tabIndex;
+        }
+        tab = gb.addTab("about:blank", options);
         bindTab(id, tab);
         if (isLoadableUrl(url)) pending.set(id, url);
       } finally {
@@ -632,21 +687,52 @@ export const Content = {
         // A tab torn down mid-load.
       }
     };
+    // The nearest model tabs already bound on each side of a native tab. An
+    // engine-created tab is adopted at this position instead of the end.
+    const nativeNeighbours = (nativeTab) => {
+      let after = "";
+      let before = "";
+      try {
+        const all = [...gb.tabs];
+        const at = all.indexOf(nativeTab);
+        if (at < 0) return { after, before };
+        for (let i = at - 1; i >= 0; i -= 1) {
+          const id = idOfTab(all[i]);
+          if (id) {
+            after = id;
+            break;
+          }
+        }
+        for (let i = at + 1; i < all.length; i += 1) {
+          const id = idOfTab(all[i]);
+          if (id) {
+            before = id;
+            break;
+          }
+        }
+      } catch {
+        // A tab leaving its container keeps the fallback position.
+      }
+      return { after, before };
+    };
     const selectTab = (id) => {
       const tab = tabOf.get(id);
-      if (!tab || gb.selectedTab === tab) return;
-      applying = true;
-      try {
-        gb.selectedTab = tab;
-      } finally {
-        applying = false;
+      if (!tab) return;
+      if (gb.selectedTab !== tab) {
+        applying = true;
+        try {
+          gb.selectedTab = tab;
+        } finally {
+          applying = false;
+        }
       }
+      // The tabbox is only the visual deck. The page itself has to be told it
+      // is hidden, or a background video never fires VideoTabHidden and the
+      // automatic picture-in-picture window cannot open.
+      applyTabActivation(browsers, id);
     };
     const activate = (id) => {
       const url = pending.get(id);
-      if (!url && gb.selectedTab === tabOf.get(id)) {
-        return;
-      }
       selectTab(id);
       if (url) {
         pending.delete(id);
@@ -713,6 +799,7 @@ export const Content = {
       if (applying) return;
       const id = idOfTab(gb.selectedTab);
       if (id) {
+        applyTabActivation(browsers, id);
         void Tabs.select({ astra_tab_id: id });
       } else {
         // An engine-created tab is in front. P4.3 adopts it; until then put
@@ -738,10 +825,13 @@ export const Content = {
       } catch {
         // A tab that has not committed yet is a New Tab.
       }
+      const { after, before } = nativeNeighbours(tab);
       const id = __adoptNative({
         url,
         selected: tab.selected === true,
-        window_id: window_id || "win-1",
+        window_id: window_id || DEFAULT_WINDOW_ID,
+        after,
+        before,
       });
       bindTab(id, tab);
       __announceAdopted(id, { selected: tab.selected === true });
@@ -766,7 +856,7 @@ export const Content = {
         return;
       }
       if (event.type === "tab.created" && id) {
-        ensureTab(id, event.data.url);
+        ensureTab(id, event.data.url, event.data.index);
         return;
       }
       if (event.type === "tab.closed" && id) {
@@ -966,10 +1056,13 @@ export const Content = {
       } catch {
         // A tab that is still restoring.
       }
+      const { after, before } = nativeNeighbours(tab);
       const id = __adoptNative({
         url,
         selected: tab.selected === true,
-        window_id: window_id || "win-1",
+        window_id: window_id || DEFAULT_WINDOW_ID,
+        after,
+        before,
       });
       bindTab(id, tab);
       if (title) __applyExternalUpdate(id, { title });
@@ -993,6 +1086,12 @@ export const Content = {
       // Restore is best-effort; never block a working window.
     }
 
+    // `tabs.archive` is a browser-wide policy with a per-window timer. The
+    // sweep closes idle Today tabs without touching Places history; detach
+    // stops this window's timer, as does closing the window.
+    const archiveWindow = window_id || DEFAULT_WINDOW_ID;
+    __startArchiveScheduler({ window_id: archiveWindow });
+
     return {
       native: true,
       get browser() {
@@ -1001,6 +1100,7 @@ export const Content = {
       browsers,
       detach() {
         off();
+        __forgetWindow(archiveWindow);
         Media.__setEngine(null);
         for (const id of [...mediaStates.keys()]) detachMedia(id);
         try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
