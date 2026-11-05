@@ -244,7 +244,11 @@ def main():
         private_levels = m.js(levels("incognito"))
         check("a private profile reads no levels", private_levels.get("levels") == [], private_levels)
         normal = {row.get("site") for row in m.js(levels()).get("levels", [])}
-        check("a private write left the normal store alone", "private-probe.example" not in normal, normal)
+        check(
+            "a private write left the normal store alone",
+            "private-probe.example" not in normal,
+            sorted(normal),
+        )
 
         # --- The UI's own list --------------------------------------------
         m.js(host('Zoom.persist({url: "https://listed.example/", zoom: 1.25})'))
@@ -252,10 +256,27 @@ def main():
         time.sleep(1.0)
         # The Settings page starts on its last section; open Appearance first.
         m.js(host('Commands.run({id: "settings.appearance"})'))
-        time.sleep(1.0)
-        rendered = m.js(
-            app("return d ? [...d.querySelectorAll('.level .site')].map((n)=>n.textContent) : [];")
+        wait(
+            lambda: m.js(
+                app("return !!d?.querySelector('[data-setting=\"appearance.zoom-levels\"]');")
+            ),
+            8,
         )
+        rendered = wait(
+            lambda: (
+                lambda rows: rows
+                if rows
+                else None
+            )(
+                m.js(
+                    app(
+                        "return d ? [...d.querySelectorAll('.level .site')]"
+                        ".map((n)=>n.textContent) : [];"
+                    )
+                )
+            ),
+            8,
+        ) or []
         check("the Appearance page renders the real level list", "listed.example" in rendered, rendered)
         m.shot("zoom-list-ui.png")
 

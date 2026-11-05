@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-C90YCj1o.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(2083,n)??`No`)),r=((n={},r={})=>(r.locale??e(),t(2082,n)??`Yes`));export{n,r as t};

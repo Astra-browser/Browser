@@ -1,4 +1,4 @@
-import type { SettingsSection } from "./settings-model";
+import { sections, type SettingsSection } from "./settings-model";
 let revision = $state(0);
 export const selectionRevision = () => revision;
 let current = $state<SettingsSection>("general");
@@ -36,17 +36,7 @@ export function handleNativeSection(id: string) {
   }
   if (
     id.startsWith("settings.section.") &&
-    [
-      "profiles",
-      "newtab",
-      "ai",
-      "focus",
-      "account",
-      "about",
-      "shortcuts",
-      "sites",
-      "privacy",
-    ].includes(section)
+    sections.some((candidate) => candidate.id === section)
   )
     select(section as SettingsSection);
 }
