@@ -218,7 +218,13 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   const gb = browser(all);
   __setBrowserForTests(() => gb);
 
+  let projected = 0;
+  const stopProjection = Events.addEventListener((event) => {
+    if (event.type === "items-changed") projected += 1;
+  });
   const result = await Performance.tick(NOW);
+  stopProjection();
+  check("the discard reaches the projection pump", projected > 0);
   check("the tick reports the tabs it considered", result.considered === 4);
   check("only the idle tab sleeps", result.slept.length === 1 && result.slept[0] === idle);
   check("the sleeping tab says so in the model", TabsMod.__tabsState().tabs.get(idle).discarded === true);

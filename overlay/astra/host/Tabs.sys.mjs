@@ -915,6 +915,9 @@ export const Tabs = {
     }
     tab.discarded = true;
     emit("tab.discarded", { astra_tab_id });
+    // The sleeping list reads the projection; a discard that never reaches it
+    // leaves the rail claiming there is nothing asleep.
+    emitItemsChanged();
     return admitted(request_id, { astra_tab_id, discarded: true });
   },
 
@@ -928,6 +931,7 @@ export const Tabs = {
     // pass would immediately discard it again.
     tab.last_active_ms = Date.now();
     emit("tab.restored", { astra_tab_id, url: tab.url });
+    emitItemsChanged();
     return admitted(request_id, { astra_tab_id, discarded: false, url: tab.url });
   },
 
