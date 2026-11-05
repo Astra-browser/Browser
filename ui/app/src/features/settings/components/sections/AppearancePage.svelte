@@ -27,13 +27,23 @@
   const root = document.documentElement;
   const rootMode = (): Mode => (root.dataset.theme === "light" ? "light" : "dark");
   let material = $state(root.dataset.material ?? "none");
+  // The tiers the host can draw on this machine (`uiInfo().materials`). It is
+  // empty in a standalone preview, where the window's own list is the
+  // fallback below.
+  let materialTiers = $state<string[]>([]);
   let windowMode = $state<Mode>(rootMode());
   // Colours are edited for one mode at a time; it starts as the window's.
   let mode = $state<Mode>(rootMode());
   let installed = $state<string[]>([]);
   onMount(() => {
+    const readTiers = () =>
+      (root.dataset.materials ?? "")
+        .split(",")
+        .map((tier) => tier.trim())
+        .filter(Boolean);
     const update = () => {
       material = root.dataset.material ?? "none";
+      materialTiers = readTiers();
       const next = rootMode();
       if (next !== windowMode) mode = next;
       windowMode = next;
@@ -41,38 +51,49 @@
     update();
     installed = installedCodeFonts();
     const observer = new MutationObserver(update);
-    observer.observe(root, { attributes: true, attributeFilter: ["data-material", "data-theme"] });
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["data-material", "data-materials", "data-theme"],
+    });
     return () => observer.disconnect();
   });
 
-  // What the person may choose here: the sky on a new tab with the system's
-  // glass beyond it, or the system's glass alone. Windows has one system
-  // material worth having; a Mac offers the glass or the older vibrancy.
-  const materialOptions = IS_WINDOWS
-    ? [
-        { value: "auto", label: m.settings_material_automatic() },
-        { value: "mica", label: m.settings_material_mica() },
-        { value: "none", label: m.settings_material_solid() },
-      ]
-    : [
-        { value: "auto", label: m.settings_material_automatic() },
-        { value: "liquid_glass", label: m.settings_material_glass() },
-        { value: "vibrancy", label: m.settings_material_vibrancy() },
-        { value: "none", label: m.settings_material_solid() },
-      ];
-  // A choice the system cannot install right now, such as glass on an older
-  // macOS or any material under Reduce Transparency, says what is showing.
-  let fallback = $derived.by(() => {
-    const chosen = preferences.value("ui.material");
-    return chosen !== "auto" && material !== "" && chosen !== material;
-  });
-  const materials: Record<string, () => string> = {
+  // Then material labels, and the one the setting offers. A platform with no
+  // native glass offers only the solid tier: the list is a capability, not a
+  // wish. `auto` is only a choice when there is a tier above solid.
+  const materialLabels: Record<string, () => string> = {
     liquid_glass: m.settings_material_glass,
     vibrancy: m.settings_material_vibrancy,
     acrylic: m.settings_material_acrylic,
     mica: m.settings_material_mica,
     none: m.settings_material_solid,
   };
+  const availableMaterials = $derived(
+    materialTiers.length > 0 ? materialTiers : IS_WINDOWS ? ["none", "mica"] : ["none"],
+  );
+  const materialOptions = $derived.by(() => {
+    const tiers = availableMaterials.filter((tier) => tier !== "none");
+    return [
+      ...(tiers.length > 0 ? [{ value: "auto", label: m.settings_material_automatic() }] : []),
+      ...tiers.map((tier) => ({
+        value: tier,
+        label: (materialLabels[tier] ?? m.settings_material_solid)(),
+      })),
+      { value: "none", label: m.settings_material_solid() },
+    ];
+  });
+  const materialChoice = $derived(preferences.value("ui.material"));
+  const materialValue = $derived(
+    materialOptions.some((option) => option.value === materialChoice) ? materialChoice : "none",
+  );
+  // A stored choice this window cannot install says what it is showing
+  // instead; the choice is kept, so a machine that gains the tier gets it back.
+  let fallback = $derived.by(() => {
+    const chosen = materialChoice;
+    if (chosen === null || chosen === undefined || chosen === "") return false;
+    if (!materialOptions.some((option) => option.value === chosen)) return true;
+    return chosen !== "auto" && chosen !== "none" && chosen !== material;
+  });
 
   // The tint is shown as it is dragged and written once it rests. Windows
   // tints with the theme on its own, so there it is not offered.
@@ -125,12 +146,12 @@
     settingId="appearance.material"
     title={m.settings_material()}
     description={fallback
-      ? m.settings_material_fallback({ material: materials[material]?.() ?? "" })
+      ? m.settings_material_fallback({ material: materialLabels[material]?.() ?? "" })
       : m.settings_material_desc()}
     ><Select
       label={m.settings_material()}
       labelHidden
-      value={preferences.value("ui.material")}
+      value={materialValue}
       disabled={preferences.saving()}
       options={materialOptions}
       onchange={(v) => void preferences.set("ui.material", v)}

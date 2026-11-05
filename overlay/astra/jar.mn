@@ -57,6 +57,7 @@ astra.jar:
   content/astra/res/host/HistoryCall.sys.mjs (host/HistoryCall.sys.mjs)
   content/astra/res/host/Favicons.sys.mjs (host/Favicons.sys.mjs)
   content/astra/res/host/System.sys.mjs (host/System.sys.mjs)
+  content/astra/res/host/Zoom.sys.mjs (host/Zoom.sys.mjs)
   content/astra/res/host/Resources.sys.mjs (host/Resources.sys.mjs)
   content/astra/res/host/Search.sys.mjs (host/Search.sys.mjs)
   content/astra/res/host/schemas/tabs.json (host/schemas/tabs.json)

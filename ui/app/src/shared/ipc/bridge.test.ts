@@ -121,6 +121,7 @@ describe("bridge wiring", () => {
       Settings: {},
       Accounts: {},
       Commands: {},
+      Zoom: {},
       Keymap: {},
       Work: {},
       Downloads: {},

@@ -3399,6 +3399,8 @@ export type UiCommand = string;
 
 export type UiInfo = {
 	material: Material,
+	/**  The tiers this build can draw on this machine, including `none`. */
+	materials?: Material[],
 };
 
 export type UpdateHighlights = {

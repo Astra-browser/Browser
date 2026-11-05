@@ -41,6 +41,7 @@ import { Accounts } from "./Accounts.sys.mjs";
 import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
 import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
 import { Commands } from "./Commands.sys.mjs";
+import { Zoom, __resetZoomForTests } from "./Zoom.sys.mjs";
 import { Keymap } from "./Keymap.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
@@ -77,6 +78,7 @@ export {
   Sidebar,
   WebExtensions,
   Commands,
+  Zoom,
   Keymap,
   Work,
   Downloads,
@@ -122,6 +124,7 @@ export function __resetForTests() {
   __resetWebExtensionsForTests();
   __resetFaviconsForTests();
   __resetOperationsForTests();
+  __resetZoomForTests();
   Permissions.__resetForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();

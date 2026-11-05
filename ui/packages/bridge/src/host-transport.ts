@@ -27,6 +27,7 @@ export interface HostModules {
   Settings: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Accounts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Zoom: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -98,6 +99,7 @@ const ROUTES: Record<string, Route> = {
   web_extension_cancel: ["WebExtensions", "cancel"],
   setting_get: ["Settings", "get"],
   setting_set: ["Settings", "set"],
+  zoom_call: ["Zoom", "call"],
   account_get: ["Accounts", "get"],
   run_command: ["Commands", "run"],
   keymap_entries: ["Keymap", "entries"],

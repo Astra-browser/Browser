@@ -41,6 +41,8 @@ export class ZoomLevelsSession {
       this.lifetime.signal,
     );
     if (answer.state === "aborted") return false;
+    // A timeout must not leave the buttons disabled forever; the request is
+    // gone even though the native effect may still be admitted.
     this.busy = false;
     const view = answer.state === "received" ? answer.value : null;
     if (!view || view.kind !== "levels") {

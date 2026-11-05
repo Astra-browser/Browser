@@ -197,8 +197,7 @@
     "work_sites",
     "work_skill_text",
     "work_skills",
-    "work_test_provider_key",
-    "zoom_call"
+    "work_test_provider_key"
   ],
   "unforwarded": [
     "astra:account-changed",

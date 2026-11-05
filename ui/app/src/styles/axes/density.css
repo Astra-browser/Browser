@@ -1,5 +1,38 @@
+/*
+ * Density axis. `browser.uidensity` is the stored choice; `data-density` on
+ * the document root is how this interface reads it. Compact is not only a
+ * Settings row height: the chrome the person actually uses (tab rows, the
+ * rail, the dock, the main bar, controls) is one geometry, so every token
+ * below moves together. A token not listed here keeps its comfortable value.
+ */
 :root[data-density="compact"] {
+  /* Rows */
   --row-page: 44px;
   --row-sidebar: 30px;
+  --row-tab: 24px;
+  --sidebar-row-gap: 2px;
+
+  /* Window and bands */
+  --window-gutter: 6px;
+  --main-bar-height: 36px;
+  --rail-width: 38px;
+
+  /* The dock and its shelf */
+  --dock-tile: 38px;
+  --dock-gap: 4px;
+  --dock-shelf-gap: 8px;
+
+  /* Controls */
+  --control-height: 22px;
+  --control-compact: 22px;
   --control-regular: 28px;
+  --control-large: 30px;
+  --control-inset: 8px;
+  --field-height: 22px;
+  --search-height: 24px;
+
+  /* Tabs */
+  --radius-tab: 7px;
+  --tab-gap: 1px;
+  --tab-inset: 6px;
 }
