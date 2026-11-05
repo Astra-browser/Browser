@@ -15,11 +15,19 @@
     void next.perform({ kind: "preferences" });
     return () => next.stop();
   });
+
+  /** A read that never lands must not present itself as still loading. */
+  const unsupported = $derived(session.supported === false);
+  const settled = $derived(session.preferences !== null || unsupported || session.error !== null);
+  const directory = $derived(
+    session.preferences?.directory ??
+      (settled ? m.download_default_directory() : m.download_settings_loading()),
+  );
 </script>
 
 <SettingsGroup
   title={m.section_downloads()}
-  description={session.error === "unsupported"
+  description={unsupported
     ? m.download_error_unsupported()
     : session.error
       ? m.download_error_unavailable()
@@ -28,8 +36,7 @@
   <SettingsRow
     settingId="downloads.path"
     title={m.pref_downloads_path()}
-    description={session.preferences?.directory ??
-      (session.error ? m.download_default_directory() : m.download_settings_loading())}
+    description={unsupported ? m.download_error_unsupported() : directory}
   >
     <Button
       disabled={session.busy || !session.preferences || !session.supported}
