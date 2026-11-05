@@ -402,7 +402,11 @@ export const Content = {
         // A restored native tab already has its committed URL/title.
         try {
           const spec = browser.currentURI?.spec;
-          if (spec && spec !== "about:blank") {
+          if (
+            spec &&
+            spec !== "about:blank" &&
+            !spec.startsWith("chrome://browser/content/blanktab")
+          ) {
             __applyExternalUpdate(id, { url: spec });
           }
           const title = browser.contentTitle;

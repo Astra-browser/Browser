@@ -143,6 +143,10 @@ export function safeTabUrl(url) {
   if (url === "about:blank") {
     return url;
   }
+  // Firefox's internal blank tab is the engine's New Tab, not a page.
+  if (url.startsWith("chrome://browser/content/blanktab")) {
+    return "about:blank";
+  }
   try {
     return TAB_SCHEMES.has(new URL(url).protocol) ? url : "about:blank";
   } catch {
@@ -540,7 +544,10 @@ function tabView(id) {
     return null;
   }
   const h = _history.get(id) ?? { entries: [], index: -1 };
-  const blank = !tab.url || tab.url === "about:blank";
+  const blank =
+    !tab.url ||
+    tab.url === "about:blank" ||
+    tab.url.startsWith("chrome://browser/content/blanktab");
   return {
     id,
     projection_revision: nextRevision(),

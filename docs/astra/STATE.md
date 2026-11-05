@@ -365,6 +365,21 @@ Also fixed while integrating: `settings.section.<id>` deep links only accepted
 a hardcoded subset, so `settings.appearance` (and General/Tabs/Search/
 Performance) never switched the page. All section ids are now accepted.
 
+**First tab fixed (2026-11-05).** Without an `about:blank` argument Firefox's
+initial native tab is `chrome://browser/content/blanktab.html`. The content
+binding adopted that chrome URL as a real page, so the native blank stage hid
+the Astra New Tab page. `safeTabUrl`, `tabView` and `Content.bindTab` now treat
+the engine blank tab as `about:blank`/New Tab; a copy of the user profile boots
+with `stage:app`, model `url:""`, and the New Tab surface visible.
+
+**Profile switching without quitting.** `Profiles.switch` now launches the
+chosen profile through `SelectableProfileService.launchInstance` (or the
+binary with `-profile` for an unmanaged toolkit roster) and leaves the current
+window open. `profiles-switch-probe.py` created “Switch Probe”, switched to it
+(accepted, process/window count rose), verified the current window stayed
+alive, then removed the probe profile. Same-window replacement is not a native
+profile operation; it would require the in-process profile-scope design below.
+
 ## Phase 0 — Discovery, inventory, scaffolding
 
 | ID | Task | Status | Agent | Branch | Notes |

@@ -28,12 +28,13 @@
 //     `profile_avatar_pick` answers `unsupported` instead of returning a token
 //     that would render as a broken image.
 //
-// Switching profiles is a relaunch-level operation. In-place switching would
-// have to replace the profile of the running process; the engine's only safe
-// path (`SelectableProfileService.launchInstance`) starts a *different*
-// process and does not move this window. `profiles_switch` therefore answers
-// an honest `unsupported_command` refusal with a disposition; it never moves
-// or closes the running profile.
+// Switching profiles cannot replace the running process's profile directory
+// in place. The engine's safe path is to launch the chosen profile in another
+// instance/window (`SelectableProfileService.launchInstance`, or the binary
+// with `-profile` for an unmanaged toolkit roster). `profiles_switch` uses
+// that path: the chosen profile appears immediately and the current window
+// stays open, so the person never has to quit. It never moves or closes the
+// running profile.
 //
 // The module can be imported by Node contract tests: the engine is reached
 // lazily and `__setProfilesBackend()` replaces the whole native seam.
@@ -363,6 +364,36 @@ function makeNative(scope) {
 
   return {
     snapshot,
+
+    async launch(id) {
+      // The profile is already in front; focus is the only useful action.
+      if (id === runningPath) return true;
+      if (selectableReady()) {
+        try {
+          const profile = await selectableById(id);
+          if (profile) {
+            selectable.launchInstance(profile);
+            return true;
+          }
+        } catch {
+          // Fall through to the toolkit launcher.
+        }
+      }
+      const profile = toolkitById(id);
+      if (!profile) return false;
+      try {
+        const executable = Services.dirsvc.get("XREExeF", Ci.nsIFile);
+        const process = Cc["@mozilla.org/process/util;1"].createInstance(
+          Ci.nsIProcess,
+        );
+        process.init(executable);
+        const args = ["-profile", profile.rootDir.path, "-no-remote"];
+        process.run(false, args, args.length);
+        return true;
+      } catch {
+        return false;
+      }
+    },
     readMeta,
     writeMeta,
 
@@ -589,12 +620,10 @@ export const Profiles = {
   },
 
   /**
-   * Create a profile. `and_switch` is a relaunch-level request this build
-   * cannot honour, so it is refused *before* anything is created — no
-   * half-applied "created but not switched" answer.
+   * Create a profile. With `and_switch`, the new profile is launched in its
+   * own window after it is stored; the current window stays open.
    */
   async create({ name = "", avatar = null, and_switch = false } = {}) {
-    if (and_switch === true) return refuse("unsupported_command");
     if (!isName(name) || !isAvatar(avatar)) return no();
     if (avatar.style === "photo") return no();
     const native = await nativeForUse();
@@ -698,7 +727,15 @@ export const Profiles = {
    * path opens a different process and is not a switch. Answer the refusal
    * with a disposition reason the UI can name.
    */
-  async switch() {
-    return refuse("unsupported_command");
+  async switch({ profile = "" } = {}) {
+    if (typeof profile !== "string" || profile === "") return no();
+    const native = await nativeForUse();
+    if (!native) return no();
+    try {
+      if ((await native.launch(profile)) === true) return ok();
+    } catch {
+      // A profile directory that is gone or locked.
+    }
+    return refuse("unavailable");
   },
 };
