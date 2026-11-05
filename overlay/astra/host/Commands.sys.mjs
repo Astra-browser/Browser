@@ -171,6 +171,12 @@ async function zoomBy(delta) {
       : Math.round((from + delta) * 100) / 100;
   const result = await Navigation.setZoom({ astra_tab_id: id, zoom: next });
   if (result?.error) return admission(false);
+  // Persist what the engine applied, not the requested step: a step past the
+  // 0.3–3.0 range is clamped by the model and must not store 2.0/3.1.
+  const applied =
+    typeof result.zoom === "number" && Number.isFinite(result.zoom)
+      ? result.zoom
+      : next;
   // The engine stores a site's level in the content-pref service; the model
   // alone would forget it on the next launch. A private tab never writes.
   // Reset removes the site's override (100% is "no own level"), even when the
@@ -178,7 +184,7 @@ async function zoomBy(delta) {
   const tab = __tabsState().tabs.get(id);
   await Zoom.persist({
     url: tab?.url ?? "",
-    zoom: delta === 0 ? 1 : next,
+    zoom: delta === 0 ? 1 : applied,
     private: tab?.private === true,
   });
   return admission(true);

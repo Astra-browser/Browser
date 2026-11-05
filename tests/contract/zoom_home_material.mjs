@@ -254,6 +254,23 @@ function levelsOf(res) {
   TabsMod.__markPrivate(tab.astra_tab_id, true);
   await Commands.run({ id: "zoom.in" });
   check("a private window's zoom change never reaches the store", !zoomStore.has("command.example"));
+
+  // A step past the engine's range stores the clamped level, not the request.
+  const edge = await Tabs.create({ request_id: "z-10", url: "https://edge.example/" });
+  await Navigation.setZoom({ request_id: "z-11", astra_tab_id: edge.astra_tab_id, zoom: 2.95 });
+  await Commands.run({ id: "zoom.in" });
+  check(
+    "a zoom step past the maximum stores the clamped level",
+    Math.abs(zoomStore.get("edge.example") - 3) < 0.0001,
+    String(zoomStore.get("edge.example")),
+  );
+  await Navigation.setZoom({ request_id: "z-12", astra_tab_id: edge.astra_tab_id, zoom: 0.3 });
+  await Commands.run({ id: "zoom.out" });
+  check(
+    "a zoom step past the minimum stores the clamped level",
+    Math.abs(zoomStore.get("edge.example") - 0.3) < 0.0001,
+    String(zoomStore.get("edge.example")),
+  );
 }
 
 // === Home command ========================================================
