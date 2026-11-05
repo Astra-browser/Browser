@@ -8,9 +8,10 @@
 // (`ui/app/src/shared/ipc/bindings.ts`).
 //
 // A file is picked with the engine's own `nsIFilePicker`, read once with a
-// hard byte bound, admitted only when its bytes decode as one of the image
-// formats the media contract allows, and written to the profile's
-// content-addressed store at `<ProfD>/astra-media/<profile>/<digest>`.
+// hard byte bound, admitted into the media contract's image/pdf/file shape
+// (an image is sniffed and decoded, a PDF is its header, anything else is a
+// file), and written to the profile's content-addressed store at
+// `<ProfD>/astra-media/<profile>/<digest>`.
 //
 // Serving is the same store over `astra-media://localhost/<profile>/<digest>`.
 // A small `nsIProtocolHandler` is registered when this module loads, so the
@@ -194,10 +195,25 @@ export function cleanName(name) {
   return out || "file";
 }
 
+/** Whether a byte stream starts with one of the image signatures the media
+ *  contract admits, even if the rest of it turns out to be malformed. */
+function looksLikeImage(bytes) {
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return true;
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8) return true;
+  if (bytes.length >= 6) {
+    const head = String.fromCharCode(...bytes.slice(0, 6));
+    if (head === "GIF87a" || head === "GIF89a") return true;
+  }
+  return bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+}
+
 /**
- * Admit one file's bytes. Only the image formats the media contract declares
- * are imported here: the New Tab picker is a background image, and refusing a
- * PDF is more honest than storing a record the surface cannot draw.
+ * Admit one file's bytes into the shared media shape: an image when the bytes
+ * decode as one the contract declares, a PDF when they carry its header, and
+ * a plain file otherwise. The New Tab picker additionally requires an image,
+ * because that surface has nothing to draw otherwise.
  */
 export async function admitMedia(bytes, name) {
   if (!(bytes instanceof Uint8Array)) {
@@ -209,29 +225,44 @@ export async function admitMedia(bytes, name) {
   }
   if (bytes.length === 0) return { ok: false, error: "invalid" };
   if (bytes.length > MAX_FILE_BYTES) return { ok: false, error: "capacity" };
-  if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, error: "capacity" };
-  const image = sniffImage(bytes);
-  if (!image) return { ok: false, error: "invalid" };
-  if (
-    image.width < 1 ||
-    image.height < 1 ||
-    image.width > MAX_DIMENSION ||
-    image.height > MAX_DIMENSION
-  ) {
-    return { ok: false, error: "invalid" };
+
+  let kind = "file";
+  let mime = "application/octet-stream";
+  let width = null;
+  let height = null;
+  if (looksLikeImage(bytes)) {
+    const image = sniffImage(bytes);
+    if (!image) return { ok: false, error: "invalid" };
+    if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, error: "capacity" };
+    if (
+      image.width < 1 ||
+      image.height < 1 ||
+      image.width > MAX_DIMENSION ||
+      image.height > MAX_DIMENSION
+    ) {
+      return { ok: false, error: "invalid" };
+    }
+    kind = "image";
+    mime = image.mime;
+    width = image.width;
+    height = image.height;
+  } else if (bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-") {
+    kind = "pdf";
+    mime = "application/pdf";
   }
+
   return {
     ok: true,
     asset: {
       version: 1,
-      kind: "image",
-      mime: image.mime,
+      kind,
+      mime,
       bytes: bytes.length,
       digest: await sha256Hex(bytes),
       name: cleanName(name),
       origin: { kind: "imported" },
-      width: image.width,
-      height: image.height,
+      width,
+      height,
     },
   };
 }
@@ -306,7 +337,14 @@ function importModule(specifier) {
   }
 }
 
-async function ioutils() {
+function ioutils() {
+  try {
+    const scope = chromeScope();
+    const io = scope.IOUtils ?? globalThis.IOUtils;
+    if (io && typeof io.read === "function") return io;
+  } catch {
+    // Fall through to the module form on a build that still ships it.
+  }
   return importModule("resource://gre/modules/IOUtils.sys.mjs")?.IOUtils ?? null;
 }
 
@@ -332,8 +370,11 @@ async function pickWithFilePicker() {
   const { cc, ci, services } = chrome;
   const picker = cc["@mozilla.org/filepicker;1"].createInstance(ci.nsIFilePicker);
   const win = services.wm.getMostRecentWindow("navigator:browser");
-  picker.init(win, "Choose a background image", ci.nsIFilePicker.modeOpen);
+  picker.init(win, "Choose a file", ci.nsIFilePicker.modeOpen);
+  // Images first for the New Tab background; All files keeps the same native
+  // command usable for Work documents.
   picker.appendFilter("Images", "*.png;*.jpg;*.jpeg;*.webp;*.gif");
+  picker.appendFilter("All files", "*.*");
   const result = await new Promise((resolve) => picker.open(resolve));
   if (result !== ci.nsIFilePicker.returnOK) return null;
   return picker.file;
@@ -370,8 +411,13 @@ async function saveBlob(profile, digest, bytes) {
     file.append(digest);
     if (file.exists()) return true;
     const io = await ioutils();
-    if (!io) return false;
-    await io.writeAtomic(file.path, bytes);
+    if (!io || typeof io.write !== "function") return false;
+    // Write beside the blob and let IOUtils move it into place, so a crash
+    // never leaves a partial content-addressed file.
+    await io.write(file.path, bytes, {
+      mode: "overwrite",
+      tmpPath: `${file.path}.tmp`,
+    });
     return true;
   } catch {
     return false;
@@ -385,12 +431,11 @@ function sniffFile(file) {
   try {
     const stream = cc["@mozilla.org/network/file-input-stream;1"].createInstance(ci.nsIFileInputStream);
     stream.init(file, 0x01, 0o444, 0);
-    const scriptable = cc["@mozilla.org/scriptableinputstream;1"].createInstance(ci.nsIScriptableInputStream);
-    scriptable.init(stream);
-    const head = scriptable.read(32);
-    scriptable.close();
-    const bytes = Uint8Array.from(head, (character) => character.charCodeAt(0));
-    return sniffImage(bytes)?.mime ?? null;
+    const binary = cc["@mozilla.org/binaryinputstream;1"].createInstance(ci.nsIBinaryInputStream);
+    binary.setInputStream(stream);
+    const head = new Uint8Array(binary.readByteArray(32));
+    binary.close();
+    return sniffImage(head)?.mime ?? null;
   } catch {
     return null;
   }
@@ -419,13 +464,22 @@ function channelFor(uri, loadInfo) {
   if (!target) throw notFound();
   const file = blobFile(services, ci, target.profile, target.digest);
   if (!file.exists() || !file.isFile()) throw notFound();
-  const { NetUtil } = importModule("resource://gre/modules/NetUtil.sys.mjs") ?? {};
-  if (!NetUtil) throw notFound();
-  const channel = NetUtil.newChannel({
-    uri: services.io.newFileURI(file),
-    loadUsingSystemPrincipal: true,
-    contentPolicyType: loadInfo?.externalContentPolicyType ?? ci.nsIContentPolicy.TYPE_IMAGE,
-  });
+  const fileURI = services.io.newFileURI(file);
+  let channel;
+  if (loadInfo && typeof services.io.newChannelFromURIWithLoadInfo === "function") {
+    // The engine checks that a handler attaches the exact loadInfo it was
+    // given (nsIOService::NewChannelFromURIWithProxyFlagsInternal). Reuse it
+    // on the file channel instead of creating a second one.
+    channel = services.io.newChannelFromURIWithLoadInfo(fileURI, loadInfo);
+  } else {
+    const { NetUtil } = importModule("resource://gre/modules/NetUtil.sys.mjs") ?? {};
+    if (!NetUtil) throw notFound();
+    channel = NetUtil.newChannel({
+      uri: fileURI,
+      loadUsingSystemPrincipal: true,
+      contentPolicyType: ci.nsIContentPolicy.TYPE_IMAGE,
+    });
+  }
   channel.contentType = sniffFile(file) ?? "application/octet-stream";
   return channel;
 }

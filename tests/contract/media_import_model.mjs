@@ -61,13 +61,22 @@ check("its digest is SHA-256", admitted.asset?.digest === DIGEST);
 check("its name loses directory separators", admitted.asset?.name === "..shot.PNG");
 check("its origin is a picked file", admitted.asset?.origin?.kind === "imported");
 
-const notImage = await admitMedia(Buffer.from("plain bytes"), "notes.txt");
-check("a non-image is refused", notImage.ok === false && notImage.error === "invalid");
+const plain = await admitMedia(Buffer.from("plain bytes"), "notes.txt");
+check("a plain file keeps the contract's file kind", plain.ok === true && plain.asset?.kind === "file");
+check("and its MIME is the octet stream", plain.asset?.mime === "application/octet-stream");
+const pdf = await admitMedia(Buffer.from("%PDF-1.7 minim"), "spec.pdf");
+check("a PDF keeps the contract's pdf kind", pdf.ok === true && pdf.asset?.kind === "pdf");
+check("and its MIME is PDF", pdf.asset?.mime === "application/pdf");
 const empty = await admitMedia(new Uint8Array(), "empty.png");
 check("an empty file is refused", empty.ok === false && empty.error === "invalid");
-const truncated = await admitMedia(Buffer.from("\x89PNG\r\n\x1a\nbroken"), "bad.png");
-check("a malformed PNG is refused", truncated.ok === false && truncated.error === "invalid");
-const tooLarge = await admitMedia(new Uint8Array(8 * 1024 * 1024 + 1), "huge.png");
+const truncated = await admitMedia(
+  new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x62, 0x72]),
+  "bad.png",
+);
+check("a malformed image is refused", truncated.ok === false && truncated.error === "invalid");
+const hugeImage = new Uint8Array(8 * 1024 * 1024 + 1);
+hugeImage.set(PNG, 0);
+const tooLarge = await admitMedia(hugeImage, "huge.png");
 check("an oversized image is capacity", tooLarge.ok === false && tooLarge.error === "capacity");
 check("a blank name becomes the contract's fallback", cleanName("") === "file");
 check("a 64 KiB name is bounded", cleanName("a".repeat(65536)).length <= 255);
@@ -128,9 +137,12 @@ check("the stored bytes are the picked bytes", saved?.bytes?.length === PNG.leng
 picked = null;
 check("a cancelled picker is cancelled", (await MediaImport.import({ expected_profile: PROFILE })).kind === "cancelled");
 
-picked = { name: "notes.txt", bytes: Buffer.from("plain bytes") };
+picked = {
+  name: "bad.png",
+  bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x62, 0x72]),
+};
 const refused = await MediaImport.import({ expected_profile: PROFILE });
-check("a non-image pick is refused", refused.kind === "refused" && refused.error === "invalid");
+check("a malformed image pick is refused", refused.kind === "refused" && refused.error === "invalid");
 
 check(
   "a malformed profile is invalid before any picker opens",
