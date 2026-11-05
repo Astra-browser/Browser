@@ -258,7 +258,7 @@ the shell, and each window writes its own view of `astra.time.state.v1`; a
 second window's counted time is not merged yet (the same single-writer limit
 as the organisation store, P5b-3).
 
-Evidence: `node tests/contract/sleep_model.mjs` 61 checks,
+Evidence: `node tests/contract/sleep_model.mjs` 63 checks,
 `node tests/contract/time_model.mjs` 187 checks, `hostapi_v1` 324,
 `wire_coverage` 50. Live probe steps are in `docs/astra/SLEEPING.md` and the
 lane report; network-level focus blocking still needs the engine Net hook

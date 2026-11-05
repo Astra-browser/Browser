@@ -331,6 +331,25 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   check("stop is idempotent", Performance.status().running === false);
 }
 
+// --- extension autoDiscardable and picture-in-picture rules are honoured --
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const marked = await addTab("https://webrtc.example/");
+  const pip = await addTab("https://pip.example/");
+  const markedNative = nativeFor(marked);
+  markedNative.attrs.add("undiscardable");
+  const pipNative = nativeFor(pip);
+  pipNative.attrs.add("pictureinpicture");
+  __setBrowserForTests(() => browser([markedNative, pipNative]));
+  const result = await Performance.tick(NOW);
+  check("an extension-marked tab stays awake", result.slept.length === 0);
+  check(
+    "a picture-in-picture tab stays awake",
+    TabsMod.__tabsState().tabs.get(pip).discarded === false,
+  );
+}
+
 // --- a private tab never sleeps ------------------------------------------
 {
   resetWorld();

@@ -217,10 +217,16 @@ export function enrich(tab, native) {
     try {
       audible =
         native.hasAttribute("soundplaying") ||
+        // Picture-in-Picture is a media surface even when muted; TabUnloader
+        // treats it as never discardable.
+        native.hasAttribute("pictureinpicture") ||
         native.linkedBrowser?.audioPlaybackActive === true;
       devtools = native.getAttribute("devtools-opened") === "true";
       unsaved =
         native.linkedBrowser?.hasBeforeUnload === true ||
+        // An extension can mark a tab non-discardable (autoDiscardable=false).
+        native.hasAttribute("undiscardable") ||
+        native.undiscardable === true ||
         native.hasAttribute("attention");
       pinned = pinned || native.pinned === true;
     } catch {
