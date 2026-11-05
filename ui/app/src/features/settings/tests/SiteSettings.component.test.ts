@@ -8,6 +8,7 @@ import SiteSettings from "../components/SiteSettings.svelte";
 const native = vi.hoisted(() => ({
   list: vi.fn<(origin?: string) => Promise<SitePermissionsView | null>>(),
   set: vi.fn(async () => true),
+  watch: vi.fn(() => () => {}),
 }));
 vi.mock("$domain/permissions", () => ({ sitePermissions: native }));
 afterEach(() => vi.clearAllMocks());

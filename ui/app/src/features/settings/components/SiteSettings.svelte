@@ -28,6 +28,7 @@
   let loaded = $state(false);
   let busy = $state<string | null>(null);
   let failed = $state(false);
+  let generation = 0;
 
   let groups = $derived(
     (view?.kinds ?? [])
@@ -50,7 +51,10 @@
         ];
 
   async function load() {
-    view = await sitePermissions.list();
+    const current = ++generation;
+    const next = await sitePermissions.list();
+    if (current !== generation) return;
+    view = next;
     loaded = true;
   }
 
@@ -62,7 +66,10 @@
     busy = null;
   }
 
-  onMount(() => void load());
+  onMount(() => {
+    void load();
+    return sitePermissions.watch(() => void load());
+  });
 </script>
 
 <div class="site-settings" data-setting="privacy.site-settings" aria-busy={!loaded || undefined}>

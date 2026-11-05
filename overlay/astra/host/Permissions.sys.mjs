@@ -73,7 +73,59 @@ export const ENGINE_PERMISSION_NAME = {
   xr: "xr",
   "loopback-network": "loopback-network",
   "local-network": "local-network",
+  midi: "midi",
+  popups: "popup",
 };
+
+// --- Site settings projection (Lane 3) ---------------------------------------
+//
+// `site_permissions` lists the decisions the engine actually holds and
+// `site_permission_set` writes/removes one through `SitePermissions` (which is
+// `Services.perms` with scope handling). The projection is deliberately
+// narrower than the UI union: only kinds this engine keeps in
+// `SitePermissions.sys.mjs` are reported, so the page never offers a switch
+// that would write nothing.
+//
+// Private windows save nothing; their list is empty and a write is refused
+// with `invalid_scope`. The write path is synchronous and fenced by the same
+// principal the list came from, so a stale origin cannot hit another site.
+
+/** Kinds this host can list and write, in display order. */
+export const SITE_KINDS = [
+  "camera",
+  "microphone",
+  "geolocation",
+  "notifications",
+  "midi",
+  "popups",
+];
+
+const SITE_DECISIONS = new Set(["allow", "block"]);
+
+/** `Services.perms` type -> Astra kind. */
+const SITE_KIND_BY_ENGINE_NAME = {
+  camera: "camera",
+  microphone: "microphone",
+  geo: "geolocation",
+  "desktop-notification": "notifications",
+  midi: "midi",
+  popup: "popups",
+};
+
+/** Injectable seam: Node contract tests use a small in-memory store. */
+let _siteBackend = null;
+
+export function __setSitePermissionsBackend(backend) {
+  _siteBackend = backend;
+  return () => {
+    if (_siteBackend === backend) _siteBackend = null;
+  };
+}
+
+export function __resetSitePermissionsForTests() {
+  _siteBackend = null;
+  lazyModules.SitePermissions = null;
+}
 
 const DECISIONS = new Set([
   "allow_once",
@@ -478,6 +530,11 @@ export function askForWebRTC({
     if (prior === null) return false;
     const ok = writePermissionStates(prior, allow, durable);
     if (!ok) restorePermissionStates(prior);
+    if (ok && durable) {
+      for (const kind of list) {
+        announceSites(origin, kind, allow ? "allow" : "block");
+      }
+    }
     return ok;
   };
   const rollback = () => {
@@ -642,6 +699,120 @@ export const Permissions = {
       // Re-publish so the open prompt moves between the card and the sheet.
       publish();
     }
+  },
+
+  /**
+   * Site settings: the decisions this profile actually holds.
+   *
+   * `origin` narrows the list to one canonical origin (the page panel's
+   * shape); null is the Settings page. A private window answers an empty,
+   * private list rather than exposing the normal profile's decisions.
+   */
+  async listSites({ origin = null } = {}) {
+    const backend = siteBackend();
+    let kinds = SITE_KINDS.filter(siteKindSupported);
+    if (backend) {
+      try {
+        const supported = backend.kinds();
+        if (Array.isArray(supported)) {
+          kinds = SITE_KINDS.filter((kind) => supported.includes(kind));
+        }
+      } catch {
+        // Keep the engine-supported set; `complete` below says what was read.
+      }
+    }
+    if (!backend) {
+      return { private: false, complete: false, kinds, entries: [] };
+    }
+    let isPrivate = false;
+    try {
+      isPrivate = backend.isPrivate() === true;
+    } catch {
+      isPrivate = false;
+    }
+    if (isPrivate) {
+      return { private: true, complete: true, kinds, entries: [] };
+    }
+    let filter = null;
+    if (origin !== null && origin !== undefined && origin !== "") {
+      filter = canonicalOrigin(origin);
+      if (filter === null) {
+        return { private: false, complete: false, kinds, entries: [] };
+      }
+    }
+    let result = null;
+    try {
+      result = backend.list(filter);
+    } catch {
+      result = null;
+    }
+    const entries = [];
+    if (result && Array.isArray(result.entries)) {
+      for (const entry of result.entries) {
+        if (!entry || !SITE_DECISIONS.has(entry.decision)) continue;
+        const entryOrigin = canonicalOrigin(entry.origin);
+        if (entryOrigin === null) continue;
+        if (!SITE_KINDS.includes(entry.kind) || !kinds.includes(entry.kind)) {
+          continue;
+        }
+        // Pop-ups are blocked by default; the UI only offers "allow", so a
+        // stored block is not a row a person can act on.
+        if (entry.kind === "popups" && entry.decision === "block") continue;
+        entries.push({
+          origin: entryOrigin,
+          kind: entry.kind,
+          decision: entry.decision,
+        });
+      }
+    }
+    return {
+      private: false,
+      complete: result !== null && result?.complete !== false,
+      kinds,
+      entries,
+    };
+  },
+
+  /**
+   * Site settings: write one decision, or forget it when `decision` is null.
+   * Returns an OperationAdmission; a private profile and a write the engine
+   * refused are both reported as rejected, never optimistically applied.
+   */
+  async setSite({ origin = "", kind = "", decision = null } = {}) {
+    const canonical = canonicalOrigin(origin);
+    if (canonical === null) return refuse("invalid_input");
+    if (!SITE_KINDS.includes(kind)) return refuse("invalid_input");
+    if (decision !== null && !SITE_DECISIONS.has(decision)) {
+      return refuse("invalid_input");
+    }
+    const backend = siteBackend();
+    if (!backend) return refuse("unsupported_command");
+    let isPrivate = false;
+    try {
+      isPrivate = backend.isPrivate() === true;
+    } catch {
+      isPrivate = false;
+    }
+    if (isPrivate) {
+      // A private window keeps nothing; do not write the normal profile.
+      return refuse("invalid_scope");
+    }
+    let supported = true;
+    try {
+      supported = backend.kinds().includes(kind);
+    } catch {
+      supported = false;
+    }
+    if (!supported) return refuse("unsupported_command");
+    let stored = false;
+    try {
+      stored = backend.set(canonical, kind, decision) === true;
+    } catch {
+      stored = false;
+    }
+    if (!stored) return refuse("store_admission_rejected");
+    announceSites(canonical, kind, decision);
+    return admit({ outcome: "applied", reason: "mutation_applied" });
   },
 
   /** The projection the app should be showing. */
@@ -915,6 +1086,173 @@ function removePermission(kind, principal, browser) {
   }
 }
 
+/** True when the focused browser window is private. */
+function focusedWindowIsPrivate() {
+  try {
+    const win =
+      Services.focus?.activeWindow ??
+      Services.wm.getMostRecentWindow("navigator:browser");
+    if (!win) return false;
+    return isPrivateWindow(win);
+  } catch {
+    return false;
+  }
+}
+
+/** A canonical HTTP(S) origin, or null. */
+function canonicalOrigin(value) {
+  if (typeof value !== "string" || value === "" || value.length > 2048) {
+    return null;
+  }
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.origin === value ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function siteKindSupported(kind) {
+  if (!SITE_KINDS.includes(kind)) return false;
+  if (kind === "midi") {
+    try {
+      return Services.prefs.getBoolPref("dom.webmidi.enabled", false) === true;
+    } catch {
+      return false;
+    }
+  }
+  if (kind === "popups") {
+    try {
+      return (
+        Services.prefs.getBoolPref("dom.disable_open_during_load", true) === true ||
+        Services.prefs.getBoolPref(
+          "dom.security.framebusting_intervention.enabled",
+          true
+        ) === true
+      );
+    } catch {
+      return true;
+    }
+  }
+  return true;
+}
+
+function originOfPrimary(principal) {
+  try {
+    if (!principal.schemeIs("http") && !principal.schemeIs("https")) return "";
+    if (!(principal.URI instanceof Ci.nsIStandardURL)) return "";
+    return principal.origin;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The real SitePermissions/Services.perms adapter. Every method is guarded so
+ * a hostile or stale value cannot throw through the host route.
+ */
+function liveSiteBackend() {
+  const SitePermissions = lazyModule(
+    "resource:///modules/SitePermissions.sys.mjs",
+    "SitePermissions"
+  );
+  if (!SitePermissions) return null;
+  try {
+    if (typeof Services === "undefined" || !Services?.perms) return null;
+  } catch {
+    return null;
+  }
+  return {
+    isPrivate: focusedWindowIsPrivate,
+    kinds() {
+      return SITE_KINDS.filter(siteKindSupported);
+    },
+    list(origin) {
+      const entries = [];
+      let complete = true;
+      const names = SITE_KINDS.filter(siteKindSupported)
+        .map((kind) => ENGINE_PERMISSION_NAME[kind])
+        .filter(Boolean);
+      try {
+        const permissions = Services.perms.getAllByTypes(names);
+        for (const permission of permissions) {
+          const kind = SITE_KIND_BY_ENGINE_NAME[permission.type];
+          if (!kind) continue;
+          if (
+            permission.capability !== SitePermissions.ALLOW &&
+            permission.capability !== SitePermissions.BLOCK
+          ) {
+            // PROMPT/UNKNOWN is "ask again", not a saved decision.
+            continue;
+          }
+          const principalOrigin = originOfPrimary(permission.principal);
+          if (principalOrigin === "") continue;
+          if (typeof origin === "string" && origin !== "" && principalOrigin !== origin) {
+            continue;
+          }
+          entries.push({
+            origin: principalOrigin,
+            kind,
+            decision:
+              permission.capability === SitePermissions.ALLOW ? "allow" : "block",
+          });
+        }
+      } catch {
+        complete = false;
+      }
+      entries.sort((a, b) =>
+        a.origin === b.origin
+          ? SITE_KINDS.indexOf(a.kind) - SITE_KINDS.indexOf(b.kind)
+          : a.origin.localeCompare(b.origin)
+      );
+      return { entries, complete };
+    },
+    set(origin, kind, decision) {
+      const name = ENGINE_PERMISSION_NAME[kind];
+      if (!name) return false;
+      let principal;
+      try {
+        principal = Services.scriptSecurityManager.createContentPrincipalFromOrigin(
+          origin
+        );
+      } catch {
+        return false;
+      }
+      if (!principal) return false;
+      try {
+        if (decision === null) {
+          SitePermissions.removeFromPrincipal(principal, name);
+        } else {
+          SitePermissions.setForPrincipal(
+            principal,
+            name,
+            decision === "allow" ? SitePermissions.ALLOW : SitePermissions.BLOCK,
+            SitePermissions.SCOPE_PERSISTENT
+          );
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+function siteBackend() {
+  return _siteBackend ?? liveSiteBackend();
+}
+
+/** Emit the host-side change signal the Settings page reloads from. */
+function announceSites(origin, kind, decision) {
+  emit("sites-changed", {
+    profile: focusedWindowIsPrivate() ? "incognito" : "default",
+    origin: typeof origin === "string" ? origin : null,
+    kind: typeof kind === "string" ? kind : null,
+    decision: decision === "allow" || decision === "block" ? decision : null,
+  });
+}
+
 /** Geoposition is shared with the site, not just granted: the toolbar and the
  *  site panel read this state, and "Stop sharing" clears it. */
 function setGeoSharing(browser, sharing) {
@@ -1054,7 +1392,13 @@ function promptForRequest(kind, type, request) {
       if (kind === "geolocation") setGeoSharing(browser, false);
       request.cancel();
     },
-    persist: (allow, durable) => persistPermission(kind, principal, browser, allow, durable),
+    persist: (allow, durable) => {
+      const stored = persistPermission(kind, principal, browser, allow, durable);
+      if (stored && durable) {
+        announceSites(origin, kind, allow ? "allow" : "block");
+      }
+      return stored;
+    },
     rollback: () => removePermission(kind, principal, browser),
   });
   if (token === null) {

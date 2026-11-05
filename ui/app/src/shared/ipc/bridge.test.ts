@@ -126,6 +126,7 @@ describe("bridge wiring", () => {
       Work: {},
       Downloads: {},
       Profiles: {},
+      MediaImport: {},
       Media: {},
       Notes: {},
       Bookmarks: {},
@@ -137,6 +138,8 @@ describe("bridge wiring", () => {
       PageSource: {},
       DialogPrompts: {},
       Permissions: {},
+      BrowsingData: {},
+      Blocker: {},
       Operations: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,
@@ -150,7 +153,7 @@ describe("bridge wiring", () => {
       astra_tab_id: "tab-1",
     });
     expect(seen[0]).toMatchObject({ background: true, request_id: "req-1" });
-    await expect(bridge.invoke("blocker_status")).rejects.toMatchObject({
+    await expect(bridge.invoke("profiles_get")).rejects.toMatchObject({
       code: "unknown_command",
     });
   });
