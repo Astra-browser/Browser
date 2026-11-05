@@ -41,8 +41,6 @@ import { emit } from "./Events.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
 
 const PREF = "astra.blocker.enabled";
-const ZERO_REVISION = "0".repeat(32);
-const HEX32 = /^[0-9a-f]{32}$/u;
 const HEX16 = /^[0-9a-f]{16}$/u;
 
 /** Failure categories the UI understands; unknown values are never echoed. */
@@ -123,6 +121,7 @@ let _live = null;
 let _installed = false;
 let _revision = 0;
 let _generationSeq = 0;
+let _installing = null;
 
 /** Test-only: swap the native/pref adapter. */
 export function __setBlockerBackend(backend) {
@@ -139,6 +138,7 @@ export function __resetBlockerForTests() {
   _installed = false;
   _revision = 0;
   _generationSeq = 0;
+  _installing = null;
   _state = freshState();
 }
 
@@ -439,6 +439,11 @@ function liveBackend() {
       }
       try {
         const result = await Promise.resolve(native.installRules(rules ?? undefined));
+        if (typeof result === "number") {
+          // A future XPCOM wrapper may return nsresult; 0 is success.
+          if (result !== 0) return { ok: false, failure: "native_installation" };
+          return { ok: true, generation: null, coverage: null };
+        }
         if (result && result.ok === false) {
           return {
             ok: false,
@@ -465,6 +470,10 @@ function liveBackend() {
       }
       try {
         const result = await Promise.resolve(native.refreshSources());
+        if (typeof result === "number") {
+          if (result !== 0) return { ok: false, failure: "internal" };
+          return { ok: true, generation: null, coverage: null };
+        }
         if (!result || result.ok !== true) {
           return { ok: false, failure: sourceFailure(result?.failure) ?? "internal" };
         }
@@ -749,6 +758,17 @@ async function installRules(backend) {
   return { ok: false, failure: _state.failure };
 }
 
+/** One in-flight install shared by status reconciliation and a toggle. */
+function ensureInstalled(backend) {
+  if (_installing) return _installing;
+  const task = installRules(backend);
+  _installing = task;
+  void task.finally(() => {
+    if (_installing === task) _installing = null;
+  });
+  return task;
+}
+
 async function refreshAndInstall(backend) {
   if (!backend || typeof backend.refreshSources !== "function") {
     return { ok: false, failure: "internal" };
@@ -857,7 +877,24 @@ export const Blocker = {
   /** The full projection, read from the running backend every call. */
   async status() {
     install();
-    return buildStatus();
+    const view = buildStatus();
+    // A profile that left protection on must not sit pending forever after a
+    // restart: the pref is the arming gate, and an install is idempotent.
+    if (
+      view.desired_enabled === true &&
+      view.applied_enabled !== true &&
+      view.can_enable &&
+      view.failure === null &&
+      _installing === null
+    ) {
+      void ensureInstalled(getBackend())
+        .then(() => publish())
+        .catch(() => {
+          // The next status call reports the failure; never reject a
+          // projection read.
+        });
+    }
+    return view;
   },
 
   /** Real counts only; null when the native runtime cannot report them. */
@@ -922,7 +959,7 @@ export const Blocker = {
     } catch {
       // Installation below reports the real outcome.
     }
-    const result = await installRules(backend);
+    const result = await ensureInstalled(backend);
     publish();
     return result.ok
       ? admit({ outcome: "applied", reason: "mutation_applied" })

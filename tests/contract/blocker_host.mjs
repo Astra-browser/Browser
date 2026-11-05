@@ -324,6 +324,22 @@ function validStatus(view) {
   check("disable reports protection off", (await Blocker.status()).protection === "disabled");
 }
 
+// --- Restart reconciliation --------------------------------------------------
+{
+  reset();
+  const backend = fake({ available: true, pref: true });
+  inject(backend);
+  const first = await Blocker.status();
+  check("a pref-on restart starts pending", first.protection === "pending");
+  check("the first status kicks off exactly one install", backend.state.installs === 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const second = await Blocker.status();
+  check("the reconciled status becomes active", second.protection === "active");
+  check("the reconciled status claims applied", second.applied_enabled === true);
+  check("reconciliation does not install twice", backend.state.installs === 1);
+  check("a reconciled install emitted a projection", statusEvents().length >= 1);
+}
+
 // --- Failure, retry ----------------------------------------------------------
 {
   reset();
@@ -393,7 +409,7 @@ function validStatus(view) {
 // --- Site change -------------------------------------------------------------
 {
   reset();
-  const backend = fake({ available: true, pref: true, site: SITE });
+  const backend = fake({ available: true, pref: false, site: SITE });
   inject(backend);
   const view = await Blocker.status();
   check("site context is exposed when a tab is present", validStatus(view) && view.site.context.site === "news.example");

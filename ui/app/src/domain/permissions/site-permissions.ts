@@ -4,6 +4,7 @@ import type {
   SitePermissionsView,
 } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
+import { listen } from "@astra/bridge";
 import { operations, settle } from "$domain/operations";
 
 /**
@@ -32,4 +33,29 @@ export async function set(
   }
   const result = await settle(commands.sitePermissionSet(origin, kind, decision), 10_000);
   return result.outcome === "applied" || result.outcome === "no_op";
+}
+
+/**
+ * Calls `onChange` when a site decision changes anywhere (this page, the page
+ * panel, or a browsing-data clear). Returns the teardown.
+ */
+export function watch(onChange: () => void): () => void {
+  let active = true;
+  let stop: (() => void) | null = null;
+  void listen("sites-changed", () => {
+    if (active) onChange();
+  })
+    .then((off) => {
+      if (active) stop = off;
+      else off();
+    })
+    .catch(() => {
+      // Standalone/mock builds may not carry the channel; the first load
+      // still shows the real list.
+    });
+  return () => {
+    active = false;
+    stop?.();
+    stop = null;
+  };
 }

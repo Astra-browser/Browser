@@ -9,14 +9,17 @@
   let status = $derived(blocker.status());
   let busy = $state(false);
   let message = $state("");
+  let unavailable = $derived(status.can_enable !== true);
   let standing = $derived(
-    status.protection === "pending"
-      ? "Protection starting… You can keep browsing."
-      : status.protection === "active"
-        ? "Protection is active."
-        : status.protection === "disabled"
-          ? "Protection is off for this profile."
-          : "Protection needs attention. The last working rules are retained when available.",
+    unavailable
+      ? "Unavailable in this build: the native blocker is compiled, but it exposes no management interface for Astra to install or validate rules."
+      : status.protection === "pending"
+        ? "Protection starting… You can keep browsing."
+        : status.protection === "active"
+          ? "Protection is active."
+          : status.protection === "disabled"
+            ? "Protection is off for this profile."
+            : "Protection needs attention. The last working rules are retained when available.",
   );
   onMount(() => {
     void blocker.refresh();
@@ -57,7 +60,9 @@
   </SettingsRow>
   <SettingsRow
     title="Filter lists"
-    description="EasyList and EasyPrivacy from their official HTTPS publisher. Updates are validated before activation, with a built-in offline fallback."
+    description={unavailable
+      ? "EasyList and EasyPrivacy ship in the repository, but this build cannot hand them to the engine."
+      : "EasyList and EasyPrivacy from their official HTTPS publisher. Updates are validated before activation, with a built-in offline fallback."}
   >
     <Button
       disabled={busy || !status.can_refresh_sources}
