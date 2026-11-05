@@ -283,10 +283,15 @@ function onHostEvent(event) {
     return;
   }
   // A policy change applies now rather than at the next interval: the driver
-  // reads the pref on every tick, and a change wakes one.
+  // reads the pref on every tick, and a change wakes one. A resource-policy
+  // change can also re-enable background unload after "keep-ready".
+  if (command.startsWith("preference.performance.memory=")) {
+    scheduled();
+    void Performance.tick();
+    return;
+  }
   if (
     command.startsWith("preference.performance.after=") ||
-    command.startsWith("preference.performance.memory=") ||
     command.startsWith("preference.performance.exceptions=")
   ) {
     void Performance.tick();
