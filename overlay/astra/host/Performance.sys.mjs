@@ -286,7 +286,8 @@ function onHostEvent(event) {
   // reads the pref on every tick, and a change wakes one. A resource-policy
   // change can also re-enable background unload after "keep-ready".
   if (command.startsWith("preference.performance.memory=")) {
-    scheduled();
+    if (readPolicy().background) scheduled();
+    else unscheduled();
     void Performance.tick();
     return;
   }
