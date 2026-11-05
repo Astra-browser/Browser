@@ -45,6 +45,7 @@ import { Zoom, __resetZoomForTests } from "./Zoom.sys.mjs";
 import { Keymap } from "./Keymap.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
+import { Profiles, __resetProfilesForTests } from "./Profiles.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { MediaImport, __resetMediaImportForTests } from "./MediaImport.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
@@ -84,6 +85,7 @@ export {
   Keymap,
   Work,
   Downloads,
+  Profiles,
   Media,
   MediaImport,
   Notes,
@@ -130,6 +132,7 @@ export function __resetForTests() {
   __resetOperationsForTests();
   __resetZoomForTests();
   Permissions.__resetForTests();
+  __resetProfilesForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();
   __resetMediaImportForTests();

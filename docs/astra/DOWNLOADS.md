@@ -1,10 +1,27 @@
 # Downloads manager + PDF viewing (P4-T08)
 
 Parity owner: downloads UI. Native transfers, paths, and durable history stay
-in `astra-core` behind `download_call` / `download_open_access_settings`
+in the engine behind `download_call` / `download_open_access_settings`
 (`docs/astra/ipc-surface.md`); the Svelte side is a projection over
 `downloads-changed` (`DownloadSession` in `ui/app/src/domain/downloads/`,
 rendered by `ui/app/src/features/downloads/`).
+
+## Native wiring (2026-11-05)
+
+`overlay/astra/host/Downloads.sys.mjs` is backed by
+`Downloads.getList(Downloads.PUBLIC)` and the engine's download preferences
+(`browser.download.useDownloadDir`, `browser.download.folderList`,
+`browser.download.dir`, `Downloads.getPreferredDownloadsDirectory()`). A folder
+choice is `nsIFilePicker` + `folderList = 2`; the settings ask switch writes
+`useDownloadDir`; native list changes emit `downloads-changed`. `list` and
+`preferences` answer `supported: true` only when the engine answered, and the
+settings panel renders an honest unsupported state otherwise.
+
+Still deferred: this engine exposes no pause/resume or type-held lifecycle, so
+those calls answer `unavailable`; downloads remain global rather than
+per-profile until the core store owns them. The live Marionette probe (fixture
+attachment, folder/ask round-trip) runs in the integration branch after the
+bundle rebuild.
 
 ## What P4-T08 adds
 

@@ -210,5 +210,174 @@ for (const kind of ["entries", "teleport", ""]) {
   check("hostile payloads answer instead of throwing", threw === false);
 }
 
+// === Native seam: the list, preferences and writes are the engine's ========
+{
+  const { __setDownloadsNative, __resetDownloadsForTests } = await import(
+    path.join(HOST, "Downloads.sys.mjs")
+  );
+  const reset = () => {
+    __resetDownloadsForTests();
+  };
+  const view = (id, state = "completed", extra = {}) => ({
+    id,
+    revision: "9000000000000001",
+    created_at: "2026-11-05T10:00:00.000Z",
+    filename: `${id}.zip`,
+    source: `https://example.test/${id}.zip`,
+    state,
+    received: "100",
+    total: "100",
+    error: null,
+    ...extra,
+  });
+
+  // The newest id sorts first, as the UI expects.
+  let store = [
+    view("0000000000000001-0", "completed"),
+    view("0000000000000002-0", "receiving", { total: null, received: "40" }),
+    view("0000000000000003-0", "failed", { error: "network" }),
+  ];
+  let preferences = {
+    ask_destination: false,
+    directory: "/home/person/Downloads",
+    site_downloads_require_confirmation: false,
+  };
+  let calls = [];
+  let cancelled = false;
+  const native = {
+    async list() {
+      return store.map((entry) => ({ ...entry }));
+    },
+    async preferences() {
+      return { ...preferences };
+    },
+    async setAskDestination(enabled) {
+      calls.push(["ask", enabled]);
+      preferences = { ...preferences, ask_destination: enabled };
+      return true;
+    },
+    async chooseDirectory() {
+      calls.push(["choose"]);
+      if (cancelled) return { cancelled: true };
+      preferences = { ...preferences, directory: "/home/person/Save here" };
+      return { cancelled: false };
+    },
+    async cancel(id) {
+      calls.push(["cancel", id]);
+      return store.some((entry) => entry.id === id);
+    },
+    async open(id) {
+      calls.push(["open", id]);
+      return store.some((entry) => entry.id === id);
+    },
+    async reveal(id) {
+      calls.push(["reveal", id]);
+      return store.some((entry) => entry.id === id);
+    },
+    async forget(id) {
+      calls.push(["forget", id]);
+      const before = store.length;
+      store = store.filter((entry) => entry.id !== id);
+      return store.length !== before;
+    },
+    async clear() {
+      calls.push(["clear"]);
+      store = store.filter((entry) => entry.state === "receiving");
+      return true;
+    },
+    async pause() {
+      return false;
+    },
+    async resume() {
+      return false;
+    },
+    async keep() {
+      return false;
+    },
+    async discard() {
+      return false;
+    },
+  };
+
+  reset();
+  __setDownloadsNative(native);
+
+  const page = await call(P, { kind: "list", before: null, limit: 2 });
+  check("native list is a supported page", page.kind === "page" && page.supported === true);
+  check("native list reflects the transfer count", page.entries.length === 2);
+  check("native list is newest first", page.entries[0].id === "0000000000000003-0");
+  check("native list carries a next cursor", page.next === "0000000000000002-0");
+  const more = await call(P, { kind: "list", before: page.next, limit: 2 });
+  check("native pagination returns the rest", more.kind === "page" && more.entries.length === 1);
+  check("native pagination ends", more.next === null);
+  check(
+    "native entries keep the wire shape",
+    more.entries.every(
+      (entry) =>
+        typeof entry.id === "string" &&
+        typeof entry.revision === "string" &&
+        typeof entry.state === "string" &&
+        typeof entry.received === "string" &&
+        (entry.total === null || typeof entry.total === "string"),
+    ),
+  );
+
+  const prefs = await call(P, { kind: "preferences" });
+  check("native preferences are supported", prefs.kind === "preferences" && prefs.supported === true);
+  check("native preferences carry the resolved folder", prefs.preferences.directory === "/home/person/Downloads");
+  check("ask is the inverse of useDownloadDir", prefs.preferences.ask_destination === false);
+  check(
+    "preferences carry only the wire fields",
+    Object.keys(prefs.preferences).sort().join(",") === "ask_destination,directory",
+  );
+  check("profile is echoed", prefs.profile === P);
+
+  const asked = await call(P, { kind: "set_ask_destination", enabled: true });
+  check("asking first lands as preferences", asked.kind === "preferences" && asked.preferences.ask_destination === true);
+  check("asking first reached the native seam", calls.some((call_) => call_[0] === "ask" && call_[1] === true));
+
+  const chosen = await call(P, { kind: "choose_directory" });
+  check("choosing a folder answers the new preferences", chosen.kind === "preferences");
+  check("the chosen folder is the picker's", chosen.preferences.directory === "/home/person/Save here");
+
+  cancelled = true;
+  const cancelledChoice = await call(P, { kind: "choose_directory" });
+  check("a cancelled picker is not an error", cancelledChoice.kind === "preferences");
+  check("a cancelled picker leaves the folder alone", cancelledChoice.preferences.directory === "/home/person/Save here");
+
+  const cancel = await call(P, { kind: "cancel", id: "0000000000000002-0" });
+  check("cancel reaches the native transfer", cancel.kind === "applied");
+  const unknown = await call(P, { kind: "cancel", id: "00000000000000ff-0" });
+  check("an unknown transfer is unavailable, not applied", unknown.kind === "error" && unknown.error === "unavailable");
+  const paused = await call(P, { kind: "pause", id: "0000000000000002-0" });
+  check("pause is unavailable where the engine has no pause", paused.kind === "error" && paused.error === "unavailable");
+
+  const removedBefore = await call(P, { kind: "list", before: null, limit: 50 });
+  check("the snapshot saw three transfers", removedBefore.entries.length === 3);
+  store = store.filter((entry) => entry.id !== "0000000000000003-0");
+  const updates = await call(P, { kind: "updates" });
+  check("updates names the removed transfer", updates.removed.includes("0000000000000003-0"));
+  check("updates still carries the remaining transfers", updates.entries.length === 2);
+
+  const cleared = await call(P, { kind: "clear" });
+  check("clear is accepted", cleared.kind === "accepted");
+  const afterClear = await call(P, { kind: "list", before: null, limit: 50 });
+  check("clear removed the finished transfer", afterClear.entries.length === 1);
+  check("clear kept the transfer in progress", afterClear.entries[0].state === "receiving");
+
+  // A native seam that refuses a write must not be reported as applied.
+  __setDownloadsNative({
+    ...native,
+    async setAskDestination() {
+      return false;
+    },
+  });
+  const refused = await call(P, { kind: "set_ask_destination", enabled: false });
+  check("a refused native write is unavailable", refused.kind === "error" && refused.error === "unavailable");
+
+  reset();
+}
+
 console.log(`\ndownloads_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
+

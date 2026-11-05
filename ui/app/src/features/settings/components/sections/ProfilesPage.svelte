@@ -12,7 +12,7 @@
 
   onMount(() => {
     void profiles.retain();
-    if (takeNewRequest()) create(true);
+    if (takeNewRequest()) create();
     return () => profiles.release();
   });
 
@@ -22,6 +22,7 @@
   let editing = $state.raw<ProfileEntryView | null>(null);
   let switching = $state<string | null>(null);
   let failed = $state<string | null>(null);
+  let switchUnsupported = $state(false);
   /** A new profile starts on the first colour no other profile wears. */
   const nextColor = $derived(
     Array.from({ length: AVATAR_COLORS }, (_, index) => (index + 1) % AVATAR_COLORS).find(
@@ -29,9 +30,7 @@
     ) ?? 1,
   );
 
-  let andSwitch = $state(false);
-  function create(fromSidebar = false) {
-    andSwitch = fromSidebar;
+  function create() {
     editing = null;
     sheetOpen = true;
   }
@@ -45,7 +44,10 @@
     if (switching) return;
     switching = profile.id;
     failed = null;
-    if (!(await profiles.switchTo(profile.id))) failed = profile.id;
+    switchUnsupported = false;
+    const result = await profiles.switchTo(profile.id);
+    if (result === "unsupported") switchUnsupported = true;
+    else if (result !== "applied") failed = profile.id;
     switching = null;
   }
 </script>
@@ -94,6 +96,9 @@
       </button>
     </li>
   </ul>
+  {#if switchUnsupported}
+    <p class="note unsupported" role="status">{m.profiles_switch_unsupported()}</p>
+  {/if}
   <p class="note">{m.profiles_list_note()}</p>
 </section>
 
@@ -102,7 +107,7 @@
   profile={editing}
   current={editing?.id === currentId}
   color={nextColor}
-  {andSwitch}
+  andSwitch={false}
 />
 
 <style>
@@ -221,5 +226,9 @@
     color: var(--color-muted);
     font-size: var(--text-label);
     line-height: 1.5;
+  }
+
+  .unsupported {
+    color: var(--color-label-secondary);
   }
 </style>

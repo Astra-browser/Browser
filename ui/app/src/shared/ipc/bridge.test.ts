@@ -125,6 +125,7 @@ describe("bridge wiring", () => {
       Keymap: {},
       Work: {},
       Downloads: {},
+      Profiles: {},
       Media: {},
       Notes: {},
       Bookmarks: {},

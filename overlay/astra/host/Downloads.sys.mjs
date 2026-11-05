@@ -2,40 +2,50 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Host API Downloads module (v1, wiring). The downloads list and the
-// Downloads settings panel are projections over `download_call` /
-// `download_open_access_settings` (`docs/astra/DOWNLOADS.md`,
-// `docs/astra/ipc-surface.md`). Native transfers, paths and durable history
-// belong to astra-core; this module is the host-side answer while that
-// manager is not connected, so the surfaces render their real state (nothing
-// held) instead of failing with `unknown_command`.
+// Host API Downloads module (v1, native). The Downloads panel and the
+// Downloads settings panel are projections over `download_call`
+// (`docs/astra/ipc-surface.md`, `DownloadCall`/`DownloadResponse` in
+// `ui/app/src/shared/ipc/bindings.ts`). Native transfers, paths and durable
+// history are the engine's own Downloads manager:
+//
+//   - the list is `Downloads.getList(Downloads.PUBLIC)`. Private-window
+//     downloads are never read here; the public list is the only list this
+//     module exposes.
+//   - the preferred folder is `Downloads.getPreferredDownloadsDirectory()`,
+//     which resolves `browser.download.folderList` (0 Desktop, 1 Downloads,
+//     2 Custom) and `browser.download.dir`.
+//   - asking first is the inverse of `browser.download.useDownloadDir`.
+//   - choosing a folder is `nsIFilePicker` in `modeGetFolder`; the result is
+//     stored as `browser.download.dir` with `folderList = 2`, exactly what the
+//     engine's own save path reads.
 //
 // What this module will and will not say:
-// - `updates` and `list` answer with an empty set. The host holds no
-//   transfers and no durable history yet, and it never invents entries.
-// - `list` reports `supported: false` so the panel says downloads are not
-//   available yet instead of passing an empty page off as the person's whole
-//   history.
-// - `preferences` answers the documented defaults only: the default saves
-//   straight to the system Downloads folder, and no native picker has minted
-//   a directory identity.
-// - `clear` and `retry_cleanup` are idempotent on that empty set: there is
-//   nothing to clear and no failed cleanup to retry, so they answer
-//   `accepted` / `applied` without inventing work.
-// - Anything that needs a real transfer, file or durable preference
-//   (`cancel`, `pause`, `resume`, `keep`, `discard`, `open`, `reveal`,
-//   `forget`, `choose_directory`, `set_ask_destination`) answers the reply's
-//   own `error` variant `unavailable`. Nothing is reported as applied.
-// - A malformed call answers `{ kind: "error", error: "invalid" }`; an
-//   unknown `kind` is `invalid` too. The call never throws.
-// - Every reply echoes the profile the caller asked for. Nothing is stored
-//   per profile, so nothing can be read as another profile's state.
+// - A reply is either real native state or an honest error. Nothing is
+//   reported as `applied` when the write did not land.
+// - `pause`, `resume`, `keep` and `discard` name engine features this build
+//   does not expose (a paused download and a type-held download have no native
+//   API); they answer `unavailable` rather than pretending.
+// - A malformed call answers `{ kind: "error", error: "invalid" }`; without a
+//   native Downloads manager every read says `supported: false` and every
+//   write says `unavailable`.
+// - Every reply echoes the profile the caller asked for. Downloads are still
+//   global in this build (docs/astra/STATE.md), so the same list is visible to
+//   every profile; the echo keeps the UI's own scope check honest.
+// - A native list change emits `downloads-changed` for each profile that has
+//   asked for downloads, so the panel refreshes from the engine rather than
+//   polling.
 //
-// Pure logic, no Firefox internals, no Events import: nothing here changes
-// state, so there is no `downloads-changed` to announce.
+// The module can be imported by Node contract tests: the engine is reached
+// lazily and a test can substitute the whole native seam with
+// `__setDownloadsNative()`.
+
+import { emit } from "./Events.sys.mjs";
 
 /** Page of entries the UI asks for in one `list` call. */
 const MAX_PAGE_LIMIT = 2000;
+
+/** How often one native burst becomes one `downloads-changed`. */
+const CHANGE_COALESCE_MS = 250;
 
 /** The idle cleanup state: no pass is running and none failed. */
 function idleCleanup() {
@@ -56,6 +66,24 @@ function isEntryId(id) {
   return typeof id === "string" && id !== "";
 }
 
+/** A `preferences` reply with only the fields `DownloadPreferences` declares. */
+function preferencesReply(profile, native) {
+  return {
+    kind: "preferences",
+    profile,
+    preferences: {
+      ask_destination: native?.ask_destination === true,
+      directory:
+        typeof native?.directory === "string" && native.directory !== ""
+          ? native.directory
+          : null,
+    },
+    supported: true,
+    site_downloads_require_confirmation:
+      native?.site_downloads_require_confirmation === true,
+  };
+}
+
 /** `{ before: string | null, limit: number }`, exactly as the UI sends it. */
 function isPageCall(call) {
   const { before, limit } = call;
@@ -69,7 +97,368 @@ function isPageCall(call) {
   );
 }
 
-function answer(profile, call) {
+// --- Injectable native seam -------------------------------------------------
+
+let injectedNative = null;
+let nativePromise = null;
+let nativeViewAttached = false;
+let changeTimer = null;
+
+/** Profiles that have called this module; an event names each one so the
+ *  panel's own profile filter keeps working. */
+const knownProfiles = new Set();
+
+/** Ids returned by the previous snapshot, so `updates` can name removals. */
+let lastIds = null;
+
+export function __setDownloadsNative(native) {
+  injectedNative = native;
+  nativePromise = null;
+  nativeViewAttached = false;
+  lastIds = null;
+  return () => {
+    if (injectedNative === native) {
+      injectedNative = null;
+      nativePromise = null;
+      nativeViewAttached = false;
+      lastIds = null;
+    }
+  };
+}
+
+export function __resetDownloadsForTests() {
+  injectedNative = null;
+  nativePromise = null;
+  nativeViewAttached = false;
+  knownProfiles.clear();
+  lastIds = null;
+  if (changeTimer !== null && typeof globalThis.clearTimeout === "function") {
+    globalThis.clearTimeout(changeTimer);
+  }
+  changeTimer = null;
+}
+
+function announceChange() {
+  if (changeTimer !== null) {
+    return;
+  }
+  const schedule = globalThis.setTimeout;
+  if (typeof schedule !== "function") {
+    emitChanges();
+    return;
+  }
+  changeTimer = schedule(() => {
+    changeTimer = null;
+    emitChanges();
+  }, CHANGE_COALESCE_MS);
+}
+
+function emitChanges() {
+  for (const profile of knownProfiles) {
+    emit("downloads-changed", { profile });
+  }
+}
+
+// --- Native adapter ---------------------------------------------------------
+
+/** The chrome scope, or null in Node/preview. */
+function chromeScope() {
+  try {
+    const scopes = [globalThis];
+    if (globalThis.window && globalThis.window !== globalThis) {
+      scopes.push(globalThis.window);
+    }
+    const view = globalThis.document?.defaultView;
+    if (view && !scopes.includes(view)) {
+      scopes.push(view);
+    }
+    for (const scope of scopes) {
+      if (scope?.Services?.prefs && scope?.ChromeUtils?.importESModule) {
+        return scope;
+      }
+    }
+  } catch {
+    // A partial or hostile global is the same as no chrome.
+  }
+  return null;
+}
+
+function prefsOf(scope) {
+  try {
+    return scope?.Services?.prefs ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A small stable hash so a Download object keeps one wire id across calls. */
+function hash(text) {
+  let value = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    value ^= text.charCodeAt(index);
+    value = Math.imul(value, 16777619);
+  }
+  return (value >>> 0).toString(36);
+}
+
+/** Newest first: the UI sorts `entry.id` descending, so the id starts with a
+ *  zero-padded start time. */
+function idOf(download) {
+  const started = download?.startTime?.getTime?.() ?? 0;
+  const source = download?.source?.url ?? "";
+  const target = download?.target?.path ?? "";
+  return `${String(started).padStart(16, "0")}-${hash(
+    `${source}\n${target}\n${started}`,
+  )}`;
+}
+
+/** Wire state for one native Download. */
+function stateOf(download) {
+  if (download?.error) return "failed";
+  if (download?.hasBlockedData) return "held";
+  if (download?.canceled) return download?.stopped ? "cancelled" : "cancelling";
+  if (download?.stopped) return download?.succeeded ? "completed" : "interrupted";
+  if (!download?.startTime) return "pending";
+  return "receiving";
+}
+
+/** A revision that only grows while the wire state does. */
+function revisionOf(download) {
+  const state = stateOf(download);
+  const rank = {
+    pending: 0,
+    receiving: 1,
+    paused: 2,
+    held: 3,
+    cancelling: 4,
+    finalizing: 5,
+    interrupted: 6,
+    failed: 7,
+    cancelled: 8,
+    completed: 9,
+  }[state];
+  const received = Number.isSafeInteger(download?.currentBytes)
+    ? download.currentBytes
+    : 0;
+  return `${rank}${String(Math.max(0, received)).padStart(16, "0")}`;
+}
+
+/** Wire error for one native Download. */
+function errorOf(download) {
+  const native = download?.error;
+  if (!native) return null;
+  if (
+    native.becauseBlocked ||
+    native.becauseBlockedByParentalControls ||
+    native.becauseBlockedByReputationCheck ||
+    native.becauseBlockedByContentAnalysis
+  ) {
+    return "protection";
+  }
+  if (native.becauseTargetFailed) return "storage";
+  if (native.becauseSourceFailed) return "network";
+  return "runtime";
+}
+
+function filenameOf(download) {
+  const path = download?.target?.path;
+  if (typeof path !== "string" || path === "") return "";
+  const at = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return at >= 0 ? path.slice(at + 1) : path;
+}
+
+/** One `DownloadView`; no invented fields. */
+function viewOf(download) {
+  return {
+    id: idOf(download),
+    revision: revisionOf(download),
+    created_at: (download?.startTime ?? new Date()).toISOString(),
+    filename: filenameOf(download),
+    source: download?.source?.url ?? "",
+    state: stateOf(download),
+    received: String(Math.max(0, download?.currentBytes ?? 0)),
+    total:
+      Number.isSafeInteger(download?.totalBytes) && download.totalBytes > 0
+        ? String(download.totalBytes)
+        : null,
+    error: errorOf(download),
+  };
+}
+
+function makeNative(scope) {
+  const { Downloads } = scope.ChromeUtils.importESModule(
+    "resource://gre/modules/Downloads.sys.mjs",
+  );
+  const prefs = prefsOf(scope);
+  const services = scope.Services;
+  if (!prefs || !services) {
+    throw new Error("no chrome preferences");
+  }
+
+  let listPromise = null;
+  async function list() {
+    listPromise ??= (async () => {
+      const publicList = await Downloads.getList(Downloads.PUBLIC);
+      if (!nativeViewAttached) {
+        nativeViewAttached = true;
+        publicList.addView({
+          onDownloadAdded: announceChange,
+          onDownloadChanged: announceChange,
+          onDownloadRemoved: announceChange,
+        });
+      }
+      return publicList;
+    })();
+    return listPromise;
+  }
+
+  async function find(id) {
+    const all = await (await list()).getAll();
+    return all.find((download) => idOf(download) === id) ?? null;
+  }
+
+  async function preferences() {
+    const ask = !prefs.getBoolPref("browser.download.useDownloadDir", true);
+    const directory = await Downloads.getPreferredDownloadsDirectory();
+    return {
+      ask_destination: ask,
+      directory: typeof directory === "string" && directory !== "" ? directory : null,
+      // This engine requires a save confirmation for every download only on
+      // Windows; everywhere else the choice above is the whole policy.
+      site_downloads_require_confirmation: services.appinfo?.OS === "WINNT",
+    };
+  }
+
+  return {
+    async list() {
+      const all = await (await list()).getAll();
+      return all.map(viewOf);
+    },
+
+    preferences,
+
+    async setAskDestination(enabled) {
+      if (prefs.prefIsLocked?.("browser.download.useDownloadDir")) return false;
+      prefs.setBoolPref("browser.download.useDownloadDir", !enabled);
+      return (
+        prefs.getBoolPref("browser.download.useDownloadDir", true) === !enabled
+      );
+    },
+
+    async chooseDirectory() {
+      const Cc = scope.Cc ?? globalThis.Cc;
+      const Ci = scope.Ci ?? globalThis.Ci;
+      if (!Cc || !Ci) return null;
+      const picker = Cc["@mozilla.org/filepicker;1"].createInstance(
+        Ci.nsIFilePicker,
+      );
+      const win = services.wm?.getMostRecentWindow?.("navigator:browser") ?? null;
+      picker.init(
+        win,
+        "Choose a downloads folder",
+        Ci.nsIFilePicker.modeGetFolder,
+      );
+      const result = await new Promise((resolve) => picker.open(resolve));
+      if (result !== Ci.nsIFilePicker.returnOK) return { cancelled: true };
+      const path = picker.file?.path;
+      if (typeof path !== "string" || path === "") return null;
+      prefs.setStringPref("browser.download.dir", path);
+      prefs.setIntPref("browser.download.folderList", 2);
+      return { cancelled: false };
+    },
+
+    async cancel(id) {
+      const download = await find(id);
+      if (!download) return false;
+      await download.cancel();
+      return true;
+    },
+
+    async open(id) {
+      const download = await find(id);
+      if (!download || !download.succeeded) return false;
+      await download.launch();
+      return true;
+    },
+
+    async reveal(id) {
+      const download = await find(id);
+      if (!download) return false;
+      await download.showContainingDirectory();
+      return true;
+    },
+
+    async forget(id) {
+      const download = await find(id);
+      if (!download) return false;
+      await (await list()).remove(download);
+      return true;
+    },
+
+    async clear() {
+      const target = await list();
+      const all = await target.getAll();
+      for (const download of all) {
+        if (download.stopped) await target.remove(download);
+      }
+      return true;
+    },
+
+    // The engine exposes no pause/resume or type-held lifecycle to this
+    // build; the module answers `unavailable` instead of inventing one.
+    async pause() {
+      return false;
+    },
+    async resume() {
+      return false;
+    },
+    async keep() {
+      return false;
+    },
+    async discard() {
+      return false;
+    },
+  };
+}
+
+/** The native Downloads adapter, or null where no chrome engine exists. */
+async function nativeForUse() {
+  if (injectedNative) return injectedNative;
+  if (nativePromise) return nativePromise;
+  const attempt = (async () => {
+    const scope = chromeScope();
+    if (!scope) return null;
+    try {
+      return makeNative(scope);
+    } catch {
+      // A missing or broken Downloads manager is reported as unsupported by
+      // the reads; it is never mistaken for an empty history.
+      return null;
+    }
+  })();
+  nativePromise = attempt;
+  const native = await attempt;
+  // Do not cache a failure for the life of the process: a manager that was
+  // not ready on the first call may be ready on the next one.
+  if (native === null && nativePromise === attempt) nativePromise = null;
+  return native;
+}
+
+// --- Wire answering ---------------------------------------------------------
+
+function pageOf(entries, call) {
+  const sorted = [...entries].sort((a, b) => b.id.localeCompare(a.id));
+  let start = 0;
+  if (call.before !== null) {
+    const at = sorted.findIndex((entry) => entry.id === call.before);
+    start = at >= 0 ? at + 1 : 0;
+  }
+  const page = sorted.slice(start, start + call.limit);
+  const next = start + page.length < sorted.length ? page.at(-1)?.id ?? null : null;
+  return { entries: page, next };
+}
+
+async function answer(profile, call) {
   if (
     call === null ||
     typeof call !== "object" ||
@@ -79,74 +468,147 @@ function answer(profile, call) {
     return error(profile, "invalid");
   }
 
+  const native = await nativeForUse();
+
   switch (call.kind) {
-    case "updates":
-      // Nothing is transferring, so there is nothing new and nothing removed.
-      return {
-        kind: "updates",
-        profile,
-        entries: [],
-        removed: [],
-        cleanup: idleCleanup(),
-      };
-
-    case "list":
-      if (!isPageCall(call)) {
-        return error(profile, "invalid");
+    case "updates": {
+      if (!native) {
+        lastIds = new Set();
+        return {
+          kind: "updates",
+          profile,
+          entries: [],
+          removed: [],
+          cleanup: idleCleanup(),
+        };
       }
-      return {
-        kind: "page",
-        profile,
-        entries: [],
-        next: null,
-        // The manager that would answer this is not connected; saying so is
-        // honest, claiming an empty history is not.
-        supported: false,
-        cleanup: idleCleanup(),
-      };
+      try {
+        const entries = await native.list();
+        const current = new Set(entries.map((entry) => entry.id));
+        const removed =
+          lastIds === null
+            ? []
+            : [...lastIds].filter((id) => !current.has(id));
+        lastIds = current;
+        return {
+          kind: "updates",
+          profile,
+          entries,
+          removed,
+          cleanup: idleCleanup(),
+        };
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
-    case "preferences":
-      return {
-        kind: "preferences",
-        profile,
-        preferences: defaultPreferences(),
-        supported: false,
-        // No download can be admitted without a manager, so the safe default
-        // (a site may not write a file unprompted) stands.
-        site_downloads_require_confirmation: true,
-      };
+    case "list": {
+      if (!isPageCall(call)) return error(profile, "invalid");
+      if (!native) {
+        lastIds = new Set();
+        return {
+          kind: "page",
+          profile,
+          entries: [],
+          next: null,
+          supported: false,
+          cleanup: idleCleanup(),
+        };
+      }
+      try {
+        const entries = await native.list();
+        lastIds = new Set(entries.map((entry) => entry.id));
+        const page = pageOf(entries, call);
+        return {
+          kind: "page",
+          profile,
+          entries: page.entries,
+          next: page.next,
+          supported: true,
+          cleanup: idleCleanup(),
+        };
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
-    case "clear":
-      // Clearing an empty list is a no-op that succeeds; there is nothing to
-      // forget and no event to send.
-      return { kind: "accepted", profile };
+    case "preferences": {
+      if (!native) {
+        return {
+          kind: "preferences",
+          profile,
+          preferences: defaultPreferences(),
+          supported: false,
+          site_downloads_require_confirmation: true,
+        };
+      }
+      try {
+        return preferencesReply(profile, await native.preferences());
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
+
+    case "clear": {
+      if (!native) {
+        return { kind: "accepted", profile };
+      }
+      try {
+        if (!(await native.clear())) return error(profile, "unavailable");
+        lastIds = new Set();
+        return { kind: "accepted", profile };
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
     case "retry_cleanup":
-      // The cleanup state is idle, so there is no failed pass to retry.
       return { kind: "applied", profile };
 
     case "cancel":
-    case "pause":
-    case "resume":
-    case "keep":
-    case "discard":
     case "open":
     case "reveal":
     case "forget":
-      // These name one transfer or one file; without the manager there is
-      // none to act on.
-      return isEntryId(call.id)
-        ? error(profile, "unavailable")
-        : error(profile, "invalid");
+    case "pause":
+    case "resume":
+    case "keep":
+    case "discard": {
+      if (!isEntryId(call.id)) return error(profile, "invalid");
+      if (!native) return error(profile, "unavailable");
+      try {
+        if (!(await native[call.kind](call.id))) {
+          return error(profile, "unavailable");
+        }
+        return { kind: "applied", profile };
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
-    case "choose_directory":
-      // The native directory picker belongs to the manager.
-      return error(profile, "unavailable");
+    case "choose_directory": {
+      if (!native) return error(profile, "unavailable");
+      try {
+        const choice = await native.chooseDirectory();
+        if (choice === null) return error(profile, "unavailable");
+        // Cancelled is not an error; the current preferences are the answer.
+        return preferencesReply(profile, await native.preferences());
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
-    case "set_ask_destination":
-      return typeof call.enabled === "boolean"
-        ? error(profile, "unavailable")
-        : error(profile, "invalid");
+    case "set_ask_destination": {
+      if (typeof call.enabled !== "boolean") return error(profile, "invalid");
+      if (!native) return error(profile, "unavailable");
+      try {
+        if (!(await native.setAskDestination(call.enabled))) {
+          return error(profile, "unavailable");
+        }
+        return preferencesReply(profile, await native.preferences());
+      } catch {
+        return error(profile, "unavailable");
+      }
+    }
 
     default:
       return error(profile, "invalid");
@@ -165,8 +627,9 @@ export const Downloads = {
     if (typeof asked !== "string" || asked === "") {
       return error("", "invalid");
     }
+    knownProfiles.add(asked);
     try {
-      return answer(asked, call);
+      return await answer(asked, call);
     } catch {
       // Defensive: a hostile payload must not take the host down.
       return error(asked, "runtime");
@@ -174,9 +637,9 @@ export const Downloads = {
   },
 
   /**
-   * Where the system grants folder access. There is no native picker or OS
-   * access panel to open until the real manager is connected, so this
-   * reports `false` instead of pretending a panel opened.
+   * Where the system grants folder access. This build has no OS access panel
+   * (folder access is granted by the picker itself), so this reports `false`
+   * instead of pretending a panel opened.
    */
   async openAccessSettings() {
     return false;

@@ -72,11 +72,20 @@ export type AvatarDraft = ProfileAvatarInputV1;
 
 const applied = (result: Settlement) => result.outcome === "applied" || result.outcome === "no_op";
 
-/** With `andSwitch`, the window shows the new profile once it exists. */
 export const create = async (name: string, avatar: AvatarDraft, andSwitch = false) =>
   applied(await settle(commands.profilesCreate(name, avatar, andSwitch), andSwitch ? 8000 : 5000));
-export const switchTo = async (id: string) =>
-  applied(await settle(commands.profilesSwitch(id), 8000));
+
+/** Switching is a relaunch-level operation this build cannot honour; the
+ *  host answers a classified refusal rather than moving the window. */
+export type SwitchResult = "applied" | "unsupported" | "failed";
+export const switchTo = async (id: string): Promise<SwitchResult> => {
+  const result = await settle(commands.profilesSwitch(id), 8000);
+  if (applied(result)) return "applied";
+  if (result.outcome === "rejected" && result.disposition?.reason === "unsupported_command") {
+    return "unsupported";
+  }
+  return "failed";
+};
 export const rename = async (id: string, name: string) =>
   applied(await settle(commands.profilesRename(id, name)));
 export const setAvatar = async (id: string, avatar: AvatarDraft) =>

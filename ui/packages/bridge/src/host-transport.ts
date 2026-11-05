@@ -31,6 +31,7 @@ export interface HostModules {
   Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Profiles: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   MediaImport: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Notes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -115,6 +116,13 @@ const ROUTES: Record<string, Route> = {
   work_call: ["Work", "call"],
   download_call: ["Downloads", "call"],
   download_open_access_settings: ["Downloads", "openAccessSettings"],
+  profiles_get: ["Profiles", "get"],
+  profiles_create: ["Profiles", "create"],
+  profiles_rename: ["Profiles", "rename"],
+  profiles_delete: ["Profiles", "remove"],
+  profiles_set_avatar: ["Profiles", "setAvatar"],
+  profile_avatar_pick: ["Profiles", "avatarPick"],
+  profiles_switch: ["Profiles", "switch"],
   media_player: ["Media", "player"],
   media_import: ["MediaImport", "import"],
   tab_set_muted: ["Tabs", "setMuted", TAB_ARG],

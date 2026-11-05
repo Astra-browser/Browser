@@ -28,7 +28,7 @@
   } = $props();
 
   let picking = $state(false);
-  let refused = $state(false);
+  let refused = $state<null | "unsupported" | "unavailable">(null);
   const initials = $derived(initialsOf(name) || "?");
   const photoSrc = $derived(value.photo ? stagedUrl(value.photo) : saved);
   const preview = $derived({
@@ -42,15 +42,15 @@
   async function choosePhoto() {
     if (picking) return;
     picking = true;
-    refused = false;
+    refused = null;
     const pick = await profiles.pickPhoto();
     picking = false;
     if (typeof pick === "object") value = { ...value, style: "photo", photo: pick.token };
-    else if (pick !== "cancelled") refused = true;
+    else if (pick !== "cancelled") refused = pick;
   }
 
   const choose = (patch: Partial<AvatarChoice>) => {
-    refused = false;
+    refused = null;
     value = { ...value, ...patch };
   };
 </script>
@@ -70,7 +70,9 @@
         <span>{photoSrc ? m.profiles_avatar_change_photo() : m.profiles_avatar_choose_photo()}</span
         >
       </button>
-      {#if refused}<p class="refused" role="alert">{m.profiles_avatar_unsupported()}</p>{/if}
+      {#if refused}<p class="refused" role="alert">
+          {refused === "unsupported" ? m.profiles_avatar_unavailable() : m.profiles_avatar_failed()}
+        </p>{/if}
     </div>
   </div>
 
