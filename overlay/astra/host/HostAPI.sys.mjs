@@ -37,6 +37,7 @@ import { Keymap } from "./Keymap.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { MediaImport, __resetMediaImportForTests } from "./MediaImport.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
 import { Time } from "./Time.sys.mjs";
@@ -73,6 +74,7 @@ export {
   Work,
   Downloads,
   Media,
+  MediaImport,
   Notes,
   Bookmarks,
   Time,
@@ -114,6 +116,7 @@ export function __resetForTests() {
   Permissions.__resetForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();
+  __resetMediaImportForTests();
   DialogPrompts.__resetForTests();
   __resetEventsForTests();
 }

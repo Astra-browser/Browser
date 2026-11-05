@@ -157,6 +157,19 @@ test("defaults do no image work, and every figure and wordmark updates live and 
   expect(preferences.value("search.engine")).toBe("google");
 });
 
+test("the image picker is reachable before a background image is chosen", async () => {
+  await preferences.init();
+  const settings = await settingsScreen();
+  await expect
+    .element(settings.getByRole("button", { name: "Choose image…", exact: true }))
+    .toBeVisible();
+  expect(native.import).not.toHaveBeenCalled();
+  await settings.getByRole("button", { name: "Choose image…", exact: true }).click();
+  await expect.poll(() => native.import.mock.calls.length).toBe(1);
+  await expect.poll(() => preferences.value("ui.newtab-background")).toBe("image");
+  expect(preferences.value("ui.newtab-image")).toBe(digest);
+});
+
 test("a custom background uses one sized local image, no sky decode or frost, and dims live", async () => {
   native.settings = { "ui.newtab-background": "image", "ui.newtab-image": digest };
   await preferences.init();

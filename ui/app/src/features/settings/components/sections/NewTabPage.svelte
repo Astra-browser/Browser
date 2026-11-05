@@ -96,12 +96,18 @@
       ]}
     />
   </SettingsRow>
+  <!-- The picker is reachable before the choice is made: choosing the image
+       is what turns the background on, so it cannot wait for that state. -->
+  <SettingsRow
+    settingId="ntp.image"
+    title={m.ntp_own_image()}
+    description={ownImage ? undefined : m.ntp_background_help()}
+  >
+    <Button size="compact" disabled={busy} onclick={() => void importImage()}
+      >{m.ntp_choose_image()}</Button
+    >
+  </SettingsRow>
   {#if ownImage}
-    <SettingsRow title={m.ntp_own_image()}>
-      <Button size="compact" disabled={busy} onclick={() => void importImage()}
-        >{m.ntp_choose_image()}</Button
-      >
-    </SettingsRow>
     <SettingsRow settingId="ntp.dim" title={m.ntp_dim()} description={m.ntp_dim_help()}>
       <Switch
         label={m.ntp_dim()}
