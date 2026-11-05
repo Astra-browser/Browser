@@ -128,6 +128,19 @@ function apply() {
   document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
 }
 
+/**
+ * The window material the host actually resolved, plus the tiers this build
+ * can draw. The settings picker reads `data-materials` so an unsupported
+ * platform shows only the solid tier instead of a list that does nothing.
+ */
+function applyMaterial(material: string, materials?: readonly string[]) {
+  const root = document.documentElement;
+  root.setAttribute("data-material", material);
+  if (Array.isArray(materials) && materials.length > 0) {
+    root.setAttribute("data-materials", materials.join(","));
+  }
+}
+
 async function initialize(generation: number) {
   // Establish system dark/light synchronously before the first native IPC
   // await so the hidden bootstrap document already has deterministic tokens.
@@ -141,8 +154,20 @@ async function initialize(generation: number) {
       const material = id.slice("material.".length);
       if (["none", "vibrancy", "liquid_glass", "acrylic", "mica"].includes(material)) {
         commandMaterial = material;
-        document.documentElement.setAttribute("data-material", material);
+        applyMaterial(material);
       }
+      return;
+    }
+    // A material choice is a capability decision, not just a stored string:
+    // ask the host to resolve and apply it, then paint the tier it can draw.
+    if (id.startsWith("preference.ui.material=")) {
+      void commands
+        .uiInfo()
+        .then((info) => {
+          if (generation !== lifecycle) return;
+          applyMaterial(info.material, info.materials);
+        })
+        .catch(() => {});
       return;
     }
     // Settings writes the stored `appearance` preference; every other surface
@@ -171,7 +196,7 @@ async function initialize(generation: number) {
       (await listener)();
       return;
     }
-    document.documentElement.setAttribute("data-material", commandMaterial ?? info.material);
+    applyMaterial(commandMaterial ?? info.material, info.materials);
 
     const stored = await commands.settingGet("appearance");
     if (generation !== lifecycle) {

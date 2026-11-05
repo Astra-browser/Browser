@@ -17,10 +17,19 @@
 //   same hour cycle the OS hands this process, and maps it to the wire's
 //   boolean. A runtime that reports neither `hourCycle` nor `hour12` answers
 //   `null`, and the page keeps its language's own cycle.
-// - `ui_info` answers `material: "none"`. No native window material has been
-//   discovered, and `none` is the documented opaque tier the bootstrap
-//   document already paints; a tier is announced only once native finds it
-//   (`material.*` on `ui-command`), never guessed from the platform.
+// - `ui_info` answers the material tier this build can actually put behind
+//   the window, plus the tiers it can offer. The window material is a
+//   platform capability, never a preference: Windows can install Mica through
+//   the widget's own `widget.windows.mica` switch (the chrome root already
+//   carries `windowsmica="true"`, and the widget reads the pref live). Linux
+//   has no native glass API, so only the opaque `none` tier is offered there.
+//   macOS also offers `none`: the engine's vibrancy (`NSVisualEffectView`
+//   behind `-moz-mac-vibrant-titlebar-*`) and macOS 26 glass
+//   (`NSGlassEffectView`) are applied to native menus and titlebars by the
+//   widget, and this build exposes no JS switch for a whole web-chrome
+//   window. A tier is therefore never announced for a platform that cannot
+//   draw it. `ui_info` applies the resolved native tier as it reads it, so the
+//   boot answer and the window agree.
 // - `about_info` answers `null`. The app's version, the OS product version
 //   and the arch are the bundle's facts; nothing in this tree holds them yet,
 //   and a placeholder version would be read on About as the real one.
@@ -40,15 +49,139 @@
 //   (1/0/2). Content reads that mirrored pref, so a page's
 //   `prefers-color-scheme` follows the chrome's theme instead of the OS.
 //
-// `set_content_color_scheme` is the one write here: it reaches the chrome
-// window's `Services.prefs` and answers `{ applied: false }` outside chrome
-// (a Node test or preview) instead of throwing. No Events import: the app
-// already knows the theme it chose, so there is no event to announce.
-// `ui_info` lives here because Boot answers the handshake only; it never
-// answers `ui_info`.
+// `set_content_color_scheme` reaches the chrome window's `Services.prefs` and
+// answers `{ applied: false }` outside chrome (a Node test or preview) instead
+// of throwing. No Events import: the app already knows the theme it chose, so
+// there is no event to announce. `ui_info` lives here because Boot answers the
+// handshake only; it never answers `ui_info`. It is the second chrome write:
+// resolving the material also sets the platform's own switch on Windows.
+
+import { Settings } from "./Settings.sys.mjs";
 
 /** `Material`'s opaque tier: no native effect is behind the window. */
 const MATERIAL_NONE = "none";
+
+/** Windows installs Mica through the widget's own switch. */
+const WINDOWS_MICA_PREF = "widget.windows.mica";
+
+/** Mica exists from Windows 11 22H2 (build 22621) on. Below it the DWM call
+ *  is accepted but draws nothing, so it is not offered. */
+const MICA_MIN_BUILD = 22621;
+
+/** Test-only platform/pref seams (Node has neither Services nor a window). */
+let injectedPlatform = null;
+let injectedPrefs = null;
+
+export function __setPlatformForTests(platform) {
+  injectedPlatform = platform ?? null;
+}
+
+export function __setSystemPrefsForTests(prefs) {
+  injectedPrefs = prefs ?? null;
+}
+
+export function __resetSystemForTests() {
+  injectedPlatform = null;
+  injectedPrefs = null;
+}
+
+/** The running OS and its build, or empty strings outside chrome. */
+function platformInfo() {
+  if (injectedPlatform) {
+    return {
+      os: String(injectedPlatform.os ?? ""),
+      build: String(injectedPlatform.build ?? ""),
+    };
+  }
+  try {
+    const scopes = [globalThis];
+    if (globalThis.window && globalThis.window !== globalThis) {
+      scopes.push(globalThis.window);
+    }
+    const view = globalThis.document?.defaultView;
+    if (view && !scopes.includes(view)) scopes.push(view);
+    for (const scope of scopes) {
+      const services = scope?.Services;
+      if (!services?.appinfo) continue;
+      return {
+        os: String(services.appinfo.OS ?? ""),
+        build: String(services.sysinfo?.getProperty?.("build") ?? ""),
+      };
+    }
+  } catch {
+    // A partial or hostile global is the same as no chrome.
+  }
+  return { os: "", build: "" };
+}
+
+/** The chrome window's `Services.prefs`, or null outside a chrome process. */
+function systemPrefs() {
+  if (injectedPrefs) return injectedPrefs;
+  try {
+    const scopes = [globalThis];
+    if (globalThis.window && globalThis.window !== globalThis) {
+      scopes.push(globalThis.window);
+    }
+    const view = globalThis.document?.defaultView;
+    if (view && !scopes.includes(view)) scopes.push(view);
+    for (const scope of scopes) {
+      const prefs = scope?.Services?.prefs;
+      if (prefs && typeof prefs.setBoolPref === "function") return prefs;
+    }
+  } catch {
+    // A partial or hostile global is the same as no chrome.
+  }
+  return null;
+}
+
+/**
+ * The material tiers this build can draw on this machine, and what
+ * `auto` resolves to. `none` is always available: it is what the bootstrap
+ * document paints before any discovery.
+ */
+function materialCapability() {
+  const { os, build } = platformInfo();
+  const system = os.toLowerCase();
+  if (system === "winnt") {
+    // `build` is the release build number on Windows ("22631"), but be
+    // tolerant of a dotted form: the last group is the build.
+    const groups = String(build).match(/\d+/gu) ?? [];
+    const number = groups.length > 0 ? Number(groups[groups.length - 1]) : NaN;
+    if (Number.isFinite(number) && number >= MICA_MIN_BUILD) {
+      return { os: system, available: ["none", "mica"], automatic: "mica" };
+    }
+  }
+  return { os: system, available: [MATERIAL_NONE], automatic: MATERIAL_NONE };
+}
+
+/**
+ * The tier a stored choice resolves to: `auto` means the platform's best,
+ * an unsupported tier falls back to the opaque one, and the answer always
+ * names the tiers the picker may offer.
+ */
+function resolveMaterial(choice) {
+  const capability = materialCapability();
+  const picked =
+    choice === "auto" || choice === null || choice === undefined
+      ? capability.automatic
+      : String(choice);
+  const material = capability.available.includes(picked)
+    ? picked
+    : MATERIAL_NONE;
+  return { material, materials: capability.available, capability };
+}
+
+/** Put the resolved tier behind the window where the platform has a switch. */
+function applyMaterial(material, capability) {
+  if (capability.os !== "winnt" || !capability.available.includes("mica")) {
+    return;
+  }
+  try {
+    systemPrefs()?.setBoolPref(WINDOWS_MICA_PREF, material === "mica");
+  } catch {
+    // No pref service: the UI still reports the tier it can draw.
+  }
+}
 
 /** The resolved hour cycles that mean a 24-hour clock, and the two that do
  *  not. Anything else (a runtime reporting neither) stays unknown. */
@@ -194,9 +327,15 @@ export const System = {
     return { applied: true, value };
   },
 
-  // `UiInfo`: the material axis' opaque tier, which the UI already paints
-  // before native discovery. Never a tier nothing has discovered.
+  // `UiInfo`: the tier this build can actually draw, and the tiers the picker
+  // may offer. Reading also puts the resolved tier behind the window where the
+  // platform has a switch, so the boot answer and the chrome agree.
   async uiInfo() {
-    return { material: MATERIAL_NONE };
+    const stored = Settings.current("ui.material");
+    const resolved = resolveMaterial(
+      typeof stored === "string" && stored !== "" ? stored : "auto",
+    );
+    applyMaterial(resolved.material, resolved.capability);
+    return { material: resolved.material, materials: resolved.materials };
   },
 };

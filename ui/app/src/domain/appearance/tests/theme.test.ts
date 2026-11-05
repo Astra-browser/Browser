@@ -101,6 +101,32 @@ describe("theme startup lifecycle", () => {
     expect(harness.media.removeEventListener).toHaveBeenCalledOnce();
   });
 
+  it("writes the density and contrast axes the settings chose", async () => {
+    const theme = await import("../theme");
+
+    theme.applyLayout({ density: "compact", contrast: true });
+    expect(harness.attributes.get("data-density")).toBe("compact");
+    expect(harness.attributes.get("data-contrast")).toBe("true");
+
+    theme.applyLayout({ density: "comfortable", contrast: false });
+    expect(harness.attributes.get("data-density")).toBe("comfortable");
+    expect(harness.attributes.get("data-contrast")).toBe("false");
+  });
+
+  it("reports the material tiers the host can draw", async () => {
+    harness.uiInfo.mockImplementation(async () => ({
+      material: "none" as const,
+      materials: ["none" as const],
+    }));
+
+    const theme = await import("../theme");
+    await theme.init();
+
+    expect(harness.attributes.get("data-material")).toBe("none");
+    expect(harness.attributes.get("data-materials")).toBe("none");
+    theme.dispose();
+  });
+
   it("does not let a stale stored preference overwrite a live theme command", async () => {
     let resolveStored: ((value: string) => void) | undefined;
     harness.settingGet.mockImplementation(
