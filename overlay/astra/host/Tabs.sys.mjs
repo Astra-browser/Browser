@@ -95,6 +95,10 @@ function selectInternal(id) {
   const tab = _tabs.get(id);
   if (tab) {
     _selectedBySpace.set(tab.space_id, id);
+    // Sleep policy: a tab's idle clock starts when the person leaves it. The
+    // selected tab is therefore never stale, and a tab that was in front for
+    // an hour does not become sleep-eligible the moment it is left.
+    tab.last_active_ms = Date.now();
   }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap, selected: true });
@@ -290,6 +294,11 @@ export function __applyExternalUpdate(id, patch = {}) {
   if (typeof patch.discarded === "boolean") {
     tab.discarded = patch.discarded;
   }
+  // A page still doing something in front counts as activity: its progress
+  // events must not let the idle clock run down on the tab the person is on.
+  if (tab.selected === true || id === _selectedId) {
+    tab.last_active_ms = Date.now();
+  }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap });
   emitItemsChanged();
@@ -441,6 +450,10 @@ function tabView(id) {
     failure: tab.failure ?? null,
     certificate_exception: tab.certificate_exception === true,
     audio: tab.muted ? { muted: true, can_mute: true } : null,
+    // The rail's sleeping list and the essential tile both read this. It is
+    // the model's own state, set by `Tabs.discard` and cleared by selecting
+    // the tab or by the content binding when the engine refused.
+    availability: tab.discarded === true ? { state: "sleeping" } : null,
   };
 }
 
@@ -508,6 +521,7 @@ export const Tabs = {
         pinned: false,
         discarded: false,
         muted: false,
+        last_active_ms: Date.now(),
       });
       _order.push(astra_tab_id);
       _selectedId = astra_tab_id;
@@ -533,6 +547,7 @@ export const Tabs = {
       discarded: false,
       muted: false,
       private: false,
+      last_active_ms: Date.now(),
     });
     if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
       _order.splice(index, 0, astra_tab_id);
@@ -558,6 +573,12 @@ export const Tabs = {
     // and the address bar naming different tabs.
     if (target.space_id !== _activeSpaceId) {
       _activeSpaceId = target.space_id;
+    }
+    // Selecting a sleeping tab is how the person wakes it: the tabbrowser
+    // restores the discarded page on selection, so clear the model flag here
+    // rather than leaving the row (and the rail) claiming "sleeping".
+    if (target.discarded === true) {
+      target.discarded = false;
     }
     const snap = selectInternal(astra_tab_id);
     emitItemsChanged();
@@ -903,6 +924,9 @@ export const Tabs = {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
     }
     tab.discarded = false;
+    // A freshly restored tab starts its idle clock now; otherwise the next
+    // pass would immediately discard it again.
+    tab.last_active_ms = Date.now();
     emit("tab.restored", { astra_tab_id, url: tab.url });
     return admitted(request_id, { astra_tab_id, discarded: false, url: tab.url });
   },
@@ -1008,6 +1032,7 @@ export function __adoptNative({
     discarded: false,
     muted: false,
     private: privateWindow === true,
+    last_active_ms: Date.now(),
   });
   _order.push(astra_tab_id);
   __pushHistory(astra_tab_id, safeTabUrl(url));
@@ -1033,6 +1058,29 @@ export function __announceAdopted(astra_tab_id, { selected = false } = {}) {
   });
   emitItemsChanged();
   return snapshot(astra_tab_id);
+}
+
+/**
+ * The sleeping policy's view of the model (`crates/astra-core/src/sleeping.rs`
+ * `TabState`), one entry per tab, without native-only facts. The live driver
+ * enriches these with audio/DevTools/beforeunload from the native tab.
+ */
+export function __sleepState() {
+  const now = Date.now();
+  return [..._order].filter((id) => _tabs.has(id)).map((id) => {
+    const tab = _tabs.get(id);
+    return {
+      id,
+      url: tab.url ?? "",
+      title: tab.title ?? "",
+      last_active_ms: Number.isFinite(tab.last_active_ms) ? tab.last_active_ms : now,
+      active: tab.selected === true || id === _selectedId,
+      pinned: tab.pinned === true,
+      discarded: tab.discarded === true,
+      private: tab.private === true,
+      has_page_request: tab.page_request != null,
+    };
+  });
 }
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.

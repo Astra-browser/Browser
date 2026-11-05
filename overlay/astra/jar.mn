@@ -54,6 +54,7 @@ astra.jar:
   content/astra/res/host/Notes.sys.mjs (host/Notes.sys.mjs)
   content/astra/res/host/Bookmarks.sys.mjs (host/Bookmarks.sys.mjs)
   content/astra/res/host/Time.sys.mjs (host/Time.sys.mjs)
+  content/astra/res/host/Performance.sys.mjs (host/Performance.sys.mjs)
   content/astra/res/host/HistoryCall.sys.mjs (host/HistoryCall.sys.mjs)
   content/astra/res/host/Favicons.sys.mjs (host/Favicons.sys.mjs)
   content/astra/res/host/System.sys.mjs (host/System.sys.mjs)
