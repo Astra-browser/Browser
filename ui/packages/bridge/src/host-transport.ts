@@ -41,6 +41,8 @@ export interface HostModules {
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  BrowsingData: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Blocker: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
@@ -145,6 +147,16 @@ const ROUTES: Record<string, Route> = {
   // the envelope `request_id` is the command correlation id, not the fence.
   page_permission_respond: ["Permissions", "respond", { request_id: "prompt_id" }],
   page_permission_card_host: ["Permissions", "cardHost"],
+  site_permissions: ["Permissions", "listSites"],
+  site_permission_set: ["Permissions", "setSite"],
+  browsing_data_call: ["BrowsingData", "call"],
+  blocker_status: ["Blocker", "status"],
+  blocker_stats: ["Blocker", "stats"],
+  blocker_set_enabled: ["Blocker", "setEnabled"],
+  blocker_refresh_sources: ["Blocker", "refreshSources"],
+  blocker_retry: ["Blocker", "retry"],
+  blocker_site_change: ["Blocker", "siteChange"],
+  blocker_picker: ["Blocker", "picker"],
   operation_status: ["Operations", "status"],
   operations_reconcile: ["Operations", "reconcile"],
   operation_acknowledge: ["Operations", "acknowledge"],

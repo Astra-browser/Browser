@@ -46,6 +46,8 @@ import { System } from "./System.sys.mjs";
 import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
+import { BrowsingData, __resetBrowsingDataForTests } from "./BrowsingData.sys.mjs";
+import { Blocker, __resetBlockerForTests } from "./Blocker.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
 import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
@@ -82,6 +84,8 @@ export {
   Resources,
   Search,
   Permissions,
+  BrowsingData,
+  Blocker,
   Operations,
   Metadata,
   PageSource,
@@ -112,6 +116,8 @@ export function __resetForTests() {
   __resetFaviconsForTests();
   __resetOperationsForTests();
   Permissions.__resetForTests();
+  __resetBrowsingDataForTests();
+  __resetBlockerForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();
   DialogPrompts.__resetForTests();
