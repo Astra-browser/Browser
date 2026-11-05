@@ -714,6 +714,28 @@ reset();
   check("a break shuts nothing", Time.status().shut.length === 0);
 }
 
+// === A round started before the app named its profile still counts ========
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  TimeMod.__setPrefsForTests(prefs);
+  const t0 = Date.UTC(2026, 10, 5, 9, 0, 0);
+  let now = t0;
+  __setClockForTests(() => now);
+
+  await Time.focus({ control: { kind: "start", minutes: 1, breaks: false } });
+  now += 60_000;
+  Time.status();
+  const day = localDayOf(now);
+  const res = await call(P, { kind: "focus_days", from_day: day, days: 1 });
+  check("a fallback round moves to the named profile", res.days.length === 1);
+  check("its focused seconds move with it", res.days[0]?.seconds === 60);
+  check("its session count moves with it", res.days[0]?.sessions === 1);
+  check("its completed round moves with it", res.days[0]?.completed === 1);
+}
+
 // === The module never throws ==============================================
 {
   let threw = false;

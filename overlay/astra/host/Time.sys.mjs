@@ -423,6 +423,30 @@ function stopTracking() {
   lastSite = "";
 }
 
+/** Move a fallback profile's counted data into the profile that named itself. */
+function migrateProfile(from, to) {
+  if (from === to) return;
+  const data = loadStore();
+  const source = data.profiles[from];
+  if (!source) return;
+  const target = profileRecord(to);
+  for (const [hour, sites] of Object.entries(source.hours ?? {})) {
+    const bucket = (target.hours[hour] ??= {});
+    for (const [site, values] of Object.entries(sites)) {
+      const entry = (bucket[site] ??= [0, 0]);
+      entry[0] += Number(values?.[0]) || 0;
+      entry[1] += Number(values?.[1]) || 0;
+    }
+  }
+  for (const [day, values] of Object.entries(source.days ?? {})) {
+    const entry = dayEntry(target, Number(day));
+    entry[0] += Number(values?.[0]) || 0;
+    entry[1] += Number(values?.[1]) || 0;
+    entry[2] += Number(values?.[2]) || 0;
+  }
+  delete data.profiles[from];
+}
+
 /** Keep the running session with the profile that owns it. */
 function ensureProfile(profile) {
   if (profile === sessionProfile) return;
@@ -430,6 +454,7 @@ function ensureProfile(profile) {
     // The round started before the app named its profile. Move it to the
     // profile that just identified itself instead of losing it.
     if (session !== null) {
+      migrateProfile(sessionProfile, profile);
       sessionProfile = profile;
       saveSession();
       return;
