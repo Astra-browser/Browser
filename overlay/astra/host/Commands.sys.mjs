@@ -26,6 +26,8 @@
 import { emit } from "./Events.sys.mjs";
 import { Tabs, __itemsSnapshot, __tabsState } from "./Tabs.sys.mjs";
 import { Navigation } from "./Navigation.sys.mjs";
+import { Settings } from "./Settings.sys.mjs";
+import { Zoom } from "./Zoom.sys.mjs";
 
 /** Browser surfaces a command can stand over the active tab. */
 const PAGES = new Set([
@@ -163,8 +165,55 @@ async function zoomBy(delta) {
   if (!id) return admission(false);
   const current = await Navigation.getZoom({ astra_tab_id: id });
   const from = typeof current.zoom === "number" ? current.zoom : 1;
-  const next = delta === 0 ? 1 : Math.round((from + delta) * 100) / 100;
+  const next =
+    delta === 0
+      ? await Zoom.defaultLevel()
+      : Math.round((from + delta) * 100) / 100;
   const result = await Navigation.setZoom({ astra_tab_id: id, zoom: next });
+  if (result?.error) return admission(false);
+  // The engine stores a site's level in the content-pref service; the model
+  // alone would forget it on the next launch. A private tab never writes.
+  // Reset removes the site's override (100% is "no own level"), even when the
+  // level it falls back to is a non-100% default.
+  const tab = __tabsState().tabs.get(id);
+  await Zoom.persist({
+    url: tab?.url ?? "",
+    zoom: delta === 0 ? 1 : next,
+    private: tab?.private === true,
+  });
+  return admission(true);
+}
+
+/**
+ * The address `nav.home` lands on. The Settings choice (`tabs.home`) wins;
+ * otherwise the first startup page (`browser.startup.homepage`) is the home
+ * page, as it is in Firefox's own BrowserHome. With neither, Astra's New Tab
+ * is the page in front: `about:blank` is the stage's New Tab, while
+ * `about:home`/`about:newtab` would be treated as search words.
+ */
+function homeUrl() {
+  const custom = Settings.current("tabs.home");
+  const chosen = typeof custom === "string" ? custom.trim() : "";
+  if (chosen !== "") {
+    return chosen === "about:home" || chosen === "about:newtab"
+      ? "about:blank"
+      : chosen;
+  }
+  const pages = Settings.current("tabs.startup-pages");
+  const first =
+    typeof pages === "string"
+      ? pages
+          .split("\n")
+          .map((page) => page.trim())
+          .find(Boolean)
+      : "";
+  return first === undefined || first === "" ? "about:blank" : first;
+}
+
+async function goHome() {
+  const id = selectedId();
+  if (!id) return admission(false);
+  const result = await Navigation.loadURL({ astra_tab_id: id, url: homeUrl() });
   return admission(!result?.error);
 }
 
@@ -257,6 +306,8 @@ export const Commands = {
         return tabNavigation("reload");
       case "nav.hardReload":
         return tabNavigation("hardReload");
+      case "nav.home":
+        return goHome();
       case "nav.stop":
         return tabNavigation("stop");
       case "zoom.in":
@@ -305,6 +356,7 @@ export const Commands = {
       "nav.forward",
       "nav.reload",
       "nav.hardReload",
+      "nav.home",
       "nav.stop",
       "zoom.in",
       "zoom.out",

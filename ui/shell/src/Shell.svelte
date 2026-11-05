@@ -345,6 +345,9 @@
       "goForwardKb",
       "goBackKb2",
       "goForwardKb2",
+      // Alt+Home is the product's own `nav.home`; the native goHome key must
+      // not also run `cmd_home` (it would answer with the engine homepage).
+      "goHome",
       "key_reload",
       "key_reload2",
       "key_reload_skip_cache",
