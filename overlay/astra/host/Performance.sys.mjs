@@ -218,15 +218,22 @@ export function enrich(tab, native) {
       audible =
         native.hasAttribute("soundplaying") ||
         native.linkedBrowser?.audioPlaybackActive === true;
-      devtools =
-        native.hasAttribute("devtools-opened") ||
-        native.getAttribute("devtools-opened") === "true";
+      devtools = native.getAttribute("devtools-opened") === "true";
       unsaved =
         native.linkedBrowser?.hasBeforeUnload === true ||
         native.hasAttribute("attention");
       pinned = pinned || native.pinned === true;
     } catch {
       // A native tab mid-teardown.
+    }
+    try {
+      // DevTools state lives in gDevTools, not on the tab element.
+      const gDevTools = globalThis.window?.gDevTools ?? globalThis.gDevTools;
+      if (!devtools && typeof gDevTools?.getToolboxForTab === "function") {
+        devtools = !!gDevTools.getToolboxForTab(native);
+      }
+    } catch {
+      // No DevTools integration in this build/window.
     }
   }
   return {

@@ -210,11 +210,13 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   const audible = await addTab("https://audio.example/");
   const pinned = await addTab("https://kept.example/");
   const excepted = await addTab("https://safe.example/");
+  const unsaved = await addTab("https://form.example/");
   await Tabs.pin({ astra_tab_id: pinned });
   Settings.set({ key: "performance.exceptions", value: "safe.example" });
 
-  const all = [selected, idle, audible, pinned, excepted].map(nativeFor);
+  const all = [selected, idle, audible, pinned, excepted, unsaved].map(nativeFor);
   natives.get(audible).attrs.add("soundplaying");
+  natives.get(unsaved).linkedBrowser.hasBeforeUnload = true;
   const gb = browser(all);
   __setBrowserForTests(() => gb);
 
@@ -232,6 +234,7 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   check("an audible tab stays awake", TabsMod.__tabsState().tabs.get(audible).discarded === false);
   check("a kept tab stays awake", TabsMod.__tabsState().tabs.get(pinned).discarded === false);
   check("an excepted site stays awake", TabsMod.__tabsState().tabs.get(excepted).discarded === false);
+  check("a page with unsaved input stays awake", TabsMod.__tabsState().tabs.get(unsaved).discarded === false);
 
   const projection = TabsMod.__itemsSnapshot();
   const sleeping = projection.tabs.find((tab) => tab.id === idle);

@@ -253,7 +253,7 @@ are not reachable from the protocol. The exact commands still needed are:
 When those exist, `Time.sys.mjs` should delegate to them (and keep the
 host-side tracker only as a fallback), not run two counters.
 
-Evidence: `node tests/contract/sleep_model.mjs` 60 checks,
+Evidence: `node tests/contract/sleep_model.mjs` 61 checks,
 `node tests/contract/time_model.mjs` 183 checks, `hostapi_v1` 324,
 `wire_coverage` 50. Live probe steps are in `docs/astra/SLEEPING.md` and the
 lane report; network-level focus blocking still needs the engine Net hook
