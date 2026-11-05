@@ -119,6 +119,12 @@ recorded below; this list is what is still genuinely unwired.
   `tests/contract/wire_baseline.json`; `wire_coverage` fails on any new gap.
   Add each with a UI caller, a route-table entry, a contract test and a live
   probe.
+- **New Tab tracker figure.** `blocker_stats` is still unrouted (Lane 3 owns
+  the blocker). The New Tab figure now hides until a real count arrives instead
+  of drawing `0`; it appears only when the reply is `status: "ok"`. This is a
+  presentation-side guard, not blocker wiring. `media_import` is routed: the
+  picker stores an admitted image in `<ProfD>/astra-media/<profile>/<digest>`
+  and the host serves it over `astra-media://localhost/`.
 - **Host projection ownership.** `overlay/astra/host/Tabs.sys.mjs` still derives
   the projection; `astra-core` ownership is plan §5.4 work.
 - **Popup / external-protocol cards.** `Tabs.answerPageRequest` is routed and

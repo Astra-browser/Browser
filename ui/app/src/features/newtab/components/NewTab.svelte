@@ -129,12 +129,15 @@
   );
 
   // Private windows show no figures. Each requested figure closes up beside
-  // its neighbours; hidden figures do not read their counters.
+  // its neighbours; hidden figures do not read their counters. The tracker
+  // count has no host route yet (`blocker_stats` is still in the wire
+  // baseline), so the figure waits for a real number instead of drawing a
+  // fabricated zero.
   let figures = $derived(
     incognito
       ? []
       : [
-          ...(showTrackers ? ["trackers"] : []),
+          ...(showTrackers && blocked !== null ? ["trackers"] : []),
           ...(showFocus ? ["focus"] : []),
           ...(showDue ? ["due"] : []),
         ],
@@ -478,7 +481,7 @@
           <div class="figure">
             <Icon icon={Shield01Icon} size={14} /><span class="name"
               >{m.ntp_trackers_blocked()}</span
-            ><span class="value">{number.format(blocked ?? 0)}</span>
+            ><span class="value">{blocked === null ? "" : number.format(blocked)}</span>
           </div>
         {:else if figure === "focus"}
           <button type="button" class="figure" onclick={ontime}>
