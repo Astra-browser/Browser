@@ -69,6 +69,10 @@ const ROUTES: Record<string, Route> = {
   tabs_open: ["Tabs", "create"],
   tabs_bootstrap: ["Tabs", "bootstrap"],
   tabs_close: ["Tabs", "close", TAB_ARG],
+  // Sleeping tabs: the host driver sleeps them on its own timer; these two
+  // are the explicit verbs for a surface or a live probe to use the same path.
+  tabs_discard: ["Tabs", "discard", TAB_ARG],
+  tabs_wakeup: ["Tabs", "wakeup", TAB_ARG],
   tabs_activate: ["Tabs", "select", TAB_ARG],
   tabs_answer_sign_in: ["DialogPrompts", "answerAuth", TAB_ARG],
   tabs_answer_page_request: ["Tabs", "answerPageRequest", TAB_ARG],

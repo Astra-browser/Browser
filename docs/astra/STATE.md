@@ -229,6 +229,61 @@ in `ui/app/src/shared/ipc/bindings.ts` (the sanctioned generated-binding
 exception) so the appearance picker can list the tiers the host can actually
 draw instead of a dead platform list. `zoom_call` left
 `tests/contract/wire_baseline.json` now that it has a route.
+### Time + Performance wiring (Lane 5, 2026-11-05)
+
+`overlay/astra/host/Performance.sys.mjs` is the live sleeping-tabs driver. It
+reads `performance.sleep`, `performance.after`, `performance.memory` and
+`performance.exceptions` on every tick, mirrors the Rust policy
+(`crates/astra-core/src/sleeping.rs`), discards through `Tabs.discard` (the
+content binding calls `gBrowser.discardBrowser`) and reverts the model when
+the engine refuses. The delay applies immediately because the driver reads it;
+`Settings` keeps `browser.tabs.unloadOnLowMemory` and
+`browser.tabs.min_inactive_duration_before_unload` in sync. Teardown is one
+interval, one event subscription and one `unload` listener.
+
+The projection now carries `TabView.availability = { state: "sleeping" }` for
+a discarded tab, so the rail's sleeping list is real; selecting the row wakes
+it (the tabbrowser restores the page and the model clears the flag).
+
+**Wire extension (SCOPE rule 5).** `tabs_discard` and `tabs_wakeup` are routed
+to `Tabs.discard`/`Tabs.wakeup` in `ui/packages/bridge/src/host-transport.ts`.
+They are not in the generated `CommandName` registry (`ipc-surface.md` has no
+row for them), so `bindings.ts` has no typed helper yet; the route is the
+envelope name a probe or a future row uses. The host driver itself calls the
+module methods directly, so it does not depend on the wire.
+
+**Time/focus persistence is host-side.** `Time.sys.mjs` counts the selected
+public tab's dwell time (per profile, split at local-hour boundaries), counts
+one "open" on a site change, persists hourly buckets and focus days under
+`astra.time.state.v1` in the profile pref store, prunes by `time.retention`,
+and persists/restores the running focus round. `focus_days` now returns real
+rows and `shut` lists the `focus.blocked` sites while a round runs.
+
+**Missing core commands (not faked).** `astra-core` still exposes only
+`boot.handshake`, `session.save`, `session.load` and `core.shutdown`; it has
+no time/focus surface, and `astra-store`'s `time_sessions`/`focus_rules` tables
+are not reachable from the protocol. The exact commands still needed are:
+
+- `time.start` / `time.end` / `time.report` over an activity event (the lane
+  plan's names) — `time.report` must return the same
+  `TimeResponse` buckets/sites the UI already renders.
+- `focus.start` / `focus.stop` / `focus.history` — `focus.history` must fill
+  `FocusDayView` rows for `focus_days`.
+
+When those exist, `Time.sys.mjs` should delegate to them (and keep the
+host-side tracker only as a fallback), not run two counters.
+
+Known limit: the host tracker follows the selected tab of the window that owns
+the shell, and each window writes its own view of `astra.time.state.v1`; a
+second window's counted time is not merged yet (the same single-writer limit
+as the organisation store, P5b-3).
+
+Evidence: `node tests/contract/sleep_model.mjs` 63 checks,
+`node tests/contract/time_model.mjs` 187 checks, `hostapi_v1` 324,
+`wire_coverage` 50. Live probe steps are in `docs/astra/SLEEPING.md` and the
+lane report; network-level focus blocking still needs the engine Net hook
+(`crates/astra-time` `FocusBlockHook`), so `shut` is configuration, not a
+claim that a request was cancelled.
 
 
 

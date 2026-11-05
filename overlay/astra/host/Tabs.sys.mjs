@@ -204,8 +204,9 @@ function selectInternal(id) {
   const tab = _tabs.get(id);
   if (tab) {
     _selectedBySpace.set(tab.space_id, id);
-    // An idle timer measures time since the person last looked at the tab.
+    // One clock feeds the archive age, one feeds the sleep policy.
     tab.last_active_at = clockNow();
+    tab.last_active_ms = Date.now();
     touchMru(id);
   }
   const snap = snapshot(id);
@@ -403,6 +404,11 @@ export function __applyExternalUpdate(id, patch = {}) {
   if (typeof patch.discarded === "boolean") {
     tab.discarded = patch.discarded;
   }
+  // A page still doing something in front counts as activity: its progress
+  // events must not let the idle clock run down on the tab the person is on.
+  if (tab.selected === true || id === _selectedId) {
+    tab.last_active_ms = Date.now();
+  }
   const snap = snapshot(id);
   emit("tab.updated", { ...snap });
   emitItemsChanged();
@@ -554,6 +560,10 @@ function tabView(id) {
     failure: tab.failure ?? null,
     certificate_exception: tab.certificate_exception === true,
     audio: tab.muted ? { muted: true, can_mute: true } : null,
+    // The rail's sleeping list and the essential tile both read this. It is
+    // the model's own state, set by `Tabs.discard` and cleared by selecting
+    // the tab or by the content binding when the engine refused.
+    availability: tab.discarded === true ? { state: "sleeping" } : null,
   };
 }
 
@@ -622,6 +632,7 @@ export const Tabs = {
         discarded: false,
         muted: false,
         last_active_at: clockNow(),
+        last_active_ms: Date.now(),
       });
       _order.push(astra_tab_id);
       _selectedId = astra_tab_id;
@@ -650,6 +661,7 @@ export const Tabs = {
       muted: false,
       private: false,
       last_active_at: clockNow(),
+      last_active_ms: Date.now(),
     });
     const at = insertionIndexFor({ index, window_id, space_id });
     _order.splice(at, 0, astra_tab_id);
@@ -679,6 +691,12 @@ export const Tabs = {
     // and the address bar naming different tabs.
     if (target.space_id !== _activeSpaceId) {
       _activeSpaceId = target.space_id;
+    }
+    // Selecting a sleeping tab is how the person wakes it: the tabbrowser
+    // restores the discarded page on selection, so clear the model flag here
+    // rather than leaving the row (and the rail) claiming "sleeping".
+    if (target.discarded === true) {
+      target.discarded = false;
     }
     const snap = selectInternal(astra_tab_id);
     emitItemsChanged();
@@ -1029,6 +1047,9 @@ export const Tabs = {
     }
     tab.discarded = true;
     emit("tab.discarded", { astra_tab_id });
+    // The sleeping list reads the projection; a discard that never reaches it
+    // leaves the rail claiming there is nothing asleep.
+    emitItemsChanged();
     return admitted(request_id, { astra_tab_id, discarded: true });
   },
 
@@ -1038,7 +1059,11 @@ export const Tabs = {
       return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id}`);
     }
     tab.discarded = false;
+    // A freshly restored tab starts its idle clock now; otherwise the next
+    // pass would immediately discard it again.
+    tab.last_active_ms = Date.now();
     emit("tab.restored", { astra_tab_id, url: tab.url });
+    emitItemsChanged();
     return admitted(request_id, { astra_tab_id, discarded: false, url: tab.url });
   },
 
@@ -1147,6 +1172,7 @@ export function __adoptNative({
     muted: false,
     private: privateWindow === true,
     last_active_at: clockNow(),
+    last_active_ms: Date.now(),
   });
   // Native is the truth for where the engine put this tab. The caller passes
   // the nearest bound neighbours from gb.tabs, so the model splices at that
@@ -1285,6 +1311,29 @@ export function __mruForTests(window_id = DEFAULT_WINDOW_ID) {
 
 export function __archiveSchedulerActiveForTests(window_id = DEFAULT_WINDOW_ID) {
   return _archiveTimers.has(window_id);
+}
+
+/**
+ * The sleeping policy's view of the model (`crates/astra-core/src/sleeping.rs`
+ * `TabState`), one entry per tab, without native-only facts. The live driver
+ * enriches these with audio/DevTools/beforeunload from the native tab.
+ */
+export function __sleepState() {
+  const now = Date.now();
+  return [..._order].filter((id) => _tabs.has(id)).map((id) => {
+    const tab = _tabs.get(id);
+    return {
+      id,
+      url: tab.url ?? "",
+      title: tab.title ?? "",
+      last_active_ms: Number.isFinite(tab.last_active_ms) ? tab.last_active_ms : now,
+      active: tab.selected === true || id === _selectedId,
+      pinned: tab.pinned === true,
+      discarded: tab.discarded === true,
+      private: tab.private === true,
+      has_page_request: tab.page_request != null,
+    };
+  });
 }
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.

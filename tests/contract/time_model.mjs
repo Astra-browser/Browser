@@ -36,6 +36,34 @@ const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Time, __setClockForTests, __resetTimeForTests } = await import(
   path.join(HOST, "Time.sys.mjs"),
 );
+const TimeMod = await import(path.join(HOST, "Time.sys.mjs"));
+const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
+const SettingsMod = await import(path.join(HOST, "Settings.sys.mjs"));
+const { Tabs } = TabsMod;
+const { Settings, __resetSettingsForTests } = SettingsMod;
+
+const MINUTE = 60_000;
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+const localHourOf = (ms) =>
+  Math.floor((ms - new Date(ms).getTimezoneOffset() * MINUTE) / HOUR);
+const localDayOf = (ms) =>
+  Math.floor((ms - new Date(ms).getTimezoneOffset() * MINUTE) / DAY);
+
+/** A stand-in for the profile pref store (`astra.time.state.v1`). */
+function fakePrefs() {
+  const values = new Map();
+  return {
+    values,
+    getStringPref(name) {
+      if (!values.has(name)) throw new Error(`missing pref ${name}`);
+      return values.get(name);
+    },
+    setStringPref(name, value) {
+      values.set(name, String(value));
+    },
+  };
+}
 
 let passed = 0;
 let failed = 0;
@@ -461,8 +489,6 @@ reset();
     { kind: "start", minutes: 25.5, breaks: true },
     { kind: "start", minutes: "25", breaks: true },
     { kind: "start", minutes: 25, breaks: "yes" },
-    { kind: "start", minutes: 25 },
-    { kind: "start" },
     { kind: "allow", site: "" },
     { kind: "allow", site: "a".repeat(254) },
     { kind: "allow", site: 7 },
@@ -491,6 +517,223 @@ reset();
   check("focus with no arguments is refused, not a throw", refused(nothing));
   const nullInput = await Time.focus(null);
   check("focus with a null input is refused, not a throw", refused(nullInput));
+}
+
+// === Counting: a real span becomes a site row =============================
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  TimeMod.__setPrefsForTests(prefs);
+  const t0 = Date.UTC(2026, 10, 5, 9, 0, 0);
+  let now = t0;
+  __setClockForTests(() => now);
+
+  await Tabs.create({ url: "https://a.example/page" });
+  // The first read starts the tracker and anchors at t0.
+  await call(P, { kind: "focus_days", from_day: localDayOf(t0), days: 1 });
+
+  now = t0 + 60_000;
+  const one = await call(P, {
+    kind: "report",
+    from_hour: localHourOf(t0),
+    bucket_hours: 1,
+    buckets: 1,
+    site: null,
+  });
+  check("a counted span is a report", one.kind === "report");
+  check("60 s lands in the hour", one.buckets[0].browse === 60);
+  check("the site is ranked", one.sites.length === 1 && one.sites[0].site === "a.example");
+  check("the site carries its seconds", one.sites[0].seconds === 60);
+  check("the site counts one open", one.sites[0].opens === 1);
+  check("work time stays zero", one.buckets[0].work === 0);
+
+  // Switching site at +60 s credits the first and opens the second.
+  await Tabs.create({ url: "https://b.example/x" });
+  now = t0 + 90_000;
+  const two = await call(P, {
+    kind: "report",
+    from_hour: localHourOf(t0),
+    bucket_hours: 1,
+    buckets: 1,
+    site: null,
+  });
+  const a = two.sites.find((site) => site.site === "a.example");
+  const b = two.sites.find((site) => site.site === "b.example");
+  check("the first site keeps the time it held", a?.seconds === 60);
+  check("the new site starts counting", b?.seconds === 30);
+  check("the new site counts its own open", b?.opens === 1);
+  check("the hour totals both sites", two.buckets[0].browse === 90);
+
+  const narrowed = await call(P, {
+    kind: "report",
+    from_hour: localHourOf(t0),
+    bucket_hours: 1,
+    buckets: 1,
+    site: "b.example",
+  });
+  check("a site report keeps only that site", narrowed.sites.length === 1 && narrowed.sites[0].site === "b.example");
+  check("a site report keeps the narrowed bucket", narrowed.buckets[0].browse === 30);
+
+  // "Count time" off stops the clock; it does not delete what was counted.
+  prefs.setStringPref("astra.settings.time.track", "false");
+  const anchored = await call(P, {
+    kind: "report",
+    from_hour: localHourOf(t0),
+    bucket_hours: 1,
+    buckets: 1,
+    site: null,
+  });
+  check("the read at the change anchors the stopped clock", anchored.buckets[0].browse === 90);
+  now = t0 + 240_000;
+  const paused = await call(P, {
+    kind: "report",
+    from_hour: localHourOf(t0),
+    bucket_hours: 1,
+    buckets: 1,
+    site: null,
+  });
+  check("time.track=false stops new credit", paused.buckets[0].browse === 90);
+}
+
+// === Retention prunes old buckets; stored data reaches the report =========
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  const now = Date.UTC(2026, 10, 5, 12, 0, 0);
+  __setClockForTests(() => now);
+  const today = localDayOf(now);
+  const hour = localHourOf(now);
+  const oldDay = today - 400;
+  const oldHour = hour - 400 * 24;
+  prefs.setStringPref("astra.settings.time.retention", "30");
+  prefs.setStringPref(
+    "astra.time.state.v1",
+    JSON.stringify({
+      v: 1,
+      profiles: {
+        [P]: {
+          hours: {
+            [String(hour)]: { "today.example": [120, 2] },
+            [String(oldHour)]: { "old.example": [3600, 5] },
+          },
+          days: {
+            [String(today)]: [600, 2, 1],
+            [String(oldDay)]: [5000, 9, 8],
+          },
+          session: null,
+        },
+      },
+    }),
+  );
+  TimeMod.__setPrefsForTests(prefs);
+  TimeMod.__reloadStoreForTests();
+
+  const report = await call(P, { kind: "report", from_hour: hour, bucket_hours: 1, buckets: 1, site: null });
+  check("stored seconds reach the report", report.buckets[0].browse === 120);
+  check("stored opens reach the site row", report.sites[0]?.opens === 2);
+  check("an old bucket is outside the report", report.sites.every((site) => site.site !== "old.example"));
+
+  TimeMod.__flushForTests();
+  const stored = JSON.parse(prefs.getStringPref("astra.time.state.v1"));
+  check("retention drops an old hour", !stored.profiles[P].hours[String(oldHour)]);
+  check("retention drops an old day", !stored.profiles[P].days[String(oldDay)]);
+  check("retention keeps the current hour", !!stored.profiles[P].hours[String(hour)]);
+  check("retention keeps the current day", !!stored.profiles[P].days[String(today)]);
+}
+
+// === Focus history: finished rounds are real and survive a reload =========
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  TimeMod.__setPrefsForTests(prefs);
+  const t0 = Date.UTC(2026, 10, 5, 9, 0, 0);
+  let now = t0;
+  __setClockForTests(() => now);
+
+  // Naming the profile first keeps the round in this profile's history.
+  await call(P, { kind: "focus_days", from_day: localDayOf(t0), days: 1 });
+  const started = await Time.focus({ control: { kind: "start", minutes: 25, breaks: true } });
+  check("a round starts", started.accepted === true);
+
+  now = t0 + 25 * MINUTE;
+  const status = Time.status();
+  check("the round finishes into a break", status.session?.phase === "break" && status.session.rounds === 1);
+
+  const day = localDayOf(now);
+  const today = await call(P, { kind: "focus_days", from_day: day, days: 1 });
+  check("the finished round is a focus day", today.days.length === 1);
+  check("the day carries the focused seconds", today.days[0]?.seconds === 25 * 60);
+  check("the day counts one session", today.days[0]?.sessions === 1);
+  check("the day counts one completed round", today.days[0]?.completed === 1);
+
+  TimeMod.__flushForTests();
+  TimeMod.__reloadStoreForTests();
+  const after = await call(P, { kind: "focus_days", from_day: day, days: 1 });
+  check("the focus day survives a reload", after.days.length === 1 && after.days[0].seconds === 25 * 60);
+  const restored = Time.status();
+  check("the running break survives a reload", restored.session?.phase === "break" && restored.session.rounds === 1);
+}
+
+// === Focus settings and the shut list ====================================
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  TimeMod.__setPrefsForTests(prefs);
+  const t0 = Date.UTC(2026, 10, 5, 9, 0, 0);
+  let now = t0;
+  __setClockForTests(() => now);
+  await call(P, { kind: "focus_days", from_day: localDayOf(t0), days: 1 });
+
+  prefs.setStringPref("astra.settings.focus.minutes", "50");
+  prefs.setStringPref("astra.settings.focus.breaks", "true");
+  prefs.setStringPref("astra.settings.focus.blocked", "x.com\nnews.example");
+
+  const started = await Time.focus({ control: { kind: "start" } });
+  check("a start with no length is admitted", started.accepted === true);
+  const status = Time.status();
+  check("start reads focus.minutes", status.session?.minutes === 50);
+  check("start reads focus.breaks", status.session?.breaks === true);
+  check(
+    "shut lists the configured sites",
+    status.shut.map((entry) => entry.site).join(",") === "x.com,news.example",
+  );
+
+  await Time.focus({ control: { kind: "allow", site: "x.com" } });
+  const allowed = Time.status();
+  check("an allow removes that exact shut site", allowed.shut.length === 1 && allowed.shut[0].site === "news.example");
+
+  now += 50 * MINUTE;
+  check("a break shuts nothing", Time.status().shut.length === 0);
+}
+
+// === A round started before the app named its profile still counts ========
+{
+  __resetTimeForTests();
+  __resetSettingsForTests();
+  TabsMod.__resetTabsForTests();
+  const prefs = fakePrefs();
+  TimeMod.__setPrefsForTests(prefs);
+  const t0 = Date.UTC(2026, 10, 5, 9, 0, 0);
+  let now = t0;
+  __setClockForTests(() => now);
+
+  await Time.focus({ control: { kind: "start", minutes: 1, breaks: false } });
+  now += 60_000;
+  Time.status();
+  const day = localDayOf(now);
+  const res = await call(P, { kind: "focus_days", from_day: day, days: 1 });
+  check("a fallback round moves to the named profile", res.days.length === 1);
+  check("its focused seconds move with it", res.days[0]?.seconds === 60);
+  check("its session count moves with it", res.days[0]?.sessions === 1);
+  check("its completed round moves with it", res.days[0]?.completed === 1);
 }
 
 // === The module never throws ==============================================
