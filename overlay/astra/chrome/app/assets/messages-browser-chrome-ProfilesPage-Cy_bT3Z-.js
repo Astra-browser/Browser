@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-C90YCj1o.js";var n=((n,r={})=>(r.locale??t(),e(3347,n)??`Switch this window to ${n?.name}`));export{n as t};
