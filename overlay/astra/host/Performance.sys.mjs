@@ -275,8 +275,13 @@ function onHostEvent(event) {
     void Performance.tick();
     return;
   }
-  // The delay changed: apply it now rather than at the next interval.
-  if (command.startsWith("preference.performance.after=")) {
+  // A policy change applies now rather than at the next interval: the driver
+  // reads the pref on every tick, and a change wakes one.
+  if (
+    command.startsWith("preference.performance.after=") ||
+    command.startsWith("preference.performance.memory=") ||
+    command.startsWith("preference.performance.exceptions=")
+  ) {
     void Performance.tick();
   }
 }

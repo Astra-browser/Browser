@@ -253,6 +253,11 @@ are not reachable from the protocol. The exact commands still needed are:
 When those exist, `Time.sys.mjs` should delegate to them (and keep the
 host-side tracker only as a fallback), not run two counters.
 
+Known limit: the host tracker follows the selected tab of the window that owns
+the shell, and each window writes its own view of `astra.time.state.v1`; a
+second window's counted time is not merged yet (the same single-writer limit
+as the organisation store, P5b-3).
+
 Evidence: `node tests/contract/sleep_model.mjs` 61 checks,
 `node tests/contract/time_model.mjs` 183 checks, `hostapi_v1` 324,
 `wire_coverage` 50. Live probe steps are in `docs/astra/SLEEPING.md` and the

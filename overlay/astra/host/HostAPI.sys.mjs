@@ -39,7 +39,7 @@ import { Downloads } from "./Downloads.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
-import { Time } from "./Time.sys.mjs";
+import { Time, __resetTimeForTests } from "./Time.sys.mjs";
 import { Performance, __resetPerformanceForTests } from "./Performance.sys.mjs";
 import { HistoryCall } from "./HistoryCall.sys.mjs";
 import { Favicons, __resetFaviconsForTests } from "./Favicons.sys.mjs";
@@ -118,5 +118,6 @@ export function __resetForTests() {
   Media.__resetForTests();
   DialogPrompts.__resetForTests();
   __resetPerformanceForTests();
+  __resetTimeForTests();
   __resetEventsForTests();
 }
