@@ -45,6 +45,12 @@
   } = $props();
 
   let displayUnits = $derived(sidebarDisplayUnits(section, entries, tabs.splitGroup()));
+  // The close-button choice is one setting for both the Today list and the
+  // Essentials dock. `always` reveals the control on every closable row;
+  // `hover` leaves the row's own rule in charge. Pinned/essential rows have
+  // no close control at all (`closable` is only true for Today), so the
+  // setting never invents a way to close a kept site.
+  let closeButtons = $derived(preferences.value("tabs.close-button"));
   const folded = new SvelteSet<string>();
   let hiddenUnits = $derived(collapsedSidebarUnits(displayUnits, folded, tabs.activeId()));
 
@@ -144,7 +150,7 @@
   class={["tab-list", variant === "essentials" && "tab-list-flush"]}
   aria-label={label}
   hidden={entries.length === 0}
-  data-close-buttons={preferences.value("tabs.close-button")}
+  data-close-buttons={closeButtons}
 >
   <!-- The column reads as sections rather than as one unbroken stack; the
        label is visual only, because the nav already carries this name. -->
