@@ -36,6 +36,7 @@ import { Commands } from "./Commands.sys.mjs";
 import { Keymap } from "./Keymap.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
+import { Profiles, __resetProfilesForTests } from "./Profiles.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
@@ -72,6 +73,7 @@ export {
   Keymap,
   Work,
   Downloads,
+  Profiles,
   Media,
   Notes,
   Bookmarks,
@@ -112,6 +114,7 @@ export function __resetForTests() {
   __resetFaviconsForTests();
   __resetOperationsForTests();
   Permissions.__resetForTests();
+  __resetProfilesForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();
   DialogPrompts.__resetForTests();

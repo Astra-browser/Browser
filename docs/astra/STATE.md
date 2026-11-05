@@ -192,12 +192,12 @@ The live audit drives every switch, select and segmented control in the
 Browser group. Remaining honest gaps, all blocked by a missing native
 subsystem rather than the setting binding:
 
-- **Profiles** — `profiles_get` (and create/switch/rename/delete/avatar) has
-  no Host route or module, so the page shows only "New Profile…". Native
-  profile lifecycle/relaunch work.
-- **Downloads** — `downloads.ask` is disabled because `Downloads.sys.mjs`
-  reports `supported: false` until the native download manager is connected
-  (`downloads.path` likewise).
+- **Profiles** — closed in the Lane 4 section below: native roster, create,
+  rename, delete and avatar are routed; in-place switching is refused honestly
+  because it needs a relaunch. Photo avatars wait on the media route.
+- **Downloads** — closed in the Lane 4 section below: the native public list,
+  folder and ask preference are wired; the settings panel no longer reports a
+  permanent unsupported state.
 - **Ad & tracker protection** — `privacy.blocking` is disabled while the
   blocker reports "needs attention"; the Rust/C++ blocker is a separate
   engine lane.
@@ -208,6 +208,62 @@ These settings were already native and stay so through their own host modules,
 not `setting_get`: default browser, login item, downloads (native download
 manager), per-site permissions, browsing-data clearing, site data, import /
 export, and per-site zoom levels.
+
+### Lane 4 settings: Downloads + Profiles (2026-11-05)
+
+`overlay/astra/host/Downloads.sys.mjs` is now backed by the engine's public
+download list instead of answering `supported: false`:
+
+- `list`/`updates` read `Downloads.getList(Downloads.PUBLIC)`; ids are derived
+  from the download's start time/source/target and revisions grow with state
+  and bytes, so the existing `DownloadSession` merge keeps working.
+- `preferences` reads `browser.download.useDownloadDir` (ask = inverse),
+  `browser.download.folderList`/`browser.download.dir` through
+  `Downloads.getPreferredDownloadsDirectory()`. `choose_directory` is
+  `nsIFilePicker` + `folderList = 2`; `set_ask_destination` writes
+  `useDownloadDir` and answers the new preferences. A cancelled picker returns
+  the unchanged preferences, not an error.
+- `cancel`/`open`/`reveal`/`forget`/`clear` act on the real transfer;
+  `pause`/`resume`/`keep`/`discard` answer `unavailable` because this engine
+  exposes no pause or type-held lifecycle. Native list changes emit
+  `downloads-changed` per known profile.
+- `DownloadPreferences.svelte` now renders an honest unsupported state when a
+  reply says `supported: false`, instead of “Loading download preferences…”.
+
+`overlay/astra/host/Profiles.sys.mjs` is new and wired through
+`host-transport.ts` for `profiles_get`, `profiles_create`, `profiles_rename`,
+`profiles_delete`, `profiles_set_avatar`, `profile_avatar_pick` and
+`profiles_switch`; writes emit `profiles-changed`.
+
+- Roster: `SelectableProfileService` when its group is initialised, otherwise
+  `nsIToolkitProfileService`. The running profile is identified by `ProfD`, so
+  the dev build's `-profile` is reported even when
+  `toolkitProfileService.currentProfile` is null; an unregistered directory is
+  listed by its leaf name.
+- Create/rename/delete are real profile-service operations. Avatars use the
+  engine's standard avatar names when selectable profiles are available; an
+  unmanaged toolkit profile has no native avatar, so its chosen symbol/tint
+  lives under `astra.profiles.avatar.<hash>` (presentation only).
+- Switching is **not supported**: the only safe engine path launches a
+  different process, which is not an in-place switch. `profiles_switch`
+  answers an `unsupported_command` refusal and the page says so.
+- `profile_avatar_pick` answers `unsupported`: this build has no media route
+  for a staged profile photo, so it does not mint a token that would render as
+  a broken image.
+
+Verified in this lane: `node tests/contract/downloads_model.mjs` (117),
+`node tests/contract/profiles_model.mjs` (68), `hostapi_v1.mjs` (324),
+`wire_coverage.mjs` (48), `settings_native.mjs` (100),
+`shell_assembly.mjs` PASS, `bun run check` typecheck 0 errors, UI unit suite
+1236 passed, the ProfilesPage component test passed, bridge 27, state-check
+and brand-lint clean. Live Marionette probe is pending the integration rebuild:
+download a fixture attachment, change folder/ask and read them back,
+list/create/rename/delete a profile, and confirm Switch reports the unsupported
+state.
+
+Deferred: photo avatars (needs the media route), in-place profile switching,
+and per-profile download scoping (downloads stay global until the core store
+owns them).
 
 
 ## Phase 0 — Discovery, inventory, scaffolding

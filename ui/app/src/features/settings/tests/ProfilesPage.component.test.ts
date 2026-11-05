@@ -29,17 +29,17 @@ vi.mock("$shared/ipc/bindings", async () => {
   });
 });
 
-test("New Profile from the sidebar creates and switches; from the list it only creates", async () => {
+test("New Profile opens the create sheet without promising a switch", async () => {
   await page.viewport(1200, 800);
   requestNew();
   let screen = await render(ProfilesPage);
   await screen.getByLabelText("Name").fill("School");
-  await screen.getByRole("button", { name: "Create and Switch" }).click();
+  await screen.getByRole("button", { name: "Create Profile" }).click();
   await expect.poll(() => native.create.mock.calls.length).toBe(1);
   expect(native.create).toHaveBeenLastCalledWith(
     "School",
     expect.objectContaining({ style: "initials", photo: null }),
-    true,
+    false,
   );
   await screen.unmount();
 

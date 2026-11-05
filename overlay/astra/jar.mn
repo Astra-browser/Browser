@@ -50,6 +50,7 @@ astra.jar:
   content/astra/res/host/Keymap.sys.mjs (host/Keymap.sys.mjs)
   content/astra/res/host/Work.sys.mjs (host/Work.sys.mjs)
   content/astra/res/host/Downloads.sys.mjs (host/Downloads.sys.mjs)
+  content/astra/res/host/Profiles.sys.mjs (host/Profiles.sys.mjs)
   content/astra/res/host/Media.sys.mjs (host/Media.sys.mjs)
   content/astra/res/host/Notes.sys.mjs (host/Notes.sys.mjs)
   content/astra/res/host/Bookmarks.sys.mjs (host/Bookmarks.sys.mjs)
