@@ -172,7 +172,7 @@ store is wired: theme/colour/font/material/tint, sidebar mode, New Tab
 switches, search engine/custom template (Astra's resolver owns them), tab
 dedupe/close-button/archive/after-close, performance memory profile and
 exceptions, AI/Work/Notes/Tasks/Time, updates, account, diagnostics, reset, the
-Home command target (`tabs.home`, which has no caller yet), and the remaining
+Home command target (`tabs.home`, now read by `nav.home`), and the remaining
 preview site-permission rows (pop-ups, clipboard, automatic downloads, sound)
 whose native form is per-site only.
 
@@ -208,6 +208,22 @@ These settings were already native and stay so through their own host modules,
 not `setting_get`: default browser, login item, downloads (native download
 manager), per-site permissions, browsing-data clearing, site data, import /
 export, and per-site zoom levels.
+
+### Lane 6 — Material, zoom and home (2026-11-05)
+
+| Surface | Wiring | Verified |
+|---|---|---|
+| Zoom levels | `zoom_call` → `Zoom.sys.mjs` → `nsIContentPrefService2` (`getByName`, `removeByDomainAndName`, `removeByName`) over `browser.content.full-zoom`; `zoom.in/out/reset` persist the active site when `browser.zoom.siteSpecific` is on, never from a private tab, and 100%/reset remove the override | `tests/contract/zoom_home_material.mjs` |
+| Home | `nav.home` → `Commands` → `Navigation.loadURL`, reading `tabs.home` then `browser.startup.homepage` then Astra's New Tab; `goHome` is added to the shell's disabled native keys | same contract; live probe |
+| Window material | `ui.material` is resolved by `System.uiInfo` against the platform's real capability: Windows 11 22H2+ offers Mica and applies `widget.windows.mica`; Linux and this macOS build offer solid only. `data-material`/`data-materials` follow the resolved choice, and the picker lists only those tiers | same contract; live probe |
+| Density | compact tokens now cover tab rows, rail, dock, main bar, controls and search, not only Settings rows | live measured heights |
+
+Binding note (SCOPE rule 5): `UiInfo` gained an optional `materials: Material[]`
+in `ui/app/src/shared/ipc/bindings.ts` (the sanctioned generated-binding
+exception) so the appearance picker can list the tiers the host can actually
+draw instead of a dead platform list. `zoom_call` left
+`tests/contract/wire_baseline.json` now that it has a route.
+
 
 
 ## Phase 0 — Discovery, inventory, scaffolding
