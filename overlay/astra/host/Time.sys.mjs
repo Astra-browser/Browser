@@ -291,7 +291,11 @@ function trackingOn() {
 }
 
 /** True while this chrome window is the focused window (unknown → true). */
+let focusOverride = null;
+let idleOverride = null;
+
 function windowFocused() {
+  if (typeof focusOverride === "boolean") return focusOverride;
   try {
     const win = globalThis.window;
     const focus = win?.Services?.focus;
@@ -306,6 +310,7 @@ function windowFocused() {
 
 /** True when the person has not touched the machine for a minute. */
 function userIdle() {
+  if (typeof idleOverride === "boolean") return idleOverride;
   try {
     const idle = globalThis.window?.Services?.idle;
     if (idle && typeof idle.idleTime === "number") {
@@ -924,6 +929,14 @@ function admitted() {
 /** A control that was not applied: malformed, or nothing to act on. */
 function refused() {
   return { operation_id: null, accepted: false };
+}
+
+export function __setTimeIdleForTests(value) {
+  idleOverride = typeof value === "boolean" ? value : null;
+}
+
+export function __setTimeFocusedForTests(value) {
+  focusOverride = typeof value === "boolean" ? value : null;
 }
 
 export const Time = {

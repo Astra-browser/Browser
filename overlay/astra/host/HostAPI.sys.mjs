@@ -27,6 +27,7 @@ import {
   __resetTabsForTests,
   __setArchiveClockForTests,
   __setTabLastActiveForTests,
+  __sleepState,
   __spacesState,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navigation.sys.mjs";
@@ -50,7 +51,12 @@ import { Media } from "./Media.sys.mjs";
 import { MediaImport, __resetMediaImportForTests } from "./MediaImport.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
-import { Time, __resetTimeForTests } from "./Time.sys.mjs";
+import {
+  Time,
+  __resetTimeForTests,
+  __setTimeFocusedForTests,
+  __setTimeIdleForTests,
+} from "./Time.sys.mjs";
 import { Performance, __resetPerformanceForTests } from "./Performance.sys.mjs";
 import { HistoryCall } from "./HistoryCall.sys.mjs";
 import { Favicons, __resetFaviconsForTests } from "./Favicons.sys.mjs";
@@ -93,6 +99,8 @@ export {
   Notes,
   Bookmarks,
   Time,
+  __setTimeFocusedForTests,
+  __setTimeIdleForTests,
   Performance,
   HistoryCall,
   Favicons,
@@ -116,6 +124,7 @@ export {
   __archiveSweep,
   __setArchiveClockForTests,
   __setTabLastActiveForTests,
+  __sleepState,
 };
 
 // Test-only reset so contract tests (P1-T11/P2-T06) start from a clean slate.

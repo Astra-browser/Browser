@@ -342,6 +342,29 @@ and per-profile download scoping (downloads stay global until the core store
 owns them).
 
 
+### Parity lanes — live results (2026-11-05)
+
+The six lanes are merged on `fix/browser-settings-parity`. Generated chrome
+and shell bundles were rebuilt; contracts and live probes were run.
+
+| Probe | Result |
+|---|---|
+| `settings-audit-probe.py` | **60 controls, 0 failed** (Profiles lists 4 rows; downloads.ask toggles; startup, proxy, appearance, tabs, search, new tab, focus, performance, privacy rows all change and restore) |
+| `settings-restart-probe.py` | **49/49** (all values survive a quit/relaunch, density/motion re-applied, startup page opens) |
+| `material-zoom-home-probe.py` | **14/14** (material tiers + data-material, compact geometry, `nav.home`, real zoom list/reset, private refuses) |
+| `tabs-settings-probe.py` | **14/15** — new-tab position, after-close next/previous/recent, close buttons and archive pass live; automatic PiP parks the outgoing browser and the page reaches `visibilityState=hidden`, but the synthetic harness cannot inject the mouse-over the PiP child needs to track the video, so the window itself was not reproduced |
+| `settings-parity-probe.py` | **19/19**: site-permission list/write/remove, private-clear refusal, clear browsing data, blocker honesty, custom engine, all four bangs, sleep/discard/wake, and time reporting with the selected site |
+
+Two integration bugs found by the live pass and fixed: `BrowsingData.lazyModule`
+returned the module member instead of the module (so Sanitizer was null and
+clear always failed), and the time probe compared UTC hours with the tracker's
+local-hour buckets. The sleep driver also needed the browser binding and
+settled native tabs before a tick; it now discards and wakes live tabs.
+
+Also fixed while integrating: `settings.section.<id>` deep links only accepted
+a hardcoded subset, so `settings.appearance` (and General/Tabs/Search/
+Performance) never switched the page. All section ids are now accepted.
+
 ## Phase 0 — Discovery, inventory, scaffolding
 
 | ID | Task | Status | Agent | Branch | Notes |

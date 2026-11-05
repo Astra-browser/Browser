@@ -46,7 +46,7 @@ const RANGE_MS = new Map([
 /** UI category -> Sanitizer item names. `cookies` is cookies + site data. */
 const CLEAR_ITEMS = {
   history: ["history"],
-  cookies: ["cookies", "offlineApps"],
+  cookies: ["cookiesAndStorage"],
   cache: ["cache"],
   downloads: ["downloads"],
 };
@@ -57,6 +57,7 @@ const KINDS = ["history", "cookies", "cache", "downloads"];
 const MAX_SITE = 255;
 
 let _backend = null;
+let _lastClearError = "";
 
 export function __setBrowsingDataBackend(backend) {
   _backend = backend;
@@ -70,9 +71,24 @@ export function __resetBrowsingDataForTests() {
 }
 
 function lazyModule(specifier, key) {
-  if (typeof ChromeUtils === "undefined") return null;
-  const imported = ChromeUtils.importESModule(specifier);
-  return imported[key] ?? null;
+  try {
+    if (typeof ChromeUtils !== "undefined") {
+      return ChromeUtils.importESModule(specifier);
+    }
+  } catch (error) {
+    _lastClearError = String(error);
+  }
+  const scopes = [globalThis, globalThis.window, globalThis.document?.defaultView];
+  for (const scope of scopes) {
+    const chromeUtils = scope?.ChromeUtils ?? globalThis.ChromeUtils;
+    if (!chromeUtils || typeof chromeUtils.importESModule !== "function") continue;
+    try {
+      return chromeUtils.importESModule(specifier);
+    } catch {
+      // Try the next scope; the module may only be reachable from a window.
+    }
+  }
+  return null;
 }
 
 function sharedServices() {
@@ -140,12 +156,18 @@ function liveBackend() {
         if (!kinds[kind]) continue;
         items.push(...CLEAR_ITEMS[kind]);
       }
-      if (items.length === 0) return false;
+      if (items.length === 0) {
+        _lastClearError = `no-items kinds=${JSON.stringify(kinds)}`;
+        return false;
+      }
       const { Sanitizer } = lazyModule(
         "resource:///modules/Sanitizer.sys.mjs",
         "Sanitizer"
       );
-      if (!Sanitizer) return false;
+      if (!Sanitizer) {
+        _lastClearError = "no-sanitizer";
+        return false;
+      }
       const span = RANGE_MS.get(range);
       const options =
         span === null
@@ -157,9 +179,10 @@ function liveBackend() {
       try {
         await Sanitizer.sanitize(items, options);
         return true;
-      } catch {
+      } catch (error) {
         // Sanitizer throws when any item failed; the caller reports failed
         // rather than claiming a partial clear succeeded.
+        _lastClearError = String(error);
         return false;
       }
     },
@@ -401,4 +424,7 @@ export const BrowsingData = {
 
   /** Test/diagnostic seam only. */
   __backend: () => backend(),
+
+  /** The last backend failure, for the live probe's diagnosis. */
+  __lastClearError: () => _lastClearError,
 };
