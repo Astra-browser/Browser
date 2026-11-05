@@ -32,6 +32,7 @@ export interface HostModules {
   Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  MediaImport: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Notes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -111,6 +112,7 @@ const ROUTES: Record<string, Route> = {
   download_call: ["Downloads", "call"],
   download_open_access_settings: ["Downloads", "openAccessSettings"],
   media_player: ["Media", "player"],
+  media_import: ["MediaImport", "import"],
   tab_set_muted: ["Tabs", "setMuted", TAB_ARG],
   // Keep / let go and place in one call: the app's drag verb.
   tabs_set_essential: ["Tabs", "setEssential", TAB_ARG],

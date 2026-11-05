@@ -2,14 +2,14 @@ import type {
   WorkRecordMediaRefV1,
   MediaAssetV1_Deserialize as MediaAssetV1,
 } from "$shared/ipc/bindings";
-import { IS_MAC } from "$shared/platform";
-
 export type { MediaAssetV1 };
 
 const DIGEST = /^[0-9a-f]{64}$/;
 const PROFILE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const STEP_ID = /^[A-Za-z0-9_-]{1,64}$/;
-const base = IS_MAC ? "astra-media://localhost/" : "http://astra-media.localhost/";
+// The host registers this scheme and serves the profile's own admitted blobs;
+// on Linux the old `http://astra-media.localhost` name had no listener.
+const base = "astra-media://localhost/";
 
 /** The newest frame of one agent page; the generation only busts caches. */
 export function pageFrameUrl(attempt: string, step: string, generation: number): string | null {

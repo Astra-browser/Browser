@@ -157,6 +157,38 @@ test("defaults do no image work, and every figure and wordmark updates live and 
   expect(preferences.value("search.engine")).toBe("google");
 });
 
+test("the image picker is reachable before a background image is chosen", async () => {
+  await preferences.init();
+  const settings = await settingsScreen();
+  await expect
+    .element(settings.getByRole("button", { name: "Choose image…", exact: true }))
+    .toBeVisible();
+  expect(native.import).not.toHaveBeenCalled();
+  await settings.getByRole("button", { name: "Choose image…", exact: true }).click();
+  await expect.poll(() => native.import.mock.calls.length).toBe(1);
+  await expect.poll(() => preferences.value("ui.newtab-background")).toBe("image");
+  expect(preferences.value("ui.newtab-image")).toBe(digest);
+});
+
+test("the tracker figure waits for real stats instead of drawing a fake zero", async () => {
+  native.blocked.mockReset().mockResolvedValue({ status: "error", error: null });
+  await preferences.init();
+  const ntp = await tab();
+  await expect.poll(() => native.blocked.mock.calls.length).toBeGreaterThan(0);
+  await expect.poll(() => ntp.container.querySelectorAll(".figure").length).toBe(2);
+  expect(ntp.container.textContent).not.toContain("Ads & trackers blocked");
+  native.blocked
+    .mockReset()
+    .mockResolvedValue({ status: "ok", data: { today: 4, last7Days: 9, days: [] } });
+  // Turning the figure back on re-reads the counter, as the page does when the
+  // setting changes.
+  await preferences.set("ui.newtab-trackers", "false");
+  await preferences.set("ui.newtab-trackers", "true");
+  await expect.poll(() => ntp.container.querySelectorAll(".figure").length).toBe(3);
+  expect(ntp.container.textContent).toContain("Ads & trackers blocked");
+  expect(ntp.container.textContent).toContain("4");
+});
+
 test("a custom background uses one sized local image, no sky decode or frost, and dims live", async () => {
   native.settings = { "ui.newtab-background": "image", "ui.newtab-image": digest };
   await preferences.init();

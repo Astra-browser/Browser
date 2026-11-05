@@ -17,14 +17,18 @@
     if (!editing) customUrl = value;
   });
 
-  /** Feedback only, mirroring `astra_core::search::valid_template`. Native
+  /** Feedback only, mirroring `astra_core::search::valid_template`. Both `%s`
+   *  and `{searchTerms}` are accepted; the host normalises once. Native
    *  remains the authority and rejects anything this misses. */
   let invalid = $derived.by(() => {
     const value = customUrl.trim();
     if (!value) return false;
-    if (value.length > 2048 || value.split("{searchTerms}").length !== 2) return true;
+    if (value.length > 2048) return true;
+    const tokens = value.match(/\{searchTerms\}|%s/gu) ?? [];
+    if (tokens.length !== 1) return true;
     try {
-      const url = new URL(value.replace("{searchTerms}", "astra-query"));
+      const normalised = value.replace("%s", "{searchTerms}");
+      const url = new URL(normalised.replace("{searchTerms}", "astra-query"));
       return (
         url.protocol !== "https:" ||
         !url.search.includes("astra-query") ||
@@ -97,7 +101,7 @@
         value={customUrl}
         maxlength={2048}
         spellcheck={false}
-        placeholder={"https://example.com/search?q={searchTerms}"}
+        placeholder="https://example.com/search?q=%s"
         error={invalid ? m.search_custom_invalid() : undefined}
         hint={invalid || saved ? undefined : m.search_custom_hint()}
         oninput={(event) => {
