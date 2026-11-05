@@ -6,8 +6,9 @@
   import PreviewNotice from "../PreviewNotice.svelte";
   import ProtectionControls from "../ProtectionControls.svelte";
   import SettingsGroup from "$shared/ui/SettingsGroup";
+  import PreferenceSelect from "../PreferenceSelect.svelte";
+  import PreferenceSwitch from "../PreferenceSwitch.svelte";
   import PreviewSelect from "../PreviewSelect.svelte";
-  import PreviewToggle from "../PreviewToggle.svelte";
   import ClearBrowsingData from "../ClearBrowsingData.svelte";
   import SiteData from "../SiteData.svelte";
   import SiteExceptions from "../SiteExceptions.svelte";
@@ -24,9 +25,13 @@
 {#if showPreviews}
   <PreviewNotice />
   <SettingsGroup title={m.settings_site_permissions()}
-    ><PreviewSelect id="privacy.camera" /><PreviewSelect id="privacy.microphone" /><PreviewSelect
-      id="privacy.location"
-    /><PreviewSelect id="privacy.notifications" /></SettingsGroup
+    ><PreferenceSelect id="privacy.camera" preference="privacy.camera" /><PreferenceSelect
+      id="privacy.microphone"
+      preference="privacy.microphone"
+    /><PreferenceSelect id="privacy.location" preference="privacy.location" /><PreferenceSelect
+      id="privacy.notifications"
+      preference="privacy.notifications"
+    /></SettingsGroup
   >
   <SettingsGroup title={m.privacy_media_group()}
     ><PreviewSelect id="privacy.popups" /><PreviewSelect id="privacy.clipboard" /><PreviewSelect
@@ -36,7 +41,7 @@
   <SiteExceptions />
 {/if}
 <SettingsGroup title={m.settings_browsing_data()}>
-  {#if showPreviews}<PreviewToggle id="privacy.cleanup" />{/if}
+  {#if showPreviews}<PreferenceSwitch id="privacy.cleanup" preference="privacy.cleanup" />{/if}
   <ClearBrowsingData />
   <SiteData />
 </SettingsGroup>

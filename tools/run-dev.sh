@@ -40,4 +40,4 @@ mkdir -p "$PROFILE"
 
 # Run from the dist dir: the build resolves its own resources relative to it.
 cd "$(dirname "$BIN")"
-exec ./firefox -no-remote -profile "$PROFILE" "${extra[@]+"${extra[@]}"}" about:blank
+exec ./firefox -no-remote -profile "$PROFILE" "${extra[@]+"${extra[@]}"}"

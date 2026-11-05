@@ -145,13 +145,24 @@ async function initialize(generation: number) {
       }
       return;
     }
-    const next = id.slice("theme.".length);
-    if (!id.startsWith("theme.") || (next !== "light" && next !== "dark" && next !== "system")) {
+    // Settings writes the stored `appearance` preference; every other surface
+    // hears that push, so the window must apply it too.
+    const preference = id.startsWith("preference.appearance=")
+      ? id.slice("preference.appearance=".length)
+      : null;
+    const next = preference ?? id.slice("theme.".length);
+    if (
+      (preference === null && !id.startsWith("theme.")) ||
+      (next !== "light" && next !== "dark" && next !== "system")
+    ) {
       return;
     }
     commandAppearance = next;
     appearance = next;
     apply();
+    // A keyboard or menu theme command is also a choice: store it so the next
+    // launch starts in the same mode. Settings' own write arrives as a push.
+    if (preference === null) void commands.settingSet("appearance", next).catch(() => {});
   });
 
   try {

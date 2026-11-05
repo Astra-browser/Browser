@@ -67,6 +67,11 @@ const defaults = {
   "work.favourite-models": "",
   "zoom.default": "100",
   "privacy.smartscreen": "true",
+  "privacy.cleanup": "false",
+  "privacy.camera": "Ask",
+  "privacy.microphone": "Ask",
+  "privacy.location": "Ask",
+  "privacy.notifications": "Ask",
 } as const;
 export type PreferenceKey = keyof typeof defaults;
 const values = $state<Record<PreferenceKey, string>>({ ...defaults });
@@ -118,8 +123,12 @@ async function initialize(generation: number, signal: AbortSignal) {
       apply("appearance", payload.slice(6));
     }
     if (!payload.startsWith("preference.")) return;
-    const [key, next] = payload.slice(11).split("=");
-    if (key === undefined || !Object.hasOwn(defaults, key) || next === undefined) return;
+    const body = payload.slice(11);
+    const separator = body.indexOf("=");
+    if (separator < 1) return;
+    const key = body.slice(0, separator);
+    const next = body.slice(separator + 1);
+    if (!Object.hasOwn(defaults, key)) return;
     updated[key as PreferenceKey] = true;
     apply(key as PreferenceKey, next);
   });

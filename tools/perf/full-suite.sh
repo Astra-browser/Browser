@@ -31,7 +31,7 @@ CONTRACTS=(
   hostapi_v1 shell_assembly frame_model tab_lifecycle stage_rect tabs_admission
   dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert
   permissions_prompt operations_ledger metadata_restore page_source_model
-  media_model webext_view wire_coverage containers_isolation
+  media_model webext_view wire_coverage containers_isolation settings_native
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -72,6 +72,8 @@ PROBES=(
   "webext:tools/perf/stress/webext_probe.py"
   "devtools:tools/perf/stress/devtools_probe.py"
   "first_load:tools/perf/stress/first_load_probe.py"
+  "settings_native:tools/marionette-probe/settings-native-probe.py"
+  "settings_restart:tools/marionette-probe/settings-restart-probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"

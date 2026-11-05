@@ -129,6 +129,86 @@ recorded below; this list is what is still genuinely unwired.
   been exercised with one page; multi-pane and Work pane relayout remain
   unverified.
 
+### Settings bound to native prefs (closed 2026-11-05)
+
+`overlay/astra/host/Settings.sys.mjs` now has a native adapter. Keys below read
+and write the Firefox pref (or content-pref service) that owns the behaviour;
+the app still applies its own surface from the same value.
+
+| Astra key | Native owner |
+|---|---|
+| `tabs.new-position` | `browser.tabs.insertAfterCurrent` + `browser.tabs.insertRelatedAfterCurrent` |
+| `tabs.external-position` | `browser.link.open_newwindow.override.external` (3/7/-1) |
+| `tabs.automatic-pip` | `media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled` |
+| `tabs.startup` | `browser.startup.page` (0/1/3) |
+| `tabs.startup-pages` | `browser.startup.homepage` (pipe list) |
+| `search.suggestions` | `browser.search.suggest.enabled` |
+| `search.history` | `browser.urlbar.suggest.history` |
+| `privacy.smartscreen` | `browser.safebrowsing.malware.enabled` + `.phishing.enabled` |
+| `privacy.cleanup` | `privacy.sanitize.sanitizeOnShutdown` |
+| `privacy.camera` | `permissions.default.camera` |
+| `privacy.microphone` | `permissions.default.microphone` |
+| `privacy.location` | `permissions.default.geo` |
+| `privacy.notifications` | `permissions.default.desktop-notification` |
+| `performance.sleep` | `browser.tabs.unloadOnLowMemory` |
+| `performance.after` | `browser.tabs.min_inactive_duration_before_unload` |
+| `ui.density` | `browser.uidensity` |
+| `ui.reduce-motion` | `ui.prefersReducedMotion` |
+| `network.proxy` | `network.proxy.type` (1 manual / 5 system) |
+| `network.proxy-address` | `network.proxy.http(_port)` / `ssl(_port)` / `socks(_port)` |
+| `zoom.default` | `browser.content.full-zoom` content pref |
+
+Verified: `node tests/contract/settings_native.mjs` (100 checks),
+`python3 tools/marionette-probe/settings-native-probe.py out/settings-native`
+(50 live checks), `python3 tools/marionette-probe/settings-audit-probe.py`
+(59 live controls across the Browser settings; only Profiles fails, see below)
+and `python3 tools/marionette-probe/settings-restart-probe.py` (49 checks:
+every value read back after a real quit/relaunch, Astra prefs present in the
+profile, density/motion re-applied, and the startup page actually opened).
+
+Astra-only keys have no Firefox pref owner and are now written under
+`astra.settings.<key>` in the profile, so they survive a restart until the core
+store is wired: theme/colour/font/material/tint, sidebar mode, New Tab
+switches, search engine/custom template (Astra's resolver owns them), tab
+dedupe/close-button/archive/after-close, performance memory profile and
+exceptions, AI/Work/Notes/Tasks/Time, updates, account, diagnostics, reset, the
+Home command target (`tabs.home`, which has no caller yet), and the remaining
+preview site-permission rows (pop-ups, clipboard, automatic downloads, sound)
+whose native form is per-site only.
+
+The Appearance light/dark/system picker was writing `appearance` but nothing
+applied it: `domain/appearance/theme.ts` only listened for `theme.*` commands.
+It now also applies `preference.appearance=*` pushes, and a keyboard/menu theme
+command stores its choice. Live: `light -> dark -> light`, stored `dark`.
+
+Startup needed a fix in `overlay/astra/mozilla.cfg`: it used `pref()` for
+`browser.startup.page = 3` on every launch, which overwrote the Settings choice
+(and `pages` = 1 was dropped as equal to Firefox's compiled default). It now
+seeds continue mode only when no user choice exists, and the settings writer
+moves the default branch before storing a choice. Verified by the restart
+probe: `pages` survives and the loopback startup page opens on relaunch.
+
+The live audit drives every switch, select and segmented control in the
+Browser group. Remaining honest gaps, all blocked by a missing native
+subsystem rather than the setting binding:
+
+- **Profiles** — `profiles_get` (and create/switch/rename/delete/avatar) has
+  no Host route or module, so the page shows only "New Profile…". Native
+  profile lifecycle/relaunch work.
+- **Downloads** — `downloads.ask` is disabled because `Downloads.sys.mjs`
+  reports `supported: false` until the native download manager is connected
+  (`downloads.path` likewise).
+- **Ad & tracker protection** — `privacy.blocking` is disabled while the
+  blocker reports "needs attention"; the Rust/C++ blocker is a separate
+  engine lane.
+- **Use my name** (`ntp.personalize`) is disabled until the current profile
+  has a display name (the same missing profile projection).
+
+These settings were already native and stay so through their own host modules,
+not `setting_get`: default browser, login item, downloads (native download
+manager), per-site permissions, browsing-data clearing, site data, import /
+export, and per-site zoom levels.
+
 
 ## Phase 0 — Discovery, inventory, scaffolding
 

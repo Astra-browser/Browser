@@ -29,6 +29,7 @@ const harness = vi.hoisted(() => {
       harness.order.push("settingGet");
       return "light";
     }),
+    settingSet: vi.fn(async () => ({ operation_id: null, accepted: true })),
   };
 });
 
@@ -37,6 +38,7 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     uiInfo: harness.uiInfo,
     settingGet: harness.settingGet,
+    settingSet: harness.settingSet,
   });
 });
 
@@ -84,7 +86,7 @@ describe("theme startup lifecycle", () => {
     const second = theme.init();
 
     expect(first).toBe(second);
-    expect(harness.order.slice(0, 3)).toEqual(["data-theme:dark", "listen", "uiInfo"]);
+    expect(harness.order.slice(0, 3)).toEqual(["data-theme:light", "listen", "uiInfo"]);
 
     await first;
 
@@ -118,6 +120,26 @@ describe("theme startup lifecycle", () => {
     await ready;
 
     expect(harness.attributes.get("data-theme")).toBe("dark");
+    theme.dispose();
+  });
+
+  it("stores a keyboard theme command as the appearance preference", async () => {
+    const theme = await import("../theme");
+    await theme.init();
+
+    harness.emit("theme.dark");
+    expect(harness.settingSet).toHaveBeenCalledWith("appearance", "dark");
+    theme.dispose();
+  });
+
+  it("applies the appearance preference Settings pushes", async () => {
+    const theme = await import("../theme");
+    await theme.init();
+
+    harness.emit("preference.appearance=dark");
+    expect(harness.attributes.get("data-theme")).toBe("dark");
+    harness.emit("preference.appearance=light");
+    expect(harness.attributes.get("data-theme")).toBe("light");
     theme.dispose();
   });
 
