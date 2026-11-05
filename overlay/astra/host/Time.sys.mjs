@@ -11,8 +11,8 @@
 // tab in a non-private window — and persists per-profile hourly buckets and
 // focus days through the same profile pref store the settings use
 // (`astra.time.state.v1`). The exact command the core still needs is
-// documented in `docs/astra/SLEEPING.md`/`docs/astra/STATE.md`; nothing here
-// pretends the sidecar answered.
+// documented in `docs/astra/STATE.md`; nothing here pretends the sidecar
+// answered.
 //
 // Counting semantics mirror `crates/astra-time/src/tracker.rs`:
 // - elapsed time is credited to the *previous* observation's site while that

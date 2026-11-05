@@ -169,6 +169,7 @@ export function readPolicy(setting = (key, fallback) => Settings.current(key) ??
 let timer = null;
 let unsubscribe = null;
 let unloadBound = false;
+let autoRetry = null;
 let ticking = false;
 let lastTickAt = 0;
 let lastSlept = [];
@@ -405,6 +406,10 @@ export const Performance = {
   /** Release the interval, the listener and the process-wide guard. */
   stop() {
     unscheduled();
+    if (autoRetry !== null) {
+      clearInterval(autoRetry);
+      autoRetry = null;
+    }
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
@@ -455,10 +460,11 @@ function autoStart() {
   if (driverOwned()) return;
   if (Performance.start()) return;
   let tries = 0;
-  const handle = setInterval(() => {
+  autoRetry = setInterval(() => {
     tries += 1;
     if (driverOwned() || Performance.start() || tries >= 20) {
-      clearInterval(handle);
+      clearInterval(autoRetry);
+      autoRetry = null;
     }
   }, 1000);
 }
