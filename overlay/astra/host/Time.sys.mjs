@@ -17,7 +17,8 @@
 // Counting semantics mirror `crates/astra-time/src/tracker.rs`:
 // - elapsed time is credited to the *previous* observation's site while that
 //   observation was active;
-// - an idle/private/non-web observation stops the clock without crediting;
+// - an idle/private/non-web observation stops the clock without crediting
+//   (a focused chrome window and no more than a minute of input idle);
 // - a site change re-anchors and counts one "open".
 // Time is split across local-hour boundaries, and pruned by `time.retention`
 // (days) on load, read and write. `time.track=false` stops counting; it does
@@ -93,6 +94,8 @@ const SETTINGS_PREFIX = "astra.settings.";
 const DEFAULT_RETENTION_DAYS = 90;
 const MAX_SITES_PER_HOUR = 200;
 const MAX_REPORT_SITES = 100;
+/** No keyboard/mouse input for this long pauses the clock. */
+const IDLE_LIMIT_MS = 60_000;
 /** Persist at most this often from the activity events; reads force a write. */
 const PERSIST_EVERY_MS = 30_000;
 
@@ -301,6 +304,19 @@ function windowFocused() {
   return true;
 }
 
+/** True when the person has not touched the machine for a minute. */
+function userIdle() {
+  try {
+    const idle = globalThis.window?.Services?.idle;
+    if (idle && typeof idle.idleTime === "number") {
+      return idle.idleTime >= IDLE_LIMIT_MS;
+    }
+  } catch {
+    // No idle service; the focused window is the best signal available.
+  }
+  return false;
+}
+
 /** The start of the next local hour after `ms`, or `ms + an hour`. */
 function nextLocalHourStart(ms) {
   const offset = new Date(ms).getTimezoneOffset() * 60_000;
@@ -346,7 +362,7 @@ let lastSite = "";
 /** Credit the elapsed span, then anchor a new observation at `at`. */
 function recordActivity(at = clock()) {
   const observation = selection();
-  const active = trackingOn() && windowFocused() && observation !== null;
+  const active = trackingOn() && windowFocused() && !userIdle() && observation !== null;
   if (lastObservation !== null && lastObservation.active) {
     credit(activeProfile, lastObservation.site, lastObservation.at, Math.max(0, at - lastObservation.at));
   }
