@@ -79,6 +79,7 @@ PROBES=(
   "tabs_settings:tools/marionette-probe/tabs-settings-probe.py"
   "material_zoom_home:tools/marionette-probe/material-zoom-home-probe.py"
   "profiles_switch:tools/marionette-probe/profiles-switch-probe.py"
+  "bar:tools/marionette-probe/bar-probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"

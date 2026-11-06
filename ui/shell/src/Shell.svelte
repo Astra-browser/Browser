@@ -944,11 +944,18 @@
         setMenuOpen(false);
         return;
       }
-      // The app's page bar asks for the row back when it hides, so the native
-      // stage can start at the window's gutter instead of leaving a strip of
-      // ground where the bar used to be.
+      // The app's page bar floats over a web page instead of taking a row: it
+      // keeps the page's rectangle, raises this frame, and the shell clips the
+      // raised frame to the bar's strip so only that strip answers. A pinned
+      // bar stays in the row and the page starts below it.
       if (data.kind === "bar") {
-        frameRoot.dataset.astraBar = data.hidden === true ? "hidden" : "shown";
+        const overlay = data.overlay === true;
+        frameRoot.dataset.astraBar = overlay ? "overlay" : "flow";
+        frameRoot.dataset.astraBarShown = data.shown === true ? "true" : "false";
+        frameRoot.dataset.astraBarOpen = overlay ? "true" : "false";
+        if (Number.isFinite(data.height) && data.height > 0) {
+          frameRoot.style.setProperty("--astra-bar-height", `${Math.round(data.height)}px`);
+        }
         return;
       }
       if (data.kind !== "menu-run" || typeof data.id !== "string") return;
@@ -1185,12 +1192,13 @@
     border-radius: 12px;
     overflow: hidden;
     background: transparent;
-    /* The app takes its page bar away on a web page; the page gets the row
-       back rather than leaving a strip of ground. */
+    /* A pinned bar keeps its row. A floating bar is an overlay: the page
+       keeps the card's full rectangle and the bar slides over the top of it,
+       so revealing the bar never moves the page. */
     transition: inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
-  :global(.astra-frame[data-app-booted="true"][data-astra-bar="hidden"] .astra-content),
-  :global(.astra-frame[data-app-booted="pending"][data-astra-bar="hidden"] .astra-content) {
+  :global(.astra-frame[data-app-booted="true"][data-astra-bar="overlay"] .astra-content),
+  :global(.astra-frame[data-app-booted="pending"][data-astra-bar="overlay"] .astra-content) {
     inset-block-start: 8px;
   }
   /* A deliberate change of shape travels on the app's own curve
@@ -1412,12 +1420,52 @@
       8px calc(100% - var(--astra-sidebar-card-width, 240px) - 24px) 8px 8px
     );
   }
+  /* The floating page bar lives in the app frame, which normally sits under
+     the page. Raise the frame while the bar floats and clip it to the bar's
+     strip: the bar paints over the page and the top edge catches the pointer,
+     while every part of the page below the strip keeps its own events. The
+     clip grows to the bar's measured height once it slides down. */
+  :global(.astra-frame[data-astra-bar-open="true"] .astra-app-mount) {
+    position: relative;
+    z-index: 4;
+    background: transparent;
+  }
+  :global(.astra-frame[data-astra-bar-open="true"] .astra-app-frame) {
+    /* Keep the column (and the window's left gutter) whole, and open only the
+       bar's strip over the page. A single inset would also clip the sidebar,
+       which the page never covers. A peeking hidden column widens the keep
+       region to its card. */
+    --astra-bar-keep-left: calc(var(--astra-sidebar-width, 0px) + 16px);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% var(--astra-bar-clip, 16px),
+      var(--astra-bar-keep-left) var(--astra-bar-clip, 16px),
+      var(--astra-bar-keep-left) 100%,
+      0 100%
+    );
+    /* Follow the bar's own slide instead of snapping the strip shut when it
+       hides. The polygon has the same points on both states. */
+    transition: clip-path 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.astra-frame[data-astra-bar-open="true"] .astra-app-frame) {
+      transition: none;
+    }
+  }
+  :global(.astra-frame[data-astra-bar-open="true"][data-astra-sidebar-peek="true"] .astra-app-frame) {
+    --astra-bar-keep-left: calc(var(--astra-sidebar-card-width, 240px) + 24px);
+  }
+  :global(.astra-frame[data-astra-bar-open="true"][data-astra-bar-shown="true"] .astra-app-frame) {
+    --astra-bar-clip: calc(8px + var(--astra-bar-height, 40px));
+  }
   /* A context menu is drawn in the app frame, which normally sits under the
      page. While one is open the frame comes above the page with its own
      ground transparent (the app sets `data-astra-menu`), and the peek clip is
      lifted: a menu opened over a hidden column must be visible and clickable,
      and lifting the clip also gives the page pointer back so the column can
-     be released again. */
+     be released again. These rules come after the bar clip so a menu opened
+     from the bar is never cut off. */
   :global(.astra-frame[data-astra-menu-open="true"] .astra-app-mount) {
     position: relative;
     z-index: 4;

@@ -311,15 +311,13 @@
   // switch here means a new pop-up cannot silently be drawn behind the page.
   let trayRaised = $state(false);
   let popupRaised = $state(false);
-  let frameRaised = $derived(trayRaised || popupRaised);
+  let popupOpen = $derived(trayRaised || popupRaised);
+  let frameRaised = $derived(popupOpen);
   function raiseForTray(open: boolean) {
     trayRaised = open;
   }
-  let raisedPosted: boolean | null = null;
   $effect(() => {
     const open = frameRaised;
-    if (raisedPosted === open) return;
-    raisedPosted = open;
     try {
       if (open) document.documentElement.dataset.astraRaised = "true";
       else
@@ -331,6 +329,12 @@
     } catch {
       // No document marker outside the chrome.
     }
+  });
+  let raisedPosted: boolean | null = null;
+  $effect(() => {
+    const open = popupOpen;
+    if (raisedPosted === open) return;
+    raisedPosted = open;
     try {
       window.parent.postMessage(
         { ns: "astra-shell", kind: open ? "menu-open" : "menu-close" },
@@ -391,6 +395,7 @@
       popupSync = 0;
       try {
         delete document.documentElement.dataset.astraRaised;
+        delete document.documentElement.dataset.astraBarRaised;
       } catch {
         // The document is already gone with the window.
       }
@@ -450,25 +455,70 @@
   // The page bar's visibility. `auto` keeps it on the home page and internal
   // pages and takes it away once a real web page is in front; `hidden` leaves
   // it out of the way everywhere; `always` pins it. A pointer at the top edge
-  // (or keyboard focus on the reveal strip) brings it back in either hiding
-  // mode. The shell moves the page stage up while it is away, so the page
-  // gets the room instead of a strip of empty ground.
+  // (or keyboard focus) brings it back.
+  //
+  // While the bar floats it is laid over the page instead of taking a row:
+  // the page keeps its rectangle, the bar slides down over it, and the shell
+  // raises this frame and clips it to the bar's strip. That is what removes
+  // the layout shift the reveal used to cause. The hide is delayed a beat so
+  // the pointer can travel from the top edge onto the bar ("trail").
   let barMode = $derived(preferences.value("ui.main-bar"));
   let barHover = $state(false);
+  let barFocused = $state(false);
+  let barHideTimer: ReturnType<typeof setTimeout> | null = null;
+  let barElement = $state<HTMLElement | null>(null);
+  function clearBarHide() {
+    if (barHideTimer !== null) {
+      clearTimeout(barHideTimer);
+      barHideTimer = null;
+    }
+  }
+  function holdBar() {
+    clearBarHide();
+    barHover = true;
+  }
+  function releaseBar() {
+    clearBarHide();
+    barHideTimer = setTimeout(() => {
+      barHideTimer = null;
+      barHover = false;
+    }, 260);
+  }
+  $effect(() => () => clearBarHide());
   let pageShown = $derived.by(() => {
     if (newTabShown || browserPage.currentPage() !== null) return false;
     const url = tabs.activeTab()?.url ?? null;
     return url !== null && url !== "" && url !== "about:blank";
   });
-  let barVisible = $derived(barMode === "always" || (barMode === "auto" && !pageShown) || barHover);
-  let barHiddenOnPage = $derived(!barVisible && pageShown);
-  let barPosted: boolean | null = null;
+  let barVisible = $derived(
+    barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused,
+  );
+  // The bar floats whenever it is not pinned to a row: over a web page in
+  // `auto`, and everywhere in `hidden`.
+  let barOverPage = $derived(barMode === "hidden" || (barMode === "auto" && pageShown));
   $effect(() => {
-    const hidden = barHiddenOnPage;
-    if (barPosted === hidden) return;
-    barPosted = hidden;
     try {
-      window.parent.postMessage({ ns: "astra-shell", kind: "bar", hidden }, "*");
+      if (barOverPage && pageShown) document.documentElement.dataset.astraBarRaised = "true";
+      else delete document.documentElement.dataset.astraBarRaised;
+    } catch {
+      // No document marker outside the chrome.
+    }
+  });
+  let barPosted = "";
+  $effect(() => {
+    // The shell only has to raise and clip for a floating bar when a native
+    // page is actually behind it. On the home page or an internal surface the
+    // app owns the pixels below the bar, so the bar floats without a clip.
+    const overlay = barOverPage && pageShown;
+    const shown = barVisible;
+    // A layout read, not a reactive value: the density setting can change the
+    // bar's height and the shell's clip has to follow it.
+    const height = Math.round(barElement?.getBoundingClientRect().height ?? 0);
+    const key = `${overlay}:${shown}:${height}`;
+    if (barPosted === key) return;
+    barPosted = key;
+    try {
+      window.parent.postMessage({ ns: "astra-shell", kind: "bar", overlay, shown, height }, "*");
     } catch {
       // No shell: the bar lives in this document.
     }
@@ -713,13 +763,13 @@
           />{/snippet}</LazyView
       >{/snippet}</Sidebar
   >
-  <div class="stage-column" data-bar-hidden={barHiddenOnPage}>
+  <div class="stage-column" data-bar-overlay={barOverPage}>
     <!-- The page's own bar: navigation and the one address field, above the
          stage and never in the sidebar. The field is composed here, with the
          tray that acts on the page it names, and the bar only places it.
          It stays in the tree on every surface: the home page and internal
-         pages always show it, and a web page hides it unless the person
-         pinned it or reached for the top edge. -->
+         pages keep it in a row, and a web page floats it over the page when
+         the person pinned it or reached for the top edge. -->
     <div
       class="stage-bar"
       role="toolbar"
@@ -727,8 +777,15 @@
       aria-label={m.ui_navigation()}
       data-hidden={!barVisible}
       data-mode={barMode}
-      onpointerenter={() => (barHover = true)}
-      onpointerleave={() => (barHover = false)}
+      bind:this={barElement}
+      onpointerenter={holdBar}
+      onpointerleave={releaseBar}
+      onfocusin={() => (barFocused = true)}
+      onfocusout={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && barElement?.contains(next)) return;
+        barFocused = false;
+      }}
     >
       <ContentBar>
         {#snippet field()}
@@ -758,16 +815,20 @@
         {/snippet}
       </ContentBar>
     </div>
-    {#if !barVisible}
-      <!-- The strip the hidden bar leaves at the top. Reaching it brings the
-           bar back; the shell moves the page down in the same turn. -->
+    {#if barOverPage}
+      <!-- The strip that brings a floating bar back. It stays in the tree
+           while the bar is shown so keyboard focus is not dropped; when the
+           bar is down it sits beneath it and takes no pointer. -->
       <button
         type="button"
         class="bar-reveal"
+        data-active={!barVisible}
         aria-label={m.ui_show_bar()}
         title={m.ui_show_bar()}
-        onpointerenter={() => (barHover = true)}
-        onfocus={() => (barHover = true)}
+        onpointerenter={holdBar}
+        onpointerleave={releaseBar}
+        onfocus={() => (barFocused = true)}
+        onblur={() => (barFocused = false)}
       ></button>
     {/if}
     {#if stageCard}<div class="stage-card" aria-hidden="true"></div>{/if}
@@ -1015,16 +1076,39 @@
     min-height: 0;
   }
 
-  /* The page bar is one row of the column while it is present. Taking it out
-     of the flow (rather than only fading it) is what gives the page the row
-     the shell is about to hand it. */
-  .stage-bar[data-hidden="true"] {
-    display: none;
+  /* A floating bar is laid over the page instead of taking a row. The page
+     keeps the whole stage's rectangle; the bar travels on its own layer with
+     a real ground so what passes under it stays readable, and the shell
+     raises/clips the frame to this strip. */
+  .stage-column[data-bar-overlay="true"] .stage-bar {
+    position: absolute;
+    z-index: 30;
+    inset-block-start: 0;
+    inset-inline: 0;
+    background: color-mix(in srgb, var(--color-chrome) 94%, transparent);
+    border-block-end: 1px solid var(--color-border);
+    box-shadow: var(--shadow-float);
+    backdrop-filter: blur(14px);
+    transition:
+      transform var(--motion-base) var(--ease-out),
+      opacity var(--motion-fast) var(--ease-out);
+  }
+
+  .stage-column[data-bar-overlay="true"] .stage-bar[data-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(-100% - 2px));
+  }
+
+  .stage-column[data-bar-overlay="true"] .stage-bar[data-hidden="false"] {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   /* The top edge of the stage is free while the bar is away: reaching it
      brings the bar back. It stays inside the column so the window's own
-     drag strip and the sidebar are untouched. */
+     drag strip and the sidebar are untouched. When the bar is down the strip
+     sits beneath it and lets the bar take the pointer. */
   .bar-reveal {
     position: absolute;
     z-index: 12;
@@ -1038,9 +1122,19 @@
     cursor: default;
   }
 
+  .bar-reveal[data-active="false"] {
+    pointer-events: none;
+  }
+
   .bar-reveal:focus-visible {
     outline: none;
     background: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-column[data-bar-overlay="true"] .stage-bar {
+      transition: none;
+    }
   }
 
   /* The card the page stands on. A native page is rounded by the shell but
@@ -1058,7 +1152,7 @@
 
   /* The shell moves the native page into the gutter; the card's shadow
      follows it so the drop still traces the page's own edge. */
-  .stage-column[data-bar-hidden="true"] .stage-card {
+  .stage-column[data-bar-overlay="true"] .stage-card {
     inset-block-start: 8px;
   }
 
