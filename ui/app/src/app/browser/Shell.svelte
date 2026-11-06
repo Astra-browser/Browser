@@ -389,13 +389,22 @@
       attributeFilter: ["hidden", "style", "data-open", "data-state", "open"],
     });
     syncPopups();
+    // The shell owns the top-edge strip while the page covers this frame, so
+    // its hover reaches the bar the same way a pointer on the bar does.
+    const onShellMessage = (event: MessageEvent) => {
+      const data = event.data as { ns?: string; kind?: string; hover?: boolean } | null;
+      if (data?.ns !== "astra-shell" || data.kind !== "bar-hover") return;
+      if (data.hover === true) holdBar();
+      else releaseBar();
+    };
+    window.addEventListener("message", onShellMessage);
     return () => {
       observer.disconnect();
+      window.removeEventListener("message", onShellMessage);
       if (popupSync !== 0) clearTimeout(popupSync);
       popupSync = 0;
       try {
         delete document.documentElement.dataset.astraRaised;
-        delete document.documentElement.dataset.astraBarRaised;
       } catch {
         // The document is already gone with the window.
       }
@@ -496,14 +505,6 @@
   // The bar floats whenever it is not pinned to a row: over a web page in
   // `auto`, and everywhere in `hidden`.
   let barOverPage = $derived(barMode === "hidden" || (barMode === "auto" && pageShown));
-  $effect(() => {
-    try {
-      if (barOverPage && pageShown) document.documentElement.dataset.astraBarRaised = "true";
-      else delete document.documentElement.dataset.astraBarRaised;
-    } catch {
-      // No document marker outside the chrome.
-    }
-  });
   let barPosted = "";
   $effect(() => {
     // The shell only has to raise and clip for a floating bar when a native

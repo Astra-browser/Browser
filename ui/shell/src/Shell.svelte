@@ -52,6 +52,22 @@
   // person sees is the product UI, never the fallback chrome (P3-T21).
   let appBooted = $state(null);
   let appApi = null;
+  // The page covers the app frame, so the top-edge strip belongs to the shell
+  // while the bar is away. It forwards hover to the app, which owns the bar's
+  // own reveal delay.
+  let barHoverPosted = false;
+  function postBarHover(hover) {
+    if (barHoverPosted === hover) return;
+    barHoverPosted = hover;
+    try {
+      appApi?.element?.contentWindow?.postMessage(
+        { ns: "astra-shell", kind: "bar-hover", hover },
+        "*",
+      );
+    } catch {
+      // The app frame is gone with the window.
+    }
+  }
   /** The tab the stage shows, as the last projection named it. */
   let activeTabId = "";
   /** The tab and address the stage has already put in front (a real document
@@ -887,7 +903,6 @@
         menuTimer = setTimeout(() => setMenuOpen(false), 30000);
       }
     }
-
     const tabIdOf = (browser) => {
       for (const [id, entry] of mounted?.browsers ?? []) {
         if (entry.browser === browser) return id;
@@ -950,9 +965,13 @@
       // bar stays in the row and the page starts below it.
       if (data.kind === "bar") {
         const overlay = data.overlay === true;
+        const shown = data.shown === true;
         frameRoot.dataset.astraBar = overlay ? "overlay" : "flow";
-        frameRoot.dataset.astraBarShown = data.shown === true ? "true" : "false";
-        frameRoot.dataset.astraBarOpen = overlay ? "true" : "false";
+        frameRoot.dataset.astraBarShown = shown ? "true" : "false";
+        // Raise only while the bar is actually down. A hidden floating bar is
+        // the shell's own top-edge strip, so the frame (and its themed ground)
+        // stays under the page.
+        frameRoot.dataset.astraBarOpen = overlay && shown ? "true" : "false";
         if (Number.isFinite(data.height) && data.height > 0) {
           frameRoot.style.setProperty("--astra-bar-height", `${Math.round(data.height)}px`);
         }
@@ -1056,6 +1075,15 @@
           <p class="slot-error" role="alert">{appError}</p>
         {/if}
       </div>
+      <!-- The top edge of the page belongs to the shell while the app frame
+           is under it. Hover here asks the app for its bar; the shell then
+           raises the frame only while that bar is down. -->
+      <div
+        class="astra-bar-reveal"
+        aria-hidden="true"
+        onpointerenter={() => postBarHover(true)}
+        onpointerleave={() => postBarHover(false)}
+      ></div>
       <div class="astra-bar-mount" role="banner" hidden={appBooted !== false} bind:this={barMount}></div>
       <div class="astra-split-mount" hidden={appBooted !== false} bind:this={splitMount}></div>
       <div class="astra-content" role="main" aria-label="Web content" data-astra-content="" bind:this={slot}>
@@ -1401,6 +1429,25 @@
     display: flex;
     flex-direction: column;
     background: #1c1b22;
+  }
+  /* The shell's share of the bar's reveal: the page starts 8px down, so the
+     strip sits in the window gutter and never covers page content. It stays
+     above the raised app frame so a pointer parked on it keeps the bar down. */
+  .astra-bar-reveal {
+    display: none;
+    position: absolute;
+    z-index: 5;
+    inset-block-start: 0;
+    inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 16px);
+    inset-inline-end: 0;
+    block-size: 8px;
+    /* stylelint-disable-next-line property-no-unknown -- Gecko chrome property. */
+    -moz-window-dragging: drag;
+  }
+  /* `data-astra-bar` is set imperatively on the frame, so the ancestor is
+     global; a scoped selector here is pruned as unreachable. */
+  :global(.astra-frame[data-app-booted="true"][data-astra-bar="overlay"]) .astra-bar-reveal {
+    display: block;
   }
   /* The hidden column's card is inside the app frame; over a live page the
      frame comes above the page surface with only the card painted. */

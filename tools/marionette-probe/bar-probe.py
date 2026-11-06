@@ -89,6 +89,7 @@ def main():
           const bodyFont=d.defaultView.getComputedStyle(d.body).fontFamily;
           return JSON.stringify({bar: !!bar, hidden: bar?.getAttribute('data-hidden')??null,
             top: content?Math.round(content.getBoundingClientRect().top):null,
+            ground: d.defaultView.getComputedStyle(d.querySelector('.shell')).backgroundImage,
             bodyFont, inter: d.fonts.check('13px InterVariable'),
             display: d.defaultView.getComputedStyle(d.documentElement).getPropertyValue('--font-display').trim()});
         })()""")
@@ -111,19 +112,19 @@ def main():
         floated = wait(lambda: m.js("return document.querySelector('.astra-frame')?.getAttribute('data-astra-bar') === 'overlay';"), 10)
         time.sleep(1.2)
         top = m.js("return Math.round(document.querySelector('[data-astra-content]').getBoundingClientRect().top);")
-        collapsed = m.js("return (()=>{const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;return JSON.stringify({hidden:d?.querySelector('.stage-bar')?.getAttribute('data-hidden')??null, overlay:d?.querySelector('.stage-column')?.getAttribute('data-bar-overlay')??null, raised:d?.documentElement.getAttribute('data-astra-bar-raised'), open:document.querySelector('.astra-frame')?.getAttribute('data-astra-bar-open')});})()")
+        collapsed = m.js("return (()=>{const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;return JSON.stringify({hidden:d?.querySelector('.stage-bar')?.getAttribute('data-hidden')??null, overlay:d?.querySelector('.stage-column')?.getAttribute('data-bar-overlay')??null, ground:d?d.defaultView.getComputedStyle(d.querySelector('.shell')).backgroundImage:null, open:document.querySelector('.astra-frame')?.getAttribute('data-astra-bar-open')});})()")
         print("page floating", floated, "content top", top, collapsed)
         if not floated: failures.append("the page bar left the row on a web page")
         if top > 12: failures.append(f"the page did not take the bar's row (top {top})")
         c = json.loads(collapsed)
         if c["hidden"] != "true": failures.append("the page bar did not hide on a web page")
         if c["overlay"] != "true": failures.append("the app did not mark the bar as floating")
-        if c["raised"] != "true": failures.append("the app did not step its ground aside for the floating bar")
-        if c["open"] != "true": failures.append("the shell was not raised for the floating bar")
+        if c["ground"] != h["ground"]: failures.append("the window ground changed on a web page")
+        if c["open"] == "true": failures.append("the shell was raised while the bar was hidden")
 
-        hover = m.js("return (()=>{" + app + """
-          const r=d.querySelector('.bar-reveal'); if(!r) return 'no reveal';
-          r.dispatchEvent(new d.defaultView.PointerEvent('pointerenter',{bubbles:true}));
+        hover = m.js("""return (()=>{
+          const r=document.querySelector('.astra-bar-reveal'); if(!r) return 'no shell reveal';
+          r.dispatchEvent(new PointerEvent('pointerenter',{bubbles:true}));
           return 'sent';
         })()""")
         print("hover", hover)
@@ -137,9 +138,9 @@ def main():
         b = json.loads(bar_state)
         if b["hidden"] != "false": failures.append("the revealed bar still reports itself hidden")
 
-        leave = m.js("return (()=>{" + app + """
-          const b=d.querySelector('.stage-bar'); if(!b) return 'no bar';
-          b.dispatchEvent(new d.defaultView.PointerEvent('pointerleave',{bubbles:true}));
+        leave = m.js("""return (()=>{
+          const r=document.querySelector('.astra-bar-reveal'); if(!r) return 'no shell reveal';
+          r.dispatchEvent(new PointerEvent('pointerleave',{bubbles:true}));
           return 'sent';
         })()""")
         print("leave", leave)
