@@ -18,6 +18,7 @@ const native = vi.hoisted(() => ({
     async (_query: string, _context: import("$shared/ipc/bindings").SearchContext) => true,
   ),
   run: vi.fn(async () => ({ accepted: true, operation_id: null })),
+  navigate: vi.fn(async () => ({ accepted: true, operation_id: null })),
   cancel: vi.fn(async () => true),
 }));
 vi.mock("$shared/ipc/bindings", async () => {
@@ -26,6 +27,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     newtabSearchContext: async () => native.context,
     newtabSearch: native.search,
     newtabRun: native.run,
+    tabsNavigate: native.navigate,
     newtabCancel: native.cancel,
   });
 });
@@ -48,6 +50,10 @@ const search = (title: string): SearchResult => ({
   icon: null,
   action: { type: "OpenUrl", url: `https://duckduckgo.com/?q=${title}` },
 });
+const searchUrl = (title: string) => {
+  const action = search(title).action;
+  return action.type === "OpenUrl" ? action.url : "";
+};
 const tab = (title: string, id = title): SearchResult => ({
   kind: "tab",
   title,
@@ -151,15 +157,16 @@ test("Enter runs what was typed even when a local match exists", async () => {
   const screen = await mount({ tabId: "tab" });
   await screen.getByRole("combobox").fill("rust");
   // Native already orders the typed action first; the surface must not
-  // re-point Enter at a local row just because one matched well.
-  const context = await reply("rust", [search("rust"), tab("Rust docs")]);
+  // re-point Enter at a local row just because one matched well. The typed
+  // words take the address bar's own route, not a second host round trip.
+  await reply("rust", [search("rust"), tab("Rust docs")]);
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() =>
-    expect(native.run).toHaveBeenCalledExactlyOnceWith(search("rust").action, context),
+    expect(native.navigate).toHaveBeenCalledExactlyOnceWith("tab", searchUrl("rust")),
   );
 });
 
-test("Enter pressed before the answer runs what was typed once it lands", async () => {
+test("Enter pressed before the answer searches what was typed immediately", async () => {
   const screen = await mount({ tabId: "tab" });
   const input = screen.getByRole("combobox");
   await input.fill("rus");
@@ -168,11 +175,11 @@ test("Enter pressed before the answer runs what was typed once it lands", async 
   const seen = issued();
   await userEvent.type(input, "t");
   await userEvent.keyboard("{Enter}");
+  await vi.waitFor(() => expect(native.navigate).toHaveBeenCalledExactlyOnceWith("tab", "rust"));
+  // A late answer must not replay the action.
+  await replyToNew(seen, "rust", [search("rust")]);
   expect(native.run).not.toHaveBeenCalled();
-  const context = await replyToNew(seen, "rust", [search("rust")]);
-  await vi.waitFor(() =>
-    expect(native.run).toHaveBeenCalledExactlyOnceWith(search("rust").action, context),
-  );
+  expect(native.navigate).toHaveBeenCalledTimes(1);
 });
 
 test("an Enter that commits a composition does not run the row", async () => {
@@ -194,12 +201,12 @@ test("an Enter that commits a composition does not run the row", async () => {
   });
   input.dispatchEvent(commit);
   expect(commit.defaultPrevented).toBe(false);
-  const context = await replyToNew(seen, "にほんご", [search("にほんご")]);
+  await replyToNew(seen, "にほんご", [search("にほんご")]);
   await new Promise((done) => setTimeout(done, 50));
-  expect(native.run).not.toHaveBeenCalled();
+  expect(native.navigate).not.toHaveBeenCalled();
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() =>
-    expect(native.run).toHaveBeenCalledExactlyOnceWith(search("にほんご").action, context),
+    expect(native.navigate).toHaveBeenCalledExactlyOnceWith("tab", searchUrl("にほんご")),
   );
 });
 

@@ -28,6 +28,12 @@
 
 import { Settings } from "./Settings.sys.mjs";
 import { emit } from "./Events.sys.mjs";
+// Pure model modules; importing them here (rather than a dynamic `import()`
+// on the click path) keeps a typed search on the same footing as the address
+// bar's direct navigation. Navigation imports `resolve` from this module, so
+// this is a call-time cycle: neither side touches the other at module load.
+import { Tabs, __tabsState } from "./Tabs.sys.mjs";
+import { Navigation } from "./Navigation.sys.mjs";
 
 /** Engines by the id `search.engine` stores. Every URL is https. */
 const ENGINES = {
@@ -464,8 +470,6 @@ export const Search = {
     // refused outright instead of being turned into a search.
     const resolved = resolve(action.url);
     if (!resolved || resolved.kind !== "url") return { operation_id: null, accepted: false };
-    const { Tabs, __tabsState } = await import("./Tabs.sys.mjs");
-    const { Navigation } = await import("./Navigation.sys.mjs");
     const tab = __tabsState().selectedId;
     if (tab) {
       await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });
@@ -488,8 +492,6 @@ export const Search = {
   async openUrl({ url = "", new_tab = false } = {}) {
     const resolved = resolve(url);
     if (!resolved) return { operation_id: null, accepted: false };
-    const { Tabs, __tabsState } = await import("./Tabs.sys.mjs");
-    const { Navigation } = await import("./Navigation.sys.mjs");
     const tab = new_tab ? "" : __tabsState().selectedId;
     if (tab) {
       const result = await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });
@@ -540,8 +542,6 @@ export const Search = {
     // refused outright instead of being turned into a search.
     const resolved = resolve(action.url);
     if (!resolved || resolved.kind !== "url") return { operation_id: null, accepted: false };
-    const { Tabs, __tabsState } = await import("./Tabs.sys.mjs");
-    const { Navigation } = await import("./Navigation.sys.mjs");
     const tab = __tabsState().selectedId;
     if (tab) {
       await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });

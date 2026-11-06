@@ -6,6 +6,7 @@ import type { PanelState, SearchResult, ToolKind } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
+import { tabs } from "$domain/tabs";
 import { createSearchController, type SearchSnapshot } from "./search-controller";
 import { calculate, type Calculation } from "./calculator";
 import {
@@ -254,7 +255,9 @@ export function createSearchSurface(options: {
     failed = false;
     try {
       const admission = anchored
-        ? await settle(commands.newtabRun(action, owner))
+        ? row.result.kind === "search" && action.type === "OpenUrl" && options.tabId !== null
+          ? await settle(commands.tabsNavigate(options.tabId, action.url))
+          : await settle(commands.newtabRun(action, owner))
         : await commands.launcherRun(action, owner, background);
       if (disposed) return;
       const rejected =
@@ -350,7 +353,17 @@ export function createSearchSurface(options: {
     running = true;
     failed = false;
     try {
-      const result = await settle(commands.browserOpenUrl(value, false));
+      // Both search boxes take the address bar's own route when there is a tab
+      // to type into: the New Tab field is bound to its own blank tab, and the
+      // launcher to the page behind it. Going through a second host route (and
+      // resolving "the selected tab" there) made the same words feel slower
+      // than the address field on a window with more than one tab.
+      const tabId = anchored ? options.tabId : tabs.activeId();
+      const result = await settle(
+        tabId !== null
+          ? commands.tabsNavigate(tabId, value)
+          : commands.browserOpenUrl(value, false),
+      );
       if (disposed) return;
       failed = result.outcome === "failed" || result.outcome === "rejected";
       if (!failed) {

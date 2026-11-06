@@ -19,6 +19,8 @@ const native = vi.hoisted(() => ({
   },
   search: vi.fn(async (_query: string, _request: string) => true),
   run: vi.fn(async (..._args: unknown[]) => ({ accepted: true, operation_id: null })),
+  open: vi.fn(async (..._args: unknown[]) => ({ accepted: true, operation_id: null })),
+  navigate: vi.fn(async (..._args: unknown[]) => ({ accepted: true, operation_id: null })),
   layout: vi.fn(async (_layout: PanelLayout) => {}),
 }));
 vi.mock("$shared/ipc/bindings", async () => {
@@ -26,6 +28,8 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     launcherSearch: native.search,
     launcherRun: native.run,
+    browserOpenUrl: native.open,
+    tabsNavigate: native.navigate,
     panelLayout: native.layout,
   });
 });
@@ -97,15 +101,14 @@ async function reply(query: string, results: SearchResult[], completion: string 
   return owner;
 }
 
-test("Enter before any answer arrives runs once, against that exact request", async () => {
+test("Enter before any answer arrives searches the words immediately", async () => {
   const screen = await render(LauncherPanel, { props: { context, destinations } });
   const input = screen.getByRole("combobox");
   await input.fill("rust");
   await userEvent.keyboard("{Enter}");
+  // The address bar's own route, not a queue behind the provider answer.
+  await vi.waitFor(() => expect(native.open).toHaveBeenCalledExactlyOnceWith("rust", false));
   const owner = await reply("rust", [search("rust")]);
-  await vi.waitFor(() =>
-    expect(native.run).toHaveBeenCalledExactlyOnceWith(search("rust").action, owner, false),
-  );
   // A later answer for the same query must not replay the action.
   emitNativeEvent("searchChanged", {
     context: owner,
@@ -114,7 +117,8 @@ test("Enter before any answer arrives runs once, against that exact request", as
     pending: false,
     results: [search("rust"), search("rust book")],
   });
-  expect(native.run).toHaveBeenCalledTimes(1);
+  expect(native.open).toHaveBeenCalledTimes(1);
+  expect(native.run).not.toHaveBeenCalled();
 });
 
 test("an obsolete answer cannot put its rows back on screen", async () => {
