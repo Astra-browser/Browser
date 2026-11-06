@@ -367,6 +367,25 @@ export function createSearchSurface(options: {
   function submit(background = false) {
     if (composing) return;
     const row = rows.find((candidate) => candidate.id === selectedId);
+    // Enter with words and nothing aimed at is the search itself. Waiting for
+    // a provider answer first made the New Tab field and the launcher feel
+    // slower than the address bar; the host already resolves the same words.
+    // A local answer (calculation, destination) and a row the person actually
+    // moved to still win.
+    if (!background && !moved) {
+      if (row?.id === CALCULATION_ID || row?.tool) {
+        void run(row);
+        return;
+      }
+      if (settled && row) {
+        void run(row);
+        return;
+      }
+      if (query.trim() !== "") {
+        void searchTyped();
+        return;
+      }
+    }
     if (row && (settled || row.id === CALCULATION_ID || (moved && local(row)))) {
       void run(row, background);
       return;

@@ -531,8 +531,11 @@
         appBooted = false;
         appError = message;
       },
-      // The app chooses light or dark; web pages follow the same choice.
+      // The app chooses light or dark; web pages follow the same choice, and
+      // the shell's own loading ground (which paints before/behind a page)
+      // follows it too.
       onTheme: (theme) => {
+        frameRoot.dataset.astraTheme = theme === "light" ? "light" : "dark";
         void host.System?.setContentColorScheme?.({ light: theme === "light" });
       },
       // The app renders from the projection, and a private window's profile
@@ -1061,7 +1064,7 @@
   });
 </script>
 
-<div class="astra-shell astra-frame" data-astra-frame="" data-astra-fullscreen="false" data-app-booted={appBooted === null ? "pending" : appBooted ? "true" : "false"} bind:this={frameRoot}>
+<div class="astra-shell astra-frame" data-astra-frame="" data-astra-theme="light" data-astra-fullscreen="false" data-app-booted={appBooted === null ? "pending" : appBooted ? "true" : "false"} bind:this={frameRoot}>
   <div class="astra-titlebar-mount" bind:this={titleMount}></div>
   <div class="astra-toolbar-mount" hidden={appBooted !== false} bind:this={toolMount}></div>
   <div class="astra-frame-body">
@@ -1115,12 +1118,33 @@
 
 <style>
   .astra-shell {
+    /* The shell paints the ground a page is still arriving on, and the
+       skeleton in front of it. The app announces its theme as soon as it
+       mounts; until then the shipped light default is the right guess. */
+    --shell-loading-ground: #f1f1f3;
+    --shell-loading-raised: #fffdf9;
+    --shell-loading-fill: #e8e6e2;
+    --shell-loading-fill-hi: #f7f5f2;
+    --shell-loading-text: #1c1c1f;
+    --shell-loading-border: rgb(24 24 27 / 0.12);
+    --shell-loading-border-strong: rgb(24 24 27 / 0.18);
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: #1c1b22;
-    color: #fbfbfe;
+    background: var(--shell-loading-ground);
+    color: var(--shell-loading-text);
+  }
+  /* The attribute is set from the app's theme message, so the ancestor is
+     global; a scoped selector here is pruned as unreachable. */
+  :global(.astra-frame[data-astra-theme="dark"]) {
+    --shell-loading-ground: #1c1b22;
+    --shell-loading-raised: #2b2a33;
+    --shell-loading-fill: #3a3a44;
+    --shell-loading-fill-hi: #4a4a55;
+    --shell-loading-text: #f4f4f6;
+    --shell-loading-border: rgb(255 255 255 / 0.12);
+    --shell-loading-border-strong: rgb(255 255 255 / 0.18);
   }
   .astra-frame-body {
     flex: 1 1 auto;
@@ -1301,8 +1325,9 @@
     display: flex;
     flex-direction: column;
     /* The chrome's ground while a page is on its way: a load should read as
-       the window waiting, not as the window dying. The page paints over it. */
-    background: var(--color-chrome, #1c1b22);
+       the window waiting, not as the window dying. The page paints over it,
+       and it follows the app's light/dark choice. */
+    background: var(--shell-loading-ground);
   }
 
   /* A page still arriving says what it is waiting for, quietly, in the middle
@@ -1318,10 +1343,10 @@
     gap: 10px;
     translate: -50% -50%;
     padding: 10px 16px;
-    border: 1px solid var(--color-border, rgb(255 255 255 / 12%));
+    border: 1px solid var(--shell-loading-border);
     border-radius: 999px;
-    background: var(--color-raised, rgb(43 42 51 / 92%));
-    color: var(--color-text, #f4f4f6);
+    background: var(--shell-loading-raised);
+    color: var(--shell-loading-text);
     font: 500 13px/1.2 system-ui, sans-serif;
     white-space: nowrap;
     pointer-events: none;
@@ -1331,8 +1356,8 @@
   .loading-spinner {
     inline-size: 14px;
     block-size: 14px;
-    border: 2px solid var(--color-border-strong, rgb(255 255 255 / 18%));
-    border-block-start-color: var(--color-text, #f4f4f6);
+    border: 2px solid var(--shell-loading-border-strong);
+    border-block-start-color: var(--shell-loading-text);
     border-radius: 50%;
     animation: content-loading 720ms linear infinite;
   }
@@ -1359,7 +1384,7 @@
     flex-direction: column;
     gap: 12px;
     padding: 6% 8%;
-    background: var(--color-chrome, #1c1b22);
+    background: var(--shell-loading-ground);
     pointer-events: none;
   }
 
@@ -1367,9 +1392,9 @@
     border-radius: var(--radius-control, 6px);
     background: linear-gradient(
       90deg,
-      var(--color-raised, #2b2a33) 25%,
-      var(--color-fill, #3a3a44) 40%,
-      var(--color-raised, #2b2a33) 55%
+      var(--shell-loading-fill) 25%,
+      var(--shell-loading-fill-hi) 40%,
+      var(--shell-loading-fill) 55%
     );
     background-size: 220% 100%;
     animation: sk-shimmer 1.25s linear infinite;
@@ -1428,7 +1453,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: #1c1b22;
+    background: var(--shell-loading-ground);
   }
   /* The shell's share of the bar's reveal: the page starts 8px down, so the
      strip sits in the window gutter and never covers page content. It stays
