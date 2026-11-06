@@ -19,6 +19,21 @@
   display: none !important;
 }
 
+/* Astra paints a borderless window, so the compositor has no native frame to
+   round. A non-zero radius on the document root also makes Gecko create a
+   transparent widget (nsLayoutUtils::GetFrameTransparency), which lets the
+   desktop show through the four corners instead of a square plate. It stays
+   on for a tiled or maximized window (the usual Hyprland shape here); only a
+   fullscreen surface is square, because there is no desktop beside it. */
+@media (-moz-platform: linux) {
+  #main-window:not([sizemode="fullscreen"]):not([inDOMFullscreen]) {
+    --astra-window-radius: 14px;
+    overflow: hidden;
+    border-radius: var(--astra-window-radius);
+    background: transparent !important;
+  }
+}
+
 #astra-root {
   position: relative;
   flex: 1 1 auto;

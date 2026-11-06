@@ -81,6 +81,7 @@ PROBES=(
   "profiles_switch:tools/marionette-probe/profiles-switch-probe.py"
   "bar:tools/marionette-probe/bar-probe.py"
   "search_theme:tools/marionette-probe/search-theme-probe.py"
+  "window_radius:tools/marionette-probe/window-radius-probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"
