@@ -23,7 +23,7 @@
     void profiles.retain();
     return () => profiles.release();
   });
-  const name = $derived(tabs.profile()?.name ?? profiles.current()?.name ?? "");
+  const name = $derived(profiles.current()?.name ?? tabs.profile()?.name ?? "");
   const others = $derived(profiles.inPrivate() ? [] : profiles.others());
   const privately = $derived(profiles.inPrivate() || tabs.profile()?.kind === "incognito");
   /** The private window is open behind the regular tabs, and this brings it back. */

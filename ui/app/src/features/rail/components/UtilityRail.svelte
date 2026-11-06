@@ -37,7 +37,9 @@
   const sleeping = $derived(sleepingTabs(tabs.tabs(), privateWindow));
   const current = $derived(privately ? null : profiles.current());
   const face = $derived(current && current.avatar.revision > 0 ? drawn(current) : null);
-  const who = $derived(privately ? "" : (tabs.profile()?.name ?? current?.name ?? ""));
+  // The roster follows the active space, so a switch updates the name here
+  // even though the tab projection's own `profile` is the running directory.
+  const who = $derived(privately ? "" : (current?.name ?? tabs.profile()?.name ?? ""));
   const others = $derived(privately ? [] : profiles.others());
   // macOS keeps AppKit's traffic lights in the window's top-left corner; the
   // rail gives them their row and starts beneath it.

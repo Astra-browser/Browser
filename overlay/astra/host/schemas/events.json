@@ -23,6 +23,7 @@
         "tab.moved",
         "tab.space-changed",
         "space.deleted",
+        "space.switched",
         "tab.closed",
         "tab.pinned",
         "tab.unpinned",

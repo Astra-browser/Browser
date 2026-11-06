@@ -46,6 +46,17 @@ Everything below was re-run against the freshly packed dev build.
   documented missing `content_style.js` and friends. They are not part of the
   canonical gate.
 
+## Owner report: floating page bar + in-window profiles (2026-11-07)
+
+| Surface | Fix | Wiring / files | Live evidence |
+|---|---|---|---|
+| Page bar float | Revealing the bar no longer takes a row and moves the page. The bar is absolutely positioned over the page with its own ground, slides in/out on the motion curve, and hides after a 260 ms trail so the pointer can travel from the top edge onto it. The shell raises the app frame, clips it to the bar strip plus the sidebar, and keeps the native page at the card's full rectangle, so the pointer reaches the page below the bar. | `ui/app/src/app/browser/Shell.svelte` (`barOverPage`, `holdBar`/`releaseBar`, `data-bar-overlay`), `ui/app/src/styles/browser.css` (`data-astra-bar-raised`), `ui/shell/src/Shell.svelte` (`data-astra-bar=overlay`/`flow`, `data-astra-bar-open`, polygon clip) | `tools/marionette-probe/bar-probe.py` (now in the full suite): home `flow`; page `overlay` with content top 8; hover `shown` with top still 8; leave hides after the trail; app menu still opens over the page |
+| In-window profiles | A profile switch selects that profile's space in the same window: no new window/process, tabs kept per space, and a container partition per profile. Create/rename/delete carry the space and its container data. | `overlay/astra/host/Profiles.sys.mjs` (profile↔space map under `astra.profiles.spaces`, `spaceForProfile`, in-window `switch`), `overlay/astra/host/Tabs.sys.mjs` (`space.switched`), `ProfilesPage`/rail copy | `profiles-switch-probe.py`: rail menu switch accepted, 1 window, tabs restored on return, `probe=personal` absent in Work, localStorage isolated; delete removes the space + container |
+
+Limit: preferences, extensions and the Places history database are shared by the
+one running profile directory; cookies/sign-ins/localStorage/IndexedDB/cache are
+per profile. D-41 records the decision.
+
 ## Owner report: page bar, media, popups, downloads and type (2026-11-06)
 
 One surface batch from the owner's report. Each row was exercised against the
@@ -62,17 +73,20 @@ from the steps).
 | Downloads window | Native sends `created_at` as an ISO timestamp, but the list parsed it as epoch seconds; the invalid `Date` threw during day grouping and the panel rendered nothing. Both the day label and the sort now accept ISO and legacy epoch seconds. | `ui/app/src/features/downloads/components/DownloadsList.svelte` | `DownloadsList.component.test.ts` (ISO grouping); host probe: a real attachment appears in the native list with `created_at:"2026-11-06T11:25:55.469Z"` and `state:"completed"` |
 | Online search suggestions | The address field is now a third suggestion consumer (New Tab and launcher were already wired). It asks the same host `Search.launcherSearch`, so `search.suggestions` gates every box. | `ui/app/src/features/address/components/AddressField.svelte` | `suggest-probe.py`: `weather` → five Google suggestions + the search row; setting off → no provider rows |
 | Interface type | The body is Inter and display type is Instrument Serif, bundled in the chrome app. `ui.font` now defaults to `astra`; the system/rounded/serif/mono faces remain choices. | `ui/app/src/styles/fonts.css`, `styles/fonts/*.woff2`, `axes/type.css`, `tokens.css`, `FontPicker.svelte` | `bar-probe.py`: body computed `"InterVariable", …`, `document.fonts.check("13px InterVariable") === true`, `--font-display` resolves to Instrument Serif |
-| Profile switch | A switch launches the chosen profile and hands the window over: the old window closes once the new instance opens. This is not an in-process profile-directory change (the engine has none); it is the closest honest Arc-style switch. | `overlay/astra/host/Profiles.sys.mjs` (`launchAndHandoff`), `profiles-switch-probe.py` rewritten to the handoff contract | `profiles-switch-probe.py`: accepted, old window closed, new window reports the chosen profile and a live tab model; probe cleans the roster entry |
+| Profile switch | In-window: each profile browses in an Astra space backed by a Firefox container. A switch selects that space in the same window, restores its tabs, and swaps the container partition; no new window or process. Create/rename/delete carry their space. | `overlay/astra/host/Profiles.sys.mjs` (`spaceForProfile`, `switch`), `Tabs.switchSpace`, `profiles-switch-probe.py`, D-41 | `profiles-switch-probe.py`: accepted, 1 window before/after, tabs restored on return, `probe=personal` invisible in Work and back; probe removes its profile |
 
 Notes and limits:
 
 - **Fonts are open equivalents.** ABC Oracle, Exposure and GT Alpina are
   commercial and are not redistributed. Inter and Instrument Serif are SIL OFL
   1.1; sources/licences are in `ui/app/src/styles/fonts/README.md`.
-- **True in-place profile switching is still not a native capability.** A
-  real profile directory cannot be moved into a running process. The handoff
-  closes the old window after 1.4 s only when it is the sole browser window, so
-  a multi-window workspace is never torn down by a switch.
+- **In-window profile switching is container-scoped, not a profile-directory
+  change.** A real profile directory cannot be moved into a running process.
+  D-41 gives each profile an Astra space backed by a container: cookies,
+  sign-ins, localStorage/IndexedDB and the HTTP cache are isolated per profile,
+  and tabs are kept per space. Preferences, extensions and the Places history
+  database are still shared by the one running directory; the Profiles copy
+  states this. Proven live by `profiles-switch-probe.py`.
 - **PiP and the media rail need an audio/video device for a full live proof.**
   The engine's launcher actor and the tab-visibility path are verified; the
   player window and audio rail remain reasoned SKIPs under the headless
@@ -392,9 +406,11 @@ download list instead of answering `supported: false`:
   engine's standard avatar names when selectable profiles are available; an
   unmanaged toolkit profile has no native avatar, so its chosen symbol/tint
   lives under `astra.profiles.avatar.<hash>` (presentation only).
-- Switching is **not supported**: the only safe engine path launches a
-  different process, which is not an in-place switch. `profiles_switch`
-  answers an `unsupported_command` refusal and the page says so.
+- Switching is **in-window** (D-41): the chosen profile's space is activated
+  in the same window, its tabs are restored and its container partition is
+  used. Cookies, sign-ins, localStorage/IndexedDB and the cache are isolated;
+  preferences, extensions and Places history remain shared by the running
+  directory, and the page says so.
 - `profile_avatar_pick` answers `unsupported`: this build has no media route
   for a staged profile photo, so it does not mint a token that would render as
   a broken image.
@@ -409,9 +425,10 @@ download a fixture attachment, change folder/ask and read them back,
 list/create/rename/delete a profile, and confirm Switch reports the unsupported
 state.
 
-Deferred: photo avatars (needs the media route), in-place profile switching,
-and per-profile download scoping (downloads stay global until the core store
-owns them).
+Deferred: photo avatars (needs the media route), per-profile preferences /
+extensions / Places history (they remain shared by one profile directory), and
+per-profile download scoping (downloads stay global until the core store owns
+them).
 
 
 ### Parity lanes — live results (2026-11-05)
@@ -450,7 +467,8 @@ binary with `-profile` for an unmanaged toolkit roster) and leaves the current
 window open. `profiles-switch-probe.py` created “Switch Probe”, switched to it
 (accepted, process/window count rose), verified the current window stayed
 alive, then removed the probe profile. Same-window replacement is not a native
-profile operation; it would require the in-process profile-scope design below.
+profile-directory operation; D-41 implements it as the profile's container-backed
+space (see the owner report above).
 
 ## Phase 0 — Discovery, inventory, scaffolding
 

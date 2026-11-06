@@ -29,18 +29,32 @@
 //     that would render as a broken image.
 //
 // Switching profiles cannot replace the running process's profile directory
-// in place. The engine's safe path is to launch the chosen profile in another
-// instance/window (`SelectableProfileService.launchInstance`, or the binary
-// with `-profile` for an unmanaged toolkit roster). `profiles_switch` uses
-// that path: the chosen profile appears immediately and the current window
-// stays open, so the person never has to quit. It never moves or closes the
-// running profile.
+// in place, so `profiles_switch` is an in-window environment transition: each
+// profile browses in an Astra space backed by a Firefox container, and the
+// window selects that space. Cookies, sign-ins, localStorage/IndexedDB and the
+// HTTP cache are isolated per profile; tabs are kept per space and restored on
+// return. Preferences, extensions and the Places history database are shared
+// by the one profile directory this process runs — an honest limit, recorded
+// in docs/astra/STATE.md.
 //
 // The module can be imported by Node contract tests: the engine is reached
 // lazily and `__setProfilesBackend()` replaces the whole native seam.
 
-import { emit } from "./Events.sys.mjs";
+import { addEventListener, emit } from "./Events.sys.mjs";
 import { refuse } from "./Operations.sys.mjs";
+import { Tabs, __spacesState } from "./Tabs.sys.mjs";
+
+// A profile is a browsing environment, and this engine cannot move a running
+// process to another profile directory. The in-window switch therefore gives
+// each profile an Astra space, and a space is a Firefox container: cookies,
+// sign-ins, localStorage/IndexedDB and the HTTP cache are partitioned per
+// `userContextId`, tabs are kept per space, and switching selects the space's
+// last tab instead of opening a window. Preferences, extensions and the Places
+// history database stay shared by the one profile directory this process runs;
+// that limit is recorded in docs/astra/STATE.md.
+const SPACE_MAP_PREF = "astra.profiles.spaces";
+let _spaceMap = new Map();
+let _spaceListener = null;
 
 /** Avatar names Astra maps onto the engine's standard profile avatars; the
  *  index is the `symbol` field of `ProfileAvatarView`. */
@@ -80,49 +94,6 @@ const MAX_REVISION = 0xffffffff;
 
 const ok = () => ({ operation_id: null, accepted: true });
 const no = () => ({ operation_id: null, accepted: false });
-
-/** How long the new profile's window gets to appear before the old window is
- *  retired. The engine starts a separate process, so the old process cannot
- *  observe that window opening; this is the handoff. */
-const PROFILE_HANDOFF_MS = 1400;
-
-/** The browser window that owns this host, when it is the only one. A switch
- *  from a window someone is using alongside others must not close their
- *  workspace, so the handoff is skipped then. */
-function soleBrowserWindow() {
-  try {
-    const Services = globalThis.Services;
-    const windows = [...(Services?.wm?.getEnumerator?.("navigator:browser") ?? [])];
-    return windows.length === 1 ? windows[0] : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Launch a profile and make it the window the person is left with: the
- *  running window closes once the new instance has had time to open. The
- *  engine has no in-process profile switch; this is the closest behaviour to
- *  Arc's switch that does not pretend the profile directory changed. */
-async function launchAndHandoff(native, id) {
-  const running = soleBrowserWindow();
-  let started = false;
-  try {
-    started = (await native.launch(id)) === true;
-  } catch {
-    started = false;
-  }
-  if (!started || !running) return started;
-  const timer = setTimeout(() => {
-    try {
-      running.close();
-    } catch {
-      // The window was already gone.
-    }
-  }, PROFILE_HANDOFF_MS);
-  // A Node contract test has no event loop to hold open.
-  timer?.unref?.();
-  return true;
-}
 
 /** A stable pref-key hash; profile paths are long and may contain characters
  *  a pref name should not carry. */
@@ -235,6 +206,9 @@ export function __setProfilesBackend(backend) {
 export function __resetProfilesForTests() {
   injectedBackend = null;
   nativePromise = null;
+  _spaceMap = new Map();
+  _spaceListener?.();
+  _spaceListener = null;
 }
 
 function chromeScope() {
@@ -256,6 +230,121 @@ function chromeScope() {
     // A partial or hostile global is the same as no chrome.
   }
   return null;
+}
+
+// --- Profile ↔ space binding ----------------------------------------------
+// The binding survives a restart in the profile pref store; Node contract
+// tests get the in-memory fallback. A stale binding (the space snapshot was
+// replaced) is ignored and the profile gets a fresh space.
+
+function readSpaceMap() {
+  const scope = chromeScope();
+  if (!scope) return new Map(_spaceMap);
+  try {
+    const raw = scope.Services.prefs.getStringPref(SPACE_MAP_PREF, "");
+    if (raw === "") return new Map(_spaceMap);
+    const parsed = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return new Map(_spaceMap);
+    }
+    const map = new Map();
+    for (const [profile, space] of Object.entries(parsed)) {
+      if (typeof profile === "string" && typeof space === "string") map.set(profile, space);
+    }
+    return map;
+  } catch {
+    return new Map(_spaceMap);
+  }
+}
+
+function writeSpaceMap(map) {
+  _spaceMap = new Map(map);
+  const scope = chromeScope();
+  if (!scope) return;
+  try {
+    scope.Services.prefs.setStringPref(
+      SPACE_MAP_PREF,
+      JSON.stringify(Object.fromEntries(map)),
+    );
+  } catch {
+    // The in-memory map still serves this run.
+  }
+}
+
+function bindProfileSpace(profileId, spaceId) {
+  const map = readSpaceMap();
+  map.set(profileId, spaceId);
+  writeSpaceMap(map);
+}
+
+function unbindProfileSpace(profileId) {
+  const map = readSpaceMap();
+  if (!map.delete(profileId)) return;
+  writeSpaceMap(map);
+}
+
+function spaceForProfileSpace(profileId) {
+  const map = readSpaceMap();
+  return map.get(profileId) ?? null;
+}
+
+function profileForSpace(spaceId) {
+  for (const [profile, space] of readSpaceMap()) {
+    if (space === spaceId) return profile;
+  }
+  return null;
+}
+
+function hasSpace(spaceId) {
+  return __spacesState().spaces.some((space) => space.id === spaceId);
+}
+
+/** The space a profile browses in, created on first use. The running profile
+ *  uses the window's first space (the default environment) instead of minting
+ *  a second one for an identity it already owns. */
+async function spaceForProfile(profile, { running = false } = {}) {
+  const bound = spaceForProfileSpace(profile.id);
+  if (bound !== null && hasSpace(bound)) return bound;
+  if (running) {
+    const spaces = __spacesState().spaces;
+    const home = spaces.find((space) => space.id === "space-1") ?? spaces[0];
+    if (home) {
+      bindProfileSpace(profile.id, home.id);
+      return home.id;
+    }
+  }
+  const existing = __spacesState().spaces.find((space) => space.name === profile.name);
+  if (existing) {
+    bindProfileSpace(profile.id, existing.id);
+    return existing.id;
+  }
+  const before = new Set(__spacesState().spaces.map((space) => space.id));
+  await Tabs.createSpace({ request_id: "profile-space", name: profile.name });
+  const created = __spacesState().spaces.find((space) => !before.has(space.id));
+  if (!created) return null;
+  bindProfileSpace(profile.id, created.id);
+  return created.id;
+}
+
+/** The roster's `current` follows the active space's profile. */
+function withActiveProfile(view) {
+  if (view === null) return null;
+  const profile = profileForSpace(__spacesState().active_space_id);
+  if (profile === null || !view.profiles.some((entry) => entry.id === profile)) return view;
+  return { ...view, current: profile };
+}
+
+/** The rail names the active profile, so a plain space switch has to refresh
+ *  the roster too. One listener for the process; reset removes it. */
+function listenForSpaceSwitches() {
+  if (_spaceListener !== null) return;
+  _spaceListener = addEventListener((event) => {
+    if (event.type !== "space.switched") return;
+    void (async () => {
+      const native = await nativeForUse();
+      if (native) await announce(native);
+    })();
+  });
 }
 
 function profilePath(profile) {
@@ -629,7 +718,7 @@ async function currentView(native) {
 
 async function announce(native) {
   const view = await currentView(native);
-  if (view !== null) emit("profiles-changed", view);
+  if (view !== null) emit("profiles-changed", withActiveProfile(view));
 }
 
 async function avatarFor(native, id, avatar) {
@@ -657,16 +746,14 @@ async function avatarFor(native, id, avatar) {
 export const Profiles = {
   /** `ProfilesView | null`; null means the engine answered nothing usable. */
   async get() {
+    listenForSpaceSwitches();
     const native = await nativeForUse();
     if (!native) return null;
-    return currentView(native);
+    return withActiveProfile(await currentView(native));
   },
 
-  /**
-   * Create a profile. With `and_switch`, the new profile is launched after it
-   * is stored and the current window hands over to it (see
-   * `launchAndHandoff`).
-   */
+  /** Create a profile. With `and_switch`, the window moves into the new
+   *  profile's space after it is stored — same window, same process. */
   async create({ name = "", avatar = null, and_switch = false } = {}) {
     if (!isName(name) || !isAvatar(avatar)) return no();
     if (avatar.style === "photo") return no();
@@ -686,10 +773,17 @@ export const Profiles = {
     }
     await announce(native);
     if (and_switch === true) {
-      // The profile is stored; opening it is the engine's launch path, not an
-      // in-place switch of the running window.
-      if ((await launchAndHandoff(native, id)) === true) return ok();
-      return refuse("native_dispatch_rejected");
+      // The profile is stored; the window moves into its space. No second
+      // process or window is created.
+      const space = await spaceForProfile({ id, name: name.trim() });
+      if (space === null) return refuse("native_dispatch_rejected");
+      const applied = await Tabs.switchSpace({
+        request_id: "profile-switch",
+        space,
+      });
+      if (applied?.accepted !== true) return refuse("native_dispatch_rejected");
+      await announce(native);
+      return ok();
     }
     return ok();
   },
@@ -707,6 +801,15 @@ export const Profiles = {
       renamed = false;
     }
     if (!renamed) return no();
+    // The profile's space is the visible half of the same identity.
+    const space = spaceForProfileSpace(profile);
+    if (space !== null && hasSpace(space)) {
+      await Tabs.updateSpace({
+        request_id: "profile-rename",
+        space,
+        name: name.trim(),
+      });
+    }
     await announce(native);
     return ok();
   },
@@ -722,6 +825,14 @@ export const Profiles = {
       removed = false;
     }
     if (!removed) return no();
+    // The space leaves with the profile: its tabs close and `space.deleted`
+    // lets the content binding drop the container and its site data. A window
+    // with one space keeps it (the model refuses to remove the last one).
+    const space = spaceForProfileSpace(profile);
+    unbindProfileSpace(profile);
+    if (space !== null && hasSpace(space)) {
+      await Tabs.deleteSpace({ request_id: "profile-remove", space });
+    }
     await announce(native);
     return ok();
   },
@@ -772,18 +883,28 @@ export const Profiles = {
   },
 
   /**
-   * Switching is a relaunch-level operation: the engine has no path that
-   * moves the running process to another profile directory. Astra launches
-   * the chosen profile and hands the window over to it, closing the old
-   * window once the new instance has opened, so the person experiences a
-   * switch rather than a second window. The refusal still names the reason
-   * when the engine cannot launch the profile at all.
+   * In-window switch. The running process cannot change profile directory, so
+   * the chosen profile's browsing environment is an Astra space: selecting it
+   * swaps the tabs and the container (cookies, storage, cache) in the window
+   * that is already open. The profile's tabs are left as they were, so
+   * switching back restores that session.
    */
   async switch({ profile = "" } = {}) {
     if (typeof profile !== "string" || profile === "") return no();
     const native = await nativeForUse();
     if (!native) return no();
-    if ((await launchAndHandoff(native, profile)) === true) return ok();
-    return refuse("native_dispatch_rejected");
+    const view = await currentView(native);
+    const entry = view?.profiles.find((candidate) => candidate.id === profile) ?? null;
+    // A roster entry that vanished is refused, never claimed applied.
+    if (entry === null) return refuse("native_dispatch_rejected");
+    const space = await spaceForProfile(entry, { running: profile === view.current });
+    if (space === null) return refuse("native_dispatch_rejected");
+    const applied = await Tabs.switchSpace({
+      request_id: "profile-switch",
+      space,
+    });
+    if (applied?.accepted !== true) return refuse("native_dispatch_rejected");
+    await announce(native);
+    return ok();
   },
 };

@@ -9,8 +9,11 @@
 //   - create/rename/delete/avatar are applied and read back; duplicate or
 //     invalid names, the running profile, and photo avatars are refused
 //   - `profiles_changed` carries the new projection after each write
-//   - switching is a relaunch-level operation: it is refused with a
-//     disposition (`unsupported_command`), never silently claimed applied
+//   - create with `and_switch` moves the window into the new profile's space
+//     after it is stored; no second window is opened
+//   - switching activates the chosen profile's space in the same window,
+//     keeps the tabs of the profile left behind, and never launches a process
+//   - a vanished profile is refused with a disposition, never claimed applied
 //   - without a native backend nothing is claimed applied
 //
 // Usage: node tests/contract/profiles_model.mjs
@@ -27,8 +30,10 @@ const HOST = path.join(ROOT, "overlay", "astra", "host");
 const Mod = await import(path.join(HOST, "Profiles.sys.mjs"));
 const Events = await import(path.join(HOST, "Events.sys.mjs"));
 const Operations = await import(path.join(HOST, "Operations.sys.mjs"));
+const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
 
 const { Profiles, __resetProfilesForTests, __setProfilesBackend } = Mod;
+const { Tabs, __spacesState, __resetTabsForTests } = TabsMod;
 
 let passed = 0;
 let failed = 0;
@@ -121,6 +126,10 @@ function fakeRoster({ currentProfile = null } = {}) {
     async pickAvatar() {
       return { kind: "unsupported" };
     },
+    async launch(id) {
+      state.calls.push(["launch", id]);
+      return state.profiles.some((profile) => profile.id === id);
+    },
   };
   return { backend, state };
 }
@@ -128,8 +137,15 @@ function fakeRoster({ currentProfile = null } = {}) {
 function reset() {
   Events.__resetEventsForTests();
   Operations.__resetOperationsForTests();
+  __resetTabsForTests();
   __resetProfilesForTests();
 }
+
+const activeSpaceName = () => {
+  const state = __spacesState();
+  return state.spaces.find((space) => space.id === state.active_space_id)?.name ?? null;
+};
+const spaceNames = () => __spacesState().spaces.map((space) => space.name);
 
 // === Packaging =============================================================
 {
@@ -191,25 +207,43 @@ function reset() {
   const seen = [];
   Events.addEventListener((event) => seen.push(event));
 
-  const refusedSwitch = await Profiles.create({
-    name: "School",
+  const createdAndSwitched = await Profiles.create({
+    name: "Launch",
     avatar: { style: "initials", color: 2, symbol: 0, photo: null },
     and_switch: true,
   });
-  check("create with and_switch is admitted for classification", refusedSwitch.accepted === true);
-  const disposition = await Operations.Operations.status({
-    operation_id: refusedSwitch.operation_id,
-  });
-  check("create with and_switch is refused, not half-applied", disposition.state === "processed");
   check(
-    "the refusal names the missing native path",
-    disposition.disposition.outcome === "rejected" &&
-      disposition.disposition.reason === "unsupported_command",
+    "create with and_switch is applied",
+    createdAndSwitched.accepted === true && createdAndSwitched.operation_id === null,
   );
-  check("no profile was created for the refused switch", state.calls.length === 0);
   check(
-    "no profiles-changed was announced for the refusal",
-    seen.every((event) => event.type !== "profiles-changed"),
+    "the new profile is listed after create-and-switch",
+    state.profiles.some((profile) => profile.name === "Launch"),
+  );
+  check(
+    "create-and-switch never launches a second process",
+    state.calls.every((call) => call[0] !== "launch"),
+  );
+  check(
+    "create-and-switch moves the window into the new profile's space",
+    activeSpaceName() === "Launch",
+  );
+  check(
+    "create-and-switch creates and stores the avatar before moving",
+    JSON.stringify(state.calls.map((call) => call[0])) ===
+      JSON.stringify(["create", "avatar"]),
+  );
+  check(
+    "the roster reports the profile the window moved into",
+    (await Profiles.get()).current === "/profiles/launch",
+  );
+  check(
+    "a profiles-changed event carried the new profile",
+    seen.some(
+      (event) =>
+        event.type === "profiles-changed" &&
+        event.data.profiles.some((profile) => profile.name === "Launch"),
+    ),
   );
 
   const created = await Profiles.create({
@@ -374,23 +408,70 @@ function reset() {
   check("profile_avatar_pick is honest about the missing media route", picked.kind === "unsupported");
 }
 
-// === Switch ================================================================
+// === Switch (in-window) ====================================================
 {
   reset();
   const { backend, state } = fakeRoster();
   __setProfilesBackend(backend);
+
+  // A tab opened while the running profile's default space is in front.
+  await Tabs.create({ url: "https://personal.example/" });
+
   const admission = await Profiles.switch({ profile: WORK });
-  check("switch is admitted for classification", admission.accepted === true);
-  const status = await Operations.Operations.status({
-    operation_id: admission.operation_id,
-  });
-  check("switch resolves to a disposition", status.state === "processed");
-  check("switch is not reported applied", status.disposition.outcome === "rejected");
+  check("switch is applied", admission.accepted === true);
   check(
-    "switch names the missing relaunch path",
-    status.disposition.reason === "unsupported_command",
+    "switch never launches a process or opens a window",
+    state.calls.every((call) => call[0] !== "launch"),
   );
-  check("switch never calls a native launch or profile mutation", state.calls.length === 0);
+  check("switch brings the chosen profile's space forward", activeSpaceName() === "Work");
+  check(
+    "switch reports the chosen profile as current",
+    (await Profiles.get()).current === WORK,
+  );
+
+  // Work keeps its own tabs; returning to Personal restores its session.
+  await Tabs.create({ url: "https://work.example/" });
+  const workTabs = await Tabs.list({ request_id: "work" });
+  check(
+    "the chosen profile's space holds its own tab",
+    workTabs.tabs.find((tab) => tab.selected)?.url === "https://work.example/",
+  );
+
+  await Profiles.switch({ profile: RUNNING });
+  check(
+    "switching to the running profile returns to its default space",
+    activeSpaceName() === "Space",
+  );
+  check(
+    "no extra space is minted for the running profile",
+    spaceNames().filter((name) => name === "dev-profile").length === 0,
+  );
+  const personalTabs = await Tabs.list({ request_id: "personal" });
+  const activePersonal = personalTabs.tabs.find((tab) => tab.selected);
+  check(
+    "the earlier profile's tabs are still there and selected",
+    activePersonal?.url === "https://personal.example/",
+  );
+
+  await Profiles.switch({ profile: WORK });
+  check(
+    "returning to a profile restores its previous tab",
+    activeSpaceName() === "Work" &&
+      (await Tabs.list({ request_id: "work-again" })).tabs.find((tab) => tab.selected)?.url ===
+        "https://work.example/",
+  );
+
+  const missing = await Profiles.switch({ profile: "/profiles/missing" });
+  check("switching to a vanished profile is refused", missing.accepted === true);
+  const status = await Operations.Operations.status({
+    operation_id: missing.operation_id,
+  });
+  check("the vanished-profile refusal carries a disposition", status.state === "processed");
+  check(
+    "the vanished-profile refusal names the unmet native admission",
+    status.disposition.outcome === "rejected" &&
+      status.disposition.reason === "native_dispatch_rejected",
+  );
 }
 
 // === No native backend =====================================================

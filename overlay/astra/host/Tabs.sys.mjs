@@ -778,6 +778,7 @@ export const Tabs = {
   // result, so the UI never guesses what native did.
 
   async createSpace({ request_id = "", name = "", look = null } = {}) {
+    const previous = _activeSpaceId;
     const id = `space-${_nextSpaceId++}`;
     _spaces.push({
       id,
@@ -791,6 +792,7 @@ export const Tabs = {
     // The new space is in front, so it needs its own New Tab rather than an
     // empty stage. `create` announces it; the snapshot below is the result.
     await ensureTabInActiveSpace(request_id);
+    emit("space.switched", { space: id, previous });
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
@@ -849,6 +851,7 @@ export const Tabs = {
 
   async switchSpace({ request_id = "", space = "" } = {}) {
     if (!spaceOf(space)) return { operation_id: null, accepted: false };
+    const previous = _activeSpaceId;
     _activeSpaceId = space;
     const candidates = activeOrder();
     const remembered = _selectedBySpace.get(space);
@@ -862,6 +865,9 @@ export const Tabs = {
       // New Tab instead of a stage nothing owns.
       await ensureTabInActiveSpace(request_id);
     }
+    // The profile roster follows the active space; this is the one signal a
+    // plain space switch (or a profile switch driving one) needs.
+    emit("space.switched", { space, previous });
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },

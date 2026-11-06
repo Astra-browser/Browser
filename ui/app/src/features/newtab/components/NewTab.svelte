@@ -15,6 +15,7 @@
   import { newTabImage, imageFailed } from "$session/newtab-background.svelte";
   import { taskCounts } from "$domain/resources";
   import { tabs } from "$domain/tabs";
+  import { profiles } from "$domain/profiles";
   import Icon from "$shared/ui/Icon";
   import IconButton from "$shared/ui/IconButton";
   import { greetingFor } from "../lib/greeting";
@@ -93,7 +94,11 @@
   );
   let today = $derived(dayKey(now));
 
-  let firstName = $derived((tabs.profile()?.name ?? "").trim().split(/\s+/u)[0] ?? "");
+  // The roster follows the active space; the tab projection still names the
+  // running directory, so prefer the profile the window is actually in.
+  let firstName = $derived(
+    (profiles.current()?.name ?? tabs.profile()?.name ?? "").trim().split(/\s+/u)[0] ?? "",
+  );
   let greeting = $derived.by(() => {
     const words = greetingFor(now);
     const named = !incognito && preferences.value("ui.newtab-name") === "true" && firstName;

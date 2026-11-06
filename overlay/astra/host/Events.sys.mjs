@@ -13,6 +13,7 @@
 //   window.created, window.focused, window.closed, window.fullscreen-changed
 //   tab.created, tab.updated, tab.moved, tab.space-changed, tab.closed,
 //   tab.pinned, tab.unpinned, tab.discarded, tab.restored
+//   space.deleted, space.switched
 //   nav.committed, nav.started, nav.stopped, nav.hard-reload,
 //   nav.zoom-changed,
 //   nav.find-result, nav.print-requested, nav.reader-changed

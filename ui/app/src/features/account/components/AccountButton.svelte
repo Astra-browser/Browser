@@ -29,7 +29,7 @@
 
   const privately = $derived(profiles.inPrivate() || tabs.profile()?.kind === "incognito");
   const foot = accountFoot({ private: () => privately });
-  const who = $derived(tabs.profile()?.name || profiles.current()?.name || name);
+  const who = $derived(profiles.current()?.name || tabs.profile()?.name || name);
   const shown = $derived(who || m.browse_profile_settings());
   const others = $derived(profiles.others());
   const tone = $derived(foot.tone);
