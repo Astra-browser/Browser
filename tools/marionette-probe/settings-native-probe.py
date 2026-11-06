@@ -275,13 +275,15 @@ def main():
         check("default zoom reads back", m.js(read("zoom.default")) == "125",
               m.js(read("zoom.default")))
 
-        # Astra-only settings stay Astra's.
+        # Astra-only settings stay Astra's. They are persisted under the
+        # `astra.settings.*` namespace; no Firefox namespace may grow a pref
+        # that pretends to own the key.
         check("Astra-only setting is admitted", m.js(write("ntp.clock", "false")).get("accepted") is True)
         check(
             "Astra-only setting invents no Firefox pref",
             not m.js(
                 "return Services.prefs.getChildList('').some("
-                "(name) => name.includes('ntp.clock'));"
+                "(name) => !name.startsWith('astra.') && name.includes('ntp.clock'));"
             ),
         )
 

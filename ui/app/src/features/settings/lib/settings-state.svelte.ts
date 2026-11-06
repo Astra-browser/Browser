@@ -34,9 +34,6 @@ export function handleNativeSection(id: string) {
     select("mcp", service ? `connection.${decodeURIComponent(service).toLowerCase()}` : null);
     return;
   }
-  if (
-    id.startsWith("settings.section.") &&
-    sections.some((candidate) => candidate.id === section)
-  )
+  if (id.startsWith("settings.section.") && sections.some((candidate) => candidate.id === section))
     select(section as SettingsSection);
 }

@@ -167,7 +167,15 @@ export default defineConfig({
             commands: { benchPhotos, webkitFootprint },
             // Retina is the display this chrome is drawn for, and the one
             // where a radius or a hairline can actually be judged.
-            provider: playwright({ contextOptions: { deviceScaleFactor: 2 } }),
+            provider: playwright({
+              contextOptions: {
+                deviceScaleFactor: 2,
+                // The chrome's base locale is `en` (paraglide). Pin the test
+                // context to `en-US` so `Intl` output (prices, dates, compact
+                // numbers) does not depend on the developer's OS locale.
+                locale: "en-US",
+              },
+            }),
             instances: [
               {
                 browser:

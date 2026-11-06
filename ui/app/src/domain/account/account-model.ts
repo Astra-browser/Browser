@@ -1,4 +1,5 @@
 import type { AccountOfferV1, AccountPriceV1 } from "$shared/ipc/bindings";
+import { getLocale } from "$shared/i18n/runtime";
 import { IS_MAC } from "$shared/platform";
 
 const media = IS_MAC ? "astra-media://localhost/" : "http://astra-media.localhost/";
@@ -40,14 +41,15 @@ export function priceLabel(
   locale?: string,
 ): string | null {
   if (!price || !/^[A-Za-z]{3}$/u.test(price.currency)) return null;
+  const tag = locale ?? getLocale();
   try {
-    const format = new Intl.NumberFormat(locale, {
+    const format = new Intl.NumberFormat(tag, {
       style: "currency",
       currency: price.currency.toUpperCase(),
     });
     const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
     const amount = price.amount_minor / 10 ** digits;
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(tag, {
       style: "currency",
       currency: price.currency.toUpperCase(),
       minimumFractionDigits: Number.isInteger(amount) ? 0 : digits,
@@ -64,7 +66,7 @@ export function shortDate(iso: string | null | undefined, now = new Date(), loca
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   const sameYear = date.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(locale ?? getLocale(), {
     month: "short",
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),
@@ -94,7 +96,8 @@ function amounts(
   return { value: BigInt(units), per: BigInt(creditUnits) };
 }
 
-const whole = (locale?: string) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+const whole = (locale?: string) =>
+  new Intl.NumberFormat(locale ?? getLocale(), { maximumFractionDigits: 0 });
 
 /**
  * A balance in whole credits, rounded down so it never promises more than is
@@ -131,7 +134,7 @@ export function creditsCall(
 ): string | null {
   const at = amounts(units, creditUnits);
   if (!at) return null;
-  const format = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  const format = new Intl.NumberFormat(locale ?? getLocale(), { maximumFractionDigits: 2 });
   if (at.value === 0n) return format.format(0);
   const hundredths = (at.value * 200n + at.per) / (at.per * 2n);
   return hundredths === 0n ? `<${format.format(0.01)}` : format.format(Number(hundredths) / 100);

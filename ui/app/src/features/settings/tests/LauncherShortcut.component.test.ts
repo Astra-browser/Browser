@@ -3,6 +3,7 @@ import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import "$styles/global.css";
 import type { LauncherTrigger } from "$shared/ipc/bindings";
+import { IS_MAC } from "$shared/platform";
 import LauncherShortcut from "../components/LauncherShortcut.svelte";
 
 const trigger = (shortcut: string): LauncherTrigger => ({
@@ -44,7 +45,7 @@ test("records a shortcut, keeps listening after a refusal, and applies the next"
     .mockResolvedValueOnce({ type: "applied", trigger: trigger("Ctrl+Alt+Space") });
   const screen = await render(LauncherShortcut);
   const recorder = screen.getByRole("button", { name: "Record a shortcut" });
-  await expect.element(recorder).toHaveTextContent("⇧⌘Space");
+  await expect.element(recorder).toHaveTextContent(IS_MAC ? "⇧⌘Space" : "CtrlShiftSpace");
 
   await recorder.click();
   expect(native.record).toHaveBeenLastCalledWith(true);
@@ -55,7 +56,7 @@ test("records a shortcut, keeps listening after a refusal, and applies the next"
   await vi.waitFor(() => expect(native.set).toHaveBeenLastCalledWith("Ctrl+Alt+Space"));
   await expect
     .element(screen.getByRole("button", { name: "Record a shortcut" }))
-    .toHaveTextContent("⌃⌥Space");
+    .toHaveTextContent(IS_MAC ? "⌃⌥Space" : "CtrlAltSpace");
   await expect.element(screen.getByRole("button", { name: "Reset" })).toBeVisible();
   document.documentElement.dataset.theme = "dark";
   await page.viewport(720, 220);

@@ -111,7 +111,9 @@ test("a fault that is not about the field leaves the field alone", async () => {
     .element(screen.getByRole("alert"))
     .toHaveTextContent("Couldn’t reach the account server.");
   expect(pane("email").querySelector("form")!.dataset.invalid).toBe("false");
-  expect(height()).toBeCloseTo(size, 0);
+  // Subpixel rounding moves a 340px sheet by at most a pixel between frames;
+  // what matters is that no error row made the sheet grow.
+  expect(Math.abs(height() - size)).toBeLessThanOrEqual(2);
 });
 
 test("what the page has to say stands in the sheet, not above it", async () => {

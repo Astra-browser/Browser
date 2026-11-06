@@ -152,6 +152,5 @@
         label={m.ui_compact_mode()}
         onclick={ontoggle}
       />{/if}<span class="flex-1" aria-hidden="true"></span>
-
   </header>
 {/if}

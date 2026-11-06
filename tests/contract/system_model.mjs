@@ -276,10 +276,23 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
 {
   const answer = await System.uiInfo();
   check("ui_info answers an object", isObject(answer));
-  check("ui_info has the material key", sameKeys(answer, ["material"]));
+  check(
+    "ui_info has the material and materials keys",
+    sameKeys(answer, ["material", "materials"]),
+  );
   check(
     `ui_info names a Material (${answer.material})`,
     MATERIALS.has(answer.material),
+  );
+  check(
+    "ui_info lists the tiers the picker may offer",
+    Array.isArray(answer.materials) &&
+      answer.materials.length > 0 &&
+      answer.materials.every((tier) => MATERIALS.has(tier)),
+  );
+  check(
+    "the resolved material is one of the offered tiers",
+    answer.materials.includes(answer.material),
   );
   check(
     "ui_info claims no native material it has not discovered",

@@ -10,6 +10,12 @@ set -euo pipefail
 
 runtime="$(mktemp -d /tmp/astra-weston.XXXXXX)"
 socket="astra-test-$$"
+# Every probe creates a throwaway Firefox profile with tempfile.mkdtemp(). Give
+# them a TMPDIR inside this runtime so the trap below removes the profiles too;
+# leaked profiles used to fill /tmp until Firefox aborted with "Disk quota
+# exceeded".
+mkdir -p "$runtime/tmp"
+export TMPDIR="$runtime/tmp"
 cleanup() {
   if [ -n "${wpid:-}" ]; then
     kill "$wpid" 2>/dev/null || true

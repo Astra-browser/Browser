@@ -226,7 +226,7 @@ describe("host transport", () => {
       eventSeq: () => 0,
     };
     const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never) });
-    await expect(b.invoke("profiles_get")).rejects.toMatchObject({ code: "unknown_command" });
+    await expect(b.invoke("account_sessions")).rejects.toMatchObject({ code: "unknown_command" });
   });
 
   test("tab arguments are mapped onto the Host API's names", async () => {
