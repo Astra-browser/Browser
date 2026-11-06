@@ -440,14 +440,15 @@
   /* A small control riding the corner of something else. */
   --shadow-badge: 0 0 0 0.5px var(--color-border-strong), 0 1px 3px rgb(0 0 0 / 0.18);
 
-  /* The platform face, and only the platform face. Native menus, alerts and
-     file dialogs open out of this chrome in SF and cannot be told otherwise,
-     so a webfont here changes typeface under the user's cursor. SF also
-     carries a real optical size axis, which `font-optical-sizing` needs to
-     mean anything at the 11px end of the scale. */
+  /* Astra ships its own body face (Inter) and display face (Instrument
+     Serif), the closest open equivalents of the Arc typographic system. The
+     system stack remains the fallback for a platform where the bundled files
+     did not load and for glyphs outside the bundled subsets. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI Variable Text", "Segoe UI", "Noto Sans",
-    "Cantarell", sans-serif;
+    "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, system-ui,
+    "Segoe UI Variable Text", "Segoe UI", "Noto Sans", "Cantarell", sans-serif;
+  --font-display:
+    "Instrument Serif", "Iowan Old Style", "Sitka Display", "New York", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Menlo", "Consolas", monospace;
 
   --text-caption: 11px;
@@ -499,13 +500,7 @@
      black: a charcoal light at the top-left falling into near-black, so the
      sidebar card and the page card sit in the field instead of on a flat slab.
      The light block below swaps the stops for the warm paper field. */
-  --shell-ground: linear-gradient(
-    135deg,
-    #2f2f34 0%,
-    #1e1e21 42%,
-    #111113 72%,
-    #08080a 100%
-  );
+  --shell-ground: linear-gradient(135deg, #2f2f34 0%, #1e1e21 42%, #111113 72%, #08080a 100%);
 
   /* One optical axis for the whole chrome column. Every band measures its
      horizontal position from this, so glyphs line up from the address field
@@ -901,13 +896,7 @@
   --shine-top: inset 0 1px 0 0 rgb(255 255 255 / 0.7);
 
   /* The reference's warm wallpaper, used behind the chrome and the card. */
-  --shell-ground: linear-gradient(
-    135deg,
-    #bcd6fb 0%,
-    #e8d1c4 46%,
-    #fcedc9 78%,
-    #fee1cd 100%
-  );
+  --shell-ground: linear-gradient(135deg, #bcd6fb 0%, #e8d1c4 46%, #fcedc9 78%, #fee1cd 100%);
   --wallpaper-a: #bcd6fb;
   --wallpaper-b: #e8d1c4;
   --wallpaper-c: #fcedc9;

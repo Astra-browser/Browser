@@ -88,7 +88,7 @@ async function field(props: { compact?: boolean } = {}) {
 
 test("a click on a page's address edits it here, and only the shortcut opens the launcher", async () => {
   const { screen, input } = await field();
-  await screen.getByRole("textbox", { name: /address/iu }).click();
+  await screen.getByRole("combobox", { name: /address/iu }).click();
   expect(document.activeElement).toBe(input);
   await expect.poll(() => input.value).toBe("https://www.wikipedia.org/wiki/Premium");
   expect(native.editCalls).toBe(0);

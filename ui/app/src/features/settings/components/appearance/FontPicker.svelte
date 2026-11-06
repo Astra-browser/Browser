@@ -3,6 +3,7 @@
   import { preferences } from "$domain/preferences";
 
   const faces = [
+    { value: "astra", label: m.look_font_astra },
     { value: "system", label: m.look_font_system },
     { value: "rounded", label: m.look_font_rounded },
     { value: "serif", label: m.look_font_serif },
@@ -78,7 +79,7 @@
   .faces {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
     gap: 10px;
     padding: 0 18px 18px;
     outline: none;
@@ -142,6 +143,10 @@
     font-size: 24px;
     line-height: 30px;
     letter-spacing: -0.01em;
+  }
+
+  .face[data-face="astra"] .sample {
+    font-family: var(--font-sans);
   }
 
   .face[data-face="system"] .sample {

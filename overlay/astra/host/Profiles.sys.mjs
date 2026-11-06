@@ -81,6 +81,49 @@ const MAX_REVISION = 0xffffffff;
 const ok = () => ({ operation_id: null, accepted: true });
 const no = () => ({ operation_id: null, accepted: false });
 
+/** How long the new profile's window gets to appear before the old window is
+ *  retired. The engine starts a separate process, so the old process cannot
+ *  observe that window opening; this is the handoff. */
+const PROFILE_HANDOFF_MS = 1400;
+
+/** The browser window that owns this host, when it is the only one. A switch
+ *  from a window someone is using alongside others must not close their
+ *  workspace, so the handoff is skipped then. */
+function soleBrowserWindow() {
+  try {
+    const Services = globalThis.Services;
+    const windows = [...(Services?.wm?.getEnumerator?.("navigator:browser") ?? [])];
+    return windows.length === 1 ? windows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Launch a profile and make it the window the person is left with: the
+ *  running window closes once the new instance has had time to open. The
+ *  engine has no in-process profile switch; this is the closest behaviour to
+ *  Arc's switch that does not pretend the profile directory changed. */
+async function launchAndHandoff(native, id) {
+  const running = soleBrowserWindow();
+  let started = false;
+  try {
+    started = (await native.launch(id)) === true;
+  } catch {
+    started = false;
+  }
+  if (!started || !running) return started;
+  const timer = setTimeout(() => {
+    try {
+      running.close();
+    } catch {
+      // The window was already gone.
+    }
+  }, PROFILE_HANDOFF_MS);
+  // A Node contract test has no event loop to hold open.
+  timer?.unref?.();
+  return true;
+}
+
 /** A stable pref-key hash; profile paths are long and may contain characters
  *  a pref name should not carry. */
 function hash(text) {
@@ -620,8 +663,9 @@ export const Profiles = {
   },
 
   /**
-   * Create a profile. With `and_switch`, the new profile is launched in its
-   * own window after it is stored; the current window stays open.
+   * Create a profile. With `and_switch`, the new profile is launched after it
+   * is stored and the current window hands over to it (see
+   * `launchAndHandoff`).
    */
   async create({ name = "", avatar = null, and_switch = false } = {}) {
     if (!isName(name) || !isAvatar(avatar)) return no();
@@ -641,6 +685,12 @@ export const Profiles = {
       // The profile exists; the avatar falls back to native initials.
     }
     await announce(native);
+    if (and_switch === true) {
+      // The profile is stored; opening it is the engine's launch path, not an
+      // in-place switch of the running window.
+      if ((await launchAndHandoff(native, id)) === true) return ok();
+      return refuse("native_dispatch_rejected");
+    }
     return ok();
   },
 
@@ -722,20 +772,18 @@ export const Profiles = {
   },
 
   /**
-   * Switching is a relaunch-level operation. No native path moves the running
-   * window to another profile without replacing the process; the safe launch
-   * path opens a different process and is not a switch. Answer the refusal
-   * with a disposition reason the UI can name.
+   * Switching is a relaunch-level operation: the engine has no path that
+   * moves the running process to another profile directory. Astra launches
+   * the chosen profile and hands the window over to it, closing the old
+   * window once the new instance has opened, so the person experiences a
+   * switch rather than a second window. The refusal still names the reason
+   * when the engine cannot launch the profile at all.
    */
   async switch({ profile = "" } = {}) {
     if (typeof profile !== "string" || profile === "") return no();
     const native = await nativeForUse();
     if (!native) return no();
-    try {
-      if ((await native.launch(profile)) === true) return ok();
-    } catch {
-      // A profile directory that is gone or locked.
-    }
-    return refuse("unavailable");
+    if ((await launchAndHandoff(native, profile)) === true) return ok();
+    return refuse("native_dispatch_rejected");
   },
 };

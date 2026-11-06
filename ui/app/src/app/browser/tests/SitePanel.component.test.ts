@@ -107,7 +107,13 @@ async function shell(over: Parameters<typeof tabFixture>[0] = {}) {
     active: tab.id,
     split_group: null,
   });
-  return render(Shell);
+  const screen = await render(Shell);
+  // A web page hides the page bar until the pointer reaches the top edge.
+  // The panel lives in that bar, so a real hover is part of these tests.
+  screen.container
+    .querySelector(".bar-reveal")
+    ?.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }));
+  return screen;
 }
 
 const before = (a: Element, b: Element) =>
@@ -280,13 +286,13 @@ test("a certificate the person continued past is not secure either", async () =>
     .toBeVisible();
 });
 
-test("a new tab keeps its own search bar and no address tray", async () => {
+test("a new tab keeps its own search field and shows the page bar", async () => {
   native.extensions = true;
   const screen = await shell({ url: null });
-  // The main-page bar is the new tab's own frozen search field; the shell
-  // address form is not rendered over it.
-  expect(screen.container.querySelector("[data-astra-address]")).toBeNull();
-  expect(screen.container.querySelector("[data-content-bar]")).toBeNull();
+  // The home page always shows the page bar, beside the new tab's own field.
+  // A web page is the only place the bar steps away (until hover or pinning).
+  expect(screen.container.querySelector("[data-astra-address]")).not.toBeNull();
+  expect(screen.container.querySelector("[data-content-bar]")).not.toBeNull();
   expect(screen.container.querySelector("main#astra-stage")).not.toBeNull();
 });
 

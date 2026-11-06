@@ -11,6 +11,76 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Verification pass — 2026-11-06 (all gates green)
+
+Everything below was re-run against the freshly packed dev build.
+
+- **/tmp was the outage, not the app.** 146 leaked probe profiles (≈9 GB)
+  filled the tmpfs; Firefox aborted with `Disk quota exceeded` and every probe
+  died on connect. Cleaned. `tools/perf/hidden-display.sh` now exports
+  `TMPDIR` inside its throwaway runtime, so profiles are removed with it.
+- **Settings works live:** `settings-audit-probe.py` drove **60 controls, 0
+  failed**. `settings_audit`, `settings_parity`, `tabs_settings`,
+  `material_zoom_home` and `profiles_switch` are now part of
+  `tools/perf/full-suite.sh` instead of being manual-only.
+- **Host/tests repaired:** create with `and_switch` now launches the new
+  profile (it was accepted and silently ignored); `profiles_model` and
+  `system_model` expectations updated to the current behavior (`ui_info`
+  carries `materials`); the bridge test uses a still-unrouted command; three
+  committed files reformatted.
+- **Settings UI tests repaired:** `SiteSettings` mock lacked `watch`; account
+  dates and prices now format with the interface locale (`getLocale()`) rather
+  than the host OS locale; the component browser is pinned to `en-US`;
+  launcher-shortcut labels are platform-aware; one 1px layout tolerance.
+- **Probe determinism:** a CSS transition is finished explicitly before its
+  opacity is read (rAF is frozen under the hidden display); the tabs probe aims
+  the synthetic hover at the video `<browser>` and records automatic PiP as a
+  reasoned SKIP when no trusted pointer can cross the chrome boundary.
+- **Evidence:** `tools/perf/full-suite.sh --skip-build --skip-perf` → PASS
+  (contracts, 1238 unit tests, 24 live probes + the 5 settings probes; `media`
+  SKIP = no audio device). 44 settings component files / 178 tests pass;
+  typecheck, lint, knip, format, forge lint/footprint, state-check and
+  brand-lint clean.
+- **Known, unchanged:** component tests outside settings that need the Phase-2
+  artifacts (`SelectiveStyles`, clipboard, work/semantic) still fail on the
+  documented missing `content_style.js` and friends. They are not part of the
+  canonical gate.
+
+## Owner report: page bar, media, popups, downloads and type (2026-11-06)
+
+One surface batch from the owner's report. Each row was exercised against the
+packaged dev build with the Marionette probes named here; the probes are in
+`tools/marionette-probe/` or `/tmp/opencode/` (throwaway evidence, reproducible
+from the steps).
+
+| Surface | Fix | Wiring / files | Live evidence |
+|---|---|---|---|
+| Page bar | The bar no longer stays on a web page. `ui.main-bar` is `auto` (home and internal pages show it, a web page hides it), `always`, or `hidden` (only on hover). The shell takes the page's top row back while it is away, and a top-edge hover (or its keyboard focus) returns it. | `ui/app/src/app/browser/Shell.svelte`, `ui/shell/src/Shell.svelte` (`kind:"bar"`), `ui.main-bar` preference (Astra-only, stored under `astra.settings.ui.main-bar`), Appearance setting | `bar-probe.py`: home bar present; page load → `data-astra-bar=hidden` and `.astra-content` top `8px`; hover → `shown` and `48px`; leave → hidden again |
+| Media rail | A playing tab is projected instead of only a background one, and a tab that is audible is in the rail's list (the old projection only carried mute). Position/metadata/transport follow the same controller. | `overlay/astra/host/Content.sys.mjs` (`mediaView`, `projectMedia`, `audiblechange` → `__applyExternalUpdate`), `overlay/astra/host/Tabs.sys.mjs` (`audio`), `hostapi_v1` checks | `hostapi_v1` 327 checks (audible, silent, muted projection); `media_player_probe` is SKIP without an audio device |
+| Picture-in-picture | The player's PiP control now asks the engine's `PictureInPictureLauncher` actor, and the automatic path is seeded on at startup; a person's off choice still wins. | `Content.sys.mjs` `picture_in_picture`, `mozilla.cfg` seed for `media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled` | `tabs-settings-probe.py`: 17 checks, setting reaches the pref, outgoing browser parks and the page reports `hidden`; the PiP player window itself is a reasoned SKIP under the headless compositor (the launcher actor answered) |
+| Popups above the page | Every app pop-up (menu, dialog, listbox, select, tray, address suggestions) raises the app frame and makes its ground transparent, not just the address tray. The page menu is now drawn by the app's menu system instead of shell-inline constants, and the engine's `contentAreaContextMenu` is suppressed for the native deck too. | `ui/app/src/app/browser/Shell.svelte` (popup observer), `ui/shell/src/Shell.svelte` (`showMenu` → app, deferred, no function in the clone), `ui/shell/src/content-menu.js` (`getTabForBrowser`) | `bar-probe.py`: native page menu prevented; the app menu lists `Open Link in New Tab … Select All`; a row runs and closes; `ui-consistency-probe` still passes the ground menu/settings/narrow layout |
+| Downloads window | Native sends `created_at` as an ISO timestamp, but the list parsed it as epoch seconds; the invalid `Date` threw during day grouping and the panel rendered nothing. Both the day label and the sort now accept ISO and legacy epoch seconds. | `ui/app/src/features/downloads/components/DownloadsList.svelte` | `DownloadsList.component.test.ts` (ISO grouping); host probe: a real attachment appears in the native list with `created_at:"2026-11-06T11:25:55.469Z"` and `state:"completed"` |
+| Online search suggestions | The address field is now a third suggestion consumer (New Tab and launcher were already wired). It asks the same host `Search.launcherSearch`, so `search.suggestions` gates every box. | `ui/app/src/features/address/components/AddressField.svelte` | `suggest-probe.py`: `weather` → five Google suggestions + the search row; setting off → no provider rows |
+| Interface type | The body is Inter and display type is Instrument Serif, bundled in the chrome app. `ui.font` now defaults to `astra`; the system/rounded/serif/mono faces remain choices. | `ui/app/src/styles/fonts.css`, `styles/fonts/*.woff2`, `axes/type.css`, `tokens.css`, `FontPicker.svelte` | `bar-probe.py`: body computed `"InterVariable", …`, `document.fonts.check("13px InterVariable") === true`, `--font-display` resolves to Instrument Serif |
+| Profile switch | A switch launches the chosen profile and hands the window over: the old window closes once the new instance opens. This is not an in-process profile-directory change (the engine has none); it is the closest honest Arc-style switch. | `overlay/astra/host/Profiles.sys.mjs` (`launchAndHandoff`), `profiles-switch-probe.py` rewritten to the handoff contract | `profiles-switch-probe.py`: accepted, old window closed, new window reports the chosen profile and a live tab model; probe cleans the roster entry |
+
+Notes and limits:
+
+- **Fonts are open equivalents.** ABC Oracle, Exposure and GT Alpina are
+  commercial and are not redistributed. Inter and Instrument Serif are SIL OFL
+  1.1; sources/licences are in `ui/app/src/styles/fonts/README.md`.
+- **True in-place profile switching is still not a native capability.** A
+  real profile directory cannot be moved into a running process. The handoff
+  closes the old window after 1.4 s only when it is the sole browser window, so
+  a multi-window workspace is never torn down by a switch.
+- **PiP and the media rail need an audio/video device for a full live proof.**
+  The engine's launcher actor and the tab-visibility path are verified; the
+  player window and audio rail remain reasoned SKIPs under the headless
+  compositor, as before.
+- **The page menu posts asynchronously.** A native `popupshowing` runs inside
+  the engine's event loop; the app copy is delivered on the next turn, and the
+  `choose` closure stays in chrome (it cannot be structured-cloned).
+
 ## Where things stand (2026-11-04 — read this first, next agent)
 
 The browser builds, boots, and **the product UI is the window's chrome** (not a
@@ -174,7 +244,9 @@ profile, density/motion re-applied, and the startup page actually opened).
 
 Astra-only keys have no Firefox pref owner and are now written under
 `astra.settings.<key>` in the profile, so they survive a restart until the core
-store is wired: theme/colour/font/material/tint, sidebar mode, New Tab
+store is wired: theme/colour/font/material/tint (the interface face defaults to
+the bundled `astra` = Inter), the page-bar mode (`ui.main-bar`: `auto` /
+`always` / `hidden`), sidebar mode, New Tab
 switches, search engine/custom template (Astra's resolver owns them), tab
 dedupe/close-button/archive/after-close, performance memory profile and
 exceptions, AI/Work/Notes/Tasks/Time, updates, account, diagnostics, reset, the

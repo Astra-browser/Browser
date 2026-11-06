@@ -1,0 +1,1 @@
+export{t as default}from"./AskCard-BUXri6q4.js";

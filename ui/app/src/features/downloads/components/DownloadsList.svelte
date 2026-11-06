@@ -56,8 +56,17 @@
   const rates = new TransferRate();
   const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
+  /** Native sends an ISO timestamp; older callers sent epoch seconds. */
+  function timeOf(value: string): number {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && !String(value).includes("-")) return numeric * 1000;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
   function dayOf(entry: DownloadView) {
-    const at = new Date(Number(entry.created_at) * 1000);
+    const at = new Date(timeOf(entry.created_at));
+    if (!Number.isFinite(at.getTime())) return "";
     const today = new Date();
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (at.toDateString() === today.toDateString()) return m.history_today();
@@ -69,7 +78,7 @@
   let days = $derived.by(() => {
     rates.retain(session.entries);
     const grouped: { label: string; entries: DownloadView[] }[] = [];
-    const newest = session.entries.toSorted((a, b) => Number(b.created_at) - Number(a.created_at));
+    const newest = session.entries.toSorted((a, b) => timeOf(b.created_at) - timeOf(a.created_at));
     for (const entry of newest) {
       const label = dayOf(entry);
       const last = grouped.at(-1);

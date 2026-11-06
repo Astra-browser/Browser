@@ -237,6 +237,7 @@
 </SettingsGroup>
 
 <SettingsGroup title={m.look_advanced()}>
+  <PreferenceSelect id="ui.main-bar" preference="ui.main-bar" />
   <PreferenceSelect id="appearance.density" preference="ui.density" />
   <SettingsRow
     settingId="appearance.motion"

@@ -408,6 +408,12 @@ export function __applyExternalUpdate(id, patch = {}) {
   if (typeof patch.discarded === "boolean") {
     tab.discarded = patch.discarded;
   }
+  // A page making sound is a live fact the media rail reads. It is separate
+  // from mute: a muted tab can still be playing, and an audible one is
+  // exactly what "Now playing" names.
+  if (typeof patch.audible === "boolean") {
+    tab.audible = patch.audible;
+  }
   // A page still doing something in front counts as activity: its progress
   // events must not let the idle clock run down on the tab the person is on.
   if (tab.selected === true || id === _selectedId) {
@@ -566,7 +572,14 @@ function tabView(id) {
     page_request: tab.page_request ?? null,
     failure: tab.failure ?? null,
     certificate_exception: tab.certificate_exception === true,
-    audio: tab.muted ? { muted: true, can_mute: true } : null,
+    // Present while the page makes sound or is muted. The rail's media list
+    // reads this, so a playing tab appears even before it is switched away
+    // from (the previous shape only projected mute, so an unmuted video in
+    // the tab in front looked like "Nothing playing").
+    audio:
+      tab.audible || tab.muted
+        ? { muted: tab.muted === true, can_mute: true }
+        : null,
     // The rail's sleeping list and the essential tile both read this. It is
     // the model's own state, set by `Tabs.discard` and cleared by selecting
     // the tab or by the content binding when the engine refused.

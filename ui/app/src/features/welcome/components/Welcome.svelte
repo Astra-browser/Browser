@@ -196,8 +196,9 @@
 
   h1 {
     margin: 0;
+    font-family: var(--font-display);
     font-size: 32px;
-    font-weight: 550;
+    font-weight: 400;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }

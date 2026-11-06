@@ -309,6 +309,17 @@ export const fields = {
     description: m.pref_tabs_automatic_pip_help,
     initial: true,
   },
+  "ui.main-bar": {
+    section: "appearance",
+    label: m.pref_ui_main_bar,
+    description: m.pref_ui_main_bar_help,
+    initial: "auto",
+    options: [
+      { value: "auto", label: m.pref_ui_main_bar_option_auto },
+      { value: "always", label: m.pref_ui_main_bar_option_always },
+      { value: "hidden", label: m.pref_ui_main_bar_option_hidden },
+    ],
+  },
   "tabs.external": {
     section: "tabs",
     label: m.tabs_external,

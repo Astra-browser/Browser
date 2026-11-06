@@ -412,6 +412,30 @@ test("a download of a risky type asks before it is kept and can be deleted inste
   await screen.unmount();
 });
 
+test("a completed download with an ISO start time is grouped, not dropped", async () => {
+  // Native sends `created_at` as an ISO timestamp. Parsing it as epoch
+  // seconds produced an Invalid Date inside the day grouping and the whole
+  // list failed to render.
+  const profile = "00000000000000000000000001";
+  serving(
+    {
+      ...base,
+      filename: "report.pdf",
+      state: "completed",
+      received: "100",
+      created_at: new Date().toISOString(),
+    },
+    () => null,
+  );
+  const screen = await render(DownloadsList, { profile });
+
+  await expect
+    .element(page.getByRole("button", { name: "Open report.pdf", exact: true }))
+    .toBeVisible();
+  await expect.element(page.getByText("Today", { exact: true })).toBeVisible();
+  await screen.unmount();
+});
+
 test("deleting a held download sends the discard and no keep", async () => {
   const profile = "00000000000000000000000001";
   serving({ ...base, revision: "00000002", state: "held", received: "100" }, (call) =>

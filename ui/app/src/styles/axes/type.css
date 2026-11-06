@@ -1,7 +1,11 @@
-/* The interface face and size, and the face code is set in. Every face is
-   one the system already has: SF Pro Rounded, New York and SF Mono on a Mac,
-   which a WebView reaches only through the ui-* families. WebView2 does not
-   know those, so Windows falls through to its own faces. */
+/* The interface face and size, and the face code is set in. Astra's own face
+   is bundled (`fonts.css`); the rest are system faces. */
+:root[data-font="astra"] {
+  --font-sans:
+    "InterVariable", "Inter", -apple-system, blinkmacsystemfont, system-ui,
+    "Segoe UI Variable Text", "Segoe UI", "Noto Sans", "Cantarell", sans-serif;
+}
+
 :root[data-font="rounded"] {
   --font-sans:
     ui-rounded, "SF Pro Rounded", -apple-system, "BlinkMacSystemFont", "Segoe UI Variable Text",

@@ -234,6 +234,22 @@ let tA, tB, tC;
   check("muted true", mu.muted === true);
   checkErr("tabs.setMuted unknown", await Tabs.setMuted({ request_id: "t-25", astra_tab_id: "tab-nope" }), "t-25", "no_such_tab");
 
+  // A playing page is what the media rail's "Now playing" reads. Audio is a
+  // native edge (audiblechange → __applyExternalUpdate), not the mute flag.
+  const tabAudio = () =>
+    TabsMod.__itemsSnapshot().tabs.find((tab) => tab.id === tA)?.audio;
+  await Tabs.setMuted({ request_id: "t-24b", astra_tab_id: tA, muted: false });
+  TabsMod.__applyExternalUpdate(tA, { audible: true });
+  check(
+    "an audible tab projects audio",
+    tabAudio()?.muted === false && tabAudio()?.can_mute === true,
+  );
+  TabsMod.__applyExternalUpdate(tA, { audible: false });
+  check("a silent, unmuted tab projects no audio", tabAudio() === null);
+  await Tabs.setMuted({ request_id: "t-24c", astra_tab_id: tA, muted: true });
+  check("a muted tab still projects for the rail", tabAudio()?.muted === true);
+  await Tabs.setMuted({ request_id: "t-24d", astra_tab_id: tA, muted: false });
+
   // The drag verb: keep (pin) or let go, and land where the person dropped.
   const k1 = (await Tabs.create({ request_id: "t-28", url: "https://keep1.example/", background: true })).astra_tab_id;
   const k2 = (await Tabs.create({ request_id: "t-29", url: "https://keep2.example/", background: true })).astra_tab_id;

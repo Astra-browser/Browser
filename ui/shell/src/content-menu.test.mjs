@@ -8,7 +8,7 @@
 // real-tab preference and the open/close split.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { devTabFor, showDevTools } from "./content-menu.js";
+import { devTabFor, isContentBrowser, showDevTools } from "./content-menu.js";
 
 /** A chrome window with a tab strip that finds `tab` for any browser. */
 function fakeWindow({ tab = null, toolbox = null, enabled = true, throwOnImport = false } = {}) {
@@ -52,6 +52,28 @@ function fakeWindow({ tab = null, toolbox = null, enabled = true, throwOnImport 
 }
 
 const browser = { id: "content-browser" };
+
+describe("isContentBrowser", () => {
+  it("recognises a browser the window's tabbrowser owns", () => {
+    // The native deck docks gBrowser's browser in #tabbrowser-tabbox, so it is
+    // no longer inside [data-astra-content]; the old containment-only test let
+    // the engine's own page menu answer a right-click.
+    const win = {
+      gBrowser: { getTabForBrowser: (candidate) => (candidate?.id === browser.id ? {} : null) },
+      document: { querySelector: () => null },
+    };
+    const contentBrowser = { ...browser, hasAttribute: () => false };
+    assert.equal(isContentBrowser(win, contentBrowser), true);
+  });
+
+  it("refuses a browser from another window", () => {
+    const win = {
+      gBrowser: { getTabForBrowser: () => null },
+      document: { querySelector: () => null },
+    };
+    assert.equal(isContentBrowser(win, { hasAttribute: () => false }), false);
+  });
+});
 
 describe("devTabFor", () => {
   it("uses the real tabbrowser tab for a stage browser", () => {

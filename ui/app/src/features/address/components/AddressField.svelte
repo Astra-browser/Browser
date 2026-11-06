@@ -14,14 +14,15 @@
   import { tabs } from "$domain/tabs";
   import { surface } from "$domain/surface";
   import { uiCommands as ui } from "$domain/ui-commands";
-  import { commands } from "$shared/ipc/bindings";
+  import { commands, type SearchResult } from "$shared/ipc/bindings";
+  import { events } from "$shared/ipc/native-events";
   import Icon from "$shared/ui/Icon";
   import Button from "$shared/ui/Button";
   import IconButton from "$shared/ui/IconButton";
   import CaptureControl from "$shared/ui/CaptureControl";
   import { preferences } from "$domain/preferences";
   import * as find from "../lib/find.svelte";
-  import { flushSync, untrack, type Snippet } from "svelte";
+  import { flushSync, onMount, untrack, type Snippet } from "svelte";
   import { duration, easing, reducedMotion } from "$shared/lib/motion";
   import {
     addressSecurity,
@@ -167,6 +168,7 @@
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     if (composing || pending || !value.trim()) return;
+    closeSuggestions();
     const id = tabs.activeId();
     const profile = tabs.profile()?.id;
     const opensNewTab = activeContent !== "web";
@@ -199,12 +201,106 @@
     if (!(target instanceof HTMLInputElement)) return;
     failed = false;
     draft = target.value;
+    scheduleSuggestions(target.value);
   }
+
+  // Online suggestions in the address field. The launcher's search is the one
+  // host path that returns provider suggestions plus the action for the typed
+  // words, so every search box in the product sends the same query to the
+  // same engine. The setting (`search.suggestions`) is read by the host, so a
+  // person who turns it off gets no request from here either.
+  let suggestRows = $state.raw<SearchResult[]>([]);
+  let suggestOpen = $state(false);
+  let suggestIndex = $state(-1);
+  let suggestToken = 0;
+  let suggestQuery = "";
+  let suggestTimer: ReturnType<typeof setTimeout> | undefined;
+  const SUGGEST_LIMIT = 6;
+  const SUGGEST_DEBOUNCE_MS = 80;
+
+  function looksLikeAddress(text: string): boolean {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
+    if (/^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(\/|$)/i.test(text)) return true;
+    return /^[^\s/]+\.[^\s/]+/.test(text) && !text.includes(" ");
+  }
+
+  function closeSuggestions() {
+    if (suggestTimer !== undefined) clearTimeout(suggestTimer);
+    suggestTimer = undefined;
+    suggestToken += 1;
+    suggestQuery = "";
+    suggestRows = [];
+    suggestOpen = false;
+    suggestIndex = -1;
+  }
+
+  function scheduleSuggestions(text: string) {
+    if (compact) return;
+    const value = text.trim();
+    if (value === "" || looksLikeAddress(value)) {
+      closeSuggestions();
+      return;
+    }
+    if (suggestTimer !== undefined) clearTimeout(suggestTimer);
+    const token = ++suggestToken;
+    suggestTimer = setTimeout(() => {
+      suggestTimer = undefined;
+      if (token !== suggestToken || !editing) return;
+      suggestQuery = value;
+      void commands.launcherSearch(value, `address-${token}`).catch(() => {});
+    }, SUGGEST_DEBOUNCE_MS);
+  }
+
+  function moveSuggestion(step: number) {
+    if (suggestRows.length === 0) return;
+    const next = suggestIndex + step;
+    if (next < 0) suggestIndex = -1;
+    else if (next >= suggestRows.length) suggestIndex = suggestRows.length - 1;
+    else suggestIndex = next;
+  }
+
+  function runSuggestion(row: SearchResult) {
+    const context = {
+      window_id: "win-1",
+      session_id: "address",
+      request_id: "",
+      profile_id: "default",
+      space_id: "space-1",
+    };
+    closeSuggestions();
+    input?.blur();
+    void settle(commands.launcherRun(row.action, context, false));
+  }
+
+  onMount(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void events.searchChanged
+      .listen(({ payload }) => {
+        if (disposed || !editing || payload.context !== null) return;
+        if (payload.query.trim() !== suggestQuery) return;
+        // The launcher's own list may also be open in this document; the host
+        // emits one answer per query, so the rows are the same either way.
+        suggestRows = payload.results.slice(0, SUGGEST_LIMIT);
+        suggestOpen = suggestRows.length > 0;
+        suggestIndex = -1;
+      })
+      .then((unsubscribe) => {
+        if (disposed) unsubscribe();
+        else stop = unsubscribe;
+      });
+    return () => {
+      disposed = true;
+      stop?.();
+      closeSuggestions();
+    };
+  });
 
   function beginEditing() {
     // Keep the resting chrome quiet while preserving the complete location
     // when the user explicitly enters edit mode.
     const from = textStart();
+    closeSuggestions();
     draft = editingAddress(activeUrl) || value;
     editing = true;
     flushSync();
@@ -214,6 +310,7 @@
 
   function endEditing() {
     const from = textStart();
+    closeSuggestions();
     editing = false;
     flushSync();
     slide(from);
@@ -290,7 +387,13 @@
   compact mode it is present and correct but unpainted, and the launcher is the
   visible way to reach it.
 -->
-<form bind:this={form} class="shrink-0" class:pb-2={!compact} onsubmit={submit} role="search">
+<form
+  bind:this={form}
+  class="relative shrink-0"
+  class:pb-2={!compact}
+  onsubmit={submit}
+  role="search"
+>
   <!--
     A refused navigation rings the field, following the shared Field
     convention. The message is announced rather than drawn: a block of text
@@ -335,6 +438,11 @@
         data-astra-address
         type="text"
         aria-label={m.ui_address_and_search()}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={suggestOpen}
+        aria-controls={suggestOpen ? "address-suggestions" : undefined}
+        aria-activedescendant={suggestIndex >= 0 ? `address-suggestion-${suggestIndex}` : undefined}
         autocomplete="off"
         autocapitalize="off"
         enterkeyhint="go"
@@ -345,10 +453,34 @@
         oncompositionstart={() => (composing = true)}
         oncompositionend={() => (composing = false)}
         onkeydown={(event) => {
-          if (event.key === "Escape" && !event.isComposing) {
+          if (event.isComposing) return;
+          if (event.key === "Escape") {
             event.preventDefault();
+            if (suggestOpen) {
+              closeSuggestions();
+              return;
+            }
             failed = false;
             input.blur();
+            return;
+          }
+          if (suggestOpen && suggestRows.length > 0) {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              moveSuggestion(1);
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              moveSuggestion(-1);
+              return;
+            }
+            if (event.key === "Enter" && suggestIndex >= 0) {
+              event.preventDefault();
+              const row = suggestRows[suggestIndex];
+              if (row) runSuggestion(row);
+              return;
+            }
           }
         }}
         aria-invalid={failed || undefined}
@@ -423,6 +555,32 @@
       {#if trailing}{@render trailing(sitePage)}{/if}
     {/if}
   </div>
+  {#if !compact && suggestOpen && suggestRows.length > 0}
+    <div
+      class="address-suggestions"
+      id="address-suggestions"
+      role="listbox"
+      aria-label={m.ui_address_and_search()}
+      data-astra-popup
+    >
+      {#each suggestRows as row, index (row.title)}
+        <button
+          type="button"
+          id={`address-suggestion-${index}`}
+          class="address-suggestion"
+          class:is-active={index === suggestIndex}
+          role="option"
+          aria-selected={index === suggestIndex}
+          onmousedown={(event) => event.preventDefault()}
+          onpointerenter={() => (suggestIndex = index)}
+          onclick={() => runSuggestion(row)}
+        >
+          <span class="address-suggestion-title">{row.title}</span>
+          {#if row.detail}<span class="address-suggestion-detail">{row.detail}</span>{/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
   {#if !compact && listedInstalled}
     {#if removing}
       <div
@@ -556,5 +714,61 @@
     min-width: 0;
     align-self: stretch;
     overflow: clip;
+  }
+
+  /* Engine suggestions hang from the address field like the site tray does.
+     The shell raises the app frame while this is open (it is marked
+     data-astra-popup), so it draws over the page instead of under it. */
+  .address-suggestions {
+    position: absolute;
+    z-index: 80;
+    inset-inline: 0;
+    inset-block-start: calc(100% + 6px);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-block-size: min(60vh, 420px);
+    overflow-y: auto;
+    padding: 4px;
+    border-radius: var(--radius-row);
+    background: var(--color-float);
+    box-shadow: var(--shadow-menu);
+  }
+
+  .address-suggestion {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    inline-size: 100%;
+    min-block-size: 32px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: var(--radius-inset);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: default;
+  }
+
+  .address-suggestion.is-active {
+    background: var(--color-fill-hover);
+  }
+
+  .address-suggestion-title {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-body);
+  }
+
+  .address-suggestion-detail {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-muted);
+    font-size: var(--text-caption);
   }
 </style>

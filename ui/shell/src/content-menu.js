@@ -21,16 +21,32 @@ const SHELL_NS = "astra-shell";
 /** Result of a menu action; the caller only needs to know it finished. */
 const NOTHING = Object.freeze({ accepted: true });
 
-function isContentBrowser(win, browser) {
+export function isContentBrowser(win, browser) {
   if (!browser || typeof browser.hasAttribute !== "function") {
     return false;
   }
   if (browser.hasAttribute("data-astra-browser") || browser.hasAttribute("data-astra-browser-parked")) {
     return true;
   }
-  // The attribute is toggled on the tab in front; a parked page keeps the
-  // parked marker. Some engine paths hand over the inner browser instead, so
-  // fall back to the window's own content slot.
+  // The native deck docks `gBrowser`'s selected browser over the Astra content
+  // slot; the browser is no longer a DOM child of that slot (it lives in
+  // `#tabbrowser-tabbox`), so `contains()` alone left the engine's own page
+  // menu answering a right-click. A browser the window's tabbrowser owns is
+  // still the content stage, whether or not it can be found by containment.
+  try {
+    if (win.gBrowser?.getTabForBrowser?.(browser)) {
+      return true;
+    }
+  } catch {
+    // A window still assembling its tabbrowser.
+  }
+  try {
+    if (browser.getTabBrowser?.() === win.gBrowser) {
+      return true;
+    }
+  } catch {
+    // No tabbrowser relationship on this browser.
+  }
   try {
     const slot = win.document.querySelector("[data-astra-content]");
     return !!slot && slot.contains(browser);

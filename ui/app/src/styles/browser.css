@@ -177,10 +177,12 @@
 }
 .settings-page-heading h1 {
   margin: 0;
+  /* Display type carries the Arc-style serif; body copy stays Inter. */
+  font-family: var(--font-display);
   font-size: 27px;
   line-height: 1.25;
-  letter-spacing: -0.035em;
-  font-weight: 550;
+  letter-spacing: -0.02em;
+  font-weight: 400;
   outline: none;
 }
 .settings-page-heading > p {

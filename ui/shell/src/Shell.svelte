@@ -896,7 +896,37 @@
     };
     const contentMenu = installContentMenu(win, {
       host,
-      showMenu: (menu) => shellMenuApi.show(menu),
+      // The page menu is drawn by the app, so it uses the same menu recipe as
+      // every other Astra menu. The app posts the chosen id back and the
+      // chrome acts on the live `nsContextMenu`. The shell-drawn menu stays as
+      // a fallback for a window whose app frame has not mounted.
+      showMenu: (menu) => {
+        let target = null;
+        try {
+          target = appApi?.element?.contentWindow ?? null;
+        } catch {
+          target = null;
+        }
+        if (!target) {
+          shellMenuApi.show(menu);
+          return;
+        }
+        // `choose` is a closure and cannot be structured-cloned across the
+        // frame; the chrome keeps the engine menu and runs the id the app
+        // posts back.
+        const { x, y, items } = menu;
+        // A native popupshowing runs inside the engine's own event loop; a
+        // synchronous cross-document post can be refused there. Deliver it on
+        // the next turn, once the engine menu has been suppressed, and fall
+        // back to the shell-drawn menu only if that also fails.
+        setTimeout(() => {
+          try {
+            target.postMessage({ ns: "astra-shell", kind: "menu", menu: { x, y, items } }, "*");
+          } catch {
+            shellMenuApi.show(menu);
+          }
+        }, 0);
+      },
       isFromApp: fromApp,
       tabIdOf,
     });
@@ -914,11 +944,29 @@
         setMenuOpen(false);
         return;
       }
+      // The app's page bar asks for the row back when it hides, so the native
+      // stage can start at the window's gutter instead of leaving a strip of
+      // ground where the bar used to be.
+      if (data.kind === "bar") {
+        frameRoot.dataset.astraBar = data.hidden === true ? "hidden" : "shown";
+        return;
+      }
       if (data.kind !== "menu-run" || typeof data.id !== "string") return;
       setMenuOpen(false);
-      if (data.id.startsWith("window.") || data.id === "bookmark.current") {
-        void runChromeAction(win, host, data.id);
-      }
+      // A page-menu row belongs to the chrome objects the engine handed over
+      // (the link, the image, the page); a window row belongs to the window.
+      void (async () => {
+        let handled = false;
+        try {
+          const result = await contentMenu.run(data.id);
+          handled = result?.accepted === true;
+        } catch {
+          handled = false;
+        }
+        if (!handled && (data.id.startsWith("window.") || data.id === "bookmark.current")) {
+          void runChromeAction(win, host, data.id);
+        }
+      })();
     };
     win.addEventListener("message", onWindowMenu);
     const onSizeMode = () => mirrorFullscreen(win.fullScreen === true);
@@ -1137,13 +1185,22 @@
     border-radius: 12px;
     overflow: hidden;
     background: transparent;
+    /* The app takes its page bar away on a web page; the page gets the row
+       back rather than leaving a strip of ground. */
+    transition: inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  :global(.astra-frame[data-app-booted="true"][data-astra-bar="hidden"] .astra-content),
+  :global(.astra-frame[data-app-booted="pending"][data-astra-bar="hidden"] .astra-content) {
+    inset-block-start: 8px;
   }
   /* A deliberate change of shape travels on the app's own curve
      (`--motion-page` 400ms, `--ease-emphasized`); those tokens live in the
      app document, not this one, so the values are mirrored here. A drag
      reports animate=false: the page must track the pointer, not chase it. */
   :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {
-    transition: inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1),
+      inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   @media (prefers-reduced-motion: reduce) {
     :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {

@@ -304,20 +304,29 @@
     if (copied) notices.show(m.notice_link_copied());
   }
 
-  // The field's tray opens over the page, and the app frame sits under the
-  // page surface. While the tray is open, raise the frame the way a context
-  // menu does and let its ground step aside, so the panel is visible and the
-  // page still shows around it. The shell owns the stacking; this only asks.
-  let trayRaised = false;
+  // The app frame sits under the page surface. Every pop-up the app draws —
+  // the field's tray, a menu, a sheet, a select, a dialog — floats over that
+  // page, so the frame has to be raised while one is open and its ground has
+  // to step aside. The shell owns the stacking; this only asks. Keeping one
+  // switch here means a new pop-up cannot silently be drawn behind the page.
+  let trayRaised = $state(false);
+  let popupRaised = $state(false);
+  let frameRaised = $derived(trayRaised || popupRaised);
   function raiseForTray(open: boolean) {
     trayRaised = open;
+  }
+  let raisedPosted: boolean | null = null;
+  $effect(() => {
+    const open = frameRaised;
+    if (raisedPosted === open) return;
+    raisedPosted = open;
     try {
       if (open) document.documentElement.dataset.astraRaised = "true";
       else
         requestAnimationFrame(() => {
           // Lowered first, then the ground comes back: the shell needs one
           // turn to put the frame under the page again.
-          if (!trayRaised) delete document.documentElement.dataset.astraRaised;
+          if (!frameRaised) delete document.documentElement.dataset.astraRaised;
         });
     } catch {
       // No document marker outside the chrome.
@@ -330,15 +339,67 @@
     } catch {
       // No shell: the panel is drawn in this document.
     }
-  }
-  $effect(() => () => {
-    if (!trayRaised) return;
-    trayRaised = false;
+  });
+  // Pop-ups this app draws are the elements that claim to be one. A mutation
+  // observer catches conditionally rendered menus and panels; a timeout
+  // (rather than rAF) keeps it working under a hidden display.
+  const POPUP_SELECTOR = [
+    '[role="menu"]:not([inert]):not([data-open="false"])',
+    '[role="dialog"]:not([inert]):not([data-open="false"])',
+    '[role="listbox"]:not([inert]):not([data-open="false"])',
+    "dialog[open]",
+    ".ui-disclosure-panel[data-open='true']",
+    ".shell-menu",
+    "[data-astra-popup]",
+  ].join(",");
+  function popupVisible(element: Element): boolean {
     try {
-      delete document.documentElement.dataset.astraRaised;
+      const style = getComputedStyle(element);
+      return (
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        element.getClientRects().length > 0
+      );
     } catch {
-      // The document is already gone with the window.
+      return false;
     }
+  }
+  let popupSync = 0;
+  function syncPopups() {
+    if (popupSync !== 0) return;
+    popupSync = window.setTimeout(() => {
+      popupSync = 0;
+      try {
+        popupRaised = [...document.querySelectorAll(POPUP_SELECTOR)].some(popupVisible);
+      } catch {
+        popupRaised = false;
+      }
+    }, 0);
+  }
+  onMount(() => {
+    const observer = new MutationObserver(syncPopups);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["hidden", "style", "data-open", "data-state", "open"],
+    });
+    syncPopups();
+    return () => {
+      observer.disconnect();
+      if (popupSync !== 0) clearTimeout(popupSync);
+      popupSync = 0;
+      try {
+        delete document.documentElement.dataset.astraRaised;
+      } catch {
+        // The document is already gone with the window.
+      }
+      try {
+        window.parent.postMessage({ ns: "astra-shell", kind: "menu-close" }, "*");
+      } catch {
+        // No shell.
+      }
+    };
   });
 
   // Loaded when a command first asks to clear a site's data, then kept: the
@@ -385,6 +446,32 @@
     const tab = tabs.activeTab();
     if (!tab || tab.url || (tab.content ?? "web") !== "web") return false;
     return browserPage.currentPage() === null && (!tab.loading || newTabLoad === tab.id);
+  });
+  // The page bar's visibility. `auto` keeps it on the home page and internal
+  // pages and takes it away once a real web page is in front; `hidden` leaves
+  // it out of the way everywhere; `always` pins it. A pointer at the top edge
+  // (or keyboard focus on the reveal strip) brings it back in either hiding
+  // mode. The shell moves the page stage up while it is away, so the page
+  // gets the room instead of a strip of empty ground.
+  let barMode = $derived(preferences.value("ui.main-bar"));
+  let barHover = $state(false);
+  let pageShown = $derived.by(() => {
+    if (newTabShown || browserPage.currentPage() !== null) return false;
+    const url = tabs.activeTab()?.url ?? null;
+    return url !== null && url !== "" && url !== "about:blank";
+  });
+  let barVisible = $derived(barMode === "always" || (barMode === "auto" && !pageShown) || barHover);
+  let barHiddenOnPage = $derived(!barVisible && pageShown);
+  let barPosted: boolean | null = null;
+  $effect(() => {
+    const hidden = barHiddenOnPage;
+    if (barPosted === hidden) return;
+    barPosted = hidden;
+    try {
+      window.parent.postMessage({ ns: "astra-shell", kind: "bar", hidden }, "*");
+    } catch {
+      // No shell: the bar lives in this document.
+    }
   });
   // Beside a new tab the window, whatever it is made of, takes on the
   // sky's light; it gives it back as a page arrives.
@@ -626,11 +713,23 @@
           />{/snippet}</LazyView
       >{/snippet}</Sidebar
   >
-  <div class="stage-column">
+  <div class="stage-column" data-bar-hidden={barHiddenOnPage}>
     <!-- The page's own bar: navigation and the one address field, above the
          stage and never in the sidebar. The field is composed here, with the
-         tray that acts on the page it names, and the bar only places it. -->
-    {#if !newTabShown}
+         tray that acts on the page it names, and the bar only places it.
+         It stays in the tree on every surface: the home page and internal
+         pages always show it, and a web page hides it unless the person
+         pinned it or reached for the top edge. -->
+    <div
+      class="stage-bar"
+      role="toolbar"
+      tabindex="-1"
+      aria-label={m.ui_navigation()}
+      data-hidden={!barVisible}
+      data-mode={barMode}
+      onpointerenter={() => (barHover = true)}
+      onpointerleave={() => (barHover = false)}
+    >
       <ContentBar>
         {#snippet field()}
           <AddressField>
@@ -658,6 +757,18 @@
           </AddressField>
         {/snippet}
       </ContentBar>
+    </div>
+    {#if !barVisible}
+      <!-- The strip the hidden bar leaves at the top. Reaching it brings the
+           bar back; the shell moves the page down in the same turn. -->
+      <button
+        type="button"
+        class="bar-reveal"
+        aria-label={m.ui_show_bar()}
+        title={m.ui_show_bar()}
+        onpointerenter={() => (barHover = true)}
+        onfocus={() => (barHover = true)}
+      ></button>
     {/if}
     {#if stageCard}<div class="stage-card" aria-hidden="true"></div>{/if}
     {#if browserPage.navigationFailed()}<div class="navigation-error" role="alert">
@@ -904,6 +1015,34 @@
     min-height: 0;
   }
 
+  /* The page bar is one row of the column while it is present. Taking it out
+     of the flow (rather than only fading it) is what gives the page the row
+     the shell is about to hand it. */
+  .stage-bar[data-hidden="true"] {
+    display: none;
+  }
+
+  /* The top edge of the stage is free while the bar is away: reaching it
+     brings the bar back. It stays inside the column so the window's own
+     drag strip and the sidebar are untouched. */
+  .bar-reveal {
+    position: absolute;
+    z-index: 12;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+  }
+
+  .bar-reveal:focus-visible {
+    outline: none;
+    background: var(--color-accent);
+  }
+
   /* The card the page stands on. A native page is rounded by the shell but
      cannot paint its own drop, and an internal stage paints only its ground,
      so the column draws the card under both. It is transparent and takes no
@@ -915,6 +1054,12 @@
     border-radius: var(--content-radius);
     box-shadow: var(--shadow-card);
     pointer-events: none;
+  }
+
+  /* The shell moves the native page into the gutter; the card's shadow
+     follows it so the drop still traces the page's own edge. */
+  .stage-column[data-bar-hidden="true"] .stage-card {
+    inset-block-start: 8px;
   }
 
   .stage-column > :global(main) {

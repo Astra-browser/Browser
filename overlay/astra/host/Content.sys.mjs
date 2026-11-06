@@ -419,9 +419,11 @@ export const Content = {
       }
     };
     // --- media player projection (P9) -----------------------------------
-    // The sidebar player belongs to the tab playing behind the page in front.
-    // The engine controller lives per browser; a private window projects
-    // nothing. Position/duration arrive only when the page publishes them.
+    // The sidebar player follows whatever is playing, including the tab in
+    // front: a video the person is watching is still something they can
+    // pause, seek and picture-in-picture. The engine controller lives per
+    // browser; a private window projects nothing. Position/duration arrive
+    // only when the page publishes them.
     const mediaStates = new Map(); // astra_tab_id -> state
     const mediaView = (id) => {
       const state = mediaStates.get(id);
@@ -458,22 +460,17 @@ export const Content = {
         position: state.position ?? null,
         rate: state.rate ?? null,
         playing: controller.isPlaying === true,
-        waiting: false,
-        can_pip: false,
-        in_pip: false,
+        waiting: controller.isPlaying !== true && controller.isActive === true,
+        // The engine's PiP launcher can toggle any playing video in this
+        // browser; expose the control when there is something to launch.
+        can_pip: controller.isPlaying === true,
+        in_pip: state.in_pip === true,
         muted: state.browser.audioMuted === true,
         can_mute: true,
       };
     };
     const projectMedia = (id) => {
-      const selected = (() => {
-        try {
-          return __tabsState().selectedId;
-        } catch {
-          return "";
-        }
-      })();
-      if (isPrivateWindow(win) || id === selected) {
+      if (isPrivateWindow(win)) {
         Media.__projectMedia(id, null);
         return;
       }
@@ -509,9 +506,29 @@ export const Content = {
         position: null,
         duration: null,
         rate: null,
+        in_pip: false,
+        audible: null,
         listeners: [],
       };
-      const refresh = () => projectMedia(id);
+      // Keep the tab projection's audio flag in step with the engine. The
+      // rail's "Now playing" list reads that flag, not a guess.
+      const projectAudible = () => {
+        let audible = false;
+        try {
+          audible = browser.audioPlaybackActive === true;
+        } catch {
+          audible = false;
+        }
+        // Position events fire continuously; only a real audio edge is worth
+        // re-projecting the tab list.
+        if (state.audible === audible) return;
+        state.audible = audible;
+        __applyExternalUpdate(id, { audible });
+      };
+      const refresh = () => {
+        projectAudible();
+        projectMedia(id);
+      };
       for (const type of [
         "activated",
         "deactivated",
@@ -575,6 +592,29 @@ export const Content = {
             }
             projectMedia(id);
             return true;
+          case "picture_in_picture": {
+            // The engine's own launcher actor finds the playing video in
+            // this browser and toggles it. This is the same entry point the
+            // automatic tab-switch path uses, so it works for the video a
+            // person is watching without needing a clicked element.
+            let actor = null;
+            try {
+              actor = state?.browser?.browsingContext?.currentWindowGlobal?.getActor(
+                "PictureInPictureLauncher",
+              );
+            } catch {
+              actor = null;
+            }
+            if (!actor || typeof actor.sendAsyncMessage !== "function") return false;
+            try {
+              actor.sendAsyncMessage("PictureInPicture:AutoToggle");
+            } catch {
+              return false;
+            }
+            state.in_pip = state.in_pip !== true;
+            projectMedia(id);
+            return true;
+          }
           case "show":
             void Tabs.select({ request_id: `media-show-${id}`, astra_tab_id: id });
             return true;
