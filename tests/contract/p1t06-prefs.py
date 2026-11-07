@@ -91,6 +91,8 @@ def main():
                         "app.shield.optoutstudies.enabled"),
                       shieldLocked: S.prefs.prefIsLocked(
                         "app.shield.optoutstudies.enabled"),
+                      emeEnabled: S.prefs.getBoolPref("media.eme.enabled"),
+                      emeUi: S.prefs.getBoolPref("browser.eme.ui.enabled"),
                     };""",
                 "args": [],
             })
@@ -103,6 +105,8 @@ def main():
                 ("app.normandy.enabled locked (mozilla.cfg)", res.get("normandyLocked") is True),
                 ("app.shield.optoutstudies.enabled == false", res.get("shield") is False),
                 ("app.shield.optoutstudies.enabled locked (mozilla.cfg)", res.get("shieldLocked") is True),
+                ("media.eme.enabled == true (protected content)", res.get("emeEnabled") is True),
+                ("browser.eme.ui.enabled == false (Astra owns DRM UI)", res.get("emeUi") is False),
             ]
             failed = [name for name, ok in checks if not ok]
             for name, ok in checks:

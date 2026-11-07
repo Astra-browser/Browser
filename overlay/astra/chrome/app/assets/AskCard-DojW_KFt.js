@@ -1,1 +1,0 @@
-export{t as default}from"./AskCard-WOjL12dq.js";
