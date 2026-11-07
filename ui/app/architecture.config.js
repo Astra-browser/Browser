@@ -85,6 +85,11 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "settings" } } },
             allow: { to: { element: { type: "features", captured: { module: "assist" } } } },
           },
+          // Settings → Spaces edits a space with the switcher's own editor.
+          {
+            from: { element: { type: "features", captured: { module: "settings" } } },
+            allow: { to: { element: { type: "features", captured: { module: "tabs" } } } },
+          },
           // The sidebar assistant's composer borrows Work's model chip and dictation.
           {
             from: { element: { type: "features", captured: { module: "assist" } } },

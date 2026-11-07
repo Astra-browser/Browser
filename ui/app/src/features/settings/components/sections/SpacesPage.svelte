@@ -1,13 +1,16 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { Add01Icon } from "@hugeicons/core-free-icons";
-  import type { SpaceLookInputV1, SpaceView } from "$shared/ipc/bindings";
+  import { Dialog } from "bits-ui";
+  import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
+  import type { SpaceView } from "$shared/ipc/bindings";
   import { commands } from "$shared/ipc/bindings";
+  import { loadSpaceEditor } from "$features/tabs";
   import { profiles } from "$domain/profiles";
   import { tabs } from "$domain/tabs";
   import * as m from "$shared/i18n/messages";
   import Button from "$shared/ui/Button";
   import Icon from "$shared/ui/Icon";
+  import IconButton from "$shared/ui/IconButton";
   import Select from "$shared/ui/Select";
 
   onMount(() => {
@@ -39,25 +42,35 @@
   ];
   const markColor = (color: number) => HUES[Math.abs(color) % HUES.length];
 
-  let editing = $state<string | null>(null);
-  let draft = $state("");
   let busy = $state<string | null>(null);
-  let deleting = $state<string | null>(null);
   let failed = $state<string | null>(null);
 
-  // A profile switch changes the list under the page; an editor or a pending
-  // confirmation for the profile left behind must not linger on another one.
+  // --- Full space settings -------------------------------------------------
+  // The switcher's editor is the one place a space's name, icon, colour,
+  // theme and deletion live; Settings embeds the same component rather than
+  // growing a second, divergent copy.
+
+  let editorOpen = $state(false);
+  let editorFresh = $state(false);
+  let editorSpace = $state<SpaceView | null>(null);
+
+  function edit(space: SpaceView, fresh = false) {
+    editorSpace = space;
+    editorFresh = fresh;
+    editorOpen = true;
+    failed = null;
+  }
+
+  // A profile switch changes the list under the page; a dialog for the
+  // profile left behind must not linger on another one.
   const shownProfile = $derived(current?.id ?? null);
   $effect(() => {
     void shownProfile;
-    editing = null;
-    deleting = null;
+    editorOpen = false;
+    editorSpace = null;
+    busy = null;
     failed = null;
   });
-
-  function lookOf(space: SpaceView): SpaceLookInputV1 {
-    return { icon: space.icon, color: space.color, theme: space.theme };
-  }
 
   async function create() {
     if (current === null) return;
@@ -76,57 +89,27 @@
     const created = tabs
       .spaces()
       .find((space) => space.profile_id === current.id && !before.has(space.id));
-    if (created) {
-      editing = created.id;
-      draft = created.name;
-    }
-  }
-
-  function startRename(space: SpaceView) {
-    editing = space.id;
-    draft = space.name;
-    failed = null;
-  }
-
-  async function saveRename(space: SpaceView) {
-    if (editing !== space.id) return;
-    const name = draft.trim();
-    if (name === "" || name === space.name) {
-      editing = null;
-      return;
-    }
-    busy = space.id;
-    const result = await tabs.updateSpace(space.id, name, lookOf(space));
-    busy = null;
-    if (result.outcome === "applied" || result.outcome === "no_op") {
-      editing = null;
-      failed = null;
-    } else {
-      failed = m.spaces_settings_rename_failed();
-    }
-  }
-
-  async function remove(space: SpaceView) {
-    if (deleting !== space.id) {
-      deleting = space.id;
-      failed = null;
-      return;
-    }
-    busy = space.id;
-    const result = await tabs.deleteSpace(space.id);
-    busy = null;
-    deleting = null;
-    if (result.outcome === "applied" || result.outcome === "no_op") {
-      failed = null;
-    } else {
-      failed = m.spaces_settings_delete_last();
-    }
+    if (created) edit(created, true);
   }
 
   async function switchTo(space: SpaceView) {
     if (space.id === active?.id) return;
     busy = space.id;
     await tabs.switchSpace(space.id);
+    busy = null;
+  }
+
+  /** Move one row up or down; the host renumbers inside the profile. */
+  async function move(space: SpaceView, step: -1 | 1) {
+    const at = mine.findIndex((entry) => entry.id === space.id);
+    if (at < 0) return;
+    if (step < 0 && at === 0) return;
+    if (step > 0 && at === mine.length - 1) return;
+    // `before` is the row the space should sit in front of. Moving down one
+    // means clearing the next row, so the anchor is the one after it.
+    const before = step < 0 ? (mine[at - 1]?.id ?? null) : (mine[at + 2]?.id ?? null);
+    busy = space.id;
+    await tabs.reorderSpace(space.id, before);
     busy = null;
   }
 
@@ -141,11 +124,11 @@
   // The source and target always name spaces of this profile; a stale choice
   // (a deleted space) falls back to the first sensible one.
   $effect(() => {
-    if (!mine.some((space) => space.id === importFrom)) {
-      importFrom = mine[0]?.id ?? "";
-    }
     if (!mine.some((space) => space.id === importInto)) {
       importInto = active?.id ?? mine[0]?.id ?? "";
+    }
+    if (!mine.some((space) => space.id === importFrom) || importFrom === importInto) {
+      importFrom = mine.find((space) => space.id !== importInto)?.id ?? "";
     }
   });
 
@@ -202,11 +185,12 @@
   }
 
   const spaceCount = (id: string) => all.filter((space) => space.profile_id === id).length;
-  const spaceOptions = (skip: string) =>
-    mine
-      .filter((space) => space.id !== skip)
-      .map((space) => ({ value: space.id, label: space.name }));
   const clearOptions = $derived(mine.map((space) => ({ value: space.id, label: space.name })));
+  const importOptions = $derived(
+    mine
+      .filter((space) => space.id !== importInto)
+      .map((space) => ({ value: space.id, label: space.name })),
+  );
 </script>
 
 <section class="spaces" aria-label={m.section_spaces()}>
@@ -218,27 +202,14 @@
   </div>
 
   <ul class="list">
-    {#each mine as space (space.id)}
+    {#each mine as space, index (space.id)}
       {@const here = space.id === active?.id}
       <li class="row" data-current={here || undefined}>
         <span class="mark" style:background={markColor(space.color)} aria-hidden="true">
           {space.name.slice(0, 1).toUpperCase()}
         </span>
         <div class="copy">
-          {#if editing === space.id}
-            <input
-              class="rename"
-              aria-label={m.space_name()}
-              bind:value={draft}
-              maxlength="80"
-              onkeydown={(event) => {
-                if (event.key === "Enter") void saveRename(space);
-                if (event.key === "Escape") editing = null;
-              }}
-            />
-          {:else}
-            <strong>{space.name}</strong>
-          {/if}
+          <strong>{space.name}</strong>
           <small>
             {space.tabs === 1
               ? m.spaces_settings_tabs_one()
@@ -247,42 +218,38 @@
           </small>
         </div>
         <div class="actions">
-          {#if editing === space.id}
-            <Button
+          <div class="order">
+            <IconButton
+              icon={ArrowUp01Icon}
+              label={m.spaces_settings_move_up({ name: space.name })}
+              buttonSize={24}
+              size={14}
+              disabled={index === 0 || busy !== null}
+              onclick={() => void move(space, -1)}
+            />
+            <IconButton
+              icon={ArrowDown01Icon}
+              label={m.spaces_settings_move_down({ name: space.name })}
+              buttonSize={24}
+              size={14}
+              disabled={index === mine.length - 1 || busy !== null}
+              onclick={() => void move(space, 1)}
+            />
+          </div>
+          {#if !here}<Button
               size="compact"
-              variant="primary"
               pending={busy === space.id}
-              onclick={() => void saveRename(space)}>{m.spaces_settings_save()}</Button
-            >
-            <Button size="compact" variant="ghost" onclick={() => (editing = null)}
-              >{m.spaces_settings_cancel()}</Button
-            >
-          {:else}
-            {#if !here}<Button
-                size="compact"
-                pending={busy === space.id}
-                disabled={!!busy}
-                aria-label={m.spaces_settings_switch_label({ name: space.name })}
-                onclick={() => void switchTo(space)}>{m.spaces_settings_switch()}</Button
-              >{/if}
-            <Button
-              size="compact"
-              variant="ghost"
               disabled={!!busy}
-              aria-label={m.profiles_edit_label({ name: space.name })}
-              onclick={() => startRename(space)}>{m.spaces_settings_rename()}</Button
-            >
-            <Button
-              size="compact"
-              variant={deleting === space.id ? "danger" : "ghost"}
-              pending={busy === space.id}
-              disabled={!!busy && busy !== space.id}
-              onclick={() => void remove(space)}
-              >{deleting === space.id
-                ? m.spaces_settings_confirm_delete()
-                : m.spaces_settings_delete()}</Button
-            >
-          {/if}
+              aria-label={m.spaces_settings_switch_label({ name: space.name })}
+              onclick={() => void switchTo(space)}>{m.spaces_settings_switch()}</Button
+            >{/if}
+          <Button
+            size="compact"
+            variant="ghost"
+            disabled={!!busy}
+            aria-label={m.spaces_settings_edit_label({ name: space.name })}
+            onclick={() => edit(space)}>{m.spaces_settings_edit()}</Button
+          >
         </div>
       </li>
     {/each}
@@ -294,6 +261,7 @@
     </li>
   </ul>
 
+  <p class="note">{m.spaces_settings_manage_hint()}</p>
   {#if failed}<p class="failed" role="alert">{failed}</p>{/if}
 
   <section class="group" aria-labelledby="spaces-import-title">
@@ -305,7 +273,7 @@
       <div class="controls">
         <Select
           label={m.spaces_settings_import_from()}
-          options={spaceOptions(importInto)}
+          options={importOptions}
           bind:value={importFrom}
         />
         <Select
@@ -380,6 +348,28 @@
 
   <p class="note">{m.spaces_settings_isolation()}</p>
 </section>
+
+<Dialog.Root bind:open={editorOpen}>
+  <Dialog.Portal>
+    <Dialog.Overlay class="settings-dialog-overlay" />
+    <Dialog.Content class="settings-dialog-content space-sheet">
+      <Dialog.Title class="sr-only"
+        >{m.space_edit_label({ name: editorSpace?.name ?? "" })}</Dialog.Title
+      >
+      <Dialog.Description class="sr-only">{m.spaces_settings_isolation_note()}</Dialog.Description>
+      {#if editorOpen && editorSpace}
+        {#await loadSpaceEditor() then { default: SpaceEditor }}
+          <SpaceEditor
+            space={editorSpace}
+            fresh={editorFresh}
+            deletable={mine.length > 1}
+            onclose={() => (editorOpen = false)}
+          />
+        {/await}
+      {/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
 
 <style>
   .spaces {
@@ -507,23 +497,18 @@
     line-height: 1.5;
   }
 
-  .rename {
-    box-sizing: border-box;
-    inline-size: 100%;
-    padding: 6px 8px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-control);
-    background: var(--color-surface);
-    color: var(--color-text);
-    font: inherit;
-    font-size: var(--text-page-title);
-  }
-
   .actions {
     display: flex;
     flex: none;
     align-items: center;
     gap: 6px;
+  }
+
+  .order {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-inline-end: 2px;
   }
 
   .add {
@@ -560,5 +545,16 @@
 
   .failed {
     color: var(--color-danger) !important;
+  }
+
+  /* The dialog element is rendered by bits-ui, so the page's scoped hash is
+     not on it; the class is unique to this sheet. */
+  :global(.space-sheet) {
+    inline-size: min(420px, calc(100vw - 32px));
+    max-block-size: min(720px, calc(100vh - 48px));
+    overflow: hidden;
+    padding: 0;
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
   }
 </style>

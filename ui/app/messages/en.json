@@ -3948,5 +3948,11 @@
   "spaces_settings_cleared": "This space's site data was cleared.",
   "spaces_settings_clear_failed": "The space data could not be cleared.",
   "spaces_settings_no_spaces": "This profile has no space yet.",
-  "spaces_settings_import_into": "Copy into"
+  "spaces_settings_import_into": "Copy into",
+  "spaces_settings_edit": "Edit…",
+  "spaces_settings_edit_label": "Edit {name}",
+  "spaces_settings_move_up": "Move {name} up",
+  "spaces_settings_move_down": "Move {name} down",
+  "spaces_settings_manage_hint": "Name, icon, colour and theme are in Edit.",
+  "spaces_settings_created": "{name} is ready."
 }
