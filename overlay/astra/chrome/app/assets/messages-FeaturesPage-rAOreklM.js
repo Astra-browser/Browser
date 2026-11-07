@@ -1,0 +1,1 @@
+import{C as e}from"./chrome-shared-Vsn24tXl.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-bbkz7y02-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3425,n)??`AI and Work`)),r=((n={},r={})=>(r.locale??e(),t(3426,n)??`Tools`));export{n,r as t};
