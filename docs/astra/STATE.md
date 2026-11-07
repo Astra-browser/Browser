@@ -873,3 +873,23 @@ and `US$` currency formatting), so they are not from this work.
 Deferred: Work's canvas popovers/HUD keep their canvas-specific float recipe
 (a canvas object is not a menu); extension pop-ups remain native windows owned
 by the engine; per-space theming is unchanged.
+
+## Owner report: spaces inside profiles (2026-11-08)
+
+**Decision:** D-44. **Contract:** `docs/astra/SPACES.md`.
+
+| Surface | What changed | Wiring / files | Verification |
+|---|---|---|---|
+| Profile → many spaces | A profile mints a home space and can own any number of further spaces. Space ownership is immutable and persisted. The running profile adopts pre-ownership spaces once; creating/deleting a profile creates/deletes all of its spaces. | `overlay/astra/host/Tabs.sys.mjs` (`profile_id`, `__activeProfileId`, `__adoptSpace`, `createSpace({profile, activate})`, owner guards), `overlay/astra/host/Profiles.sys.mjs` (`spaceForProfile`, `switch`, `create`, `remove`), `overlay/astra/host/Metadata.sys.mjs` (`profile_id` in save/restore), `crates/astra-core/src/session.rs` (`SpaceSnapshot.profile_id`) | `tests/contract/spaces_profiles_model.mjs` 37/37; `profiles_model.mjs` 77/77; `spaces_model.mjs` 21/21; `cargo test -p astra-core --jobs 2` |
+| No sharing across profiles | The switcher, reorder, tab move, bookmark import and clear-data only act inside the profile in front. A space of another profile is not listed, cannot be edited/deleted from it, and is refused without confirming it exists. | `Tabs.sys.mjs` (`updateSpace`, `deleteSpace`, `reorderSpace`, `moveTabToSpace` owner guards), `ui/app/src/domain/tabs/tabs.svelte.ts` (`profileSpaces`), `space-flow.svelte.ts`, `RailSpaces`, `SidebarBody`, `TabRail`, `tab-menu.ts` | Ownership and refusal checks in `spaces_profiles_model.mjs`; unit suite 1238 pass |
+| Settings → Spaces | New section: list/create/rename/delete/switch the profile's spaces, import bookmarks from a sibling space, clear one space's site data, see and switch other profiles with their space counts. | `ui/app/src/features/settings/components/sections/SpacesPage.svelte`, `settings-model.ts`, `Settings.svelte`, `ProfilesPage.svelte`, `messages/en.json` | `svelte-check` 0 errors/warnings; lint/stylelint/format clean; 200 unit test files pass |
+| Bookmark import | `bookmark_call` gained a bounded copy call (`import_space`): copies folders and links, skips other spaces' roots, never moves the source, and refuses a space of another profile. | `overlay/astra/host/Bookmarks.sys.mjs`, `bindings.ts` (`BookmarkCall`/`BookmarkResponse`) | `spaces_profiles_model.mjs` (copy + source intact + cross-profile refusal) |
+| Per-space data clear | `browsing_data_call` gained `clear_space`: clears exactly one space's cookies/site data/cache through the container's `userContextId`; refused for another profile's space. | `overlay/astra/host/BrowsingData.sys.mjs`, `bindings.ts` (`BrowsingDataCall`) | `spaces_profiles_model.mjs` (one container addressed; cross-profile refused) |
+| Credentials cannot cross spaces | Firefox's login manager, form history and address/credit-card autofill are origin-keyed, not container-keyed, so they are off by default; password-manager extensions and the OS vault remain. | `overlay/astra/mozilla.cfg` (signon/formfill defaults), `docs/astra/PASSWORD_DECISION.md` | Preference block present; contract tests assert container isolation (`containers_isolation.mjs` 117 checks) |
+
+**Deferred:** the Places history database, downloads list and favicons are still
+global to the running profile directory (D-41); per-space history needs an
+engine-side visit annotation. The packaged dev build was not rebuilt or
+restarted for this batch because a live instance was already running; run
+`tools/marionette-probe` after the next build to capture live evidence for the
+Spaces page.

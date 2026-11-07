@@ -1,5 +1,12 @@
 # Password/autofill decision proposal (P4-T09, research only)
 
+> **Implemented 2026-11-08 (D-44).** Option B is now the shipped posture:
+> `overlay/astra/mozilla.cfg` disables `signon.rememberSignons`,
+> `signon.autofillForms`, `signon.formlessCapture.enabled`,
+> `browser.formfill.enable` and the `extensions.formautofill.*` stores because
+> those stores are origin-keyed rather than container-keyed and would leak a
+> credential across Astra spaces. See `docs/astra/SPACES.md`.
+
 Owner question 6 in `OWNER_QUESTIONS.md`: keep Firefox's login-manager
 surfaces, or rely on password-manager extensions as the base browser does?
 This doc is the research + recommendation. No code changed.
