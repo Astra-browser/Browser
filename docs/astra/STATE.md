@@ -41,6 +41,27 @@ component failures outside this surface (`ShellA11y` stale
 `[data-content-bar]` selector, `SpacesLook` site-info click) are unchanged and
 are not part of `tools/perf/full-suite.sh`.
 
+## Owner report: dev-build console noise (2026-11-08)
+
+The owner pasted a dev-console dump. Four signals, three expected in a dev
+profile that gets killed and restarted, one real null-dereference.
+
+| ID | Signal | Verdict | Action / evidence |
+|---|---|---|---|
+| C-01 | `Script terminated by timeout` on YouTube's embed and miruro.tv | page-side `dom.max_script_run_time` watchdog; a debug build under CPU load (parallel build, paused process) trips it | no product change; the stack is the site's own bundle, not chrome |
+| C-02 | `services.settings … getLastModified() … request was aborted` | Remote Settings IndexedDB transaction killed by a hard restart or a wiped `storage/default`; Mozilla's own profile-generation CI logs the same lines | none; self-heals on a clean start |
+| C-03 | Bookmark backup `NotFoundError … source file does not exist` | upstream `PlacesBackups.create()` rename race: two same-hash runs move the same file, the loser gets `NS_ERROR_FILE_NOT_FOUND`; today's backup exists | none; harmless end state |
+| C-04 | `AsyncTabSwitcher … can't access property "schemeIs", requestedBrowser.currentURI is null` | **real**: `updateDisplay()` dereferenced the URI of a tab with no document yet (new, discarded/crashed, or torn down mid-switch) | ASTRA-0012; `updateDisplay()` treats a missing URI as an unloaded `about:` page and takes the blank-tab branch instead of throwing |
+
+**Verification (C-04):** `forge lint` — 12 patches clean, ASTRA-0012
+forward-applies to baseline `61e41ec4` and reverse-checks as applied;
+`build --faster --jobs 2` 3 s; the packaged `moz-src` module carries the guard;
+`state-check`, `brand-lint` clean. The null window is a race, so there is no
+deterministic live reproduction; the URI-present path is unchanged. Branch:
+`fix/async-tab-switcher-null-uri` (outer) + `astra/async-tab-switcher-null-uri`
+(engine). The other three signals were left alone; the engine-side
+`updateDisplay` guard is the only code change.
+
 ## Owner report: YouTube scriptlet resource fix (2026-11-07)
 
 **Symptom:** YouTube showed video ads and page ad slots even though the lists
