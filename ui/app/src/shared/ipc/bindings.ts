@@ -1265,7 +1265,13 @@ export type BookmarkCall =
 /**  Moves `id` into `parent` at `index` among its new siblings. */
 { kind: "move"; id: string; parent: string | null; index: number } |
 /**  Removes a bookmark, or a folder with everything in it. */
-{ kind: "remove"; id: string };
+{ kind: "remove"; id: string } |
+/**
+ *  Copy the bookmarks of another space in the same profile into `to` (or the
+ *  space in front). The source is never moved or changed; a space of another
+ *  profile is refused.
+ */
+{ kind: "import_space"; from: string; to?: string };
 
 export type BookmarkCrumb = {
 	id: string,
@@ -1282,7 +1288,10 @@ export type BookmarkResponse = { kind: "listing"; folder: string | null;
 /**  Folders from the top level down to `folder`, `folder` last. */
 path: BookmarkCrumb[]; items: BookmarkView[] } | { kind: "results"; items: BookmarkView[] } |
 /**  A write applied; `id` names what an add created. */
-{ kind: "saved"; id: string | null } | { kind: "error"; error: BookmarkError };
+{ kind: "saved"; id: string | null } |
+/**  A space import applied; `count` entries were copied and `truncated` says
+     the bounded copy stopped at the cap. */
+{ kind: "imported"; count: number; truncated: boolean } | { kind: "error"; error: BookmarkError };
 
 export type BookmarkView = {
 	id: string,
@@ -1324,7 +1333,12 @@ export type BrowsingDataCall =
  *  Everything stored for the site of one page, named by its origin
  *  (`https://host[:port]`), for a command on the page in front.
  */
-{ kind: "forget_page"; origin: string };
+{ kind: "forget_page"; origin: string } |
+/**
+ *  Cookies, site storage and cache of one Astra space, and nothing of any
+ *  sibling space. The space must belong to the profile in front.
+ */
+{ kind: "clear_space"; space: string };
 
 export type BrowsingDataError = "invalid" | "unavailable" | "capacity" |
 /**  The engine took the request and did not complete it. */
@@ -3195,6 +3209,8 @@ export type SpaceThemeView = { kind: "preset"; id: string } |
 export type SpaceView = {
 	id: string,
 	name: string,
+	/**  The one Astra profile that owns this space; a space never moves. */
+	profile_id: string,
 	icon: SpaceIconView | null,
 	/**  An avatar hue, shared with profiles. */
 	color: number,

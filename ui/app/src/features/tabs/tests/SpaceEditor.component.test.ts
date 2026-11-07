@@ -16,6 +16,7 @@ vi.mock("$shared/ipc/bindings", async () => {
 const space: SpaceView = {
   id: "studio",
   name: "Studio",
+  profile_id: "default",
   icon: { kind: "symbol", index: 1 },
   color: 2,
   theme: null,

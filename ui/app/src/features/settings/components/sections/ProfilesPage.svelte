@@ -3,6 +3,7 @@
   import { Add01Icon } from "@hugeicons/core-free-icons";
   import type { ProfileEntryView } from "$shared/ipc/bindings";
   import { drawn, profiles } from "$domain/profiles";
+  import { tabs } from "$domain/tabs";
   import { takeNewRequest } from "$session/profile-sheet.svelte";
   import * as m from "$shared/i18n/messages";
   import Button from "$shared/ui/Button";
@@ -18,6 +19,8 @@
 
   const list = $derived(profiles.all());
   const currentId = $derived(profiles.current()?.id ?? null);
+  /** A profile owns its spaces; the count is the visible half of that. */
+  const spacesFor = (id: string) => tabs.spaces().filter((space) => space.profile_id === id).length;
   let sheetOpen = $state(false);
   let editing = $state.raw<ProfileEntryView | null>(null);
   let switching = $state<string | null>(null);
@@ -61,12 +64,13 @@
         <div class="copy">
           <strong>{profile.name}</strong>
           <small
-            >{profile.kind === "default"
-              ? m.profiles_kind_default()
-              : m.profiles_kind_named()}{#if failed === profile.id}<span
-                class="failed"
-                role="alert"
-              >
+            >{profile.kind === "default" ? m.profiles_kind_default() : m.profiles_kind_named()} · {spacesFor(
+              profile.id,
+            ) === 1
+              ? m.spaces_settings_space_count_one()
+              : m.spaces_settings_space_count_other({
+                  count: spacesFor(profile.id),
+                })}{#if failed === profile.id}<span class="failed" role="alert">
                 · {m.profiles_failed()}</span
               >{/if}</small
           >

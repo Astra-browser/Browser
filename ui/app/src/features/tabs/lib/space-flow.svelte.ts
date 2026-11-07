@@ -21,7 +21,9 @@ export class SpaceFlow {
   /** The editor was opened from the list, so going back returns to it. */
   fromList = false;
 
-  spaces = $derived(tabs.spaces());
+  // The switcher lists the profile in front; another profile's spaces are
+  // reached by switching profiles, never by sharing a list.
+  spaces = $derived(tabs.profileSpaces());
   active = $derived(tabs.activeSpace());
   editing = $derived(this.spaces.find((space) => space.id === this.editingId) ?? null);
 

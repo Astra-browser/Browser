@@ -236,6 +236,7 @@ mod tests {
                 name: "S".to_owned(),
                 position: 0,
                 container_ref: None,
+                profile_id: None,
             }],
             vec![],
             vec![WindowSnapshot {

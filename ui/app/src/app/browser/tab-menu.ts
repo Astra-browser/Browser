@@ -40,7 +40,7 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
   const page = (tab.content ?? "web") === "web" && url !== null;
   const kept = tabs.isKept(id);
   const muted = tab.audio?.muted ?? false;
-  const others = tabs.spaces().filter((space) => space.id !== tabs.activeSpaceId());
+  const others = tabs.profileSpaces().filter((space) => space.id !== tabs.activeSpaceId());
   const rows: MenuItems = [
     { kind: "item", id: "tab.new", label: m.native_new_tab() },
     ...(page

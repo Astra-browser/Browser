@@ -55,6 +55,7 @@ it("groups sections as Browser, Work and App with stable ids", async () => {
     "privacy",
     "focus",
     "performance",
+    "spaces",
   ]);
   expect(listed("work")).toEqual(["work", "ai", "skills", "memory", "sites", "mcp"]);
   expect(listed("app")).toEqual(["features", "shortcuts", "about"]);

@@ -278,7 +278,53 @@ export function __spacesState() {
   return {
     spaces: _spaces.map((space) => ({ ...space })),
     active_space_id: _activeSpaceId,
+    active_profile_id: _activeProfileId,
   };
+}
+
+/** The profile whose spaces this window is showing. */
+export function __activeProfileId() {
+  return _activeProfileId;
+}
+
+/** The profile that owns a space, or null for an unknown id. */
+export function __spaceOwner(space) {
+  return spaceOf(space)?.profile_id ?? null;
+}
+
+/**
+ * Make a profile the one this window shows. The active space follows: a space
+ * from another profile is not left in front, because the person would then be
+ * looking at a space the profile does not own.
+ */
+export function __setActiveProfile(profileId, name = "") {
+  if (typeof profileId !== "string" || profileId === "") return false;
+  const switched = _activeProfileId !== profileId;
+  _activeProfileId = profileId;
+  const named = __setProfileName(profileId, name);
+  return switched || named;
+}
+
+/** Keep the display name of a profile current without selecting it. */
+export function __setProfileName(profileId, name) {
+  if (typeof profileId !== "string" || profileId === "") return false;
+  if (typeof name !== "string" || name === "") return false;
+  if (_profileNames.get(profileId) === name) return false;
+  _profileNames.set(profileId, name);
+  return true;
+}
+
+/**
+ * Internal ownership move used once when an existing install's unowned
+ * spaces are adopted by the running profile. A space never changes owner
+ * afterwards; there is no UI command for this.
+ */
+export function __adoptSpace(space, profileId) {
+  const target = spaceOf(space);
+  if (!target || target.profile_id !== DEFAULT_PROFILE_ID) return false;
+  if (typeof profileId !== "string" || profileId === "") return false;
+  target.profile_id = profileId;
+  return true;
 }
 
 /**
@@ -299,11 +345,20 @@ export function __applySpaces(spaces, active_space_id = "") {
       icon: typeof space.icon === "string" ? space.icon : null,
       color: Number.isInteger(space.color) ? space.color : 0,
       theme: typeof space.theme === "string" ? space.theme : null,
+      // A snapshot from before ownership existed restores unowned and is
+      // adopted by the running profile on the first Profiles read.
+      profile_id:
+        typeof space.profile_id === "string" && space.profile_id !== ""
+          ? space.profile_id
+          : DEFAULT_PROFILE_ID,
     });
   }
   if (next.length === 0) return false;
   _spaces = next;
   _activeSpaceId = seen.has(active_space_id) ? active_space_id : next[0].id;
+  _activeProfileId =
+    next.find((space) => space.id === _activeSpaceId)?.profile_id ??
+    DEFAULT_PROFILE_ID;
   const highest = next.reduce((max, space) => {
     const n = Number(/^space-(\d+)$/u.exec(space.id)?.[1] ?? 0);
     return Math.max(max, n);
@@ -454,10 +509,23 @@ const PROFILE_ID = "default";
 // list and each tab's membership; the projection carries both, so switching
 // a space never has to re-open anything.
 const DEFAULT_SPACE_ID = "space-1";
+// A space belongs to exactly one Astra profile. `default` is the unowned
+// value an existing install starts with; the Profiles module adopts those
+// spaces into the running profile once, then ownership is immutable.
+const DEFAULT_PROFILE_ID = "default";
 let _spaces = [
-  { id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null },
+  {
+    id: DEFAULT_SPACE_ID,
+    name: "Space",
+    icon: null,
+    color: 0,
+    theme: null,
+    profile_id: DEFAULT_PROFILE_ID,
+  },
 ];
 let _activeSpaceId = DEFAULT_SPACE_ID;
+let _activeProfileId = DEFAULT_PROFILE_ID;
+const _profileNames = new Map([[DEFAULT_PROFILE_ID, "Personal"]]);
 
 /** The active space without building a projection (and without bumping its
  *  revision); host modules use this to scope their own stores. */
@@ -527,11 +595,17 @@ async function ensureTabInActiveSpace(request_id = "") {
   return true;
 }
 
-/** A new space takes the first unused "Space N". */
-function nextSpaceName() {
+/** A new space takes the first unused "Space N" inside its own profile. */
+function nextSpaceName(profileId = _activeProfileId) {
   for (let n = 2; n < 1000; n += 1) {
     const name = `Space ${n}`;
-    if (!_spaces.some((space) => space.name === name)) return name;
+    if (
+      !_spaces.some(
+        (space) => space.profile_id === profileId && space.name === name,
+      )
+    ) {
+      return name;
+    }
   }
   return "Space";
 }
@@ -598,7 +672,13 @@ export function __itemsSnapshot() {
   const active = _selectedId && order.includes(_selectedId) ? _selectedId : (order[0] ?? null);
   return {
     projection_revision: nextRevision(),
-    profile: { id: PROFILE_ID, name: "Personal", kind: "default" },
+    // `id` stays the build's stable scope ("default") for command routing;
+    // `name` follows the profile whose spaces are in front.
+    profile: {
+      id: PROFILE_ID,
+      name: _profileNames.get(_activeProfileId) ?? "Personal",
+      kind: "default",
+    },
     spaces: _spaces.map((space) => ({
       ...space,
       tabs: _order.filter((id) => _tabs.get(id)?.space_id === space.id).length,
@@ -777,29 +857,58 @@ export const Tabs = {
   // Each answers an OperationAdmission: the projection that follows is the
   // result, so the UI never guesses what native did.
 
-  async createSpace({ request_id = "", name = "", look = null } = {}) {
+  /**
+   * Create a space inside one profile. `profile` is the owner; without one
+   * the active profile owns it. `activate: false` lets the Profiles page
+   * mint a profile's home space without moving the window into it.
+   */
+  async createSpace({
+    request_id = "",
+    name = "",
+    look = null,
+    profile = "",
+    activate = true,
+  } = {}) {
+    const owner =
+      typeof profile === "string" && profile !== "" ? profile : _activeProfileId;
+    if (typeof owner !== "string" || owner === "") {
+      return { operation_id: null, accepted: false };
+    }
     const previous = _activeSpaceId;
+    const previousProfile = _activeProfileId;
     const id = `space-${_nextSpaceId++}`;
     _spaces.push({
       id,
-      name: typeof name === "string" && name.trim() !== "" ? name.trim() : nextSpaceName(),
+      name:
+        typeof name === "string" && name.trim() !== ""
+          ? name.trim()
+          : nextSpaceName(owner),
       icon: look?.icon ?? null,
       color: Number.isInteger(look?.color) ? look.color : 0,
       theme: look?.theme ?? null,
+      profile_id: owner,
     });
-    _activeSpaceId = id;
-    _selectedId = "";
-    // The new space is in front, so it needs its own New Tab rather than an
-    // empty stage. `create` announces it; the snapshot below is the result.
-    await ensureTabInActiveSpace(request_id);
-    emit("space.switched", { space: id, previous });
+    if (activate !== false) {
+      _activeSpaceId = id;
+      _activeProfileId = owner;
+      _selectedId = "";
+      // The new space is in front, so it needs its own New Tab rather than an
+      // empty stage. `create` announces it; the snapshot below is the result.
+      await ensureTabInActiveSpace(request_id);
+      emit("space.switched", { space: id, previous, previous_profile: previousProfile });
+    }
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
 
-  async updateSpace({ request_id = "", space = "", name = "", look = null } = {}) {
+  async updateSpace({ request_id = "", space = "", name = "", look = null, owner = "" } = {}) {
     const target = spaceOf(space);
     if (!target) return { operation_id: null, accepted: false };
+    // A space is edited only inside the profile it belongs to. `owner` is the
+    // internal profile-rename path; no UI caller passes it.
+    if (target.profile_id !== _activeProfileId && owner !== target.profile_id) {
+      return { operation_id: null, accepted: false };
+    }
     if (typeof name === "string" && name.trim() !== "") target.name = name.trim();
     if (look) {
       target.icon = look.icon ?? null;
@@ -810,10 +919,26 @@ export const Tabs = {
     return { operation_id: null, accepted: true };
   },
 
-  async deleteSpace({ request_id = "", space = "" } = {}) {
+  /**
+   * Delete a space. A profile keeps at least one space, so the last one of a
+   * profile is refused. `owner` is an internal bypass used only when the
+   * profile itself is being deleted; a UI caller never passes it.
+   */
+  async deleteSpace({ request_id = "", space = "", owner = "" } = {}) {
     if (_spaces.length <= 1) return { operation_id: null, accepted: false };
     const at = _spaces.findIndex((entry) => entry.id === space);
     if (at < 0) return { operation_id: null, accepted: false };
+    const target = _spaces[at];
+    const removingProfile = typeof owner === "string" && owner === target.profile_id;
+    const owned = _spaces.filter(
+      (entry) => entry.profile_id === target.profile_id,
+    ).length;
+    if (!removingProfile) {
+      if (target.profile_id !== _activeProfileId) {
+        return { operation_id: null, accepted: false };
+      }
+      if (owned <= 1) return { operation_id: null, accepted: false };
+    }
     // Its tabs close with it: a tab cannot outlive the space that held it.
     for (const id of [..._order].filter((id) => _tabs.get(id)?.space_id === space)) {
       _tabs.delete(id);
@@ -825,7 +950,9 @@ export const Tabs = {
     _spaces.splice(at, 1);
     emit("space.deleted", { space });
     if (_activeSpaceId === space) {
-      _activeSpaceId = _spaces[Math.min(at, _spaces.length - 1)].id;
+      const next = _spaces[Math.min(at, _spaces.length - 1)];
+      _activeSpaceId = next.id;
+      _activeProfileId = next.profile_id;
       _selectedId = "";
       const first = activeOrder()[0];
       if (first !== undefined) {
@@ -842,17 +969,33 @@ export const Tabs = {
   async reorderSpace({ request_id = "", space = "", before = null } = {}) {
     const at = _spaces.findIndex((entry) => entry.id === space);
     if (at < 0) return { operation_id: null, accepted: false };
+    const movedSpace = _spaces[at];
+    if (movedSpace.profile_id !== _activeProfileId) {
+      return { operation_id: null, accepted: false };
+    }
+    // Reordering never crosses the profile boundary: a neighbour from
+    // another profile is not a position this space can take.
+    const beforeSpace = before === null ? null : spaceOf(before);
+    const anchor =
+      beforeSpace && beforeSpace.profile_id === movedSpace.profile_id
+        ? before
+        : null;
     const [moved] = _spaces.splice(at, 1);
-    const to = before === null ? _spaces.length : _spaces.findIndex((entry) => entry.id === before);
+    const to = anchor === null ? _spaces.length : _spaces.findIndex((entry) => entry.id === anchor);
     _spaces.splice(to < 0 ? _spaces.length : to, 0, moved);
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
 
   async switchSpace({ request_id = "", space = "" } = {}) {
-    if (!spaceOf(space)) return { operation_id: null, accepted: false };
+    const target = spaceOf(space);
+    if (!target) return { operation_id: null, accepted: false };
     const previous = _activeSpaceId;
+    const previousProfile = _activeProfileId;
     _activeSpaceId = space;
+    // Switching to a space always selects its owner; a window cannot show a
+    // space whose profile is not the one in front.
+    _activeProfileId = target.profile_id;
     const candidates = activeOrder();
     const remembered = _selectedBySpace.get(space);
     const chosen =
@@ -867,22 +1010,39 @@ export const Tabs = {
     }
     // The profile roster follows the active space; this is the one signal a
     // plain space switch (or a profile switch driving one) needs.
-    emit("space.switched", { space, previous });
+    emit("space.switched", {
+      space,
+      previous,
+      profile: _activeProfileId,
+      previous_profile: previousProfile,
+    });
     emitItemsChanged();
     return { operation_id: null, accepted: true };
   },
 
   async stepSpace({ request_id = "", step = 1 } = {}) {
     if (!Number.isInteger(step) || step === 0) return { operation_id: null, accepted: false };
-    const at = _spaces.findIndex((entry) => entry.id === _activeSpaceId);
-    if (at < 0) return { operation_id: null, accepted: false };
-    const next = (at + (step > 0 ? 1 : -1) + _spaces.length) % _spaces.length;
-    return Tabs.switchSpace({ request_id, space: _spaces[next].id });
+    // Stepping stays inside the profile in front; spaces of another profile
+    // are reached by switching profiles, not by walking past a boundary.
+    const visible = _spaces.filter(
+      (entry) => entry.profile_id === _activeProfileId,
+    );
+    const at = visible.findIndex((entry) => entry.id === _activeSpaceId);
+    if (at < 0 || visible.length === 0) return { operation_id: null, accepted: false };
+    const next = (at + (step > 0 ? 1 : -1) + visible.length) % visible.length;
+    return Tabs.switchSpace({ request_id, space: visible[next].id });
   },
 
   async moveTabToSpace({ request_id = "", tab = "", space = "" } = {}) {
     const target = _tabs.get(tab);
-    if (!target || !spaceOf(space)) return { operation_id: null, accepted: false };
+    const targetSpace = spaceOf(space);
+    if (!target || !targetSpace) return { operation_id: null, accepted: false };
+    // A tab may only move inside its own profile. Moving it into a space of
+    // another profile would put a page from one profile in the other's
+    // container, which is exactly the boundary this model keeps.
+    if (targetSpace.profile_id !== _activeProfileId) {
+      return { operation_id: null, accepted: false };
+    }
     const previousSpace = target.space_id;
     target.space_id = space;
     if (previousSpace !== space) {
@@ -1377,8 +1537,20 @@ export function __resetTabsForTests() {
   _selectedBySpace.clear();
   // Spaces are part of the same model: leaving them behind made a suite's
   // spaces visible to the next one in the same process.
-  _spaces = [{ id: DEFAULT_SPACE_ID, name: "Space", icon: null, color: 0, theme: null }];
+  _spaces = [
+    {
+      id: DEFAULT_SPACE_ID,
+      name: "Space",
+      icon: null,
+      color: 0,
+      theme: null,
+      profile_id: DEFAULT_PROFILE_ID,
+    },
+  ];
   _activeSpaceId = DEFAULT_SPACE_ID;
+  _activeProfileId = DEFAULT_PROFILE_ID;
+  _profileNames.clear();
+  _profileNames.set(DEFAULT_PROFILE_ID, "Personal");
   _nextSpaceId = 2;
   _projection = 0;
 }

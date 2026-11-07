@@ -42,7 +42,15 @@
 
 import { addEventListener, emit } from "./Events.sys.mjs";
 import { refuse } from "./Operations.sys.mjs";
-import { Tabs, __spacesState } from "./Tabs.sys.mjs";
+import {
+  Tabs,
+  __adoptSpace,
+  __activeProfileId,
+  __setActiveProfile,
+  __setProfileName,
+  __spacesState,
+  emitItemsChanged,
+} from "./Tabs.sys.mjs";
 
 // A profile is a browsing environment, and this engine cannot move a running
 // process to another profile directory. The in-window switch therefore gives
@@ -273,6 +281,11 @@ function writeSpaceMap(map) {
 
 function bindProfileSpace(profileId, spaceId) {
   const map = readSpaceMap();
+  // A space is never the home of two profiles. Ownership on the space is the
+  // authority; this map only remembers which owned space is the home.
+  for (const [profile, space] of map) {
+    if (space === spaceId && profile !== profileId) map.delete(profile);
+  }
   map.set(profileId, spaceId);
   writeSpaceMap(map);
 }
@@ -288,50 +301,106 @@ function spaceForProfileSpace(profileId) {
   return map.get(profileId) ?? null;
 }
 
-function profileForSpace(spaceId) {
-  for (const [profile, space] of readSpaceMap()) {
-    if (space === spaceId) return profile;
-  }
-  return null;
-}
-
 function hasSpace(spaceId) {
   return __spacesState().spaces.some((space) => space.id === spaceId);
 }
 
-/** The space a profile browses in, created on first use. The running profile
- *  uses the window's first space (the default environment) instead of minting
- *  a second one for an identity it already owns. */
+/** Every space a profile owns, in display order. */
+function spacesForProfile(profileId) {
+  return __spacesState().spaces.filter((space) => space.profile_id === profileId);
+}
+
+/**
+ * The space a profile browses in. A profile can own many spaces; its home is
+ * the one bound in `astra.profiles.spaces`, else the first owned space, and a
+ * new profile gets a home minted on first use. The running profile adopts the
+ * window's first space instead of minting a second one.
+ */
 async function spaceForProfile(profile, { running = false } = {}) {
+  const owned = spacesForProfile(profile.id);
   const bound = spaceForProfileSpace(profile.id);
-  if (bound !== null && hasSpace(bound)) return bound;
+  if (bound !== null && owned.some((space) => space.id === bound)) {
+    return bound;
+  }
+  if (owned.length > 0) {
+    const home =
+      owned.find((space) => space.name === profile.name) ?? owned[0];
+    bindProfileSpace(profile.id, home.id);
+    return home.id;
+  }
   if (running) {
     const spaces = __spacesState().spaces;
-    const home = spaces.find((space) => space.id === "space-1") ?? spaces[0];
-    if (home) {
+    const home =
+      spaces.find((space) => space.id === "space-1") ?? spaces[0];
+    // The default environment is only usable when it is unowned or already
+    // this profile's; another profile's space is never borrowed.
+    if (home && (home.profile_id === profile.id || home.profile_id === "default")) {
+      __adoptSpace(home.id, profile.id);
       bindProfileSpace(profile.id, home.id);
       return home.id;
     }
   }
-  const existing = __spacesState().spaces.find((space) => space.name === profile.name);
-  if (existing) {
-    bindProfileSpace(profile.id, existing.id);
-    return existing.id;
-  }
   const before = new Set(__spacesState().spaces.map((space) => space.id));
-  await Tabs.createSpace({ request_id: "profile-space", name: profile.name });
+  await Tabs.createSpace({
+    request_id: "profile-space",
+    name: profile.name,
+    profile: profile.id,
+    activate: false,
+  });
   const created = __spacesState().spaces.find((space) => !before.has(space.id));
   if (!created) return null;
   bindProfileSpace(profile.id, created.id);
   return created.id;
 }
 
-/** The roster's `current` follows the active space's profile. */
+/**
+ * One-time adoption for an install that predates per-profile ownership: the
+ * spaces with no owner belong to the profile this process is running. After
+ * this, ownership never moves.
+ */
+function rememberProfileNames(view) {
+  if (view === null) return false;
+  let changed = false;
+  for (const profile of view.profiles) {
+    changed = __setProfileName(profile.id, profile.name) || changed;
+  }
+  return changed;
+}
+
+function adoptRunningProfile(view) {
+  if (view === null || typeof view.current !== "string") return false;
+  const entry = view.profiles.find((profile) => profile.id === view.current);
+  if (!entry) return false;
+  let changed = false;
+  // A previous build bound one space per profile in `astra.profiles.spaces`;
+  // honour those bindings before the remaining unowned spaces fall to the
+  // profile this process is running.
+  for (const [profileId, spaceId] of readSpaceMap()) {
+    if (profileId !== entry.id && hasSpace(spaceId)) {
+      changed = __adoptSpace(spaceId, profileId) || changed;
+    }
+  }
+  for (const space of __spacesState().spaces) {
+    changed = __adoptSpace(space.id, entry.id) || changed;
+  }
+  // The window keeps the space it restored into: if the old map gave that
+  // space to another profile, that profile is the one in front.
+  const state = __spacesState();
+  const restored = state.spaces.find((space) => space.id === state.active_space_id);
+  const owner = restored?.profile_id ?? entry.id;
+  const named = view.profiles.find((profile) => profile.id === owner);
+  changed = __setActiveProfile(owner, named?.name ?? entry.name) || changed;
+  return changed;
+}
+
+/** The roster's `current` follows the active profile, not a space name. */
 function withActiveProfile(view) {
   if (view === null) return null;
-  const profile = profileForSpace(__spacesState().active_space_id);
-  if (profile === null || !view.profiles.some((entry) => entry.id === profile)) return view;
-  return { ...view, current: profile };
+  const active = __activeProfileId();
+  if (active === "default" || !view.profiles.some((entry) => entry.id === active)) {
+    return view;
+  }
+  return { ...view, current: active };
 }
 
 /** The rail names the active profile, so a plain space switch has to refresh
@@ -749,7 +818,16 @@ export const Profiles = {
     listenForSpaceSwitches();
     const native = await nativeForUse();
     if (!native) return null;
-    return withActiveProfile(await currentView(native));
+    const view = await currentView(native);
+    let changed = rememberProfileNames(view);
+    // Adoption runs once, while ownership is still unowned. A profile the
+    // person has already switched into is never yanked back to the running
+    // one by merely reading the roster.
+    if (__activeProfileId() === "default") {
+      changed = adoptRunningProfile(view) || changed;
+    }
+    if (changed) emitItemsChanged();
+    return withActiveProfile(view);
   },
 
   /** Create a profile. With `and_switch`, the window moves into the new
@@ -771,11 +849,13 @@ export const Profiles = {
     } catch {
       // The profile exists; the avatar falls back to native initials.
     }
+    // Every profile owns its own spaces from the moment it exists: the home
+    // space is minted now, without moving the window.
+    const space = await spaceForProfile({ id, name: name.trim() });
     await announce(native);
     if (and_switch === true) {
       // The profile is stored; the window moves into its space. No second
       // process or window is created.
-      const space = await spaceForProfile({ id, name: name.trim() });
       if (space === null) return refuse("native_dispatch_rejected");
       const applied = await Tabs.switchSpace({
         request_id: "profile-switch",
@@ -801,13 +881,17 @@ export const Profiles = {
       renamed = false;
     }
     if (!renamed) return no();
-    // The profile's space is the visible half of the same identity.
+    __setProfileName(profile, name.trim());
+    emitItemsChanged();
+    // The profile's home space is the visible half of the same identity. Its
+    // other spaces keep their own names.
     const space = spaceForProfileSpace(profile);
     if (space !== null && hasSpace(space)) {
       await Tabs.updateSpace({
         request_id: "profile-rename",
         space,
         name: name.trim(),
+        owner: profile,
       });
     }
     await announce(native);
@@ -825,13 +909,17 @@ export const Profiles = {
       removed = false;
     }
     if (!removed) return no();
-    // The space leaves with the profile: its tabs close and `space.deleted`
-    // lets the content binding drop the container and its site data. A window
-    // with one space keeps it (the model refuses to remove the last one).
-    const space = spaceForProfileSpace(profile);
+    // Every space of the profile leaves with it: its tabs close and
+    // `space.deleted` lets the content binding drop each container and its
+    // site data. Spaces are never handed to another profile.
+    const owned = spacesForProfile(profile).map((space) => space.id);
     unbindProfileSpace(profile);
-    if (space !== null && hasSpace(space)) {
-      await Tabs.deleteSpace({ request_id: "profile-remove", space });
+    for (const space of owned) {
+      await Tabs.deleteSpace({
+        request_id: "profile-remove",
+        space,
+        owner: profile,
+      });
     }
     await announce(native);
     return ok();
@@ -897,6 +985,9 @@ export const Profiles = {
     const entry = view?.profiles.find((candidate) => candidate.id === profile) ?? null;
     // A roster entry that vanished is refused, never claimed applied.
     if (entry === null) return refuse("native_dispatch_rejected");
+    // The window's profile follows the space it shows: selecting a profile
+    // first makes the spaces it owns the ones the projection lists.
+    __setActiveProfile(entry.id, entry.name);
     const space = await spaceForProfile(entry, { running: profile === view.current });
     if (space === null) return refuse("native_dispatch_rejected");
     const applied = await Tabs.switchSpace({

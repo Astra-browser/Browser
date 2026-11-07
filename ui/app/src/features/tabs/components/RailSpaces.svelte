@@ -11,7 +11,7 @@
   import * as requests from "../lib/space-requests.svelte";
 
   let { active, label }: { active: SpaceView; label?: string } = $props();
-  const spaces = $derived(tabs.spaces());
+  const spaces = $derived(tabs.profileSpaces());
 
   // Holding Control names the key of every row in place of its mark.
   let ctrl = $state(false);

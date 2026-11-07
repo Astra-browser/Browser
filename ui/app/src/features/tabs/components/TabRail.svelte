@@ -61,20 +61,20 @@
   const motion = new ListMotion({ enter: () => "rise" });
 
   const space = $derived(tabs.profile()?.kind === "incognito" ? undefined : tabs.activeSpace());
-  const order = $derived(tabs.spaces().map((entry) => entry.id));
+  const order = $derived(tabs.profileSpaces().map((entry) => entry.id));
   let scroller = $state<HTMLElement>();
   let stage = $state<HTMLElement>();
   let sheet = $state<HTMLElement>();
   let peeking = $state(false);
   const at = $derived(order.indexOf(tabs.activeSpaceId() ?? ""));
-  const before = $derived(at > 0 ? tabs.spaces()[at - 1] : undefined);
-  const after = $derived(at !== -1 ? tabs.spaces()[at + 1] : undefined);
+  const before = $derived(at > 0 ? tabs.profileSpaces()[at - 1] : undefined);
+  const after = $derived(at !== -1 ? tabs.profileSpaces()[at + 1] : undefined);
   $effect(() => {
     const id = tabs.activeSpaceId();
     const nodes = tabs.sidebarNodes();
     const all = tabs.tabs();
     const active = tabs.activeId();
-    const spaces = tabs.spaces();
+    const spaces = tabs.profileSpaces();
     if (id) untrack(() => remember(id, { nodes, tabs: all, active }, spaces));
   });
   const canStep = (step: 1 | -1) => {

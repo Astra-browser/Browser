@@ -61,6 +61,11 @@ pub struct SpaceSnapshot {
     pub position: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub container_ref: Option<String>,
+    /// The one Astra profile that owns the space. `None` in snapshots written
+    /// before per-profile ownership existed; the running profile adopts those
+    /// on first read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_id: Option<String>,
 }
 
 /// One tab folder inside a space.
@@ -509,12 +514,14 @@ mod tests {
                 name: "Work".to_owned(),
                 position: 0,
                 container_ref: Some("ctx-work".to_owned()),
+                profile_id: None,
             },
             SpaceSnapshot {
                 uuid: "space-play".to_owned(),
                 name: "Play".to_owned(),
                 position: 1,
                 container_ref: None,
+                profile_id: None,
             },
         ];
         let folders = vec![FolderSnapshot {
@@ -682,6 +689,7 @@ mod tests {
                 name: "S".to_owned(),
                 position: 0,
                 container_ref: None,
+                profile_id: None,
             }],
             vec![],
             vec![

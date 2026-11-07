@@ -41,7 +41,7 @@
 // `unavailable`.
 
 import { Favicons, originOf } from "./Favicons.sys.mjs";
-import { __activeSpaceId } from "./Tabs.sys.mjs";
+import { __activeSpaceId, __spaceOwner } from "./Tabs.sys.mjs";
 
 /** The first space keeps the unfiled root, so existing bookmarks stay put. */
 const DEFAULT_SPACE = "space-1";
@@ -71,6 +71,12 @@ const MAX_DEPTH = 256;
 
 /** The UI's "move to the end" index. */
 const APPEND = 0xffff_ffff;
+
+/** A space id on the wire: `space-N`, never a folder or an arbitrary string. */
+const SPACE_ID_RE = /^space-\d+$/u;
+
+/** Import copies at most this many entries, so one call stays bounded. */
+const MAX_COPY = 5000;
 
 const FOLDER = "folder";
 const LINK = "link";
@@ -120,6 +126,7 @@ export function __setBookmarksBackend(backend) {
 export function __resetBookmarksForTests() {
   _backend = null;
   _liveBackendPromise = null;
+  _spaceRoots.clear();
 }
 
 // --- In-memory backend (Node default) ---------------------------------------
@@ -558,6 +565,86 @@ async function panelStore() {
   return scopedStore(base, root);
 }
 
+// --- Import into another space ---------------------------------------------
+// A person can copy the bookmarks of one space into another space of the same
+// profile. This is an explicit copy: the source is never moved or changed, and
+// a space of another profile is refused, so the profile boundary stays intact.
+
+function isSpaceId(value) {
+  return typeof value === "string" && SPACE_ID_RE.test(value);
+}
+
+function isSpaceFolderTitle(title) {
+  return typeof title === "string" && title.startsWith(SPACE_FOLDER_PREFIX);
+}
+
+/** The folder that owns a space; the default space is the unfiled root. */
+async function spaceRoot(base, space, { create = false } = {}) {
+  if (space === DEFAULT_SPACE) return base.rootId;
+  if (create) return ensureSpaceRoot(base, space);
+  const title = `${SPACE_FOLDER_PREFIX}${space}`;
+  const children = await base.children(base.rootId);
+  return (
+    children.find((child) => child.kind === FOLDER && child.title === title)?.id ?? null
+  );
+}
+
+/** Copy links and folders recursively, never copying another space's root. */
+async function copyTree(base, fromRoot, toRoot, copied) {
+  const children = await base.children(fromRoot);
+  for (const child of children) {
+    if (copied >= MAX_COPY) return { copied, truncated: true };
+    if (child.kind === FOLDER) {
+      if (isSpaceFolderTitle(child.title)) continue;
+      const folder = await base.insert({
+        kind: FOLDER,
+        parent: toRoot,
+        title: child.title,
+        url: null,
+        index: base.defaultIndex,
+      });
+      if (!folder || !folder.id) return { copied, truncated: true };
+      copied += 1;
+      const nested = await copyTree(base, child.id, folder.id, copied);
+      copied = nested.copied;
+      if (nested.truncated) return { copied, truncated: true };
+    } else {
+      if (typeof child.url !== "string" || child.url === "") continue;
+      const link = await base.insert({
+        kind: LINK,
+        parent: toRoot,
+        title: typeof child.title === "string" ? child.title : "",
+        url: child.url,
+        index: base.defaultIndex,
+      });
+      if (!link || !link.id) return { copied, truncated: true };
+      copied += 1;
+    }
+  }
+  return { copied, truncated: false };
+}
+
+async function importSpace(profile, call) {
+  const from = call.from;
+  const to = isSpaceId(call.to) ? call.to : activeSpaceId();
+  if (!isSpaceId(from) || !isSpaceId(to) || from === to) {
+    return error(profile, "invalid");
+  }
+  const fromOwner = __spaceOwner(from);
+  const toOwner = __spaceOwner(to);
+  // An unknown space and a space of another profile both answer `missing`:
+  // this endpoint never confirms that another profile's space exists.
+  if (fromOwner === null || toOwner === null || fromOwner !== toOwner) {
+    return error(profile, "missing");
+  }
+  const base = await backend();
+  const fromRoot = await spaceRoot(base, from, { create: false });
+  if (!fromRoot) return error(profile, "missing");
+  const toRoot = await spaceRoot(base, to, { create: true });
+  const { copied, truncated } = await copyTree(base, fromRoot, toRoot, 0);
+  return { kind: "imported", count: copied, truncated };
+}
+
 // --- Listing projection ------------------------------------------------------
 
 /** Folders first, then links; Places' order inside each group. */
@@ -867,6 +954,11 @@ async function answer(profile, call) {
     case "remove":
       return isText(call.id)
         ? remove(profile, call)
+        : error(profile, "invalid");
+
+    case "import_space":
+      return isSpaceId(call.from)
+        ? importSpace(profile, call)
         : error(profile, "invalid");
 
     default:

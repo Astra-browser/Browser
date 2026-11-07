@@ -17,6 +17,14 @@ export const profile = () => state.profile;
 export const spaces = () => state.spaces;
 export const activeSpaceId = () => state.active_space_id;
 export const activeSpace = () => state.spaces.find((space) => space.id === state.active_space_id);
+/** The one profile whose spaces this window is showing. */
+export const activeProfileId = () => activeSpace()?.profile_id ?? null;
+/** Spaces of the profile in front; another profile's spaces are not a list
+ *  this profile can switch, reorder or move a tab into. */
+export const profileSpaces = () => {
+  const owner = activeProfileId();
+  return owner === null ? state.spaces : state.spaces.filter((space) => space.profile_id === owner);
+};
 export const sidebarNodes = () => state.nodes;
 export const activeTab = (): TabView | undefined =>
   state.tabs.find((tab) => tab.id === state.active);

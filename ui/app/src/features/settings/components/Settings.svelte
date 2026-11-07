@@ -23,6 +23,7 @@
     general: () => import("./sections/GeneralPage.svelte"),
     tabs: () => import("./sections/TabsPage.svelte"),
     profiles: () => import("./sections/ProfilesPage.svelte"),
+    spaces: () => import("./sections/SpacesPage.svelte"),
     search: () => import("./sections/SearchPage.svelte"),
     privacy: () => import("./sections/PrivacyPage.svelte"),
     shortcuts: () => import("./sections/KeyboardPage.svelte"),

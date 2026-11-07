@@ -44,6 +44,7 @@ impl Space {
             name: self.name.clone(),
             position: self.position,
             container_ref: self.container_ref.clone(),
+            profile_id: None,
         }
     }
 

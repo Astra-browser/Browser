@@ -66,6 +66,7 @@ const DEFAULT_SPACE = {
   icon: null,
   color: 0,
   theme: null,
+  profile_id: "default",
 };
 
 /** What may be written to disk. */
@@ -121,6 +122,11 @@ export function buildSnapshot({
       name: space.name,
       position: index,
       container_ref: null,
+      // Ownership survives a restart; a space never moves to another profile.
+      profile_id:
+        typeof space.profile_id === "string" && space.profile_id !== ""
+          ? space.profile_id
+          : null,
     })),
     folders: [],
     windows: [...windowIds].map((window_id) => ({
@@ -165,6 +171,12 @@ export function planRestore(snapshot, liveTabs = []) {
       icon: null,
       color: 0,
       theme: null,
+      // A snapshot written before ownership existed restores unowned and is
+      // adopted by the running profile on the first Profiles read.
+      profile_id:
+        typeof space.profile_id === "string" && space.profile_id !== ""
+          ? space.profile_id
+          : "default",
     }));
   if (spaces.length === 0) {
     return {

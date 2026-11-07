@@ -29,21 +29,21 @@
 
   // Private browsing keeps one space, so it has no switcher.
   const spaced = $derived(tabs.profile()?.kind !== "incognito" && tabs.activeSpace() !== undefined);
-  const order = $derived(tabs.spaces().map((space) => space.id));
+  const order = $derived(tabs.profileSpaces().map((space) => space.id));
   let stage = $state<HTMLElement>();
   let sheet = $state<HTMLElement>();
   // The neighbours are drawn only while a swipe has them in view.
   let peeking = $state(false);
   const at = $derived(order.indexOf(tabs.activeSpaceId() ?? ""));
-  const before = $derived(at > 0 ? tabs.spaces()[at - 1] : undefined);
-  const after = $derived(at !== -1 ? tabs.spaces()[at + 1] : undefined);
+  const before = $derived(at > 0 ? tabs.profileSpaces()[at - 1] : undefined);
+  const after = $derived(at !== -1 ? tabs.profileSpaces()[at + 1] : undefined);
   // What a space shows is kept, so that it can be drawn beside the next one.
   $effect(() => {
     const id = tabs.activeSpaceId();
     const nodes = tabs.sidebarNodes();
     const all = tabs.tabs();
     const active = tabs.activeId();
-    const spaces = tabs.spaces();
+    const spaces = tabs.profileSpaces();
     if (id) untrack(() => remember(id, { nodes, tabs: all, active }, spaces));
   });
   const canStep = (step: 1 | -1) => {

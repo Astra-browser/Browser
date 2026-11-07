@@ -90,6 +90,13 @@ const allSections = [
     icon: UserMultiple02Icon,
   },
   {
+    id: "spaces",
+    group: "browser",
+    title: m.section_spaces,
+    description: m.section_spaces_description,
+    icon: Layers01Icon,
+  },
+  {
     id: "work",
     group: "work",
     title: m.section_work,

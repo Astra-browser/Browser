@@ -32,7 +32,7 @@ CONTRACTS=(
   dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert
   permissions_prompt operations_ledger metadata_restore page_source_model
   media_model webext_view wire_coverage containers_isolation settings_native
-  privacy_host
+  privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then

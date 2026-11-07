@@ -30,6 +30,8 @@
 // backend is created lazily on first use.
 
 import { emit } from "./Events.sys.mjs";
+import { __activeProfileId, __spaceOwner } from "./Tabs.sys.mjs";
+import { userContextForSpace } from "./Containers.sys.mjs";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -210,6 +212,25 @@ function liveBackend() {
         return null;
       }
     },
+    // Drop exactly one space's cookies, site storage and cache. The engine
+    // keys all three on `originAttributes.userContextId`, so a pattern clear
+    // cannot touch a sibling space.
+    async clearSpace(userContextId) {
+      try {
+        return new Promise((resolve) => {
+          services.clearData.deleteDataFromOriginAttributesPattern(
+            { userContextId },
+            {
+              onDataDeleted(failedFlags) {
+                resolve(failedFlags === 0);
+              },
+            }
+          );
+        });
+      } catch {
+        return false;
+      }
+    },
     async forgetSite(site) {
       const { SiteDataManager } = lazyModule(
         "resource:///modules/SiteDataManager.sys.mjs",
@@ -270,6 +291,10 @@ function isSite(value) {
     value.length <= MAX_SITE &&
     !/[\s/]/u.test(value)
   );
+}
+
+function isSpaceId(value) {
+  return typeof value === "string" && /^space-\d+$/u.test(value);
 }
 
 function isOrigin(value) {
@@ -351,6 +376,28 @@ async function answer(expectedProfile, call) {
       // Cookies/site data and history change what other surfaces show.
       if (kinds.cookies) emit("sites-changed", { profile: "default" });
       if (kinds.history) emit("history.cleared", {});
+      return { kind: "cleared" };
+    }
+
+    case "clear_space": {
+      if (!isSpaceId(call.space)) return error("invalid");
+      const { scope } = profileScope(expectedProfile, impl);
+      if (scope === "invalid") return error("invalid");
+      if (scope === "unavailable") return error("unavailable");
+      if (scope === "private") return error("private");
+      // Only a space of the profile in front can be cleared from here; a
+      // space of another profile is not confirmed to exist.
+      const owner = __spaceOwner(call.space);
+      if (owner === null || owner !== __activeProfileId()) return error("invalid");
+      if (typeof impl.clearSpace !== "function") return error("unavailable");
+      let cleared = false;
+      try {
+        cleared = (await impl.clearSpace(userContextForSpace(call.space))) === true;
+      } catch {
+        cleared = false;
+      }
+      if (!cleared) return error("failed");
+      emit("sites-changed", { profile: "default" });
       return { kind: "cleared" };
     }
 
