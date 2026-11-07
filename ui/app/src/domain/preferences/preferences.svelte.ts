@@ -68,6 +68,7 @@ const defaults = {
   "work.favourite-models": "",
   "zoom.default": "100",
   "privacy.smartscreen": "true",
+  "privacy.drm": "true",
   "privacy.cleanup": "false",
   "privacy.fingerprinting": "true",
   "privacy.camera": "Ask",

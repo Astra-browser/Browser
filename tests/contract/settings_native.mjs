@@ -111,6 +111,7 @@ const cases = [
   ["search.suggestions", "false", "browser.search.suggest.enabled", false],
   ["search.history", "false", "browser.urlbar.suggest.history", false],
   ["privacy.smartscreen", "false", "browser.safebrowsing.malware.enabled", false],
+  ["privacy.drm", "true", "media.eme.enabled", true],
   ["privacy.cleanup", "true", "privacy.sanitize.sanitizeOnShutdown", true],
   ["privacy.camera", "Block", "permissions.default.camera", 2],
   ["privacy.microphone", "Allow", "permissions.default.microphone", 1],

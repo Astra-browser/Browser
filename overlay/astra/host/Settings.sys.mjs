@@ -348,6 +348,20 @@ const NATIVE = {
   "privacy.location": permissionDefault("permissions.default.geo"),
   "privacy.notifications": permissionDefault("permissions.default.desktop-notification"),
 
+  "privacy.drm": {
+    prefs: ["media.eme.enabled", "browser.eme.ui.enabled"],
+    read: (prefs) => flag(boolPref(prefs, "media.eme.enabled", false)),
+    write: (prefs, value) => {
+      const enabled = parseFlag(value);
+      if (enabled === null) return false;
+      prefs.setBoolPref("media.eme.enabled", enabled);
+      // Astra owns the DRM control; keep the engine's own "enable DRM"
+      // doorhanger and about:preferences checkbox out of the way.
+      prefs.setBoolPref("browser.eme.ui.enabled", false);
+      return true;
+    },
+  },
+
   "performance.sleep": {
     prefs: ["browser.tabs.unloadOnLowMemory"],
     read: (prefs) => flag(boolPref(prefs, "browser.tabs.unloadOnLowMemory", false)),

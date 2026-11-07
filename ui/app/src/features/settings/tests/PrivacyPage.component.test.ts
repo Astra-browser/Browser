@@ -63,3 +63,19 @@ test("the release page offers browsing data that works and none of the previews"
   expect(text).not.toContain("Site exceptions");
   expect(text).not.toContain("Clear site data when Astra closes");
 });
+
+test("protected content is a real setting on the release page", async () => {
+  const screen = await render(PrivacyPage);
+
+  await expect
+    .element(page.getByRole("heading", { name: "Protected content", exact: true }))
+    .toBeVisible();
+  await expect
+    .element(page.getByRole("heading", { name: "Play protected content", exact: true }))
+    .toBeVisible();
+  await expect.element(page.getByRole("switch", { name: "Play protected content" })).toBeVisible();
+
+  const text = screen.container.textContent;
+  expect(text).toContain("Widevine");
+  expect(text).toContain("L3");
+});

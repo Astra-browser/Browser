@@ -178,10 +178,10 @@ source = "live audit 2026-11-01 (idle); https://www.abcdesktop.io/faq/disable-fi
 [[endpoint]]
 host = "update.googleapis.com"
 match = "exact"
-class = "REPLACE"
-reason = "Widevine CDM Chromium update URL. Observed at idle in live run. Owner decision: ship Widevine (proprietary) or drop."
+class = "KEEP"
+reason = "Widevine CDM (L3) Chromium update URL. Astra ships protected-content playback (mozilla.cfg defaultPref media.eme.enabled=true), so the proprietary CDM must be able to fetch its updates. Owner approved shipping Widevine on 2026-11-08."
 disable = "pref media.gmp-widevinecdm.allow-chromium-update=false / media.gmp-manager.url repoint"
-owner_signoff = false
+owner_signoff = true
 source = "engine/browser/app/profile/firefox.js:2373 (media.gmp-manager.chromium-update-url)"
 
 [[endpoint]]

@@ -19,6 +19,9 @@
 
 <ProtectionControls />
 <PrivacyControls />
+<SettingsGroup title={m.privacy_protected_group()} description={m.privacy_protected_group_help()}>
+  <PreferenceSwitch id="privacy.drm" preference="privacy.drm" />
+</SettingsGroup>
 {#if IS_WINDOWS}<WindowsPrivacy />{/if}
 <PasskeysGroup />
 <SettingsGroup title={m.site_settings_title()} description={m.site_settings_help()}>

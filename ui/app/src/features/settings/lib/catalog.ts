@@ -390,6 +390,12 @@ export const fields = {
     description: m.privacy_smartscreen_help,
     initial: true,
   },
+  "privacy.drm": {
+    section: "privacy",
+    label: m.privacy_drm,
+    description: m.privacy_drm_help,
+    initial: true,
+  },
   "privacy.blocking": {
     section: "privacy",
     label: m.pref_privacy_blocking,

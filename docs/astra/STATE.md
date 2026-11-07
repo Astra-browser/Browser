@@ -11,7 +11,32 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
-## Owner report: sidebar utilities folded into the column head (2026-11-08, latest)
+## Owner report: protected content — Widevine L3 (2026-11-08, latest)
+
+**What changed:** Astra now ships protected-content playback on by default and
+owns the only switch for it. The Linux build already compiled Widevine
+(`MOZ_EME_MODULES: ['widevine']`); the missing pieces were EME being off by
+default, no Astra control, and the CDM update host classified `REPLACE`.
+
+| Surface | What works | Wiring / files | Evidence |
+|---|---|---|---|
+| Default posture | EME is on after first launch; Widevine may download; the engine's own "enable DRM" doorhanger and about:preferences checkbox never appear | `overlay/astra/mozilla.cfg` (`media.eme.enabled`, `media.gmp-widevinecdm.visible/enabled`, `browser.eme.ui.enabled=false`) | `protected_content.mjs` static checks |
+| Settings → Privacy → Protected content | A real `Play protected content` switch reads/writes `media.eme.enabled` and survives restart | `ui/app/src/features/settings/lib/catalog.ts` (`privacy.drm`), `components/sections/PrivacyPage.svelte`, `$domain/preferences` default, `overlay/astra/host/Settings.sys.mjs` NATIVE entry | `PrivacyPage.component.test.ts` 2/2; `settings_native.mjs` 103 |
+| CDM update | `update.googleapis.com` is a signed-off `KEEP`; disabling DRM re-removes the module | `tools/endpoint-audit/classify.toml` | `protected_content.mjs` |
+
+**Strict rule:** `tests/contract/protected_content.mjs` (registered in
+`tools/perf/full-suite.sh`) fails if the autoconfig, the endpoint
+classification, the host mapping, or the app surface drift.
+
+**Limits:** L3 only. Widevine L1 needs a hardware TEE and Gecko only ships the
+L1 CDM on Windows x64, so 4K/HDR OTT playback is not possible on this target.
+Recorded in `docs/astra/KNOWN_LIMITS.md` and `PRIVACY_PREFS.md`.
+
+**Verification:** `typecheck` 0/0, `eslint` clean, `prettier --check` clean,
+`PrivacyPage.component.test.ts` 2/2, `settings_native.mjs` 103/103,
+`protected_content.mjs` 19/19. Chrome bundle rebuilt and `jar.mn` regenerated.
+
+## Owner report: sidebar utilities folded into the column head (2026-11-08)
 
 **What changed:** the 44px utility rail beside the sidebar is gone. Media,
 downloads, notes, spaces and sleeping tabs now share the column's own top row,

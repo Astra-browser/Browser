@@ -45,6 +45,22 @@ matches policy-lock strength.
 | `browser.newtabpage.activity-stream.discoverystream.enabled` | `false` | `DiscoveryStreamFeed.sys.mjs:70` |
 | `...asrouter.userprefs.cfr.addons/features` | `false` | Same keys the `DisableFirefoxStudies` impl sets |
 
+### Protected content (EME)
+
+Astra ships Widevine L3 on by default and owns the only DRM control, so the
+engine's own prompt stays out of the way. The CDM update host is a signed-off
+`KEEP` (see `tools/endpoint-audit/classify.toml`); the live gate is
+`tests/contract/protected_content.mjs`.
+
+| Pref | Value | Why |
+|---|---|---|
+| `media.eme.enabled` | `true` | Firefox's Linux default is `false`; Astra exposes the choice in Settings → Privacy |
+| `media.gmp-widevinecdm.visible` | `true` | The CDM appears and may be downloaded |
+| `media.gmp-widevinecdm.enabled` | `true` | The CDM may install/run |
+| `browser.eme.ui.enabled` | `false` | No engine-owned "enable DRM" doorhanger or about:preferences checkbox |
+
+L1 and 4K are not available on Linux (see `KNOWN_LIMITS.md`).
+
 ## Deliberate omissions (not oversights)
 
 - **`DisablePocket`**: in the schema but **no implementation** in the pinned

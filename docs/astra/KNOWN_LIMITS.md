@@ -23,6 +23,26 @@ manager, resource media, notes `reveal`, and the tasks/notes Rust store. The
 wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 `unknown_command` for any of these is a product gap, not a deferral to ship.
 
+## Protected content (DRM / Widevine)
+
+- **L3 only, and it works by default.** The Linux build compiles Widevine
+  (`MOZ_EME_MODULES: ['widevine']`) and `mozilla.cfg` enables EME, so a site
+  that offers Widevine L3 can play protected audio and video. Settings →
+  Privacy → Protected content turns it off again (`media.eme.enabled`).
+- **No L1 and no 4K.** Widevine L1 needs a hardware TEE with the CDM inside
+  it; Gecko only ships the L1 CDM on Windows x64 (`MOZ_WMF_CDM && _M_AMD64`),
+  never on Linux. So Netflix and other OTT services are capped at their L3
+  tiers here (typically 720p–1080p where the service allows Firefox); 4K/HDR
+  needs L1 or PlayReady SL3000 and is out of reach on this target.
+- **The CDM is downloaded, not bundled.** The Widevine binary comes from
+  `update.googleapis.com`, which is a signed-off `KEEP` in
+  `tools/endpoint-audit/classify.toml`. Turning DRM off removes the module;
+  turning it back on re-fetches it.
+- **No engine-owned DRM UI.** `browser.eme.ui.enabled` is false: the native
+  "enable DRM" doorhanger and about:preferences checkbox never show. Astra's
+  switch is the only control (`tests/contract/protected_content.mjs` enforces
+  the wiring).
+
 ## Page loading
 
 - **The cover ends at the document commit**, not at true first paint. The
