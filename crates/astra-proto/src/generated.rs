@@ -6,8 +6,8 @@
 //! Source of truth: docs/astra/ipc-surface.md via schemas/*.json.
 //! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.
 
-/// Number of commands in the v1 surface (ipc-surface.md: 270).
-pub const COMMAND_COUNT: usize = 270;
+/// Number of commands in the v1 surface (ipc-surface.md: 275).
+pub const COMMAND_COUNT: usize = 275;
 /// Number of event channels in the v1 surface (ipc-surface.md: 35).
 pub const EVENT_COUNT: usize = 35;
 
@@ -150,6 +150,11 @@ pub enum CommandName {
     ProfileAvatarPick,
     ProfileMenuPopup,
     ProfileRename,
+    PrivacyConfigure,
+    PrivacyForgetSite,
+    PrivacySiteConfigure,
+    PrivacySiteState,
+    PrivacyState,
     ProfilesCreate,
     ProfilesDelete,
     ProfilesGet,
@@ -464,6 +469,11 @@ pub const COMMANDS: &[&str] = &[
     "profile_avatar_pick",
     "profile_menu_popup",
     "profile_rename",
+    "privacy_configure",
+    "privacy_forget_site",
+    "privacy_site_configure",
+    "privacy_site_state",
+    "privacy_state",
     "profiles_create",
     "profiles_delete",
     "profiles_get",
@@ -778,6 +788,11 @@ impl CommandName {
             CommandName::ProfileAvatarPick => "profile_avatar_pick",
             CommandName::ProfileMenuPopup => "profile_menu_popup",
             CommandName::ProfileRename => "profile_rename",
+            CommandName::PrivacyConfigure => "privacy_configure",
+            CommandName::PrivacyForgetSite => "privacy_forget_site",
+            CommandName::PrivacySiteConfigure => "privacy_site_configure",
+            CommandName::PrivacySiteState => "privacy_site_state",
+            CommandName::PrivacyState => "privacy_state",
             CommandName::ProfilesCreate => "profiles_create",
             CommandName::ProfilesDelete => "profiles_delete",
             CommandName::ProfilesGet => "profiles_get",
@@ -1053,6 +1068,11 @@ impl CommandName {
             "profile_avatar_pick" => Some(CommandName::ProfileAvatarPick),
             "profile_menu_popup" => Some(CommandName::ProfileMenuPopup),
             "profile_rename" => Some(CommandName::ProfileRename),
+            "privacy_configure" => Some(CommandName::PrivacyConfigure),
+            "privacy_forget_site" => Some(CommandName::PrivacyForgetSite),
+            "privacy_site_configure" => Some(CommandName::PrivacySiteConfigure),
+            "privacy_site_state" => Some(CommandName::PrivacySiteState),
+            "privacy_state" => Some(CommandName::PrivacyState),
             "profiles_create" => Some(CommandName::ProfilesCreate),
             "profiles_delete" => Some(CommandName::ProfilesDelete),
             "profiles_get" => Some(CommandName::ProfilesGet),

@@ -8,7 +8,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 270 command wire names. */
+/** All 275 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -146,6 +146,11 @@ export type CommandName =
   | "profile_avatar_pick"
   | "profile_menu_popup"
   | "profile_rename"
+  | "privacy_configure"
+  | "privacy_forget_site"
+  | "privacy_site_configure"
+  | "privacy_site_state"
+  | "privacy_state"
   | "profiles_create"
   | "profiles_delete"
   | "profiles_get"
@@ -419,6 +424,11 @@ export const COMMANDS: readonly CommandName[] = [
   "profile_avatar_pick",
   "profile_menu_popup",
   "profile_rename",
+  "privacy_configure",
+  "privacy_forget_site",
+  "privacy_site_configure",
+  "privacy_site_state",
+  "privacy_state",
   "profiles_create",
   "profiles_delete",
   "profiles_get",
@@ -827,6 +837,14 @@ export interface BlockerConfigurePayload {
   auto_update?: boolean;
   cosmetic?: boolean;
   scriptlets?: boolean;
+  mode?: string;
+  removeparam?: boolean;
+  bounce?: boolean;
+  block_scripts?: boolean;
+  redirects?: boolean;
+  cname?: boolean;
+  custom_lists?: Array<string>;
+  user_rules?: string;
 }
 /** `blocker_lists` (blockerLists, d:lib.rs). */
 export interface BlockerListsPayload {
@@ -1324,6 +1342,35 @@ export interface ProfileMenuPopupPayload {
 /** `profile_rename` (profileRename, d:lib.rs). */
 export interface ProfileRenamePayload {
   name: string;
+}
+/** `privacy_configure` (privacyConfigure, d:lib.rs). */
+export interface PrivacyConfigurePayload {
+  cookies?: string;
+  forget_on_close?: boolean;
+  ephemeral?: boolean;
+  fingerprinting?: string;
+  language?: boolean;
+  screen?: boolean;
+  bounce_protection?: boolean;
+}
+/** `privacy_forget_site` (privacyForgetSite, d:lib.rs). */
+export interface PrivacyForgetSitePayload {
+  host: string;
+}
+/** `privacy_site_configure` (privacySiteConfigure, d:lib.rs). */
+export interface PrivacySiteConfigurePayload {
+  host: string;
+  cookies?: string;
+  forget?: boolean;
+  fingerprint?: string;
+}
+/** `privacy_site_state` (privacySiteState, d:lib.rs). */
+export interface PrivacySiteStatePayload {
+  host: string;
+}
+/** `privacy_state` (privacyState, d:lib.rs). */
+export interface PrivacyStatePayload {
+  [key: string]: unknown;
 }
 /** `profiles_create` (profilesCreate, d:profiles.rs). */
 export interface ProfilesCreatePayload {
@@ -2111,6 +2158,11 @@ export interface CommandPayloads {
   "profile_avatar_pick": ProfileAvatarPickPayload;
   "profile_menu_popup": ProfileMenuPopupPayload;
   "profile_rename": ProfileRenamePayload;
+  "privacy_configure": PrivacyConfigurePayload;
+  "privacy_forget_site": PrivacyForgetSitePayload;
+  "privacy_site_configure": PrivacySiteConfigurePayload;
+  "privacy_site_state": PrivacySiteStatePayload;
+  "privacy_state": PrivacyStatePayload;
   "profiles_create": ProfilesCreatePayload;
   "profiles_delete": ProfilesDeletePayload;
   "profiles_get": ProfilesGetPayload;

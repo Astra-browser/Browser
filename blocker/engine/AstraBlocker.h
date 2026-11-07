@@ -16,15 +16,37 @@ bool IsInitialized();
 
 bool IsEnabled();
 
-bool ShouldBlockChannel(nsIChannel* aChannel);
+/**
+ * Inspect one channel before connect. Either cancels it (blocked), redirects
+ * it (removeparam / bounce / redirect resource), or lets it continue.
+ * Returns true when the channel was cancelled.
+ */
+bool ApplyChannelAction(nsIChannel* aChannel);
 
 nsresult InstallRules(const nsACString& aRules);
 nsresult InstallResources(const nsACString& aResourcesJson);
 void SetEnabled(bool aEnabled);
 nsresult SetSiteEnabled(const nsACString& aHost, bool aEnabled);
+nsresult SetSitePolicy(const nsACString& aHost, bool aEnabled, bool aAggressive,
+                       bool aScripts);
 bool IsSiteEnabled(const nsACString& aHost);
+nsresult SitePolicyJson(const nsACString& aHost, nsACString& aOutJson);
 nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
                      const nsACString& aIdsJson, nsACString& aOutJson);
+
+nsresult ClassifyHostJson(const nsACString& aHost, nsACString& aOutJson);
+nsresult ClassifyBounceJson(const nsACString& aUrl, nsACString& aOutJson);
+
+/** System-resolver CNAME chain for one host (fallback for platforms whose
+ *  getaddrinfo does not return a canonical name). */
+nsresult CnameJson(const nsACString& aHost, nsACString& aOutJson);
+
+/** Diagnostic verdict for one request: block, redirect resource, rewrite. */
+nsresult CheckUrlJson(const nsACString& aUrl, const nsACString& aSourceUrl,
+                      const nsACString& aType, nsACString& aOutJson);
+nsresult SetCloakedHost(const nsACString& aHost, bool aBlocked);
+bool IsCloaked(const nsACString& aHost);
+nsresult CloakedHostsJson(nsACString& aOutJson);
 
 nsresult StatusJson(nsACString& aOutJson);
 nsresult StatsJson(nsACString& aOutJson);

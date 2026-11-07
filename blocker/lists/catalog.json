@@ -321,7 +321,7 @@
       "id": "easylist-cookie",
       "title": "EasyList-Cookie",
       "group": "annoyances",
-      "default_enabled": false,
+      "default_enabled": true,
       "source_url": "https://secure.fanboy.co.nz/fanboy-cookiemonster_ubo.txt",
       "support_url": "https://forums.lanik.us/",
       "format": "Standard",
@@ -396,7 +396,7 @@
       "id": "social-media-blocker",
       "title": "Social media blocker",
       "group": "annoyances",
-      "default_enabled": false,
+      "default_enabled": true,
       "source_url": "https://easylist-downloads.adblockplus.org/fanboy-social.txt",
       "support_url": "https://forums.lanik.us/",
       "format": "Standard",
@@ -426,7 +426,7 @@
       "id": "ublock-filters-cookie-notices",
       "title": "uBlock filters – Cookie Notices",
       "group": "annoyances",
-      "default_enabled": false,
+      "default_enabled": true,
       "source_url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances-cookies.txt",
       "support_url": "https://github.com/uBlockOrigin/uAssets",
       "format": "Standard",
@@ -556,6 +556,21 @@
         "url": "https://urlhaus.abuse.ch/"
       },
       "bundled": false
+    },
+    {
+      "id": "astra-telemetry",
+      "title": "Astra Telemetry and Ad-Script Heuristics",
+      "group": "privacy",
+      "default_enabled": true,
+      "source_url": "",
+      "support_url": "https://github.com/astra-browser/astra",
+      "format": "Standard",
+      "license": {
+        "license_expression": "MPL-2.0",
+        "attribution": "The Astra contributors",
+        "url": "https://mozilla.org/MPL/2.0/"
+      },
+      "bundled": true
     },
     {
       "id": "easyprivacy",

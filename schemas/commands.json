@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 270,
+  "count": 275,
   "commands": {
     "about_info": {
       "ts": "aboutInfo",
@@ -649,6 +649,33 @@
           },
           "scriptlets": {
             "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "removeparam": {
+            "type": "boolean"
+          },
+          "bounce": {
+            "type": "boolean"
+          },
+          "block_scripts": {
+            "type": "boolean"
+          },
+          "redirects": {
+            "type": "boolean"
+          },
+          "cname": {
+            "type": "boolean"
+          },
+          "custom_lists": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_rules": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3188,6 +3215,138 @@
         },
         "ts": "unknown",
         "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "privacy_configure": {
+      "ts": "privacyConfigure",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "cookies": {
+            "type": "string"
+          },
+          "forget_on_close": {
+            "type": "boolean"
+          },
+          "ephemeral": {
+            "type": "boolean"
+          },
+          "fingerprinting": {
+            "type": "string"
+          },
+          "language": {
+            "type": "boolean"
+          },
+          "screen": {
+            "type": "boolean"
+          },
+          "bounce_protection": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PrivacyMutationView"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::PrivacyMutationView"
+      }
+    },
+    "privacy_forget_site": {
+      "ts": "privacyForgetSite",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "host"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PrivacyForgetView"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::PrivacyForgetView"
+      }
+    },
+    "privacy_site_configure": {
+      "ts": "privacySiteConfigure",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "cookies": {
+            "type": "string"
+          },
+          "forget": {
+            "type": "boolean"
+          },
+          "fingerprint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "host"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PrivacySiteMutationView"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::PrivacySiteMutationView"
+      }
+    },
+    "privacy_site_state": {
+      "ts": "privacySiteState",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "host"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PrivacySiteStateView"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::PrivacySiteStateView"
+      }
+    },
+    "privacy_state": {
+      "ts": "privacyState",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::PrivacyStateView"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::PrivacyStateView"
       }
     },
     "profiles_create": {

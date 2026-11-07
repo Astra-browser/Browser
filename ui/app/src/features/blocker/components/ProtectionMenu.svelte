@@ -10,7 +10,11 @@
   } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
   import { blocker, blockerSites, hiding, shieldPresentation } from "$domain/blocker";
-  import type { BlockerSiteAction } from "$shared/ipc/bindings";
+  import {
+    commands,
+    type BlockerSiteAction,
+    type PrivacySiteStateView,
+  } from "$shared/ipc/bindings";
   import Icon from "$shared/ui/Icon";
   import Switch from "$shared/ui/Switch";
 
@@ -24,6 +28,7 @@
   let busy = $state(false);
   let managing = $state(false);
   let failure = $state("");
+  let privacySite = $state<PrivacySiteStateView | null>(null);
   let contextKey = $derived(
     site ? `${site.context.profile}:${site.context.tab}:${site.context.site}` : "",
   );
@@ -31,6 +36,16 @@
     void contextKey;
     failure = "";
     managing = false;
+    privacySite = null;
+    const host = site?.context.site;
+    if (!host) return;
+    void (async () => {
+      try {
+        privacySite = await commands.privacySiteState(host);
+      } catch {
+        privacySite = null;
+      }
+    })();
   });
 
   // What the page's own row cannot say: protection that is off, starting or in
@@ -97,6 +112,53 @@
 
   async function hide() {
     if (site && !(await hiding.start(site.context))) failure = m.site_info_hide_failed();
+  }
+
+  const setMode = (mode: "off" | "standard" | "aggressive") =>
+    run(async () => {
+      if (!(await change({ kind: "mode", mode }))) {
+        failure = m.site_info_blocking_failed();
+        return;
+      }
+      void commands.tabsReload(site?.context.tab ?? "");
+    });
+
+  const setScripts = (blocked: boolean) =>
+    run(async () => {
+      if (!(await change({ kind: "scripts", blocked }))) {
+        failure = m.site_info_blocking_failed();
+        return;
+      }
+      void commands.tabsReload(site?.context.tab ?? "");
+    });
+
+  async function configurePrivacy(patch: {
+    cookies?: string;
+    forget?: boolean;
+    fingerprint?: string;
+  }) {
+    const host = site?.context.site;
+    if (!host) return;
+    await run(async () => {
+      const result = await (async () => {
+        try {
+          return await commands.privacySiteConfigure(
+            host,
+            patch.cookies ?? null,
+            patch.forget ?? null,
+            patch.fingerprint ?? null,
+          );
+        } catch {
+          return null;
+        }
+      })();
+      if (!result?.accepted) {
+        failure = m.site_info_blocking_failed();
+        return;
+      }
+      privacySite = result.state ?? privacySite;
+      if (patch.cookies !== undefined) void commands.tabsReload(site?.context.tab ?? "");
+    });
   }
 </script>
 
@@ -210,6 +272,96 @@
       {/if}
     {/if}
 
+    {#if site && on && site.ready}
+      <div class="site-modes" role="group" aria-label="Shield mode for this site">
+        <button
+          type="button"
+          class="mode"
+          class:active={site.mode === "off"}
+          disabled={busy || site.busy}
+          onclick={() => void setMode("off")}>Off</button
+        >
+        <button
+          type="button"
+          class="mode"
+          class:active={site.mode === "standard"}
+          disabled={busy || site.busy}
+          onclick={() => void setMode("standard")}>Standard</button
+        >
+        <button
+          type="button"
+          class="mode"
+          class:active={site.mode === "aggressive"}
+          disabled={busy || site.busy}
+          onclick={() => void setMode("aggressive")}>Aggressive</button
+        >
+      </div>
+      <div class="site-row">
+        <span class="site-label">Block scripts</span>
+        <Switch
+          label="Block scripts on this site"
+          labelHidden
+          checked={site.block_scripts === true}
+          disabled={busy || site.busy}
+          onchange={(value) => void setScripts(value)}
+        />
+      </div>
+      <div class="site-row">
+        <span class="site-label">Cookies</span>
+        <select
+          class="site-select"
+          aria-label="Cookies for this site"
+          value={privacySite?.cookies ?? "default"}
+          disabled={busy || site.busy || site.private_session}
+          onchange={(event) => void configurePrivacy({ cookies: event.currentTarget.value })}
+        >
+          <option value="default">Default</option>
+          <option value="block">Block</option>
+          <option value="allow">Allow</option>
+        </select>
+      </div>
+      <div class="site-row">
+        <span class="site-label">Forget when closed</span>
+        <Switch
+          label="Forget this site when closed"
+          labelHidden
+          checked={privacySite?.forget === true}
+          disabled={busy || site.busy || site.private_session || privacySite === null}
+          onchange={(value) => void configurePrivacy({ forget: value })}
+        />
+      </div>
+      <div class="site-row">
+        <span class="site-label">Site data</span>
+        <button
+          type="button"
+          class="site-action"
+          disabled={busy || site.busy || site.private_session}
+          onclick={() =>
+            void run(async () => {
+              const result = await commands
+                .privacyForgetSite(site?.context.site ?? "")
+                .catch(() => null);
+              if (!result?.accepted) failure = m.site_info_blocking_failed();
+            })}>Forget now</button
+        >
+      </div>
+      <div class="site-row">
+        <span class="site-label">Fingerprinting</span>
+        <select
+          class="site-select"
+          aria-label="Fingerprinting for this site"
+          value={privacySite?.fingerprint ?? ""}
+          disabled={busy || site.busy || site.private_session || privacySite === null}
+          onchange={(event) => void configurePrivacy({ fingerprint: event.currentTarget.value })}
+        >
+          <option value="">Default</option>
+          <option value="off">Off</option>
+          <option value="standard">Standard</option>
+          <option value="aggressive">Aggressive</option>
+        </select>
+      </div>
+    {/if}
+
     {#if failure}<p class="failure" role="status">{failure}</p>{/if}
   </section>
 {/if}
@@ -257,6 +409,71 @@
     background: var(--row-active);
     outline: 2px solid var(--color-ring);
     outline-offset: -2px;
+  }
+
+  .site-modes {
+    display: flex;
+    margin: 2px var(--menu-item-inset) 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+  }
+
+  .mode {
+    flex: 1;
+    min-height: 28px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-caption);
+    cursor: default;
+  }
+
+  .mode + .mode {
+    border-inline-start: 1px solid var(--color-border);
+  }
+
+  .mode.active {
+    background: var(--row-active);
+    font-weight: 600;
+  }
+
+  .site-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 28px;
+    padding: 0 var(--menu-item-inset);
+    font-size: var(--text-caption);
+  }
+
+  .site-label {
+    color: var(--color-muted);
+  }
+
+  .site-action {
+    min-height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-caption);
+    cursor: default;
+  }
+
+  .site-select {
+    min-height: 24px;
+    max-width: 120px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-caption);
   }
 
   .row:hover:not(:disabled) {

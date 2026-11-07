@@ -182,7 +182,7 @@ mod tests {
     fn registry_counts_match_surface() {
         assert_eq!(COMMANDS.len(), COMMAND_COUNT);
         assert_eq!(EVENTS.len(), EVENT_COUNT);
-        assert_eq!(COMMAND_COUNT, 270);
+        assert_eq!(COMMAND_COUNT, 275);
         assert_eq!(EVENT_COUNT, 35);
         assert!(COMMANDS.contains(&"tabs_navigate"));
         assert!(EVENTS.contains(&"tab-changed"));

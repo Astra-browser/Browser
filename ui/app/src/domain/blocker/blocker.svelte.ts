@@ -182,6 +182,14 @@ export type BlockerConfiguration = {
   autoUpdate: boolean | null;
   cosmetic: boolean | null;
   scriptlets: boolean | null;
+  mode?: "standard" | "aggressive" | null;
+  removeparam?: boolean | null;
+  bounce?: boolean | null;
+  blockScripts?: boolean | null;
+  redirects?: boolean | null;
+  cname?: boolean | null;
+  customLists?: string[] | null;
+  userRules?: string | null;
 };
 
 export const configure = (input: BlockerConfiguration) =>
@@ -192,6 +200,14 @@ export const configure = (input: BlockerConfiguration) =>
       input.autoUpdate,
       input.cosmetic,
       input.scriptlets,
+      input.mode ?? null,
+      input.removeparam ?? null,
+      input.bounce ?? null,
+      input.blockScripts ?? null,
+      input.redirects ?? null,
+      input.cname ?? null,
+      input.customLists ?? null,
+      input.userRules ?? null,
     ),
   );
 

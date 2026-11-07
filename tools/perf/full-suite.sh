@@ -32,6 +32,7 @@ CONTRACTS=(
   dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert
   permissions_prompt operations_ledger metadata_restore page_source_model
   media_model webext_view wire_coverage containers_isolation settings_native
+  privacy_host
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -77,6 +78,7 @@ PROBES=(
   "settings_audit:tools/marionette-probe/settings-audit-probe.py"
   "settings_parity:tools/marionette-probe/settings-parity-probe.py"
   "blocker:tools/marionette-probe/blocker-probe.py"
+  "shields:tools/marionette-probe/shields-probe.py"
   "fingerprint:tools/marionette-probe/fingerprint-probe.py"
   "tabs_settings:tools/marionette-probe/tabs-settings-probe.py"
   "material_zoom_home:tools/marionette-probe/material-zoom-home-probe.py"

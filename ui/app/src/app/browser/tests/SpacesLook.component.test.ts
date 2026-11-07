@@ -40,6 +40,8 @@ vi.mock("$shared/ipc/bindings", async () => {
         site: {
           context: { profile: "p", tab: "github", site: "github.example", revision: "a" },
           paused: false,
+          mode: "standard" as const,
+          block_scripts: false,
           private_session: false,
           ready: true,
           busy: false,

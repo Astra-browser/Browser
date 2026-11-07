@@ -17,10 +17,10 @@ function mockBridge() {
 }
 
 describe("surface coverage", () => {
-  test("covers all 270 commands and 35 events", () => {
-    expect(mockCommandNames()).toHaveLength(270);
+  test("covers all 275 commands and 35 events", () => {
+    expect(mockCommandNames()).toHaveLength(275);
     expect(mockEventChannels()).toHaveLength(35);
-    expect(COMMANDS).toHaveLength(270);
+    expect(COMMANDS).toHaveLength(275);
     expect(EVENTS).toHaveLength(35);
   });
 

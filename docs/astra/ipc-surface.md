@@ -11,7 +11,7 @@ camelCase TS wrappers. 8 event channels carry a previous-product prefix and **mu
 Legend: `prev_` / `prev:` / `Prev` mark verbatim source identifiers carrying the
 previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels, types).
 
-## Commands (270)
+## Commands (275)
 
 | Wire name | TS wrapper | Rust fn (file) | Params (minus caller) | Returns |
 |---|---|---|---|---|
@@ -46,7 +46,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `account_usage_history` | `accountUsageHistory` | `d:account.rs` | `async caller: WebviewWindow, cursor: Option<String>,` | `AccountHistoryV1` |
 | `account_verify` | `accountVerify` | `d:account.rs` | `async caller: WebviewWindow, code: String` | `AccountReplyV1` |
 | `add_menu_popup` | `addMenuPopup` | `d:lib.rs` | `caller: WebviewWindow, app: tauri::AppHandle, x: f64, y: f64, can_split: bool,` | `bool` |
-| `blocker_configure` | `blockerConfigure` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, list_ids: Option<Vec<String>>, update_hours: Option<u32>, auto_update: Option<bool>, cosmetic: Option<bool>, scriptlets: Option<bool>,` | `prev_ipc::OperationAdmission` |
+| `blocker_configure` | `blockerConfigure` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, list_ids: Option<Vec<String>>, update_hours: Option<u32>, auto_update: Option<bool>, cosmetic: Option<bool>, scriptlets: Option<bool>, mode: Option<String>, removeparam: Option<bool>, bounce: Option<bool>, block_scripts: Option<bool>, redirects: Option<bool>, cname: Option<bool>, custom_lists: Option<Vec<String>>, user_rules: Option<String>,` | `prev_ipc::OperationAdmission` |
 | `blocker_lists` | `blockerLists` | `d:lib.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>,` | `Result<prev_ipc::BlockerListsView, ()>` |
 | `blocker_picker` | `blockerPicker` | `d:lib.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, context: prev_ipc::BlockerSiteContext, action: prev_ipc::BlockerPickerAction,` | `Result<Option<prev_ipc::BlockerPickerView>, ()>` |
 | `blocker_refresh_sources` | `blockerRefreshSources` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>,` | `prev_ipc::OperationAdmission` |
@@ -151,6 +151,11 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `profile_avatar_pick` | `profileAvatarPick` | `d:profiles.rs` | `async caller: WebviewWindow, app: AppHandle,` | `Result<ProfileAvatarPickV1, ()>` |
 | `profile_menu_popup` | `profileMenuPopup` | `d:lib.rs` | `caller: WebviewWindow, app: tauri::AppHandle, x: f64, y: f64` | `bool` |
 | `profile_rename` | `profileRename` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, name: String,` | `prev_ipc::OperationAdmission` |
+| `privacy_configure` | `privacyConfigure` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, cookies: Option<String>, forget_on_close: Option<bool>, ephemeral: Option<bool>, fingerprinting: Option<String>, language: Option<bool>, screen: Option<bool>, bounce_protection: Option<bool>,` | `prev_ipc::PrivacyMutationView` |
+| `privacy_forget_site` | `privacyForgetSite` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, host: String,` | `prev_ipc::PrivacyForgetView` |
+| `privacy_site_configure` | `privacySiteConfigure` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, host: String, cookies: Option<String>, forget: Option<bool>, fingerprint: Option<String>,` | `prev_ipc::PrivacySiteMutationView` |
+| `privacy_site_state` | `privacySiteState` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, host: String,` | `prev_ipc::PrivacySiteStateView` |
+| `privacy_state` | `privacyState` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>,` | `prev_ipc::PrivacyStateView` |
 | `profiles_create` | `profilesCreate` | `d:profiles.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, name: String, avatar: ProfileAvatarInputV1, and_switch: bool,` | `OperationAdmission` |
 | `profiles_delete` | `profilesDelete` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, profile: String,` | `prev_ipc::OperationAdmission` |
 | `profiles_get` | `profilesGet` | `d:profiles.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>,` | `Result<Option<ProfilesView>, ()>` |

@@ -20,10 +20,21 @@ have written a user value on every boot and silently reset the switch.
 
 ## Settings
 
-Privacy → **Fingerprinting and tracking** has one switch,
-**Fingerprinting protection**, mapped to
-`privacy.fingerprintingProtection`. Turning it off leaves the filter lists and
-cookie policy untouched; native tracking protection is not forced on by Astra.
+Privacy → **Fingerprinting protection** has three levels and two independent
+spoofs (live in `ProtectionControls`/`PrivacyControls`):
+
+| Control | Native value |
+|---|---|
+| Off | `privacy.fingerprintingProtection=false` |
+| Standard | FPP on with the strengthened target set below |
+| Aggressive | FPP on with canvas/audio/WebGL/font/display **and** screen/window/locale targets |
+| Language fingerprinting | adds `+JSLocale,+JSLocalePrompt`, sets `intl.accept_languages=en-US, en`, and overrides `Accept-Language` on requests |
+| Screen fingerprinting | adds `+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowOuterSize,+WindowScreenXY,+WindowInnerScreenXY,+RoundWindowSize,+MouseEventScreenPoint` |
+| Per-site (shield menu) | `privacy.fingerprintingProtection.granularOverrides` with `{firstPartyDomain, overrides}`: `-AllTargets` (off), the standard set, or `+AllTargets` (aggressive) |
+
+Turning protection off leaves the filter lists and cookie policy untouched;
+native tracking protection is not forced on by Astra. The per-site entry is
+removed when the person chooses Default.
 
 ## Verified surfaces (packaged dev build, 2026-11-07)
 

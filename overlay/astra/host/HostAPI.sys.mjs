@@ -66,6 +66,7 @@ import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
 import { BrowsingData, __resetBrowsingDataForTests } from "./BrowsingData.sys.mjs";
 import { Blocker, __resetBlockerForTests } from "./Blocker.sys.mjs";
+import { Privacy, __resetPrivacyForTests } from "./Privacy.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
 import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
@@ -110,6 +111,7 @@ export {
   Permissions,
   BrowsingData,
   Blocker,
+  Privacy,
   Operations,
   Metadata,
   PageSource,
@@ -148,6 +150,7 @@ export function __resetForTests() {
   __resetProfilesForTests();
   __resetBrowsingDataForTests();
   __resetBlockerForTests();
+  __resetPrivacyForTests();
   __resetPageSourceForTests();
   Media.__resetForTests();
   __resetMediaImportForTests();

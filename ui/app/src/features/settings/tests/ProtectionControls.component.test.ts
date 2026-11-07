@@ -30,6 +30,15 @@ vi.mock("$domain/blocker", () => ({
       next_update_unix: null,
       installed_rules: 2,
       stats: { today: 0, last7Days: 0, days: [] },
+      mode: "standard",
+      removeparam: true,
+      bounce: true,
+      block_scripts: false,
+      redirects: true,
+      cname: true,
+      custom_lists: [],
+      user_rules: "",
+      cloaked: [],
     }),
   },
 }));
@@ -45,7 +54,7 @@ test("the real toggle dispatches intent and never invents applied protection", a
       }),
   );
   const screen = await render(ProtectionControls);
-  const toggle = screen.getByRole("switch", { name: "Block ads and trackers" });
+  const toggle = screen.getByRole("switch", { name: /Block ads/ });
   await toggle.click();
   expect(blocker.setEnabled).toHaveBeenCalledExactlyOnceWith(true);
   await expect.element(toggle).toBeDisabled();
@@ -67,4 +76,23 @@ test("filter refresh uses the real updater and reports pending settlement", asyn
   await screen.getByRole("button", { name: "Update lists now" }).click();
   expect(blocker.refreshSources).toHaveBeenCalledExactlyOnceWith();
   await expect.element(screen.getByRole("status")).toHaveTextContent("still being applied");
+});
+
+test("protection mode and shield switches dispatch the new configuration", async () => {
+  vi.mocked(blocker.configure).mockResolvedValue({
+    state: "processed",
+    disposition: { outcome: "applied", reason: "mutation_applied" },
+  } as never);
+  const screen = await render(ProtectionControls);
+
+  await screen.getByRole("button", { name: "Aggressive" }).click();
+  expect(blocker.configure).toHaveBeenCalledWith(expect.objectContaining({ mode: "aggressive" }));
+
+  vi.mocked(blocker.configure).mockClear();
+  await screen.getByRole("switch", { name: "Strip tracking parameters" }).click();
+  expect(blocker.configure).toHaveBeenCalledWith(expect.objectContaining({ removeparam: false }));
+
+  vi.mocked(blocker.configure).mockClear();
+  await screen.getByRole("switch", { name: "Block scripts" }).click();
+  expect(blocker.configure).toHaveBeenCalledWith(expect.objectContaining({ blockScripts: true }));
 });

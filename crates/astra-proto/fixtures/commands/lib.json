@@ -357,6 +357,32 @@
       }
     },
     {
+      "command": "privacy_configure",
+      "payload": {}
+    },
+    {
+      "command": "privacy_forget_site",
+      "payload": {
+        "host": "x"
+      }
+    },
+    {
+      "command": "privacy_site_configure",
+      "payload": {
+        "host": "x"
+      }
+    },
+    {
+      "command": "privacy_site_state",
+      "payload": {
+        "host": "x"
+      }
+    },
+    {
+      "command": "privacy_state",
+      "payload": {}
+    },
+    {
       "command": "profiles_delete",
       "payload": {
         "profile": "x"

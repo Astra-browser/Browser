@@ -25,8 +25,8 @@ beforeEach(() => {
 });
 
 describe("bridge wiring", () => {
-  test("covers the full surface (270 commands, 35 events)", () => {
-    expect(COMMANDS).toHaveLength(270);
+  test("covers the full surface (275 commands, 35 events)", () => {
+    expect(COMMANDS).toHaveLength(275);
     expect(EVENTS).toHaveLength(35);
   });
 
@@ -140,6 +140,7 @@ describe("bridge wiring", () => {
       Permissions: {},
       BrowsingData: {},
       Blocker: {},
+      Privacy: {},
       Operations: {},
       addEventListener: () => () => {},
       eventSeq: () => 0,

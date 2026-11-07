@@ -231,6 +231,15 @@
     } catch {
       // No dialog bridge: the engine keeps its own prompt.
     }
+    // Shields: install the process-wide observers (CNAME/CSP/forget-on-close)
+    // once at boot, not only when Settings or the shield menu is opened.
+    try {
+      host.Blocker?.install?.();
+      host.Privacy?.install?.();
+    } catch {
+      // A partially installed observer set still leaves the engine filters in
+      // place; the next Settings open retries.
+    }
 
     // P4: the native tabbrowser deck is the product path. The stage follows
     // the Astra content slot; mountNative marks it mounted once gBrowser owns

@@ -59,8 +59,61 @@ AstraBlockerService::IsSiteEnabled(const nsACString& aHost, bool* aResult) {
 }
 
 NS_IMETHODIMP
+AstraBlockerService::SetSitePolicy(const nsACString& aHost, bool aEnabled,
+                                   bool aAggressive, bool aScripts) {
+  return AstraBlocker::SetSitePolicy(aHost, aEnabled, aAggressive, aScripts);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::SitePolicy(const nsACString& aHost, nsACString& aResult) {
+  return AstraBlocker::SitePolicyJson(aHost, aResult);
+}
+
+NS_IMETHODIMP
 AstraBlockerService::SiteExceptions(nsACString& aResult) {
   return AstraBlocker::SiteExceptionsJson(aResult);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::SetCloakedHost(const nsACString& aHost, bool aBlocked) {
+  return AstraBlocker::SetCloakedHost(aHost, aBlocked);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::IsCloaked(const nsACString& aHost, bool* aResult) {
+  NS_ENSURE_ARG_POINTER(aResult);
+  *aResult = AstraBlocker::IsCloaked(aHost);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+AstraBlockerService::CloakedHosts(nsACString& aResult) {
+  return AstraBlocker::CloakedHostsJson(aResult);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::ClassifyHost(const nsACString& aHost,
+                                  nsACString& aResult) {
+  return AstraBlocker::ClassifyHostJson(aHost, aResult);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::ClassifyBounce(const nsACString& aUrl,
+                                    nsACString& aResult) {
+  return AstraBlocker::ClassifyBounceJson(aUrl, aResult);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::Cname(const nsACString& aHost, nsACString& aResult) {
+  return AstraBlocker::CnameJson(aHost, aResult);
+}
+
+NS_IMETHODIMP
+AstraBlockerService::CheckUrl(const nsACString& aUrl,
+                              const nsACString& aSourceUrl,
+                              const nsACString& aType,
+                              nsACString& aResult) {
+  return AstraBlocker::CheckUrlJson(aUrl, aSourceUrl, aType, aResult);
 }
 
 NS_IMETHODIMP

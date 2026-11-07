@@ -99,6 +99,17 @@ DEFAULT_TITLES = {
     "URLhaus Malicious URL Blocklist",
 }
 
+# Social embeds and cookie banners are on by default (owner request). Their
+# groups are optional by design, so name them explicitly.
+DEFAULT_ANNOYANCE_TITLES = {
+    "EasyList-Cookie",
+    "uBlock filters – Cookie Notices",
+    "Social media blocker",
+}
+
+ASTRA_TELEMETRY_ID = "astra-telemetry"
+ASTRA_TELEMETRY_TITLE = "Astra Telemetry and Ad-Script Heuristics"
+
 # Licences of the community sources we ship. The list text itself is data;
 # the licence travels with the catalog entry.
 LICENCES = {
@@ -231,9 +242,11 @@ def build_catalog(root: str) -> dict:
             elif entry_default and "privacy" in entry_title.lower():
                 base_group = "privacy"
             group = group_for(title, base_group)
-            default = entry_default and group in DEFAULT_GROUPS and (
-                title in DEFAULT_TITLES or group in {"privacy", "malware"}
-            )
+            default = (
+                entry_default
+                and group in DEFAULT_GROUPS
+                and (title in DEFAULT_TITLES or group in {"privacy", "malware"})
+            ) or title in DEFAULT_ANNOYANCE_TITLES
             item = {
                 "id": slug(title),
                 "title": title,
@@ -274,6 +287,27 @@ def build_catalog(root: str) -> dict:
             lists.append(existing)
         existing["bundled"] = True
 
+    # Astra-owned supplemental list: device-maker telemetry, analytics hosts
+    # that the community lists miss, and generic ad-script paths. Text source:
+    # blocker/lists/astra-telemetry.txt (MPL-2.0, maintained here).
+    lists.append(
+        {
+            "id": ASTRA_TELEMETRY_ID,
+            "title": ASTRA_TELEMETRY_TITLE,
+            "group": "privacy",
+            "default_enabled": True,
+            "source_url": "",
+            "support_url": "https://github.com/astra-browser/astra",
+            "format": "Standard",
+            "license": {
+                "license_expression": "MPL-2.0",
+                "attribution": "The Astra contributors",
+                "url": "https://mozilla.org/MPL/2.0/",
+            },
+            "bundled": True,
+        }
+    )
+
     lists.sort(key=lambda row: (row["group"], row["title"].lower()))
 
     return {
@@ -304,6 +338,39 @@ def build_catalog(root: str) -> dict:
     }
 
 
+ASTRA_RESOURCES = [
+    {
+        "name": "1x1-transparent.gif",
+        "aliases": ["1x1.gif", "transparent.gif", "1x1-transparent"],
+        "kind": {"mime": "image/gif"},
+        "content": "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+    },
+    {
+        "name": "2x2-transparent.png",
+        "aliases": ["2x2.png", "transparent.png"],
+        "kind": {"mime": "image/png"},
+        "content": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR42mNk+M+ACzDhlR3VSF+NABEkAQFJm0mDAAAAAElFTkSuQmCC",
+    },
+    {
+        "name": "noop.js",
+        "aliases": ["noopjs", "empty.js", "noop-0.1s.mp4.js"],
+        "kind": {"mime": "application/javascript"},
+        "content": "LyoqIEFzdHJhIHJlZGlyZWN0IHBsYWNlaG9sZGVyICovCg==",
+    },
+    {
+        "name": "noop.txt",
+        "aliases": ["nooptext", "empty.txt"],
+        "kind": {"mime": "text/plain"},
+        "content": "QXN0cmEgcmVkaXJlY3QgcGxhY2Vob2xkZXI=",
+    },
+    {
+        "name": "noop.css",
+        "aliases": ["empty.css"],
+        "kind": {"mime": "text/css"},
+        "content": "LyogQXN0cmEgcmVkaXJlY3QgcGxhY2Vob2xkZXIgKi8=",
+    },
+]
+
 def build_resources(root: str) -> list[dict]:
     path = os.path.join(root, "folder_context", "adblock-resources", "dist", "resources.json")
     with open(path, encoding="utf-8") as handle:
@@ -329,6 +396,7 @@ def build_resources(root: str) -> list[dict]:
         if re.search(r"(?i)brave\.(?:com|software)", text):
             continue
         out.append(resource)
+    out.extend(ASTRA_RESOURCES)
     out.sort(key=lambda row: row["name"])
     return out
 
@@ -412,6 +480,18 @@ def main() -> int:
         with open(destination, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
         print(f"sync: seed {target} sha256={digest}")
+
+    # Astra-owned supplemental seed (text in blocker/lists, gzip for the jar).
+    telemetry = os.path.join(root, "blocker", "lists", "astra-telemetry.txt")
+    with open(telemetry, "rb") as handle:
+        payload = handle.read()
+    destination = os.path.join(root, "blocker", "seed", "astra-telemetry.txt.gz")
+    with open(destination, "wb") as handle:
+        handle.write(gzip.compress(payload, mtime=0))
+    print(
+        "sync: seed astra-telemetry.txt.gz "
+        f"sha256={hashlib.sha256(payload).hexdigest()}"
+    )
 
     print(f"sync: wrote {len(catalog['lists'])} lists, {len(resources)} resources")
     return 0

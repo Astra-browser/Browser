@@ -16,7 +16,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 270 command wire names. */
+/** All 275 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -154,6 +154,11 @@ export type CommandName =
   | "profile_avatar_pick"
   | "profile_menu_popup"
   | "profile_rename"
+  | "privacy_configure"
+  | "privacy_forget_site"
+  | "privacy_site_configure"
+  | "privacy_site_state"
+  | "privacy_state"
   | "profiles_create"
   | "profiles_delete"
   | "profiles_get"
@@ -427,6 +432,11 @@ export const COMMANDS: readonly CommandName[] = [
   "profile_avatar_pick",
   "profile_menu_popup",
   "profile_rename",
+  "privacy_configure",
+  "privacy_forget_site",
+  "privacy_site_configure",
+  "privacy_site_state",
+  "privacy_state",
   "profiles_create",
   "profiles_delete",
   "profiles_get",

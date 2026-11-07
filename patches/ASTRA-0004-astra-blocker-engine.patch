@@ -10,10 +10,10 @@ Removal-Plan: delete the directory + the DIRS line if the blocker moves out of t
 ---
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.cpp b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
 new file mode 100644
-index 0000000000..c4e527d6a9
+index 0000000000..806a3bb5f2
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,438 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -27,17 +27,28 @@ index 0000000000..c4e527d6a9
 +#include "nsCOMPtr.h"
 +#include "nsIChannel.h"
 +#include "nsIContentPolicy.h"
++#include "nsIHttpChannel.h"
 +#include "nsILoadInfo.h"
 +#include "nsIPrincipal.h"
 +#include "nsIURI.h"
++#include "nsNetUtil.h"
 +
 +namespace mozilla::AstraBlocker {
 +
 +// Registered by the Astra overlay. Default false: no rules installed at
 +// first boot means no blocks until the Host module pushes a rule set.
 +static const char* kEnabledPref = "astra.blocker.enabled";
++static const char* kRemoveParamPref = "astra.blocker.removeparam";
++static const char* kBouncePref = "astra.blocker.bounce";
++static const char* kBlockScriptsPref = "astra.blocker.block-scripts";
++static const char* kRedirectsPref = "astra.blocker.redirects";
 +
 +namespace {
++
++constexpr uint32_t kFlagRemoveParam = 1 << 0;
++constexpr uint32_t kFlagBounce = 1 << 1;
++constexpr uint32_t kFlagBlockScripts = 1 << 2;
++constexpr uint32_t kFlagRedirects = 1 << 3;
 +
 +void TakeString(char* aText, nsACString& aOut) {
 +  if (!aText) {
@@ -106,6 +117,23 @@ index 0000000000..c4e527d6a9
 +         aURI->SchemeIs("view-source");
 +}
 +
++uint32_t RequestFlags() {
++  uint32_t flags = 0;
++  if (Preferences::GetBool(kRemoveParamPref, true)) {
++    flags |= kFlagRemoveParam;
++  }
++  if (Preferences::GetBool(kBouncePref, true)) {
++    flags |= kFlagBounce;
++  }
++  if (Preferences::GetBool(kBlockScriptsPref, false)) {
++    flags |= kFlagBlockScripts;
++  }
++  if (Preferences::GetBool(kRedirectsPref, true)) {
++    flags |= kFlagRedirects;
++  }
++  return flags;
++}
++
 +}  // namespace
 +
 +bool IsInitialized() { return astra_blocker_engine_is_installed(); }
@@ -115,7 +143,7 @@ index 0000000000..c4e527d6a9
 +  return Preferences::GetBool(kEnabledPref, false) && IsInitialized();
 +}
 +
-+bool ShouldBlockChannel(nsIChannel* aChannel) {
++bool ApplyChannelAction(nsIChannel* aChannel) {
 +  if (!IsEnabled() || !aChannel) {
 +    return false;
 +  }
@@ -135,16 +163,36 @@ index 0000000000..c4e527d6a9
 +  if (NS_FAILED(aChannel->GetLoadInfo(getter_AddRefs(loadInfo))) || !loadInfo) {
 +    return false;
 +  }
-+  nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
-+  bool isSystem = false;
-+  if (!loadingPrincipal ||
-+      (NS_SUCCEEDED(loadingPrincipal->GetIsSystemPrincipal(&isSystem)) &&
-+       isSystem)) {
-+    return false;
++
++  // Never classify chrome/system loads. A top-level document has no loading
++  // principal, so fall back to the triggering principal (the referrer or the
++  // system principal) and let the engine treat an empty source as the
++  // destination host.
++  nsCOMPtr<nsIPrincipal> principal = loadInfo->GetLoadingPrincipal();
++  if (!principal) {
++    (void)loadInfo->GetTriggeringPrincipal(getter_AddRefs(principal));
 +  }
 +  nsCString sourceSpec;
-+  if (NS_FAILED(loadingPrincipal->GetAsciiSpec(sourceSpec))) {
-+    return false;
++  const bool isDocument =
++      loadInfo->GetExternalContentPolicyType() ==
++      ExtContentPolicyType::TYPE_DOCUMENT;
++  if (principal) {
++    bool isSystem = false;
++    const bool system =
++        NS_SUCCEEDED(principal->GetIsSystemPrincipal(&isSystem)) && isSystem;
++    if (system) {
++      // A browser-initiated top-level navigation has a system triggering
++      // principal; it is still a web document and must be classified so
++      // removeparam/bounce/CNAME work on it. Every non-document system load
++      // (chrome, updater, internal fetch) is left alone.
++      if (!isDocument) {
++        return false;
++      }
++    } else if (!isDocument) {
++      // A document's loading principal is the referrer; per-site policy must
++      // key on the destination, so leave the source empty for the engine.
++      (void)principal->GetAsciiSpec(sourceSpec);
++    }
 +  }
 +
 +  nsCString requestType;
@@ -153,13 +201,79 @@ index 0000000000..c4e527d6a9
 +  bool isPrivate = loadInfo->GetOriginAttributes().IsPrivateBrowsing();
 +
 +  bool block = false;
-+  nsresult rv = astra_blocker_engine_should_block(
++  char* redirect = nullptr;
++  char* rewrite = nullptr;
++  nsresult rv = astra_blocker_engine_decide(
 +      url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
-+      requestType.get(), requestType.Length(), !isPrivate, &block);
++      requestType.get(), requestType.Length(), RequestFlags(), !isPrivate,
++      &block, &redirect, &rewrite);
 +  if (NS_FAILED(rv)) {
 +    return false;
 +  }
-+  return block;
++
++  auto freeActions = [&]() {
++    if (redirect) {
++      astra_blocker_string_free(redirect);
++      redirect = nullptr;
++    }
++    if (rewrite) {
++      astra_blocker_string_free(rewrite);
++      rewrite = nullptr;
++    }
++  };
++
++  if (block) {
++    freeActions();
++    aChannel->Cancel(NS_ERROR_ABORT);
++    return true;
++  }
++
++  if (!redirect && !rewrite) {
++    return false;
++  }
++
++  nsCString targetSpec;
++  const bool isResourceRedirect = redirect != nullptr;
++  targetSpec.Assign(isResourceRedirect ? redirect : rewrite);
++  freeActions();
++
++  nsCOMPtr<nsIURI> target;
++  rv = NS_NewURI(getter_AddRefs(target), targetSpec);
++  if (NS_FAILED(rv) || !target) {
++    // A redirect resource must not fall back to the ad request; a rewrite
++    // (removeparam / bounce) may fail open to the original URL.
++    if (isResourceRedirect) {
++      aChannel->Cancel(NS_ERROR_ABORT);
++      return true;
++    }
++    return false;
++  }
++
++  nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aChannel);
++  if (!http) {
++    if (isResourceRedirect) {
++      aChannel->Cancel(NS_ERROR_ABORT);
++      return true;
++    }
++    return false;
++  }
++
++  rv = http->RedirectTo(target);
++  if (NS_FAILED(rv)) {
++    if (isResourceRedirect) {
++      aChannel->Cancel(NS_ERROR_ABORT);
++      return true;
++    }
++    return false;
++  }
++
++  if (isResourceRedirect) {
++    // `RedirectTo` clears the WebExtension flag. Restore it on this channel's
++    // loadInfo so a data: body (script, image, ...) is accepted when the new
++    // channel opens. No web content can reach this path.
++    loadInfo->SetAllowInsecureRedirectToDataURI(true);
++  }
++  return false;
 +}
 +
 +nsresult InstallRules(const nsACString& aRules) {
@@ -197,8 +311,24 @@ index 0000000000..c4e527d6a9
 +                                        aEnabled);
 +}
 +
++nsresult SetSitePolicy(const nsACString& aHost, bool aEnabled, bool aAggressive,
++                       bool aScripts) {
++  return astra_blocker_set_site_policy(aHost.BeginReading(), aHost.Length(),
++                                       aEnabled, aAggressive, aScripts);
++}
++
 +bool IsSiteEnabled(const nsACString& aHost) {
 +  return astra_blocker_is_site_enabled(aHost.BeginReading(), aHost.Length());
++}
++
++nsresult SitePolicyJson(const nsACString& aHost, nsACString& aOutJson) {
++  char* json =
++      astra_blocker_site_policy_json(aHost.BeginReading(), aHost.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
 +}
 +
 +nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
@@ -206,6 +336,70 @@ index 0000000000..c4e527d6a9
 +  char* json = astra_blocker_engine_cosmetic(
 +      aUrl.BeginReading(), aUrl.Length(), aClassesJson.BeginReading(),
 +      aClassesJson.Length(), aIdsJson.BeginReading(), aIdsJson.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult ClassifyHostJson(const nsACString& aHost, nsACString& aOutJson) {
++  char* json =
++      astra_blocker_classify_host_json(aHost.BeginReading(), aHost.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult ClassifyBounceJson(const nsACString& aUrl, nsACString& aOutJson) {
++  char* json =
++      astra_blocker_classify_bounce_json(aUrl.BeginReading(), aUrl.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult CnameJson(const nsACString& aHost, nsACString& aOutJson) {
++  char* json = astra_blocker_cname_json(aHost.BeginReading(), aHost.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult CheckUrlJson(const nsACString& aUrl, const nsACString& aSourceUrl,
++                      const nsACString& aType, nsACString& aOutJson) {
++  // Diagnostic flags: redirect + removeparam + bounce (no Block Scripts, so a
++  // normal page's scripts are still described accurately).
++  constexpr uint32_t kDiagnosticFlags =
++      kFlagRemoveParam | kFlagBounce | kFlagRedirects;
++  char* json = astra_blocker_engine_check_json(
++      aUrl.BeginReading(), aUrl.Length(), aSourceUrl.BeginReading(),
++      aSourceUrl.Length(), aType.BeginReading(), aType.Length(),
++      kDiagnosticFlags);
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult SetCloakedHost(const nsACString& aHost, bool aBlocked) {
++  return astra_blocker_set_cloaked_host(aHost.BeginReading(), aHost.Length(),
++                                        aBlocked);
++}
++
++bool IsCloaked(const nsACString& aHost) {
++  return astra_blocker_is_cloaked(aHost.BeginReading(), aHost.Length());
++}
++
++nsresult CloakedHostsJson(nsACString& aOutJson) {
++  char* json = astra_blocker_cloaked_hosts_json();
 +  if (!json) {
 +    return NS_ERROR_FAILURE;
 +  }
@@ -260,10 +454,10 @@ index 0000000000..c4e527d6a9
 +}  // namespace mozilla::AstraBlocker
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.h b/toolkit/components/astra_blocker_engine/AstraBlocker.h
 new file mode 100644
-index 0000000000..abe142f3f8
+index 0000000000..39a93f6ad9
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlocker.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,59 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -282,15 +476,37 @@ index 0000000000..abe142f3f8
 +
 +bool IsEnabled();
 +
-+bool ShouldBlockChannel(nsIChannel* aChannel);
++/**
++ * Inspect one channel before connect. Either cancels it (blocked), redirects
++ * it (removeparam / bounce / redirect resource), or lets it continue.
++ * Returns true when the channel was cancelled.
++ */
++bool ApplyChannelAction(nsIChannel* aChannel);
 +
 +nsresult InstallRules(const nsACString& aRules);
 +nsresult InstallResources(const nsACString& aResourcesJson);
 +void SetEnabled(bool aEnabled);
 +nsresult SetSiteEnabled(const nsACString& aHost, bool aEnabled);
++nsresult SetSitePolicy(const nsACString& aHost, bool aEnabled, bool aAggressive,
++                       bool aScripts);
 +bool IsSiteEnabled(const nsACString& aHost);
++nsresult SitePolicyJson(const nsACString& aHost, nsACString& aOutJson);
 +nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
 +                     const nsACString& aIdsJson, nsACString& aOutJson);
++
++nsresult ClassifyHostJson(const nsACString& aHost, nsACString& aOutJson);
++nsresult ClassifyBounceJson(const nsACString& aUrl, nsACString& aOutJson);
++
++/** System-resolver CNAME chain for one host (fallback for platforms whose
++ *  getaddrinfo does not return a canonical name). */
++nsresult CnameJson(const nsACString& aHost, nsACString& aOutJson);
++
++/** Diagnostic verdict for one request: block, redirect resource, rewrite. */
++nsresult CheckUrlJson(const nsACString& aUrl, const nsACString& aSourceUrl,
++                      const nsACString& aType, nsACString& aOutJson);
++nsresult SetCloakedHost(const nsACString& aHost, bool aBlocked);
++bool IsCloaked(const nsACString& aHost);
++nsresult CloakedHostsJson(nsACString& aOutJson);
 +
 +nsresult StatusJson(nsACString& aOutJson);
 +nsresult StatsJson(nsACString& aOutJson);
@@ -303,10 +519,10 @@ index 0000000000..abe142f3f8
 +#endif  // mozilla_AstraBlocker_h
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp b/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp
 new file mode 100644
-index 0000000000..1492c390c8
+index 0000000000..665444589a
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,143 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -368,8 +584,61 @@ index 0000000000..1492c390c8
 +}
 +
 +NS_IMETHODIMP
++AstraBlockerService::SetSitePolicy(const nsACString& aHost, bool aEnabled,
++                                   bool aAggressive, bool aScripts) {
++  return AstraBlocker::SetSitePolicy(aHost, aEnabled, aAggressive, aScripts);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SitePolicy(const nsACString& aHost, nsACString& aResult) {
++  return AstraBlocker::SitePolicyJson(aHost, aResult);
++}
++
++NS_IMETHODIMP
 +AstraBlockerService::SiteExceptions(nsACString& aResult) {
 +  return AstraBlocker::SiteExceptionsJson(aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SetCloakedHost(const nsACString& aHost, bool aBlocked) {
++  return AstraBlocker::SetCloakedHost(aHost, aBlocked);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::IsCloaked(const nsACString& aHost, bool* aResult) {
++  NS_ENSURE_ARG_POINTER(aResult);
++  *aResult = AstraBlocker::IsCloaked(aHost);
++  return NS_OK;
++}
++
++NS_IMETHODIMP
++AstraBlockerService::CloakedHosts(nsACString& aResult) {
++  return AstraBlocker::CloakedHostsJson(aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::ClassifyHost(const nsACString& aHost,
++                                  nsACString& aResult) {
++  return AstraBlocker::ClassifyHostJson(aHost, aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::ClassifyBounce(const nsACString& aUrl,
++                                    nsACString& aResult) {
++  return AstraBlocker::ClassifyBounceJson(aUrl, aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::Cname(const nsACString& aHost, nsACString& aResult) {
++  return AstraBlocker::CnameJson(aHost, aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::CheckUrl(const nsACString& aUrl,
++                              const nsACString& aSourceUrl,
++                              const nsACString& aType,
++                              nsACString& aResult) {
++  return AstraBlocker::CheckUrlJson(aUrl, aSourceUrl, aType, aResult);
 +}
 +
 +NS_IMETHODIMP
@@ -544,10 +813,10 @@ index 0000000000..64a0b42cc8
 +    ]
 diff --git a/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl b/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl
 new file mode 100644
-index 0000000000..dc7f661138
+index 0000000000..6e62a8f935
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,78 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -593,8 +862,30 @@ index 0000000000..dc7f661138
 +  void setSiteEnabled(in ACString host, in boolean enabled);
 +  boolean isSiteEnabled(in ACString host);
 +
++  /** Full per-site shields policy: on/off, aggressive list extras and
++   *  JavaScript blocking. Persisted by the Host module. */
++  void setSitePolicy(in ACString host, in boolean enabled, in boolean aggressive,
++                     in boolean scripts);
++  ACString sitePolicy(in ACString host);
++
 +  /** Hosts currently paused, as a JSON string array. */
 +  ACString siteExceptions();
++
++  /** CNAME uncloaking: the Host resolves a host's canonical name and marks
++   *  the first-party host when the target is a tracker. Returns JSON. */
++  void setCloakedHost(in ACString host, in boolean blocked);
++  boolean isCloaked(in ACString host);
++  ACString cloakedHosts();
++
++  /** Classify one host or bounce URL against the live filter engine. */
++  ACString classifyHost(in ACString host);
++  ACString classifyBounce(in ACString url);
++
++  /** CNAME chain for one host, from the system resolver. */
++  ACString cname(in ACString host);
++
++  /** Diagnostic verdict (block/redirect/rewrite) for one request. */
++  ACString checkUrl(in ACString url, in ACString sourceUrl, in ACString type);
 +
 +  /** CSS selectors plus the scriptlet payload for one page, as JSON.
 +   *  `classesJson` / `idsJson` are JSON string arrays observed on the page. */
@@ -606,10 +897,10 @@ index 0000000000..dc7f661138
 +};
 diff --git a/toolkit/components/astra_blocker_engine/src/lib.rs b/toolkit/components/astra_blocker_engine/src/lib.rs
 new file mode 100644
-index 0000000000..6e25a740f1
+index 0000000000..c9c38d540a
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/src/lib.rs
-@@ -0,0 +1,669 @@
+@@ -0,0 +1,1401 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -623,9 +914,9 @@ index 0000000000..6e25a740f1
 +//! rules, a bad request, a poisoned lock, a compile error or an off-thread
 +//! caller all answer "allow" and never take the browser down.
 +
-+use std::collections::HashSet;
++use std::collections::{HashMap, HashSet};
 +use std::ffi::CString;
-+use std::os::raw::c_char;
++use std::os::raw::{c_char, c_int, c_uchar, c_void};
 +use std::panic::{catch_unwind, AssertUnwindSafe};
 +use std::ptr;
 +use std::sync::{Mutex, OnceLock};
@@ -690,14 +981,88 @@ index 0000000000..6e25a740f1
 +    let _ = adblock::url_parser::set_domain_resolver(Box::new(SchemelessSiteResolver {}));
 +}
 +
-+static DISABLED_HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
++/// Per-site shielding policy. `enabled == false` pauses every filter for the
++/// site; `aggressive` opts the site into the strict list extras; `scripts`
++/// blocks every script request for the site (Brave's "Block scripts").
++#[derive(Clone, Copy)]
++struct SitePolicy {
++    enabled: bool,
++    aggressive: bool,
++    scripts: bool,
++}
 +
-+fn hosts_slot() -> &'static Mutex<HashSet<String>> {
-+    DISABLED_HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
++impl Default for SitePolicy {
++    fn default() -> Self {
++        SitePolicy {
++            enabled: true,
++            aggressive: false,
++            scripts: false,
++        }
++    }
++}
++
++static SITE_POLICIES: OnceLock<Mutex<HashMap<String, SitePolicy>>> = OnceLock::new();
++
++fn policies_slot() -> &'static Mutex<HashMap<String, SitePolicy>> {
++    SITE_POLICIES.get_or_init(|| Mutex::new(HashMap::new()))
++}
++
++/// Hosts whose DNS canonical name resolves into a tracker domain. The Host
++/// module fills this through `AstraBlocker.addCloakedHost` after an async
++/// CNAME lookup; the channel hook then cancels every later request to the
++/// cloaked first-party host.
++static CLOAKED_HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
++
++fn cloaked_slot() -> &'static Mutex<HashSet<String>> {
++    CLOAKED_HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
 +}
 +
 +fn normalize_host(host: &str) -> String {
 +    host.trim().trim_end_matches('.').to_lowercase()
++}
++
++fn site_policy(host: &str) -> SitePolicy {
++    let key = normalize_host(host);
++    policies_slot()
++        .lock()
++        .ok()
++        .and_then(|map| map.get(&key).copied())
++        .unwrap_or_default()
++}
++
++/// Request-side switches pushed by C++ from the profile prefs.
++const FLAG_REMOVEPARAM: u32 = 1 << 0;
++const FLAG_BOUNCE: u32 = 1 << 1;
++const FLAG_BLOCK_SCRIPTS: u32 = 1 << 2;
++const FLAG_REDIRECTS: u32 = 1 << 3;
++
++/// Third-party hosts that only exist to embed a social widget on another site.
++/// Blocked when the page's per-site shield is Aggressive.
++const AGGRESSIVE_HOSTS: &[&str] = &[
++    "connect.facebook.net",
++    "facebook.com",
++    "facebook.net",
++    "platform.twitter.com",
++    "syndication.twitter.com",
++    "platform.linkedin.com",
++    "assets.pinterest.com",
++    "embed.reddit.com",
++    "instagram.com",
++    "tiktok.com",
++    "www.tiktok.com",
++    "widgets.pinterest.com",
++    "apis.google.com",
++    "accounts.google.com",
++];
++
++/// The native decision for one request. `redirect` is a complete data: URI
++/// produced by adblock-rust from a `$redirect` resource; `rewrite` is either
++/// the `$removeparam` cleaned URL or an unwrapped bounce target.
++#[derive(Default)]
++struct Verdict {
++    block: bool,
++    redirect: String,
++    rewrite: String,
 +}
 +
 +fn host_of_url(url: &str) -> String {
@@ -979,42 +1344,482 @@ index 0000000000..6e25a740f1
 +    });
 +}
 +
-+fn should_block(url: &str, source_url: &str, request_type: &str, record: bool) -> bool {
++/// The single native decision point used by both the channel hook and the
++/// management service (classifyHost/classifyBounce). Always fail-open.
++fn decide(
++    url: &str,
++    source_url: &str,
++    request_type: &str,
++    flags: u32,
++    record: bool,
++) -> Verdict {
 +    if record {
 +        record_decision();
 +    }
 +    let result = catch_unwind(AssertUnwindSafe(|| {
-+        should_block_inner(url, source_url, request_type)
++        decide_inner(url, source_url, request_type, flags)
 +    }));
-+    let blocked = result.unwrap_or(false);
-+    if blocked && record {
++    let verdict = result.unwrap_or_default();
++    if record && (verdict.block || !verdict.redirect.is_empty()) {
 +        record_block();
 +    }
-+    blocked
++    verdict
 +}
 +
-+fn should_block_inner(url: &str, source_url: &str, request_type: &str) -> bool {
-+    let disabled = match hosts_slot().lock() {
-+        Ok(hosts) => hosts.contains(&host_of_url(source_url)),
-+        Err(_) => return false,
++fn decide_inner(url: &str, source_url: &str, request_type: &str, flags: u32) -> Verdict {
++    let dest_host = host_of_url(url);
++    let source_host = host_of_url(source_url);
++    // A pause applies to the page that initiated the request; a top-level
++    // document has no loading principal host, so its own host is the site.
++    let policy_host = if source_host.is_empty() {
++        dest_host.clone()
++    } else {
++        source_host.clone()
 +    };
-+    if disabled {
-+        return false;
++    let policy = site_policy(&policy_host);
++    if !policy.enabled {
++        return Verdict::default();
 +    }
-+    with_slot(|slot| {
-+        let Some(engine) = slot.engine.as_ref() else {
-+            return false;
++    let effective_flags = if policy.aggressive {
++        flags | FLAG_REMOVEPARAM | FLAG_BOUNCE
++    } else {
++        flags
++    };
++
++    // Aggressive per-site shield: drop third-party social embeds even when the
++    // site is not in the global aggressive list set.
++    if policy.aggressive
++        && !source_host.is_empty()
++        && !dest_host.is_empty()
++        && dest_host != source_host
++        && AGGRESSIVE_HOSTS.iter().any(|candidate| {
++            dest_host == *candidate || dest_host.ends_with(&format!(".{}", candidate))
++        })
++    {
++        return Verdict {
++            block: true,
++            ..Verdict::default()
 +        };
-+        let Ok(request) = Request::new(url, source_url, request_type) else {
-+            return false;
++    }
++
++    // CNAME uncloaking: the Host resolved this first-party host to a tracker
++    // canonical name, so every later request to it is blocked.
++    if !dest_host.is_empty()
++        && cloaked_slot()
++            .lock()
++            .map(|hosts| hosts.contains(&dest_host))
++            .unwrap_or(false)
++    {
++        return Verdict {
++            block: true,
++            ..Verdict::default()
++        };
++    }
++
++    // Block Scripts: the global switch or the per-site switch.
++    if request_type == "script" && (effective_flags & FLAG_BLOCK_SCRIPTS != 0 || policy.scripts) {
++        return Verdict {
++            block: true,
++            ..Verdict::default()
++        };
++    }
++
++    let engine_result = with_slot(|slot| {
++        let Some(engine) = slot.engine.as_ref() else {
++            return None;
++        };
++        let effective_source = if source_url.is_empty() {
++            "https://astra.invalid/"
++        } else {
++            source_url
++        };
++        let Ok(request) = Request::new(url, effective_source, request_type) else {
++            return None;
 +        };
 +        // adblock 0.12.1 has no should_block() helper: matched with no
 +        // exception means block (same rule the content classifier applies).
-+        let result = engine.check_network_request(&request);
-+        result.matched && result.exception.is_none()
++        Some(engine.check_network_request(&request))
 +    })
-+    .unwrap_or(false)
++    .flatten();
++
++    let Some(result) = engine_result else {
++        return Verdict::default();
++    };
++
++    // A redirect resource replaces the body rather than just cancelling.
++    // `result.matched` distinguishes `$redirect` (also a blocking rule) from
++    // `$redirect-rule`, which applies only when another filter already matched.
++    if result.matched && result.exception.is_none() {
++        if let Some(redirect) = result.redirect {
++            if !redirect.is_empty() {
++                if effective_flags & FLAG_REDIRECTS != 0 {
++                    return Verdict {
++                        redirect,
++                        ..Verdict::default()
++                    };
++                }
++                return Verdict {
++                    block: true,
++                    ..Verdict::default()
++                };
++            }
++        }
++    }
++
++    if result.matched && result.exception.is_none() {
++        return Verdict {
++            block: true,
++            ..Verdict::default()
++        };
++    }
++
++    // `$removeparam` rewrites the URL instead of blocking it.
++    if effective_flags & FLAG_REMOVEPARAM != 0 {
++        if let Some(rewritten) = result.rewritten_url {
++            if !rewritten.is_empty() && rewritten != url {
++                return Verdict {
++                    rewrite: rewritten,
++                    ..Verdict::default()
++                };
++            }
++        }
++    }
++
++    // Debounce: unwrap a known redirector/bounce URL to its destination.
++    if effective_flags & FLAG_BOUNCE != 0
++        && (request_type == "document" || request_type == "subdocument")
++    {
++        if let Some(target) = bounce_target(url) {
++            return Verdict {
++                rewrite: target,
++                ..Verdict::default()
++            };
++        }
++    }
++
++    Verdict::default()
 +}
++
++/// Domains that exist only to bounce a navigation through a tracking hop.
++/// Keep this list short and navigation-only: unwrapping is stateless, so the
++/// destination is opened directly with no referrer parameter.
++/// Hosts that exist to bounce a navigation through a tracking hop. Each entry
++/// carries the only path and query parameters that may be unwrapped; a search
++/// engine's ordinary result page (`/?q=...`) is never rewritten.
++const BOUNCE_RULES: &[(&str, &str, &[&str])] = &[
++    ("l.facebook.com", "/l.php", &["u"]),
++    ("lm.facebook.com", "/l.php", &["u"]),
++    ("l.instagram.com", "/", &["u"]),
++    ("l.messenger.com", "/l.php", &["u"]),
++    ("out.reddit.com", "/", &["url"]),
++    ("redirect.reddit.com", "/", &["url"]),
++    ("google.com", "/url", &["q", "url", "continue"]),
++    ("google.co.uk", "/url", &["q", "url", "continue"]),
++    ("google.ca", "/url", &["q", "url", "continue"]),
++    ("google.de", "/url", &["q", "url", "continue"]),
++    ("google.fr", "/url", &["q", "url", "continue"]),
++    ("google.co.in", "/url", &["q", "url", "continue"]),
++    ("google.com.au", "/url", &["q", "url", "continue"]),
++    ("youtube.com", "/redirect", &["q", "v"]),
++    ("linkedin.com", "/redir/", &["url"]),
++    ("pinterest.com", "/url", &["url"]),
++    ("away.vk.com", "/", &["to", "u"]),
++    ("steamcommunity.com", "/linkfilter/", &["url"]),
++    ("tumblr.com", "/redirect", &["u"]),
++    // Shorteners carry the target in the query string on some platforms and
++    // in the path on most; only a query target can be unwrapped here.
++    ("t.co", "/", &["url"]),
++    ("bit.ly", "/", &["url"]),
++    ("tinyurl.com", "/", &["url"]),
++    ("ow.ly", "/", &["url"]),
++    ("buff.ly", "/", &["url"]),
++    ("is.gd", "/", &["url"]),
++    ("v.gd", "/", &["url"]),
++    ("rebrand.ly", "/", &["url"]),
++    ("t.ly", "/", &["url"]),
++    ("shorturl.at", "/", &["url"]),
++    ("goo.gl", "/", &["url"]),
++    ("tiny.cc", "/", &["url"]),
++    ("soo.gd", "/", &["url"]),
++    ("clck.ru", "/", &["url"]),
++];
++
++fn percent_decode(value: &str) -> String {
++    let bytes = value.as_bytes();
++    let mut out = Vec::with_capacity(bytes.len());
++    let mut index = 0;
++    while index < bytes.len() {
++        match bytes[index] {
++            b'%' if index + 2 < bytes.len() => {
++                let hex = |byte: u8| match byte {
++                    b'0'..=b'9' => Some(byte - b'0'),
++                    b'a'..=b'f' => Some(byte - b'a' + 10),
++                    b'A'..=b'F' => Some(byte - b'A' + 10),
++                    _ => None,
++                };
++                match (hex(bytes[index + 1]), hex(bytes[index + 2])) {
++                    (Some(high), Some(low)) => {
++                        out.push(high * 16 + low);
++                        index += 3;
++                        continue;
++                    }
++                    _ => out.push(bytes[index]),
++                }
++            }
++            b'+' => out.push(b' '),
++            byte => out.push(byte),
++        }
++        index += 1;
++    }
++    String::from_utf8_lossy(&out).into_owned()
++}
++
++fn split_url(url: &str) -> Option<(String, String, String, String)> {
++    let scheme_end = url.find("://")?;
++    let scheme = url[..scheme_end].to_ascii_lowercase();
++    if scheme != "http" && scheme != "https" {
++        return None;
++    }
++    let rest = &url[scheme_end + 3..];
++    let (authority, path_query) = match rest.find(['/', '?']) {
++        Some(index) => (&rest[..index], &rest[index..]),
++        None => (rest, ""),
++    };
++    let host = normalize_host(authority.split('@').next_back().unwrap_or(""));
++    let host = host.split(':').next().unwrap_or("").to_string();
++    let query = match path_query.find('?') {
++        Some(index) => &path_query[index + 1..],
++        None => "",
++    };
++    let path = match path_query.find('?') {
++        Some(index) => &path_query[..index],
++        None => path_query,
++    };
++    Some((scheme, host, path.to_string(), query.to_string()))
++}
++
++fn bounce_target(url: &str) -> Option<String> {
++    let (_scheme, host, path, query) = split_url(url)?;
++    if host.is_empty() || query.is_empty() {
++        return None;
++    }
++    let rule = BOUNCE_RULES.iter().find(|(candidate, _, _)| {
++        host == *candidate || host.ends_with(&format!(".{}", candidate))
++    })?;
++    let (prefix, params) = (rule.1, rule.2);
++    let path_matches = if prefix == "/" {
++        path.starts_with('/')
++    } else {
++        path == prefix || path.starts_with(&format!("{}/", prefix.trim_end_matches('/')))
++    };
++    if !path_matches {
++        return None;
++    }
++
++    for pair in query.split('&') {
++        let (key, value) = match pair.split_once('=') {
++            Some(parts) => parts,
++            None => continue,
++        };
++        if !params.iter().any(|candidate| key == *candidate) {
++            continue;
++        }
++        let decoded = percent_decode(value);
++        let (target_scheme, target_host, _target_path, _target_query) = split_url(&decoded)?;
++        if target_host.is_empty() || target_host == host {
++            return None;
++        }
++        if target_scheme != "http" && target_scheme != "https" {
++            return None;
++        }
++        if decoded.len() > 4096 {
++            return None;
++        }
++        return Some(decoded);
++    }
++    None
++}
++
++#[derive(Serialize)]
++struct ClassifyView {
++    tracker: bool,
++    host: String,
++}
++
++fn classify_host(host: &str) -> ClassifyView {
++    let key = normalize_host(host);
++    if key.is_empty() {
++        return ClassifyView {
++            tracker: false,
++            host: key,
++        };
++    }
++    let url = format!("https://{}/", key);
++    let verdict = decide_inner(&url, "https://astra.invalid/", "other", 0);
++    ClassifyView {
++        tracker: verdict.block,
++        host: key,
++    }
++}
++
++// --- CNAME uncloaking DNS fallback -----------------------------------------
++// Gecko's getaddrinfo-backed resolver does not return a canonical name on
++// every platform (systemd-resolved commonly returns an empty one). Query the
++// system resolver for the CNAME RR directly so the first-party host can still
++// be classified. Called once per first-party host by the Host module and
++// cached there for six hours.
++
++// libresolv is not on libxul's link line on every build configuration, so the
++// CNAME fallback resolves `res_query` at runtime from the system library. The
++// handle is opened once and kept for the process lifetime.
++type ResQueryFn =
++    unsafe extern "C" fn(*const c_char, c_int, c_int, *mut c_uchar, c_int) -> c_int;
++
++static RES_QUERY: OnceLock<Option<ResQueryFn>> = OnceLock::new();
++
++extern "C" {
++    fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
++    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
++}
++
++fn res_query_fn() -> Option<ResQueryFn> {
++    *RES_QUERY.get_or_init(|| unsafe {
++        let name = CString::new("libresolv.so.2").ok()?;
++        let handle = dlopen(name.as_ptr(), 2 /* RTLD_NOW */);
++        if handle.is_null() {
++            return None;
++        }
++        let symbol = dlsym(handle, c"res_query".as_ptr());
++        if symbol.is_null() {
++            return None;
++        }
++        Some(std::mem::transmute::<*mut c_void, ResQueryFn>(symbol))
++    })
++}
++
++const DNS_C_IN: c_int = 1;
++const DNS_T_CNAME: c_int = 5;
++
++fn dns_read_name(buf: &[u8], start: usize) -> Option<(String, usize)> {
++    let mut labels: Vec<String> = Vec::new();
++    let mut offset = start;
++    let mut next = start;
++    let mut jumps = 0;
++    loop {
++        if offset >= buf.len() {
++            return None;
++        }
++        let length = buf[offset] as usize;
++        if length == 0 {
++            offset += 1;
++            if next == start {
++                next = offset;
++            }
++            break;
++        }
++        if length & 0xC0 == 0xC0 {
++            if offset + 1 >= buf.len() {
++                return None;
++            }
++            let pointer = (((length & 0x3F) as usize) << 8) | buf[offset + 1] as usize;
++            if next == start {
++                next = offset + 2;
++            }
++            offset = pointer;
++            jumps += 1;
++            if jumps > 16 {
++                return None;
++            }
++            continue;
++        }
++        if offset + 1 + length > buf.len() {
++            return None;
++        }
++        let label = String::from_utf8_lossy(&buf[offset + 1..offset + 1 + length]).into_owned();
++        labels.push(label);
++        offset += 1 + length;
++    }
++    Some((labels.join("."), next))
++}
++
++/// Every CNAME target in a DNS answer, in response order.
++fn cname_targets(host: &str) -> Vec<String> {
++    let key = normalize_host(host);
++    if key.is_empty() {
++        return vec![];
++    }
++    let Ok(name) = CString::new(key.clone()) else {
++        return vec![];
++    };
++    let mut answer = [0u8; 4096];
++    let Some(query) = res_query_fn() else {
++        return vec![];
++    };
++    let length = unsafe {
++        query(
++            name.as_ptr(),
++            DNS_C_IN,
++            DNS_T_CNAME,
++            answer.as_mut_ptr(),
++            answer.len() as c_int,
++        )
++    };
++    if length <= 12 {
++        return vec![];
++    }
++    let length = (length as usize).min(answer.len());
++    let buf = &answer[..length];
++    let qd = u16::from_be_bytes([buf[4], buf[5]]) as usize;
++    let an = u16::from_be_bytes([buf[6], buf[7]]) as usize;
++    let mut offset = 12;
++    for _ in 0..qd {
++        let (_, next) = match dns_read_name(buf, offset) {
++            Some(value) => value,
++            None => return vec![],
++        };
++        offset = next + 4;
++    }
++    let mut targets = Vec::new();
++    for _ in 0..an {
++        let (_, next) = match dns_read_name(buf, offset) {
++            Some(value) => value,
++            None => break,
++        };
++        offset = next;
++        if offset + 10 > buf.len() {
++            break;
++        }
++        let ty = u16::from_be_bytes([buf[offset], buf[offset + 1]]);
++        let rdlength = u16::from_be_bytes([buf[offset + 8], buf[offset + 9]]) as usize;
++        let rdata = offset + 10;
++        if ty as c_int == DNS_T_CNAME && rdata + rdlength <= buf.len() {
++            if let Some((target, _)) = dns_read_name(buf, rdata) {
++                let target = normalize_host(&target);
++                if !target.is_empty() && target != key {
++                    targets.push(target);
++                }
++            }
++        }
++        offset = rdata + rdlength;
++    }
++    targets.sort();
++    targets.dedup();
++    targets
++}
++
++#[derive(Serialize)]
++struct CnameView {
++    host: String,
++    chain: Vec<String>,
++}
++
++fn cname_view(host: &str) -> CnameView {
++    CnameView {
++        host: normalize_host(host),
++        chain: cname_targets(host),
++    }
++}
++
 +
 +#[derive(Serialize)]
 +struct CosmeticView {
@@ -1175,7 +1980,7 @@ index 0000000000..6e25a740f1
 +    clear();
 +}
 +
-+/// Pauses (`false`) or resumes (`true`) protection for one site (host).
++/// Backwards-compatible pause/resume helper (mode `0` = paused).
 +#[no_mangle]
 +pub extern "C" fn astra_blocker_set_site_enabled(
 +    host: *const c_char,
@@ -1183,12 +1988,21 @@ index 0000000000..6e25a740f1
 +    enabled: bool,
 +) -> nsresult {
 +    let key = normalize_host(&read_str(host, host_len));
-+    match hosts_slot().lock() {
-+        Ok(mut hosts) => {
++    if key.is_empty() {
++        return NS_ERROR_INVALID_ARG;
++    }
++    match policies_slot().lock() {
++        Ok(mut map) => {
 +            if enabled {
-+                hosts.remove(&key);
-+            } else if !key.is_empty() {
-+                hosts.insert(key);
++                map.remove(&key);
++            } else {
++                map.insert(
++                    key,
++                    SitePolicy {
++                        enabled: false,
++                        ..SitePolicy::default()
++                    },
++                );
 +            }
 +            NS_OK
 +        }
@@ -1201,21 +2015,227 @@ index 0000000000..6e25a740f1
 +    host: *const c_char,
 +    host_len: usize,
 +) -> bool {
++    site_policy(&read_str(host, host_len)).enabled
++}
++
++/// Full per-site policy: enabled (shields on), aggressive mode, block scripts.
++#[no_mangle]
++pub extern "C" fn astra_blocker_set_site_policy(
++    host: *const c_char,
++    host_len: usize,
++    enabled: bool,
++    aggressive: bool,
++    scripts: bool,
++) -> nsresult {
 +    let key = normalize_host(&read_str(host, host_len));
-+    hosts_slot()
-+        .lock()
-+        .map(|hosts| !hosts.contains(&key))
-+        .unwrap_or(true)
++    if key.is_empty() {
++        return NS_ERROR_INVALID_ARG;
++    }
++    match policies_slot().lock() {
++        Ok(mut map) => {
++            if enabled && !aggressive && !scripts {
++                map.remove(&key);
++            } else {
++                map.insert(
++                    key,
++                    SitePolicy {
++                        enabled,
++                        aggressive,
++                        scripts,
++                    },
++                );
++            }
++            NS_OK
++        }
++        Err(_) => NS_ERROR_INVALID_ARG,
++    }
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_site_policy_json(host: *const c_char, host_len: usize) -> *mut c_char {
++    let key = normalize_host(&read_str(host, host_len));
++    let policy = site_policy(&key);
++    #[derive(Serialize)]
++    struct PolicyView {
++        host: String,
++        enabled: bool,
++        aggressive: bool,
++        scripts: bool,
++    }
++    json_ptr(&PolicyView {
++        host: key,
++        enabled: policy.enabled,
++        aggressive: policy.aggressive,
++        scripts: policy.scripts,
++    })
 +}
 +
 +#[no_mangle]
 +pub extern "C" fn astra_blocker_site_exceptions_json() -> *mut c_char {
-+    let mut hosts: Vec<String> = hosts_slot()
++    let mut hosts: Vec<String> = policies_slot()
++        .lock()
++        .map(|map| {
++            map.iter()
++                .filter(|(_host, policy)| !policy.enabled)
++                .map(|(host, _policy)| host.clone())
++                .collect()
++        })
++        .unwrap_or_default();
++    hosts.sort();
++    json_ptr(&hosts)
++}
++
++/// DNS CNAME uncloaking hand-off: the Host module resolves a first-party host
++/// and tells the engine when its canonical name is a tracker.
++#[no_mangle]
++pub extern "C" fn astra_blocker_set_cloaked_host(
++    host: *const c_char,
++    host_len: usize,
++    blocked: bool,
++) -> nsresult {
++    let key = normalize_host(&read_str(host, host_len));
++    if key.is_empty() {
++        return NS_ERROR_INVALID_ARG;
++    }
++    match cloaked_slot().lock() {
++        Ok(mut hosts) => {
++            if blocked {
++                // A long-lived session must not grow this set without bound.
++                if hosts.len() >= 4096 && !hosts.contains(&key) {
++                    hosts.clear();
++                }
++                hosts.insert(key);
++            } else {
++                hosts.remove(&key);
++            }
++            NS_OK
++        }
++        Err(_) => NS_ERROR_INVALID_ARG,
++    }
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_is_cloaked(host: *const c_char, host_len: usize) -> bool {
++    let key = normalize_host(&read_str(host, host_len));
++    cloaked_slot()
++        .lock()
++        .map(|hosts| hosts.contains(&key))
++        .unwrap_or(false)
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_cloaked_hosts_json() -> *mut c_char {
++    let mut hosts: Vec<String> = cloaked_slot()
 +        .lock()
 +        .map(|hosts| hosts.iter().cloned().collect())
 +        .unwrap_or_default();
 +    hosts.sort();
 +    json_ptr(&hosts)
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_classify_host_json(
++    host: *const c_char,
++    host_len: usize,
++) -> *mut c_char {
++    json_ptr(&classify_host(&read_str(host, host_len)))
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_classify_bounce_json(
++    url: *const c_char,
++    url_len: usize,
++) -> *mut c_char {
++    #[derive(Serialize)]
++    struct BounceView {
++        target: String,
++    }
++    let target = bounce_target(&read_str(url, url_len)).unwrap_or_default();
++    json_ptr(&BounceView { target })
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_cname_json(
++    host: *const c_char,
++    host_len: usize,
++) -> *mut c_char {
++    json_ptr(&cname_view(&read_str(host, host_len)))
++}
++
++/// Diagnostic/test seam: the full decision for one request, including the
++/// redirect data URI and the rewritten URL. The UI never calls this; the live
++/// probes use it to prove each action deterministically.
++#[derive(Serialize)]
++struct CheckView {
++    block: bool,
++    redirect: String,
++    rewrite: String,
++}
++
++#[no_mangle]
++pub unsafe extern "C" fn astra_blocker_engine_check_json(
++    url: *const c_char,
++    url_len: usize,
++    source_url: *const c_char,
++    source_url_len: usize,
++    request_type: *const c_char,
++    request_type_len: usize,
++    flags: u32,
++) -> *mut c_char {
++    let verdict = decide(
++        &read_str(url, url_len),
++        &read_str(source_url, source_url_len),
++        &read_str(request_type, request_type_len),
++        flags,
++        false,
++    );
++    json_ptr(&CheckView {
++        block: verdict.block,
++        redirect: verdict.redirect,
++        rewrite: verdict.rewrite,
++    })
++}
++
++/// The full verdict: block, redirect resource (data: URI) or a rewritten URL.
++#[no_mangle]
++pub unsafe extern "C" fn astra_blocker_engine_decide(
++    url: *const c_char,
++    url_len: usize,
++    source_url: *const c_char,
++    source_url_len: usize,
++    request_type: *const c_char,
++    request_type_len: usize,
++    flags: u32,
++    record: bool,
++    out_block: *mut bool,
++    out_redirect: *mut *mut c_char,
++    out_rewrite: *mut *mut c_char,
++) -> nsresult {
++    if out_block.is_null() {
++        return NS_ERROR_INVALID_ARG;
++    }
++    *out_block = false;
++    if !out_redirect.is_null() {
++        *out_redirect = ptr::null_mut();
++    }
++    if !out_rewrite.is_null() {
++        *out_rewrite = ptr::null_mut();
++    }
++    let verdict = decide(
++        &read_str(url, url_len),
++        &read_str(source_url, source_url_len),
++        &read_str(request_type, request_type_len),
++        flags,
++        record,
++    );
++    *out_block = verdict.block;
++    if !out_redirect.is_null() && !verdict.redirect.is_empty() {
++        *out_redirect = to_c_string(verdict.redirect);
++    }
++    if !out_rewrite.is_null() && !verdict.rewrite.is_empty() {
++        *out_rewrite = to_c_string(verdict.rewrite);
++    }
++    NS_OK
 +}
 +
 +#[no_mangle]
@@ -1229,16 +2249,19 @@ index 0000000000..6e25a740f1
 +    record: bool,
 +    out_block: *mut bool,
 +) -> nsresult {
-+    if out_block.is_null() {
-+        return NS_ERROR_INVALID_ARG;
-+    }
-+    *out_block = should_block(
-+        &read_str(url, url_len),
-+        &read_str(source_url, source_url_len),
-+        &read_str(request_type, request_type_len),
++    astra_blocker_engine_decide(
++        url,
++        url_len,
++        source_url,
++        source_url_len,
++        request_type,
++        request_type_len,
++        0,
 +        record,
-+    );
-+    NS_OK
++        out_block,
++        ptr::null_mut(),
++        ptr::null_mut(),
++    )
 +}
 +
 +#[no_mangle]

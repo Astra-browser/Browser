@@ -49,6 +49,15 @@ const SCRIPTLETS_PREF = "astra.blocker.scriptlets";
 const LAST_UPDATE_PREF = "astra.blocker.last-update";
 const MANIFEST_PREF = "astra.blocker.installed";
 const SITE_EXCEPTIONS_PREF = "astra.blocker.site-exceptions";
+const MODE_PREF = "astra.blocker.mode";
+const REMOVE_PARAM_PREF = "astra.blocker.removeparam";
+const BOUNCE_PREF = "astra.blocker.bounce";
+const BLOCK_SCRIPTS_PREF = "astra.blocker.block-scripts";
+const REDIRECTS_PREF = "astra.blocker.redirects";
+const CNAME_PREF = "astra.blocker.cname-uncloaking";
+const CUSTOM_LISTS_PREF = "astra.blocker.custom-lists";
+const USER_RULES_PREF = "astra.blocker.user-rules";
+const SITE_POLICIES_PREF = "astra.blocker.site-policies";
 
 // One list is capped at 16 MiB; a whole bundle at 48 MiB. These match the
 // engine's realistic upper bound (uBO + EasyList + privacy) with room for a
@@ -271,6 +280,17 @@ function resolveNative() {
       setEnabled: (enabled) => service.setEnabled(enabled),
       setSiteEnabled: (host, enabled) => service.setSiteEnabled(host, enabled),
       isSiteEnabled: (host) => service.isSiteEnabled(host) === true,
+      setSitePolicy: (host, enabled, aggressive, scripts) =>
+        service.setSitePolicy(host, enabled, aggressive, scripts),
+      sitePolicy: (host) => JSON.parse(service.sitePolicy(String(host)) || "{}"),
+      classifyHost: (host) => JSON.parse(service.classifyHost(String(host)) || "{}"),
+      classifyBounce: (url) => JSON.parse(service.classifyBounce(String(url)) || "{}"),
+      checkUrl: (url, source, type) =>
+        JSON.parse(service.checkUrl(String(url), String(source), String(type)) || "{}"),
+      cname: (host) => JSON.parse(service.cname(String(host)) || "{}"),
+      setCloakedHost: (host, blocked) => service.setCloakedHost(host, blocked),
+      isCloaked: (host) => service.isCloaked(host) === true,
+      cloakedHosts: () => JSON.parse(service.cloakedHosts() || "[]"),
       isInitialized: () => service.initialized === true,
       isEnabled: () => service.enabled === true,
       statusJson: () => service.status(),
@@ -480,9 +500,34 @@ async function readCapped(response, max) {
   return new TextDecoder().decode(bytes);
 }
 
+function isPrivateHost(host) {
+  const key = normalizeHostKey(host);
+  if (!key) return true;
+  if (key === "localhost" || key.endsWith(".localhost") || key.endsWith(".local")) {
+    return true;
+  }
+  if (key === "::1" || key === "[::1]" || key.startsWith("fc") || key.startsWith("fd")) {
+    return true;
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/u.test(key)) {
+    const [a, b] = key.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+  }
+  return false;
+}
+
 async function fetchListText(url) {
   if (typeof fetch !== "function") throw new Error("transport");
   if (!/^https:\/\//iu.test(url)) throw new Error("insecure_source");
+  try {
+    if (isPrivateHost(new URL(url).hostname)) throw new Error("private_source");
+  } catch (error) {
+    if (error?.message === "private_source") throw error;
+    throw new Error("insecure_source");
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -497,6 +542,16 @@ async function fetchListText(url) {
     if (response.url && !/^https:/iu.test(response.url)) {
       throw new Error("insecure_redirect");
     }
+    if (response.url) {
+      try {
+        if (isPrivateHost(new URL(response.url).hostname)) {
+          throw new Error("private_redirect");
+        }
+      } catch (error) {
+        if (error?.message === "private_redirect") throw error;
+        throw new Error("insecure_redirect");
+      }
+    }
     const text = await readCapped(response, MAX_LIST_BYTES);
     if (text.length === 0) throw new Error("empty");
     return text;
@@ -508,8 +563,16 @@ async function fetchListText(url) {
 function cachePaths() {
   const chrome = chromeScope();
   if (!chrome) return null;
-  const { PathUtils } = importGecko("resource://gre/modules/PathUtils.sys.mjs") ?? {};
-  const { IOUtils } = importGecko("resource://gre/modules/IOUtils.sys.mjs") ?? {};
+  // PathUtils and IOUtils are chrome-only WebIDL globals in this engine
+  // (dom/chrome-webidl/PathUtils.webidl + IOUtils.webidl). The old
+  // `resource://gre/modules/*.sys.mjs` files no longer exist, so importing
+  // them printed "Missing chrome or resource URL" on every list and left the
+  // cache directory disabled. Read the globals first and keep the module form
+  // only as a fallback for an engine that still ships it.
+  const PathUtils =
+    globalThis.PathUtils ?? importGecko("resource://gre/modules/PathUtils.sys.mjs")?.PathUtils;
+  const IOUtils =
+    globalThis.IOUtils ?? importGecko("resource://gre/modules/IOUtils.sys.mjs")?.IOUtils;
   if (!PathUtils || !IOUtils) return null;
   const dir = PathUtils.join(PathUtils.profileDir, "astra", "blocker", "lists");
   return { IOUtils, PathUtils, dir };
@@ -560,6 +623,50 @@ async function loadCatalog() {
   return parsed;
 }
 
+function readMode() {
+  return prefInt(MODE_PREF, 0) === 1 ? "aggressive" : "standard";
+}
+
+function readCustomLists() {
+  try {
+    const parsed = JSON.parse(prefString(CUSTOM_LISTS_PREF, "[]"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (entry) =>
+          entry &&
+          typeof entry === "object" &&
+          typeof entry.id === "string" &&
+          HEX16.test(entry.id) &&
+          typeof entry.url === "string" &&
+          /^https:\/\//iu.test(entry.url),
+      )
+      .slice(0, 32)
+      .map((entry) => ({
+        id: entry.id,
+        title: text(entry.title, 120) || entry.url,
+        url: entry.url,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomLists(entries) {
+  return writePrefString(CUSTOM_LISTS_PREF, JSON.stringify(entries));
+}
+
+function customListId(url) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < url.length; index += 1) {
+    hash ^= url.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${hash.toString(16).padStart(8, "0")}${(hash ^ url.length)
+    .toString(16)
+    .padStart(8, "0")}`.slice(-16);
+}
+
 function selectedListIds(catalog) {
   const known = new Set(catalog.lists.map((entry) => entry.id));
   const raw = prefString(LISTS_PREF, "");
@@ -573,9 +680,295 @@ function selectedListIds(catalog) {
       // Fall through to defaults.
     }
   }
+  if (readMode() === "aggressive") {
+    return catalog.lists
+      .filter(
+        (entry) =>
+          entry.group === "ads" ||
+          entry.group === "privacy" ||
+          entry.group === "malware" ||
+          entry.group === "annoyances",
+      )
+      .map((entry) => entry.id);
+  }
   return catalog.lists
     .filter((entry) => entry.default_enabled === true)
     .map((entry) => entry.id);
+}
+
+/** The list preset written when the person switches protection mode. */
+function modePreset(catalog, mode) {
+  if (mode === "aggressive") {
+    return catalog.lists
+      .filter(
+        (entry) =>
+          entry.group === "ads" ||
+          entry.group === "privacy" ||
+          entry.group === "malware" ||
+          entry.group === "annoyances",
+      )
+      .map((entry) => entry.id);
+  }
+  return catalog.lists
+    .filter((entry) => entry.default_enabled === true)
+    .map((entry) => entry.id);
+}
+
+function readSitePolicies() {
+  try {
+    const parsed = JSON.parse(prefString(SITE_POLICIES_PREF, "{}"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSitePolicy(host, policy) {
+  const key = String(host ?? "").trim().toLowerCase();
+  if (!key) return false;
+  const all = readSitePolicies();
+  if (!policy.enabled && !policy.aggressive && !policy.scripts) {
+    delete all[key];
+  } else {
+    all[key] = {
+      enabled: policy.enabled === true,
+      aggressive: policy.aggressive === true,
+      scripts: policy.scripts === true,
+    };
+  }
+  return writePrefString(SITE_POLICIES_PREF, JSON.stringify(all));
+}
+
+// --- CNAME uncloaking -------------------------------------------------------
+// A request host whose DNS chain ends in a tracker domain is marked here; the
+// native hook then blocks every later request to the cloaked first-party host.
+// The first request necessarily passes (the answer arrives after it starts).
+
+let _cloakObserved = false;
+let _cloakCache = new Map();
+const CLOAK_CACHE_MAX = 512;
+
+function normalizeHostKey(host) {
+  return String(host ?? "").trim().toLowerCase().replace(/\.$/u, "");
+}
+
+function cnameSpoofingEnabled() {
+  return prefBool(CNAME_PREF, true);
+}
+
+function installCloakObserver() {
+  if (_cloakObserved || !cnameSpoofingEnabled()) return;
+  const chrome = chromeScope();
+  if (!chrome) return;
+  try {
+    Services.obs.addObserver(CLOAK_OBSERVER, "http-on-modify-request");
+    _cloakObserved = true;
+  } catch {
+    _cloakObserved = false;
+  }
+}
+
+function uninstallCloakObserver() {
+  if (!_cloakObserved) return;
+  try {
+    Services.obs.removeObserver(CLOAK_OBSERVER, "http-on-modify-request");
+  } catch {
+    // The observer service is already gone.
+  }
+  _cloakObserved = false;
+}
+
+function baseDomain(host) {
+  try {
+    return Services.eTLD.getBaseDomainFromHost(host);
+  } catch {
+    return host;
+  }
+}
+
+function resolveCloakedHost(host, sourceHost) {
+  const key = normalizeHostKey(host);
+  const source = normalizeHostKey(sourceHost);
+  if (!key || !/^[a-z0-9.-]+$/u.test(key) || key === "localhost") return;
+  if (!source || key === source) return;
+  // CNAME cloaking is a first-party disguise: the request host is a subdomain
+  // of the page the person is on, but its DNS chain ends at a tracker.
+  if (baseDomain(key) !== baseDomain(source)) return;
+  const now = Date.now();
+  const cached = _cloakCache.get(key);
+  if (cached && now - cached.at < 6 * 60 * 60 * 1000) return;
+  if (_cloakCache.size >= CLOAK_CACHE_MAX) {
+    const oldest = [..._cloakCache.entries()].sort(
+      (left, right) => left[1].at - right[1].at,
+    )[0];
+    if (oldest) _cloakCache.delete(oldest[0]);
+  }
+  _cloakCache.set(key, { at: now, pending: true });
+  // A resolver that never calls back must not pin the host as pending for the
+  // full six-hour cache window.
+  setTimeout(() => {
+    const entry = _cloakCache.get(key);
+    if (entry?.pending) _cloakCache.delete(key);
+  }, 30_000);
+  try {
+    const dns = Cc["@mozilla.org/network/dns-service;1"].getService(
+      Ci.nsIDNSService,
+    );
+    const listener = {
+      _host: key,
+      _source: source,
+      onLookupComplete(_request, record, status) {
+        const native = resolveNative();
+        if (!native) return;
+        let canonical = "";
+        try {
+          canonical = record?.canonicalName || "";
+        } catch {
+          canonical = "";
+        }
+        const targets = canonical ? [canonical] : [];
+        if (targets.length === 0) {
+          // Platforms whose getaddrinfo does not expose a canonical name get
+          // one CNAME RR query from the system resolver.
+          try {
+            const answer = native.cname?.(key) ?? {};
+            if (Array.isArray(answer.chain)) targets.push(...answer.chain);
+          } catch {
+            // Leave the host uncloaked on a resolver failure.
+          }
+        }
+        try {
+          let cloaked = false;
+          for (const target of targets) {
+            if (normalizeHostKey(target) === key) continue;
+            const verdict = native.classifyHost(target);
+            if (verdict && verdict.tracker === true) {
+              cloaked = true;
+              break;
+            }
+          }
+          // A later resolution that finds no tracker must lift an earlier
+          // marking; a shared CDN can change its canonical target.
+          native.setCloakedHost(key, cloaked);
+        } catch {
+          // A failed classification leaves the host uncloaked (fail open).
+        }
+        _cloakCache.set(key, { at: Date.now() });
+      },
+    };
+    // RESOLVE_CANONICAL_NAME: without this flag the record has no
+    // canonicalName, which is exactly the CNAME chain we need.
+    dns.asyncResolve(
+      key,
+      0,
+      Ci.nsIDNSService.RESOLVE_CANONICAL_NAME |
+        Ci.nsIDNSService.RESOLVE_BYPASS_CACHE,
+      null,
+      listener,
+      Services.tm?.mainThread ?? null,
+    );
+  } catch {
+    _cloakCache.delete(key);
+  }
+}
+
+const CLOAK_OBSERVER = {
+  observe(subject, topic) {
+    if (topic !== "http-on-modify-request" || !cnameSpoofingEnabled()) return;
+    try {
+      const channel = subject.QueryInterface(Ci.nsIHttpChannel);
+      const uri = channel.URI;
+      if (!uri || (uri.scheme !== "http" && uri.scheme !== "https")) return;
+      const native = resolveNative();
+      let isPrivate = false;
+      try {
+        isPrivate =
+          (channel.loadInfo?.originAttributes?.privateBrowsingId ?? 0) !== 0;
+      } catch {
+        isPrivate = false;
+      }
+      if (isPrivate) return;
+      let sourceHost = "";
+      try {
+        const loadInfo = channel.loadInfo;
+        const principal =
+          loadInfo?.loadingPrincipal ?? loadInfo?.triggeringPrincipal;
+        sourceHost = principal?.URI?.host ?? "";
+      } catch {
+        sourceHost = "";
+      }
+      resolveCloakedHost(uri.host, sourceHost);
+    } catch {
+      // Ignore requests without a resolvable host.
+    }
+  },
+};
+
+// Block Scripts covers inline scripts too. The channel hook cancels script
+// requests; a response CSP is the only way to stop inline execution without
+// patching the engine's script compiler.
+const CSP_OBSERVER = {
+  observe(subject, topic) {
+    if (topic !== "http-on-examine-response") return;
+    try {
+      const channel = subject.QueryInterface(Ci.nsIHttpChannel);
+      const type = channel.loadInfo?.externalContentPolicyType;
+      if (
+        type !== Ci.nsIContentPolicy.TYPE_DOCUMENT &&
+        type !== Ci.nsIContentPolicy.TYPE_SUBDOCUMENT
+      ) {
+        return;
+      }
+      let host = "";
+      try {
+        host =
+          channel.loadInfo?.loadingPrincipal?.URI?.host ??
+          channel.URI?.host ??
+          "";
+      } catch {
+        host = channel.URI?.host ?? "";
+      }
+      if (!prefBool(PREF, DEFAULT_ENABLED)) return;
+      const policy = host
+        ? readSitePolicies()[normalizeHostKey(host)]
+        : undefined;
+      if (policy && policy.enabled === false) return;
+      const blocked =
+        prefBool(BLOCK_SCRIPTS_PREF, false) || policy?.scripts === true;
+      if (!blocked) return;
+      channel.setResponseHeader(
+        "Content-Security-Policy",
+        "script-src 'none'",
+        true,
+      );
+    } catch {
+      // Non-HTTP channels are left alone.
+    }
+  },
+};
+
+let _cspObserved = false;
+
+function installCspObserver() {
+  if (_cspObserved) return;
+  try {
+    Services.obs.addObserver(CSP_OBSERVER, "http-on-examine-response");
+    _cspObserved = true;
+  } catch {
+    _cspObserved = false;
+  }
+}
+
+function uninstallCspObserver() {
+  if (!_cspObserved) return;
+  try {
+    Services.obs.removeObserver(CSP_OBSERVER, "http-on-examine-response");
+  } catch {
+    // Already gone.
+  }
+  _cspObserved = false;
 }
 
 function countRules(text) {
@@ -651,6 +1044,14 @@ async function buildBundle({ refresh = false } = {}) {
   const catalog = await loadCatalog();
   const ids = selectedListIds(catalog).slice(0, MAX_LISTS);
   const byId = new Map(ids.map((id) => [id, catalog.lists.find((l) => l.id === id)]));
+  for (const entry of readCustomLists()) {
+    byId.set(`custom:${entry.id}`, {
+      id: `custom:${entry.id}`,
+      source_url: entry.url,
+      title: entry.title,
+      bundled: false,
+    });
+  }
   const sources = [];
   const manifest = {};
   const missing = [];
@@ -692,16 +1093,20 @@ async function buildBundle({ refresh = false } = {}) {
     };
   }
   sources.sort((left, right) => left.id.localeCompare(right.id));
+  const userRules = prefString(USER_RULES_PREF, "");
   const rules = sources
     .map((source) => `! ==== astra:${source.id} ====\n${source.text}`)
-    .join("\n");
+    .join("\n")
+    .concat(
+      userRules.trim() ? `\n! ==== astra:user ====\n${userRules}\n` : "",
+    );
   return {
     ok: true,
     failure: null,
     rules,
-    count: sources.length,
-    bytes: totalBytes,
-    compiledRules: totalRules,
+    count: sources.length + (userRules.trim() ? 1 : 0),
+    bytes: totalBytes + userRules.length,
+    compiledRules: totalRules + (userRules.trim() ? countRules(userRules) : 0),
     manifest,
     missing,
     revision: (await sha256Hex(rules)).slice(0, 16),
@@ -792,6 +1197,19 @@ function applySiteExceptions(native) {
   for (const host of readSiteExceptions()) {
     try {
       native.setSiteEnabled(host, false);
+    } catch {
+      // A single bad host must not stop the install.
+    }
+  }
+  const policies = readSitePolicies();
+  for (const [host, policy] of Object.entries(policies)) {
+    try {
+      native.setSitePolicy?.(
+        host,
+        policy.enabled === true,
+        policy.aggressive === true,
+        policy.scripts === true,
+      );
     } catch {
       // A single bad host must not stop the install.
     }
@@ -960,6 +1378,17 @@ function liveBackend() {
         return false;
       }
     },
+    setSitePolicy(site, enabled, aggressive, scripts) {
+      try {
+        const native = resolveNative();
+        if (!native?.setSitePolicy) return false;
+        native.setSitePolicy(site, enabled, aggressive, scripts);
+        writeSiteException(site, enabled === false);
+        return writeSitePolicy(site, { enabled, aggressive, scripts });
+      } catch {
+        return false;
+      }
+    },
     site() {
       const native = resolveNative();
       if (!native) return null;
@@ -990,12 +1419,23 @@ function liveBackend() {
       }
       if (tab === "") return null;
       const profile = privateWindow() ? "incognito" : "default";
-      let paused = false;
+      let policy = { enabled: true, aggressive: false, scripts: false };
       try {
-        paused = native.isSiteEnabled(site) === false;
+        const nativePolicy = native.sitePolicy?.(site);
+        if (nativePolicy && typeof nativePolicy === "object") {
+          policy = {
+            enabled: nativePolicy.enabled !== false,
+            aggressive: nativePolicy.aggressive === true,
+            scripts: nativePolicy.scripts === true,
+          };
+        } else {
+          policy.enabled = native.isSiteEnabled(site) !== false;
+        }
       } catch {
-        paused = false;
+        // A transient FFI read must not make the site look paused.
+        policy.enabled = true;
       }
+      const paused = policy.enabled === false;
       const key = `${profile}\n${tab}\n${site}`;
       if (key !== siteKey) {
         siteKey = key;
@@ -1009,6 +1449,8 @@ function liveBackend() {
           revision: siteRevision,
         },
         paused,
+        mode: paused ? "off" : policy.aggressive ? "aggressive" : "standard",
+        block_scripts: policy.scripts,
         private_session: profile === "incognito",
         ready: native.isInitialized() === true,
         busy: false,
@@ -1077,6 +1519,13 @@ function siteView(backend) {
   return {
     context: { profile, tab, site, revision },
     paused: raw.paused === true,
+    mode:
+      raw.mode === "off" || raw.mode === "aggressive"
+        ? raw.mode
+        : raw.paused === true
+          ? "off"
+          : "standard",
+    block_scripts: raw.block_scripts === true,
     private_session: raw.private_session === true,
     ready: raw.ready === true,
     busy: raw.busy === true,
@@ -1212,9 +1661,36 @@ async function installRules(backend) {
 }
 
 /** One in-flight install shared by status reconciliation and a toggle. */
-function ensureInstalled(backend) {
-  if (_installing) return _installing;
-  const task = installRules(backend);
+// Every compile/refresh is serialized: bundle building is async, and two
+// overlapping installs would leave the engine and the recorded generation
+// describing different rule sets.
+let _installQueue = Promise.resolve();
+
+function enqueueInstall(task) {
+  const next = _installQueue.then(task, task);
+  _installQueue = next.then(
+    () => {},
+    () => {},
+  );
+  return next;
+}
+
+function ensureInstalled(backend, force = false) {
+  if (_installing && !force) return _installing;
+  const previous = _installing;
+  const task = enqueueInstall(async () => {
+    if (force && previous) {
+      // A configuration write landed while an install was running; that
+      // install read the previous bundle. Let it settle, then compile the
+      // current one so the new rule/list is actually in the engine.
+      try {
+        await previous;
+      } catch {
+        // The new install reports its own failure.
+      }
+    }
+    return installRules(backend);
+  });
   _installing = task;
   void task.finally(() => {
     if (_installing === task) _installing = null;
@@ -1226,47 +1702,54 @@ async function refreshAndInstall(backend) {
   if (!backend || typeof backend.refreshSources !== "function") {
     return { ok: false, failure: "internal" };
   }
-  _state.sourcePhase = "refreshing";
-  publish();
-  let result = null;
-  try {
-    result = await Promise.resolve(backend.refreshSources());
-  } catch {
-    result = null;
-  }
-  if (!result || result.ok !== true) {
-    _state.sourcePhase = "failed";
-    _state.sourceFailure = sourceFailure(result?.failure) ?? "internal";
-    return { ok: false, failure: _state.sourceFailure };
-  }
-  _state.sourcePhase = "fresh";
-  _state.sourceFailure = null;
-  _state.sourceCount = integer(result.count);
-  _state.sourceBytes = integer(result.bytes);
-  _state.sourcePackageRevision =
-    typeof result.revision === "string" && HEX16.test(result.revision)
-      ? result.revision
-      : null;
-  _state.sourceInstalledRevision = _state.sourcePackageRevision;
-  _state.sourcePackageProvenance = provenance(result.provenance);
-  _state.sourceInstalledProvenance = _state.sourcePackageProvenance;
-  const generation =
-    typeof result.generation === "string" && HEX16.test(result.generation)
-      ? result.generation
-      : mintGeneration();
-  _state.desired = { generation };
-  _state.applied = {
-    generation,
-    coverage: coverage(result.coverage),
-  };
-  _state.failure = null;
-  return { ok: true, generation };
+  return enqueueInstall(async () => {
+    _state.sourcePhase = "refreshing";
+    publish();
+    let result = null;
+    try {
+      result = await Promise.resolve(backend.refreshSources());
+    } catch {
+      result = null;
+    }
+    if (!result || result.ok !== true) {
+      _state.sourcePhase = "failed";
+      _state.sourceFailure = sourceFailure(result?.failure) ?? "internal";
+      return { ok: false, failure: _state.sourceFailure };
+    }
+    _state.sourcePhase = "fresh";
+    _state.sourceFailure = null;
+    _state.sourceCount = integer(result.count);
+    _state.sourceBytes = integer(result.bytes);
+    _state.sourcePackageRevision =
+      typeof result.revision === "string" && HEX16.test(result.revision)
+        ? result.revision
+        : null;
+    _state.sourceInstalledRevision = _state.sourcePackageRevision;
+    _state.sourcePackageProvenance = provenance(result.provenance);
+    _state.sourceInstalledProvenance = _state.sourcePackageProvenance;
+    const generation =
+      typeof result.generation === "string" && HEX16.test(result.generation)
+        ? result.generation
+        : mintGeneration();
+    _state.desired = { generation };
+    _state.applied = {
+      generation,
+      coverage: coverage(result.coverage),
+    };
+    _state.failure = null;
+    return { ok: true, generation };
+  });
 }
 
 /** Watch the preference so a direct pref write republishes the projection. */
 const OBSERVER = {
   observe(_subject, topic, data) {
-    if (topic === "nsPref:changed" && data === PREF) publish();
+    if (topic !== "nsPref:changed") return;
+    if (data === PREF) publish();
+    if (data === CNAME_PREF) {
+      if (prefBool(CNAME_PREF, true)) installCloakObserver();
+      else uninstallCloakObserver();
+    }
   },
 };
 
@@ -1275,6 +1758,7 @@ export function install() {
   try {
     if (typeof Services !== "undefined" && Services?.prefs?.addObserver) {
       Services.prefs.addObserver(PREF, OBSERVER);
+      Services.prefs.addObserver(CNAME_PREF, OBSERVER);
       try {
         if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
           // Define the gate the C++ hook reads; a user value still wins.
@@ -1285,6 +1769,8 @@ export function install() {
       }
       hydrateState();
       registerActor();
+      installCloakObserver();
+      installCspObserver();
       scheduleRefresh();
       scheduleStartupRefresh();
       _installed = true;
@@ -1386,9 +1872,29 @@ export function uninstall() {
   }
   try {
     Services.prefs.removeObserver(PREF, OBSERVER);
+    Services.prefs.removeObserver(CNAME_PREF, OBSERVER);
   } catch {
     // The pref service is already gone.
   }
+  uninstallCloakObserver();
+  uninstallCspObserver();
+  _cloakCache.clear();
+}
+
+function applySitePolicy(backend, site, enabled, aggressive, scripts) {
+  try {
+    if (typeof backend.setSitePolicy === "function") {
+      return backend.setSitePolicy(site, enabled, aggressive, scripts) === true;
+    }
+    // Compatibility seam for a build/test backend that predates per-site
+    // modes: it can still answer the on/off part.
+    if (typeof backend.setSiteEnabled === "function") {
+      return backend.setSiteEnabled(site, enabled) === true;
+    }
+  } catch {
+    // Fall through to the refusal below.
+  }
+  return false;
 }
 
 function validContext(context) {
@@ -1413,7 +1919,7 @@ async function retryGeneration(backend, failedGeneration) {
   if (!_state.failure || !matches) {
     return { ok: false, reason: "invalid_scope" };
   }
-  return installRules(backend);
+  return ensureInstalled(backend, true);
 }
 
 export const Blocker = {
@@ -1535,8 +2041,7 @@ export const Blocker = {
   },
 
   /** Pause/resume this site, or retry the site's failed generation. */
-  async siteChange({ context = null, action = null } = {}) {
-    install();
+  async siteChange({ context = null, action = null } = {}) {    install();
     if (!validContext(context) || !action || typeof action.kind !== "string") {
       return refuse("invalid_input");
     }
@@ -1562,12 +2067,43 @@ export const Blocker = {
     }
     if (action.kind === "pause") {
       if (typeof action.paused !== "boolean") return refuse("invalid_input");
-      let ok = false;
-      try {
-        ok = backend.setSiteEnabled(context.site, action.paused !== true) === true;
-      } catch {
-        ok = false;
+      const enabled = action.paused !== true;
+      const ok = applySitePolicy(
+        backend,
+        context.site,
+        enabled,
+        current.mode === "aggressive",
+        current.block_scripts === true,
+      );
+      if (!ok) return refuse("store_admission_rejected");
+      publish();
+      return admit({ outcome: "applied", reason: "mutation_applied" });
+    }
+    if (action.kind === "mode") {
+      const mode = action.mode;
+      if (mode !== "off" && mode !== "standard" && mode !== "aggressive") {
+        return refuse("invalid_input");
       }
+      const ok = applySitePolicy(
+        backend,
+        context.site,
+        mode !== "off",
+        mode === "aggressive",
+        current.block_scripts === true,
+      );
+      if (!ok) return refuse("store_admission_rejected");
+      publish();
+      return admit({ outcome: "applied", reason: "mutation_applied" });
+    }
+    if (action.kind === "scripts") {
+      if (typeof action.blocked !== "boolean") return refuse("invalid_input");
+      const ok = applySitePolicy(
+        backend,
+        context.site,
+        current.mode !== "off",
+        current.mode === "aggressive",
+        action.blocked,
+      );
       if (!ok) return refuse("store_admission_rejected");
       publish();
       return admit({ outcome: "applied", reason: "mutation_applied" });
@@ -1656,6 +2192,24 @@ export const Blocker = {
       auto_update: prefBool(AUTO_UPDATE_PREF, true),
       cosmetic: prefBool(COSMETIC_PREF, true),
       scriptlets: prefBool(SCRIPTLETS_PREF, true),
+      mode: readMode(),
+      removeparam: prefBool(REMOVE_PARAM_PREF, true),
+      bounce: prefBool(BOUNCE_PREF, true),
+      block_scripts: prefBool(BLOCK_SCRIPTS_PREF, false),
+      redirects: prefBool(REDIRECTS_PREF, true),
+      cname: prefBool(CNAME_PREF, true),
+      custom_lists: readCustomLists().map((entry) => ({
+        title: entry.title,
+        url: entry.url,
+      })),
+      user_rules: prefString(USER_RULES_PREF, ""),
+      cloaked: (() => {
+        try {
+          return resolveNative()?.cloakedHosts?.() ?? [];
+        } catch {
+          return [];
+        }
+      })(),
       last_update_unix: last > 0 ? last : null,
       next_update_unix:
         hours > 0
@@ -1680,6 +2234,14 @@ export const Blocker = {
     auto_update = null,
     cosmetic = null,
     scriptlets = null,
+    mode = null,
+    removeparam = null,
+    bounce = null,
+    block_scripts = null,
+    redirects = null,
+    cname = null,
+    custom_lists = null,
+    user_rules = null,
   } = {}) {
     install();
     if (
@@ -1693,7 +2255,27 @@ export const Blocker = {
           update_hours > 720)) ||
       (auto_update !== null && typeof auto_update !== "boolean") ||
       (cosmetic !== null && typeof cosmetic !== "boolean") ||
-      (scriptlets !== null && typeof scriptlets !== "boolean")
+      (scriptlets !== null && typeof scriptlets !== "boolean") ||
+      (mode !== null && mode !== "standard" && mode !== "aggressive") ||
+      (removeparam !== null && typeof removeparam !== "boolean") ||
+      (bounce !== null && typeof bounce !== "boolean") ||
+      (block_scripts !== null && typeof block_scripts !== "boolean") ||
+      (redirects !== null && typeof redirects !== "boolean") ||
+      (cname !== null && typeof cname !== "boolean") ||
+      (custom_lists !== null &&
+        (!Array.isArray(custom_lists) ||
+          custom_lists.length > 32 ||
+          custom_lists.some(
+            (entry) =>
+              (typeof entry !== "string" && (!entry || typeof entry !== "object")) ||
+              (typeof entry === "string"
+                ? !/^https:\/\/[^\s]+$/iu.test(entry)
+                : typeof entry.url !== "string" ||
+                  !/^https:\/\/[^\s]+$/iu.test(entry.url) ||
+                  (entry.title !== undefined && typeof entry.title !== "string")),
+          ))) ||
+      (user_rules !== null &&
+        (typeof user_rules !== "string" || user_rules.length > 262_144))
     ) {
       return refuse("invalid_input");
     }
@@ -1704,14 +2286,42 @@ export const Blocker = {
       return refuse("native_dispatch_rejected");
     }
     let ids = null;
-    if (list_ids !== null) {
+    let preset = null;
+    if (list_ids !== null || mode !== null) {
       try {
         const catalog = await loadCatalog();
+        if (mode !== null) {
+          preset = modePreset(catalog, mode);
+        }
+        const source = list_ids !== null ? list_ids : preset;
         const known = new Set(catalog.lists.map((entry) => entry.id));
-        ids = [...new Set(list_ids)].filter((id) => known.has(id));
+        ids = [...new Set(source)].filter((id) => known.has(id));
         if (ids.length === 0) return refuse("invalid_input");
       } catch {
         return refuse("store_admission_rejected");
+      }
+    }
+    let nextCustom = null;
+    if (custom_lists !== null) {
+      const seen = new Set();
+      nextCustom = [];
+      for (const raw of custom_lists) {
+        const url = (typeof raw === "string" ? raw : raw.url).trim();
+        if (seen.has(url)) continue;
+        seen.add(url);
+        nextCustom.push({
+          id: customListId(url),
+          title:
+            (typeof raw === "string" ? "" : text(raw.title, 120)) ||
+            (() => {
+              try {
+                return new URL(url).hostname;
+              } catch {
+                return url;
+              }
+            })(),
+          url,
+        });
       }
     }
     const previous = (() => {
@@ -1731,6 +2341,22 @@ export const Blocker = {
           ids.length !== previous.size ||
           ids.some((id) => !previous.has(id));
       }
+      if (mode !== null) {
+        Services.prefs.setIntPref(MODE_PREF, mode === "aggressive" ? 1 : 0);
+        listsChanged = true;
+      }
+      if (nextCustom !== null) {
+        if (!writeCustomLists(nextCustom)) {
+          return refuse("store_admission_rejected");
+        }
+        listsChanged = true;
+      }
+      if (user_rules !== null) {
+        if (!writePrefString(USER_RULES_PREF, user_rules)) {
+          return refuse("store_admission_rejected");
+        }
+        listsChanged = true;
+      }
       if (update_hours !== null) {
         Services.prefs.setIntPref(SCHEDULE_PREF, update_hours);
       }
@@ -1743,12 +2369,29 @@ export const Blocker = {
       if (scriptlets !== null) {
         Services.prefs.setBoolPref(SCRIPTLETS_PREF, scriptlets);
       }
+      if (removeparam !== null) {
+        Services.prefs.setBoolPref(REMOVE_PARAM_PREF, removeparam);
+      }
+      if (bounce !== null) {
+        Services.prefs.setBoolPref(BOUNCE_PREF, bounce);
+      }
+      if (block_scripts !== null) {
+        Services.prefs.setBoolPref(BLOCK_SCRIPTS_PREF, block_scripts);
+      }
+      if (redirects !== null) {
+        Services.prefs.setBoolPref(REDIRECTS_PREF, redirects);
+      }
+      if (cname !== null) {
+        Services.prefs.setBoolPref(CNAME_PREF, cname);
+        if (cname) installCloakObserver();
+        else uninstallCloakObserver();
+      }
     } catch {
       return refuse("store_admission_rejected");
     }
     scheduleRefresh();
     if (listsChanged) {
-      const result = await ensureInstalled(getBackend());
+      const result = await ensureInstalled(getBackend(), true);
       publish();
       if (!result.ok) return refuse("native_work_pending");
       if (Array.isArray(result.missing) && result.missing.length > 0) {

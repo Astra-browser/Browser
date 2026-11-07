@@ -43,8 +43,30 @@ interface nsIAstraBlockerService : nsISupports {
   void setSiteEnabled(in ACString host, in boolean enabled);
   boolean isSiteEnabled(in ACString host);
 
+  /** Full per-site shields policy: on/off, aggressive list extras and
+   *  JavaScript blocking. Persisted by the Host module. */
+  void setSitePolicy(in ACString host, in boolean enabled, in boolean aggressive,
+                     in boolean scripts);
+  ACString sitePolicy(in ACString host);
+
   /** Hosts currently paused, as a JSON string array. */
   ACString siteExceptions();
+
+  /** CNAME uncloaking: the Host resolves a host's canonical name and marks
+   *  the first-party host when the target is a tracker. Returns JSON. */
+  void setCloakedHost(in ACString host, in boolean blocked);
+  boolean isCloaked(in ACString host);
+  ACString cloakedHosts();
+
+  /** Classify one host or bounce URL against the live filter engine. */
+  ACString classifyHost(in ACString host);
+  ACString classifyBounce(in ACString url);
+
+  /** CNAME chain for one host, from the system resolver. */
+  ACString cname(in ACString host);
+
+  /** Diagnostic verdict (block/redirect/rewrite) for one request. */
+  ACString checkUrl(in ACString url, in ACString sourceUrl, in ACString type);
 
   /** CSS selectors plus the scriptlet payload for one page, as JSON.
    *  `classesJson` / `idsJson` are JSON string arrays observed on the page. */

@@ -46,6 +46,7 @@ export interface HostModules {
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   BrowsingData: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Blocker: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Privacy: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
   eventSeq: () => number;
@@ -176,6 +177,11 @@ const ROUTES: Record<string, Route> = {
   blocker_retry: ["Blocker", "retry"],
   blocker_site_change: ["Blocker", "siteChange"],
   blocker_picker: ["Blocker", "picker"],
+  privacy_state: ["Privacy", "state"],
+  privacy_configure: ["Privacy", "configure"],
+  privacy_site_state: ["Privacy", "siteState"],
+  privacy_site_configure: ["Privacy", "siteConfigure"],
+  privacy_forget_site: ["Privacy", "forgetSite"],
   operation_status: ["Operations", "status"],
   operations_reconcile: ["Operations", "reconcile"],
   operation_acknowledge: ["Operations", "acknowledge"],

@@ -20,6 +20,33 @@
   once and keeps the previous engine if anything fails. The scheduler does the
   same every N hours (default 24) and catches up on the next start.
 
+## Shields features (native, 2026-11-07)
+
+| Feature | Native mechanism | Setting |
+|---|---|---|
+| `$removeparam` | adblock-rust returns `rewritten_url`; the channel hook redirects before connect | Strip tracking parameters |
+| `$redirect` resource substitution | adblock-rust returns the resource as a `data:` URI; the hook redirects the channel and marks the loadInfo data-URI allowance | Redirect placeholders |
+| Bounce/debounce unwrapping | native redirector table + query unwrap in Rust; top-level navigation redirects directly | Unwrap tracking links |
+| CNAME uncloaking | Host resolves a host's canonical DNS name, classifies it with the live engine, and marks the first-party host; the hook blocks later requests | CNAME uncloaking |
+| Block Scripts | the hook cancels `script` requests globally or for one site | Block scripts / per-site shield |
+| Standard / Aggressive | list preset plus aggressive social-embed blocking; per-site Aggressive also forces removeparam/bounce | Protection mode |
+| Per-site shield | `setSitePolicy(host, enabled, aggressive, scripts)` in the Rust engine, persisted by the Host | Shield menu |
+| Custom filter-list URL | HTTPS source added to the bundle and cached like a catalog list | Custom filter lists |
+| Custom rules | user rule text appended after every list | Your filter rules |
+| Social embeds + cookie banners | `social-media-blocker`, `easylist-cookie` and `ublock-filters-cookie-notices` are default-enabled | Filter lists |
+| Third-party cookies | `network.cookie.cookieBehavior` (allow / block / partition) | Cookies and site data |
+| Forgetful browsing | `nsIClearDataService.deleteDataFromHost(CLEAR_FORGET_ABOUT_SITE)` on last tab close | Forget me when I close this site |
+| Per-site cookie controls | cookie permission (`nsICookiePermission.ACCESS_DENY/ALLOW`) | Shield menu |
+| Ephemeral third-party storage | partitioned third-party storage + purge on close | Ephemeral third-party storage |
+| Fingerprinting modes | FPP target set; per-site `privacy.fingerprintingProtection.granularOverrides` | Fingerprinting protection |
+| Language spoofing | `+JSLocale/+JSLocalePrompt` and an Accept-Language header override | Language fingerprinting |
+| Screen spoofing | `+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+CSSDeviceSize,+CSSResolution` | Screen fingerprinting |
+| Full API coverage | Aggressive mode uses the full FPP target set (canvas, audio, WebGL, fonts, display, timers, media and locale) | Fingerprinting protection |
+
+The per-site shield persists under `astra.blocker.site-policies`; the
+fingerprint and cookie overrides persist under `astra.privacy.*`. Every switch
+has a Host route and a Settings control; no setting is a dead toggle.
+
 ## Wiring (route → host → engine)
 
 | Surface | Route | Host module | Native |
@@ -69,6 +96,21 @@ hook moved) → `forge build --jobs 2` → `blocker-probe.py`.
 
 ## Verification (2026-11-07, packaged dev build)
 
+**Shields feature pass (later 2026-11-07).**
+`tools/marionette-probe/shields-probe.py` PASS covers: `$removeparam` (server
+sees the cleaned URL), `$redirect` (1×1 GIF, original URL never requested),
+bounce unwrapping (Google redirector lands on the loopback destination), CNAME
+enforcement and the system-resolver CNAME chain, per-site Block Scripts, custom
+user rules, cookie modes, per-site cookie block/allow, forget-on-close data
+clear, fingerprint target sets, Accept-Language spoofing and bounce-tracking
+purge mode. `tests/contract/privacy_host.mjs` adds 22 checks over a fake chrome.
+
+**Benchmark.** `tools/marionette-probe/adblock-benchmark-probe.py` reports
+**132/132** on `https://adblock.turtlecute.org/` (128 hosts + 2 cosmetic + 2
+script canaries), and YouTube playback with no `.ad-showing` and no visible ad
+module across 24 one-second samples. Evidence: `out/adblock-benchmark/`
+(`report.json`, `turtlecute.png`, `youtube.png`).
+
 - `cargo check` of the component against vendored adblock 0.12.1: clean.
 - `./mach build -j2` (`forge build --jobs 2`): libxul links the crate, IDL and
   XPCOM service. No new vendored crates (adblock/serde/cstr were already in
@@ -91,6 +133,21 @@ hook moved) → `forge build --jobs 2` → `blocker-probe.py`.
   `crates/astra-proto/check-drift.sh`, `state-check`, `brand-lint`.
 
 ## Deferred / limits (honest)
+
+- **CNAME uncloaking is first-party-only and the first request can pass.** The
+  Host resolves a first-party subdomain's CNAME chain (Gecko canonical name,
+  then a direct system `res_query` fallback) and marks it when the chain ends
+  in a tracker. The request that triggered the lookup is already in flight;
+  every later request to that host is cancelled. Third-party CNAMEs are not
+  resolved (they are not a first-party disguise and would add DNS work to every
+  subresource). The direct system-resolver query is one blocking call per
+  first-party host and is cached for six hours; a page with many first-party
+  subdomains can therefore add resolver latency on the first visit.
+- **Block Scripts uses two native layers.** The channel hook cancels every
+  script request; an `http-on-examine-response` observer adds
+  `Content-Security-Policy: script-src 'none'` to documents so inline scripts
+  are stopped too. It is deliberately strict and site-breaking; the per-site
+  shield is the intended path.
 
 - **Redirect resources** (`$redirect=…`) block the request but do not yet
   substitute the redirect body on the network path; scriptlets and CSS are

@@ -11,6 +11,41 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: shields parity features (2026-11-07, later)
+
+Every row below is live in the packaged dev build. The engine now returns a
+three-way verdict (block / redirect resource / rewritten URL), and the Host
+owns the settings, persistence and DNS CNAME fallback.
+
+| Surface | What works | Wiring | Live evidence |
+|---|---|---|---|
+| Benchmark | 132/132 on adblock.turtlecute.org (128 hosts + 2 cosmetic + 2 script canaries), 0 not blocked | catalog defaults (14 lists incl. social and cookie) + `blocker/lists/astra-telemetry.txt` (bundled, default) + `/ads.js`, `/pagead.js` script heuristics | `adblock-benchmark-probe.py` PASS, report in `out/adblock-benchmark/` |
+| YouTube | Player plays while no `.ad-showing`, no visible ad module, for 24 s of playback | filter lists + scriptlets + script heuristics | `adblock-benchmark-probe.py` samples, screenshot `youtube.png` |
+| `$removeparam` | Tracking parameters are stripped before connect | Rust `rewritten_url` → C++ `nsIHttpChannel.redirectTo` | `shields-probe.py`: `/echo?utm_source=…` reaches the server as `/echo?keep=1` |
+| `$redirect` | Redirect rules load the neutral resource body; the original URL is never fetched | Rust returns the `data:` URI → C++ redirect + loadInfo data allowance | `shields-probe.py`: 1×1 GIF, `naturalWidth=1`, server hit 0 |
+| Bounce/unlinkable | Known redirectors and shorteners open the destination directly | Rust `bounce_target` → channel redirect; Firefox BTP mode 2 | `shields-probe.py`: Google `/url?q=` lands on the loopback destination; `classifyBounce`; BTP pref 2 |
+| CNAME uncloaking | First-party hosts whose canonical chain is a tracker are marked and then cancelled | Host DNS (`asyncResolve` canonical + `res_query` fallback) → `classifyHost` → `setCloakedHost`; Rust blocks later requests | `shields-probe.py`: direct enforcement; `cname('www.apple.com')` returns the Akamai chain |
+| Block Scripts | Global and per-site cancels `script` requests | Rust policy/flag + Host per-site persistence | `shields-probe.py`: `/site-script.js` hit 0 with per-site scripts on |
+| Standard / Aggressive | Presets switch list membership; aggressive adds annoyances and social embeds | Host `modePreset`, `astra.blocker.mode` | `ProtectionControls` control + `lists.mode` projection |
+| Per-site shield | Off / Standard / Aggressive, block scripts, cookies, forget, fingerprint | `setSitePolicy`, `privacy_site_*` routes | `shields-probe.py`: per-site block scripts; cookie block/allow; forget clears cookies |
+| Custom lists / rules | HTTPS list URLs and a user rule text are compiled with every reinstall | Host `buildBundle` + cache/refresh | `shields-probe.py`: user rule blocks `/custom.png`; `privacy_host.mjs` |
+| Cookies | Allow / block third-party / partition | `network.cookie.cookieBehavior` | `shields-probe.py`: pref 1 from `block-third-party` |
+| Forgetful browsing | Last tab for a site clears its data (`CLEAR_FORGET_ABOUT_SITE`) | `nsIClearDataService` + Host tab tracking | `shields-probe.py`: cookies 0 after `forgetSite`; `privacy_host.mjs` |
+| Fingerprinting | Off / Standard / Aggressive FPP target sets, per-site granular overrides | `privacy.fingerprintingProtection(.overrides/.granularOverrides)` | `shields-probe.py`: aggressive set includes `ScreenRect`/`JSLocale`; contract 22 checks |
+| Language / screen | `navigator.language` and Accept-Language spoof; screen metrics targets | FPP targets + `intl.accept_languages` + header observer | `shields-probe.py`: `Accept-Language: en-US` on the wire |
+| Cookies per site | Block / allow / default for the current origin (scheme + port) | `nsIPermissionManager.addFromPrincipal` | `shields-probe.py`: `document.cookie` empty when blocked, set when allowed |
+
+Rebuild note: the engine change needs `forge overlay` → `forge export` →
+`forge build --jobs 2` (never uncapped). The overlay-only/Host changes need
+`overlay` → `build --faster`.
+
+**Verification (final, 2026-11-07):** `tools/perf/full-suite.sh --skip-build
+--skip-perf` → **PASS** (contracts incl. `privacy_host` 22 checks, 1238 UI
+unit tests, 25 live probes incl. `shields`, one environment SKIP for media).
+`adblock-benchmark-probe.py` → **132/132** and YouTube 24 s playback with no
+ad; `shields-probe.py` → PASS (30 checks). Evidence in
+`out/adblock-benchmark/`.
+
 ## Owner report: Brave-derived blocker, settings and schedule (2026-11-07)
 
 | Surface | What works | Wiring / files | Live evidence |

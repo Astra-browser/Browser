@@ -415,7 +415,7 @@ export const commands = {
 	 *  Null leaves a field unchanged. List membership triggers one reinstall
 	 *  from the on-disk cache.
 	 */
-	blockerConfigure: (listIds: string[] | null, updateHours: number | null, autoUpdate: boolean | null, cosmetic: boolean | null, scriptlets: boolean | null) => __TAURI_INVOKE<OperationAdmission>("blocker_configure", { listIds, updateHours, autoUpdate, cosmetic, scriptlets }),
+	blockerConfigure: (listIds: string[] | null, updateHours: number | null, autoUpdate: boolean | null, cosmetic: boolean | null, scriptlets: boolean | null, mode?: "standard" | "aggressive" | null, removeparam?: boolean | null, bounce?: boolean | null, blockScripts?: boolean | null, redirects?: boolean | null, cname?: boolean | null, customLists?: string[] | null, userRules?: string | null) => __TAURI_INVOKE<OperationAdmission>("blocker_configure", { listIds, updateHours, autoUpdate, cosmetic, scriptlets, mode: mode ?? null, removeparam: removeparam ?? null, bounce: bounce ?? null, block_scripts: blockScripts ?? null, redirects: redirects ?? null, cname: cname ?? null, custom_lists: customLists ?? null, user_rules: userRules ?? null }),
 	/** Clear the bounded counters. Rules and list state are untouched. */
 	blockerResetStats: () => __TAURI_INVOKE<OperationAdmission>("blocker_reset_stats"),
 	blockerSetEnabled: (enabled: boolean) => __TAURI_INVOKE<OperationAdmission>("blocker_set_enabled", { enabled }),
@@ -427,6 +427,11 @@ export const commands = {
 } | null, null>(__TAURI_INVOKE("blocker_picker", { context, action })),
 	blockerRetry: (failedGeneration: string) => __TAURI_INVOKE<OperationAdmission>("blocker_retry", { failedGeneration }),
 	blockerRefreshSources: () => __TAURI_INVOKE<OperationAdmission>("blocker_refresh_sources"),
+	privacyState: () => __TAURI_INVOKE<PrivacyStateView>("privacy_state"),
+	privacyConfigure: (cookies: string | null, forgetOnClose: boolean | null, ephemeral: boolean | null, fingerprinting: string | null, language: boolean | null, screen: boolean | null, bounceProtection: boolean | null) => __TAURI_INVOKE<{ accepted: boolean; reason?: string; state?: PrivacyStateView }>("privacy_configure", { cookies, forget_on_close: forgetOnClose, ephemeral, fingerprinting, language, screen, bounce_protection: bounceProtection }),
+	privacySiteState: (host: string) => __TAURI_INVOKE<PrivacySiteStateView>("privacy_site_state", { host }),
+	privacySiteConfigure: (host: string, cookies: string | null, forget: boolean | null, fingerprint: string | null) => __TAURI_INVOKE<{ accepted: boolean; reason?: string; state?: PrivacySiteStateView }>("privacy_site_configure", { host, cookies, forget, fingerprint }),
+	privacyForgetSite: (host: string) => __TAURI_INVOKE<{ accepted: boolean; reason?: string }>("privacy_forget_site", { host }),
 	profilesDelete: (profile: string) => __TAURI_INVOKE<OperationAdmission>("profiles_delete", { profile }),
 	profilesGet: () => typedError<{
 	current: string | null,
@@ -1077,7 +1082,7 @@ export type BlockerSelectionView = {
 	positional: boolean,
 };
 
-export type BlockerSiteAction = { kind: "save_selection"; session: string; selection: string } | { kind: "retry" } | { kind: "pause"; paused: boolean } | { kind: "set_hide_enabled"; id: string; enabled: boolean } | { kind: "remove_hide"; id: string };
+export type BlockerSiteAction = { kind: "save_selection"; session: string; selection: string } | { kind: "retry" } | { kind: "pause"; paused: boolean } | { kind: "mode"; mode: "off" | "standard" | "aggressive" } | { kind: "scripts"; blocked: boolean } | { kind: "set_hide_enabled"; id: string; enabled: boolean } | { kind: "remove_hide"; id: string };
 
 /**  Exact privileged site-control context; never accepted from ordinary page IPC. */
 export type BlockerSiteContext = {
@@ -1090,6 +1095,8 @@ export type BlockerSiteContext = {
 export type BlockerSiteView = {
 	context: BlockerSiteContext,
 	paused: boolean,
+	mode: "off" | "standard" | "aggressive",
+	block_scripts: boolean,
 	private_session: boolean,
 	ready: boolean,
 	busy: boolean,
@@ -1146,6 +1153,15 @@ export type BlockerListsView = {
 	auto_update: boolean,
 	cosmetic: boolean,
 	scriptlets: boolean,
+	mode: "standard" | "aggressive",
+	removeparam: boolean,
+	bounce: boolean,
+	block_scripts: boolean,
+	redirects: boolean,
+	cname: boolean,
+	custom_lists: { title: string; url: string }[],
+	user_rules: string,
+	cloaked: string[],
 	last_update_unix: number | null,
 	next_update_unix: number | null,
 	installed_rules: number,
@@ -1156,6 +1172,29 @@ export type BlockerStatsView = {
 	today: number | null,
 	last7Days: number | null,
 	days: (number | null)[],
+};
+
+export type PrivacyStateView = {
+	cookies: "allow" | "block-third-party" | "partition",
+	forget_on_close: boolean,
+	forget_sites: string[],
+	ephemeral: boolean,
+	fingerprinting: "off" | "standard" | "aggressive",
+	language: boolean,
+	screen: boolean,
+	bounce_protection: boolean,
+	site_cookies: Record<string, string>,
+	site_fingerprints: Record<string, string>,
+	targets: string[],
+	cookie_behavior: number,
+	bounce_mode: number,
+};
+
+export type PrivacySiteStateView = {
+	host: string,
+	cookies: "default" | "allow" | "block",
+	forget: boolean,
+	fingerprint: "off" | "standard" | "aggressive" | "",
 };
 
 export type BlockerStatusChanged = BlockerStatusView;

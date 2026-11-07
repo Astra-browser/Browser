@@ -11,17 +11,28 @@
 #include "nsCOMPtr.h"
 #include "nsIChannel.h"
 #include "nsIContentPolicy.h"
+#include "nsIHttpChannel.h"
 #include "nsILoadInfo.h"
 #include "nsIPrincipal.h"
 #include "nsIURI.h"
+#include "nsNetUtil.h"
 
 namespace mozilla::AstraBlocker {
 
 // Registered by the Astra overlay. Default false: no rules installed at
 // first boot means no blocks until the Host module pushes a rule set.
 static const char* kEnabledPref = "astra.blocker.enabled";
+static const char* kRemoveParamPref = "astra.blocker.removeparam";
+static const char* kBouncePref = "astra.blocker.bounce";
+static const char* kBlockScriptsPref = "astra.blocker.block-scripts";
+static const char* kRedirectsPref = "astra.blocker.redirects";
 
 namespace {
+
+constexpr uint32_t kFlagRemoveParam = 1 << 0;
+constexpr uint32_t kFlagBounce = 1 << 1;
+constexpr uint32_t kFlagBlockScripts = 1 << 2;
+constexpr uint32_t kFlagRedirects = 1 << 3;
 
 void TakeString(char* aText, nsACString& aOut) {
   if (!aText) {
@@ -90,6 +101,23 @@ bool IsBrowserInternalScheme(nsIURI* aURI) {
          aURI->SchemeIs("view-source");
 }
 
+uint32_t RequestFlags() {
+  uint32_t flags = 0;
+  if (Preferences::GetBool(kRemoveParamPref, true)) {
+    flags |= kFlagRemoveParam;
+  }
+  if (Preferences::GetBool(kBouncePref, true)) {
+    flags |= kFlagBounce;
+  }
+  if (Preferences::GetBool(kBlockScriptsPref, false)) {
+    flags |= kFlagBlockScripts;
+  }
+  if (Preferences::GetBool(kRedirectsPref, true)) {
+    flags |= kFlagRedirects;
+  }
+  return flags;
+}
+
 }  // namespace
 
 bool IsInitialized() { return astra_blocker_engine_is_installed(); }
@@ -99,7 +127,7 @@ bool IsEnabled() {
   return Preferences::GetBool(kEnabledPref, false) && IsInitialized();
 }
 
-bool ShouldBlockChannel(nsIChannel* aChannel) {
+bool ApplyChannelAction(nsIChannel* aChannel) {
   if (!IsEnabled() || !aChannel) {
     return false;
   }
@@ -119,16 +147,36 @@ bool ShouldBlockChannel(nsIChannel* aChannel) {
   if (NS_FAILED(aChannel->GetLoadInfo(getter_AddRefs(loadInfo))) || !loadInfo) {
     return false;
   }
-  nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
-  bool isSystem = false;
-  if (!loadingPrincipal ||
-      (NS_SUCCEEDED(loadingPrincipal->GetIsSystemPrincipal(&isSystem)) &&
-       isSystem)) {
-    return false;
+
+  // Never classify chrome/system loads. A top-level document has no loading
+  // principal, so fall back to the triggering principal (the referrer or the
+  // system principal) and let the engine treat an empty source as the
+  // destination host.
+  nsCOMPtr<nsIPrincipal> principal = loadInfo->GetLoadingPrincipal();
+  if (!principal) {
+    (void)loadInfo->GetTriggeringPrincipal(getter_AddRefs(principal));
   }
   nsCString sourceSpec;
-  if (NS_FAILED(loadingPrincipal->GetAsciiSpec(sourceSpec))) {
-    return false;
+  const bool isDocument =
+      loadInfo->GetExternalContentPolicyType() ==
+      ExtContentPolicyType::TYPE_DOCUMENT;
+  if (principal) {
+    bool isSystem = false;
+    const bool system =
+        NS_SUCCEEDED(principal->GetIsSystemPrincipal(&isSystem)) && isSystem;
+    if (system) {
+      // A browser-initiated top-level navigation has a system triggering
+      // principal; it is still a web document and must be classified so
+      // removeparam/bounce/CNAME work on it. Every non-document system load
+      // (chrome, updater, internal fetch) is left alone.
+      if (!isDocument) {
+        return false;
+      }
+    } else if (!isDocument) {
+      // A document's loading principal is the referrer; per-site policy must
+      // key on the destination, so leave the source empty for the engine.
+      (void)principal->GetAsciiSpec(sourceSpec);
+    }
   }
 
   nsCString requestType;
@@ -137,13 +185,79 @@ bool ShouldBlockChannel(nsIChannel* aChannel) {
   bool isPrivate = loadInfo->GetOriginAttributes().IsPrivateBrowsing();
 
   bool block = false;
-  nsresult rv = astra_blocker_engine_should_block(
+  char* redirect = nullptr;
+  char* rewrite = nullptr;
+  nsresult rv = astra_blocker_engine_decide(
       url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
-      requestType.get(), requestType.Length(), !isPrivate, &block);
+      requestType.get(), requestType.Length(), RequestFlags(), !isPrivate,
+      &block, &redirect, &rewrite);
   if (NS_FAILED(rv)) {
     return false;
   }
-  return block;
+
+  auto freeActions = [&]() {
+    if (redirect) {
+      astra_blocker_string_free(redirect);
+      redirect = nullptr;
+    }
+    if (rewrite) {
+      astra_blocker_string_free(rewrite);
+      rewrite = nullptr;
+    }
+  };
+
+  if (block) {
+    freeActions();
+    aChannel->Cancel(NS_ERROR_ABORT);
+    return true;
+  }
+
+  if (!redirect && !rewrite) {
+    return false;
+  }
+
+  nsCString targetSpec;
+  const bool isResourceRedirect = redirect != nullptr;
+  targetSpec.Assign(isResourceRedirect ? redirect : rewrite);
+  freeActions();
+
+  nsCOMPtr<nsIURI> target;
+  rv = NS_NewURI(getter_AddRefs(target), targetSpec);
+  if (NS_FAILED(rv) || !target) {
+    // A redirect resource must not fall back to the ad request; a rewrite
+    // (removeparam / bounce) may fail open to the original URL.
+    if (isResourceRedirect) {
+      aChannel->Cancel(NS_ERROR_ABORT);
+      return true;
+    }
+    return false;
+  }
+
+  nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aChannel);
+  if (!http) {
+    if (isResourceRedirect) {
+      aChannel->Cancel(NS_ERROR_ABORT);
+      return true;
+    }
+    return false;
+  }
+
+  rv = http->RedirectTo(target);
+  if (NS_FAILED(rv)) {
+    if (isResourceRedirect) {
+      aChannel->Cancel(NS_ERROR_ABORT);
+      return true;
+    }
+    return false;
+  }
+
+  if (isResourceRedirect) {
+    // `RedirectTo` clears the WebExtension flag. Restore it on this channel's
+    // loadInfo so a data: body (script, image, ...) is accepted when the new
+    // channel opens. No web content can reach this path.
+    loadInfo->SetAllowInsecureRedirectToDataURI(true);
+  }
+  return false;
 }
 
 nsresult InstallRules(const nsACString& aRules) {
@@ -181,8 +295,24 @@ nsresult SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
                                         aEnabled);
 }
 
+nsresult SetSitePolicy(const nsACString& aHost, bool aEnabled, bool aAggressive,
+                       bool aScripts) {
+  return astra_blocker_set_site_policy(aHost.BeginReading(), aHost.Length(),
+                                       aEnabled, aAggressive, aScripts);
+}
+
 bool IsSiteEnabled(const nsACString& aHost) {
   return astra_blocker_is_site_enabled(aHost.BeginReading(), aHost.Length());
+}
+
+nsresult SitePolicyJson(const nsACString& aHost, nsACString& aOutJson) {
+  char* json =
+      astra_blocker_site_policy_json(aHost.BeginReading(), aHost.Length());
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
 }
 
 nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
@@ -190,6 +320,70 @@ nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
   char* json = astra_blocker_engine_cosmetic(
       aUrl.BeginReading(), aUrl.Length(), aClassesJson.BeginReading(),
       aClassesJson.Length(), aIdsJson.BeginReading(), aIdsJson.Length());
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
+}
+
+nsresult ClassifyHostJson(const nsACString& aHost, nsACString& aOutJson) {
+  char* json =
+      astra_blocker_classify_host_json(aHost.BeginReading(), aHost.Length());
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
+}
+
+nsresult ClassifyBounceJson(const nsACString& aUrl, nsACString& aOutJson) {
+  char* json =
+      astra_blocker_classify_bounce_json(aUrl.BeginReading(), aUrl.Length());
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
+}
+
+nsresult CnameJson(const nsACString& aHost, nsACString& aOutJson) {
+  char* json = astra_blocker_cname_json(aHost.BeginReading(), aHost.Length());
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
+}
+
+nsresult CheckUrlJson(const nsACString& aUrl, const nsACString& aSourceUrl,
+                      const nsACString& aType, nsACString& aOutJson) {
+  // Diagnostic flags: redirect + removeparam + bounce (no Block Scripts, so a
+  // normal page's scripts are still described accurately).
+  constexpr uint32_t kDiagnosticFlags =
+      kFlagRemoveParam | kFlagBounce | kFlagRedirects;
+  char* json = astra_blocker_engine_check_json(
+      aUrl.BeginReading(), aUrl.Length(), aSourceUrl.BeginReading(),
+      aSourceUrl.Length(), aType.BeginReading(), aType.Length(),
+      kDiagnosticFlags);
+  if (!json) {
+    return NS_ERROR_FAILURE;
+  }
+  TakeString(json, aOutJson);
+  return NS_OK;
+}
+
+nsresult SetCloakedHost(const nsACString& aHost, bool aBlocked) {
+  return astra_blocker_set_cloaked_host(aHost.BeginReading(), aHost.Length(),
+                                        aBlocked);
+}
+
+bool IsCloaked(const nsACString& aHost) {
+  return astra_blocker_is_cloaked(aHost.BeginReading(), aHost.Length());
+}
+
+nsresult CloakedHostsJson(nsACString& aOutJson) {
+  char* json = astra_blocker_cloaked_hosts_json();
   if (!json) {
     return NS_ERROR_FAILURE;
   }

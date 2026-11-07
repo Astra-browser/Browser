@@ -9,7 +9,7 @@ Verified-On: 153.6.0
 Removal-Plan: delete the 10-line block + include + LOCAL_INCLUDES line if the blocker moves out of tree (fallback proxy)
 ---
 diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
-index 654ecffedd..c03f79021a 100644
+index 654ecffedd..320c664d8a 100644
 --- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
 +++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
 @@ -5,6 +5,7 @@
@@ -20,7 +20,7 @@ index 654ecffedd..c03f79021a 100644
  #include "HttpBaseChannel.h"
  #include "mozilla/Components.h"
  #include "mozilla/ErrorNames.h"
-@@ -974,6 +975,15 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+@@ -974,6 +975,16 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
      contentClassifierRequest.emplace(aChannel);
    }
  
@@ -28,9 +28,10 @@ index 654ecffedd..c03f79021a 100644
 +  // aPerformBlocking like the classifier cancel below: annotation-only
 +  // passes (CheckChannelBeforeProcessResponse) must never cancel. Unlike
 +  // the content classifier, Astra verdicts apply to first- and third-party
-+  // loads. Cancel lands before the fetch is issued.
-+  if (aPerformBlocking && AstraBlocker::ShouldBlockChannel(aChannel)) {
-+    aChannel->Cancel(NS_ERROR_ABORT);
++  // loads. The action may cancel the request or redirect it to a
++  // removeparam/bounce/redirect-resource URL before the fetch is issued.
++  if (aPerformBlocking) {
++    AstraBlocker::ApplyChannelAction(aChannel);
 +  }
 +
    if (!task && !(contentClassifier && contentClassifier->IsInitialized())) {

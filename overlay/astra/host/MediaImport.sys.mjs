@@ -339,6 +339,8 @@ function importModule(specifier) {
 
 function ioutils() {
   try {
+    // Chrome-only WebIDL global in this engine; the old
+    // resource://gre/modules/IOUtils.sys.mjs file does not exist.
     const scope = chromeScope();
     const io = scope.IOUtils ?? globalThis.IOUtils;
     if (io && typeof io.read === "function") return io;

@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 # P2-T02 acceptance: every fixture validates against its schema; the two
-# `negative/` fixtures MUST fail. Counts pin the surface (270 + 35) so a
+# `negative/` fixtures MUST fail. Counts pin the surface (275 + 35) so a
 # dropped command or event breaks the gate instead of slipping through.
 # Stdlib only.
 
@@ -81,8 +81,8 @@ def main():
     commands = json.load(open(os.path.join(ROOT, "schemas/commands.json")))
     events = json.load(open(os.path.join(ROOT, "schemas/events.json")))
 
-    if commands.get("count") != 270 or len(commands["commands"]) != 270:
-        ok = fail("commands registry is not 270") and ok
+    if commands.get("count") != 275 or len(commands["commands"]) != 275:
+        ok = fail("commands registry is not 275") and ok
     if events.get("count") != 35 or len(events["events"]) != 35:
         ok = fail("events registry is not 35") and ok
     if commands.get("version") != 1 or events.get("version") != 1:
@@ -134,14 +134,14 @@ def main():
             if not check_type(case["payload"], payload, f"{f}:{name}", errors):
                 ok = False
             checked += 1
-    if checked != 270:
-        ok = fail(f"command fixtures cover {checked}, want 270") and ok
+    if checked != 275:
+        ok = fail(f"command fixtures cover {checked}, want 275") and ok
 
     for e in errors:
         print(f"validate: FAIL: {e}")
         ok = False
     print(f"validate: {'PASS' if ok else 'FAIL'} "
-          f"(commands=270 events=35 fixtures={checked + len(positives)})")
+          f"(commands=275 events=35 fixtures={checked + len(positives)})")
     return 0 if ok else 1
 
 

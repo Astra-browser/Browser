@@ -1,8 +1,10 @@
 Astra bundled blocker seed v1
 
-This directory contains unmodified EasyList and EasyPrivacy subscription text.
-Astra changes only the storage representation by applying deterministic gzip
-compression; the decompressed source bytes are unchanged.
+This directory contains unmodified EasyList and EasyPrivacy subscription text
+and Astra's own telemetry/ad-script supplemental list. Astra changes only the
+storage representation of the upstream lists by applying deterministic gzip
+compression; the decompressed source bytes are unchanged. Astra's list is
+authored by the Astra contributors and licensed MPL-2.0.
 
 Attribution: The EasyList authors (https://easylist.to/)
 Selected license: CC BY-SA 3.0 Unported (CC-BY-SA-3.0)

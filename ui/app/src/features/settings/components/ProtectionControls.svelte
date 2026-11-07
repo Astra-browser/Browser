@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { blocker } from "$domain/blocker";
-  import { preferences } from "$domain/preferences";
   import type { BlockerListEntry, BlockerListsView } from "$shared/ipc/bindings";
   import SettingsGroup from "$shared/ui/SettingsGroup";
   import SettingsRow from "$shared/ui/SettingsRow";
@@ -11,6 +10,9 @@
   let view = $state<BlockerListsView | null>(null);
   let busy = $state(false);
   let message = $state("");
+  let customUrl = $state("");
+  let customDraft = $state<string[]>([]);
+  let rulesDraft = $state("");
   let open = $state<Record<string, boolean>>({
     ads: true,
     privacy: true,
@@ -53,6 +55,8 @@
   async function refresh() {
     try {
       view = await blocker.lists();
+      customDraft = (view?.custom_lists ?? []).map((entry) => entry.url);
+      rulesDraft = view?.user_rules ?? "";
     } catch {
       view = null;
     }
@@ -164,6 +168,86 @@
     );
   }
 
+  function setMode(mode: "standard" | "aggressive") {
+    void run(() =>
+      blocker.configure({
+        listIds: null,
+        updateHours: null,
+        autoUpdate: null,
+        cosmetic: null,
+        scriptlets: null,
+        mode,
+      }),
+    );
+  }
+
+  function setFlag(
+    key: "removeparam" | "bounce" | "blockScripts" | "redirects" | "cname",
+    enabled: boolean,
+  ) {
+    void run(() =>
+      blocker.configure({
+        listIds: null,
+        updateHours: null,
+        autoUpdate: null,
+        cosmetic: null,
+        scriptlets: null,
+        [key]: enabled,
+      }),
+    );
+  }
+
+  function addCustomList() {
+    const url = customUrl.trim();
+    if (!/^https:\/\/\S+$/iu.test(url)) {
+      message = "Custom lists must use an https:// URL.";
+      return;
+    }
+    if (customDraft.includes(url)) {
+      message = "That list is already added.";
+      return;
+    }
+    const next = [...customDraft, url];
+    customUrl = "";
+    void run(() =>
+      blocker.configure({
+        listIds: null,
+        updateHours: null,
+        autoUpdate: null,
+        cosmetic: null,
+        scriptlets: null,
+        customLists: next,
+      }),
+    );
+  }
+
+  function removeCustomList(url: string) {
+    const next = customDraft.filter((entry) => entry !== url);
+    void run(() =>
+      blocker.configure({
+        listIds: null,
+        updateHours: null,
+        autoUpdate: null,
+        cosmetic: null,
+        scriptlets: null,
+        customLists: next,
+      }),
+    );
+  }
+
+  function saveRules() {
+    void run(() =>
+      blocker.configure({
+        listIds: null,
+        updateHours: null,
+        autoUpdate: null,
+        cosmetic: null,
+        scriptlets: null,
+        userRules: rulesDraft,
+      }),
+    );
+  }
+
   function formatDate(value: number | null | undefined): string {
     if (!value || !Number.isFinite(value)) return "Never";
     try {
@@ -199,6 +283,93 @@
         status.protection === "pending" ||
         (status.desired_enabled !== true && !status.can_enable)}
       onchange={(enabled) => void run(() => blocker.setEnabled(enabled))}
+    />
+  </SettingsRow>
+
+  <SettingsRow
+    title="Protection mode"
+    description={view?.mode === "aggressive"
+      ? "Aggressive adds the annoyance, cookie-banner and social-embed lists on top of ads, trackers and malware."
+      : "Standard blocks ads, trackers and malware with the low-breakage default lists. Aggressive adds annoyances, cookie banners and social embeds."}
+  >
+    <div class="segmented" role="group" aria-label="Protection mode">
+      <button
+        type="button"
+        class:active={view?.mode !== "aggressive"}
+        disabled={busy || view === null}
+        onclick={() => setMode("standard")}>Standard</button
+      >
+      <button
+        type="button"
+        class:active={view?.mode === "aggressive"}
+        disabled={busy || view === null}
+        onclick={() => setMode("aggressive")}>Aggressive</button
+      >
+    </div>
+  </SettingsRow>
+
+  <SettingsRow
+    title="Strip tracking parameters"
+    description="Remove utm_*, fbclid, gclid, msclkid and the other campaign parameters from requests before they are sent."
+  >
+    <Switch
+      label="Strip tracking parameters"
+      labelHidden
+      checked={view?.removeparam !== false}
+      disabled={busy || view === null}
+      onchange={(enabled) => setFlag("removeparam", enabled)}
+    />
+  </SettingsRow>
+
+  <SettingsRow
+    title="Unwrap tracking links"
+    description="Known bounce and redirector links (search engines, social redirectors, shorteners) open their destination directly instead of passing through the tracker."
+  >
+    <Switch
+      label="Unwrap tracking links"
+      labelHidden
+      checked={view?.bounce !== false}
+      disabled={busy || view === null}
+      onchange={(enabled) => setFlag("bounce", enabled)}
+    />
+  </SettingsRow>
+
+  <SettingsRow
+    title="CNAME uncloaking"
+    description="Resolve first-party hostnames and block the ones whose DNS canonical name is a known tracker."
+  >
+    <Switch
+      label="CNAME uncloaking"
+      labelHidden
+      checked={view?.cname !== false}
+      disabled={busy || view === null}
+      onchange={(enabled) => setFlag("cname", enabled)}
+    />
+  </SettingsRow>
+
+  <SettingsRow
+    title="Redirect placeholders"
+    description="When a list blocks an ad with a redirect resource, load the neutral placeholder instead of cancelling it. Turning this off cancels the request."
+  >
+    <Switch
+      label="Use redirect placeholders"
+      labelHidden
+      checked={view?.redirects !== false}
+      disabled={busy || view === null}
+      onchange={(enabled) => setFlag("redirects", enabled)}
+    />
+  </SettingsRow>
+
+  <SettingsRow
+    title="Block scripts"
+    description="Cancel every script request. This is a strict, site-breaking mode; prefer the per-site shield for a single site."
+  >
+    <Switch
+      label="Block scripts"
+      labelHidden
+      checked={view?.block_scripts === true}
+      disabled={busy || view === null}
+      onchange={(enabled) => setFlag("blockScripts", enabled)}
     />
   </SettingsRow>
 
@@ -281,6 +452,12 @@
     />
   </SettingsRow>
 
+  {#if (view?.cloaked?.length ?? 0) > 0}
+    <SettingsRow title="CNAME-uncloaked hosts" description={view?.cloaked?.join(", ")}>
+      <span></span>
+    </SettingsRow>
+  {/if}
+
   <SettingsRow
     title="Blocked in this profile"
     description={view?.stats?.today == null
@@ -336,25 +513,52 @@
       <p class="empty">No filter lists are available in this build.</p>
     {/if}
   </div>
-  {#if message}<p class="feedback" role="status">{message}</p>{/if}
-</SettingsGroup>
-
-<SettingsGroup
-  title="Fingerprinting and tracking"
-  description="Firefox's fingerprinting protection randomizes the signals pages use to identify a device. Astra's filter lists already block the trackers; this is the second layer."
->
   <SettingsRow
-    title="Fingerprinting protection"
-    description="Randomizes canvas and audio signals, hides the GPU model, tiers hardware concurrency, and limits font/display metrics. Low-breakage: the user agent and timezone are not spoofed."
+    title="Custom filter lists"
+    description="Add any HTTPS adblock list. It is fetched, cached and compiled with the catalog; a failed download keeps the previous rules."
   >
-    <Switch
-      label="Fingerprinting protection"
-      labelHidden
-      checked={preferences.value("privacy.fingerprinting") === "true"}
-      disabled={preferences.saving()}
-      onchange={(enabled) => void preferences.set("privacy.fingerprinting", String(enabled))}
-    />
+    <div class="custom-add">
+      <input
+        type="url"
+        class="input"
+        placeholder="https://example.com/list.txt"
+        aria-label="Custom filter list URL"
+        bind:value={customUrl}
+        disabled={busy}
+      />
+      <Button disabled={busy || view === null} onclick={addCustomList}>Add list</Button>
+    </div>
   </SettingsRow>
+
+  {#if customDraft.length > 0}
+    <ul class="custom-list">
+      {#each customDraft as url (url)}
+        <li class="row">
+          <span class="title">{url}</span>
+          <button type="button" class="remove" disabled={busy} onclick={() => removeCustomList(url)}
+            >Remove</button
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <SettingsRow
+    title="Your filter rules"
+    description="One adblock rule per line, applied after every subscribed list. Use it for a site-specific fix or a rule that is not in any list."
+  >
+    <div class="rules">
+      <textarea
+        class="textarea"
+        rows="4"
+        spellcheck="false"
+        aria-label="Custom filter rules"
+        bind:value={rulesDraft}
+        disabled={busy}></textarea>
+      <Button disabled={busy || view === null} onclick={saveRules}>Save rules</Button>
+    </div>
+  </SettingsRow>
+  {#if message}<p class="feedback" role="status">{message}</p>{/if}
 </SettingsGroup>
 
 <style>
@@ -457,5 +661,78 @@
     margin: 4px 18px;
     color: var(--color-muted);
     font-size: var(--text-body);
+  }
+
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+  }
+
+  .segmented button {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 0;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    cursor: default;
+  }
+
+  .segmented button + button {
+    border-inline-start: 1px solid var(--color-border);
+  }
+
+  .segmented button.active {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .custom-add,
+  .rules {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .input,
+  .textarea {
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+  }
+
+  .input {
+    width: min(320px, 42vw);
+  }
+
+  .textarea {
+    width: min(360px, 46vw);
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+  }
+
+  .custom-list {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0 18px 8px;
+    list-style: none;
+  }
+
+  .remove {
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font: inherit;
+    font-size: var(--text-small);
+    cursor: default;
   }
 </style>

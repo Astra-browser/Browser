@@ -5,6 +5,7 @@
   import { showPreviews } from "../../lib/settings-model";
   import PreviewNotice from "../PreviewNotice.svelte";
   import ProtectionControls from "../ProtectionControls.svelte";
+  import PrivacyControls from "../PrivacyControls.svelte";
   import SettingsGroup from "$shared/ui/SettingsGroup";
   import PreferenceSelect from "../PreferenceSelect.svelte";
   import PreferenceSwitch from "../PreferenceSwitch.svelte";
@@ -17,6 +18,7 @@
 </script>
 
 <ProtectionControls />
+<PrivacyControls />
 {#if IS_WINDOWS}<WindowsPrivacy />{/if}
 <PasskeysGroup />
 <SettingsGroup title={m.site_settings_title()} description={m.site_settings_help()}>

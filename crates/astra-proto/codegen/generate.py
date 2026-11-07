@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0.
 """astra-proto codegen (P2-T02): single source of truth is
-docs/astra/ipc-surface.md (270 commands + 35 events).
+docs/astra/ipc-surface.md (275 commands + 35 events).
 
 Reads the markdown tables and emits, deterministically:
   schemas/commands.json, schemas/events.json,
@@ -25,7 +25,7 @@ import re
 import sys
 
 PROTOCOL_VERSION = 1
-EXPECTED_COMMANDS = 270
+EXPECTED_COMMANDS = 275
 EXPECTED_EVENTS = 35
 
 # Channel rename rule for the 8 REN events (porting notes, ipc-surface.md):
@@ -262,7 +262,7 @@ def gen_rust(commands, events):
     lines.append("//! Source of truth: docs/astra/ipc-surface.md via schemas/*.json.")
     lines.append("//! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.")
     lines.append("")
-    lines.append("/// Number of commands in the v1 surface (ipc-surface.md: 270).")
+    lines.append("/// Number of commands in the v1 surface (ipc-surface.md: 275).")
     lines.append(f"pub const COMMAND_COUNT: usize = {len(commands)};")
     lines.append("/// Number of event channels in the v1 surface (ipc-surface.md: 35).")
     lines.append(f"pub const EVENT_COUNT: usize = {len(events)};")
@@ -337,7 +337,7 @@ def gen_ts(commands_data, events_data, renames):
     L.append("/** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */")
     L.append(f"export const PROTOCOL_VERSION = {PROTOCOL_VERSION} as const;")
     L.append("")
-    L.append("/** All 270 command wire names. */")
+    L.append("/** All 275 command wire names. */")
     L.append("export type CommandName =")
     for i, (wire) in enumerate(commands_data.keys()):
         sep = "  " if i == 0 else "  | "
