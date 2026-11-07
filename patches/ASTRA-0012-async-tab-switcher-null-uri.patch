@@ -1,0 +1,28 @@
+Patch-Id: ASTRA-0012
+Title: Guard AsyncTabSwitcher against a null currentURI
+Tier: P2
+Upstream-Files: browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+Intent: the async tab switcher dereferences requestedBrowser.currentURI in updateDisplay() without a null check; when the switch races a tab that has no document yet (newly created, discarded/crashed, or torn down mid-switch) it throws "can't access property 'schemeIs', requestedBrowser.currentURI is null" out of updateDisplay() and leaves that switch half-applied. Treat a missing URI as an unloaded about: page, which is the blank-tab branch the comment already describes, so the switch lands and the console stays clean
+Risk: low (one guarded property read; when currentURI exists the computed value is identical, and the null case previously threw, so no working behaviour depends on the old result)
+Test: forge lint; incremental `build --faster --jobs 2`; packaged-module check that the guard ships inside browser/omni.ja. The null window is a race, so there is no deterministic live reproduction; the existing URI path is unchanged and stays covered by the tabbrowser switch suites
+Verified-On: 153.6.0
+Removal-Plan: drop when the pinned engine null-guards this access itself (upstream firefox-main still reads requestedBrowser.currentURI.schemeIs at 2026-11-08); re-check after a base bump with `git -C engine diff FETCH_HEAD -- browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs`
+---
+diff --git a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+index 577e275985..b9bb46d840 100644
+--- a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
++++ b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+@@ -376,7 +376,12 @@ export class AsyncTabSwitcher {
+       // determined by the busy state on the tab element and checking
+       // if the loaded URI is local.
+       let isBusy = this.requestedTab.hasAttribute("busy");
+-      let isLocalAbout = requestedBrowser.currentURI.schemeIs("about");
++      // A tab that is still being created, or whose document went away while
++      // we were switching to it, has no currentURI yet. Treat that like an
++      // unloaded about: page so updateDisplay() shows the blank tab instead
++      // of throwing out to the caller and leaving the switch unfinished.
++      let isLocalAbout =
++        requestedBrowser.currentURI?.schemeIs("about") ?? true;
+       let hasSufficientlyLoaded = !isBusy && !isLocalAbout;
+ 
+       let fl = requestedBrowser.frameLoader;
