@@ -27,20 +27,8 @@
   const active = $derived(tabs.activeSpace());
   const scope = $derived(tabs.profile()?.id ?? "default");
 
-  /** One hue per space, stable against its number. */
-  const HUES = [
-    "#6b7280",
-    "#c2703a",
-    "#3f7f6b",
-    "#5b6fb0",
-    "#9a5f9e",
-    "#b68a2e",
-    "#4f8faf",
-    "#a3564f",
-    "#6f8a3d",
-    "#7a6bb0",
-  ];
-  const markColor = (color: number) => HUES[Math.abs(color) % HUES.length];
+  /** The same ten avatar hues the space editor offers. */
+  const SPACE_COLOR_COUNT = 10;
 
   let busy = $state<string | null>(null);
   let failed = $state<string | null>(null);
@@ -78,7 +66,7 @@
     const before = new Set(mine.map((space) => space.id));
     const result = await tabs.createSpace("", {
       icon: null,
-      color: mine.length % HUES.length,
+      color: mine.length % SPACE_COLOR_COUNT,
       theme: null,
     });
     if (result.outcome !== "applied" && result.outcome !== "no_op") {
@@ -205,7 +193,7 @@
     {#each mine as space, index (space.id)}
       {@const here = space.id === active?.id}
       <li class="row" data-current={here || undefined}>
-        <span class="mark" style:background={markColor(space.color)} aria-hidden="true">
+        <span class="mark" data-space-hue={space.color} aria-hidden="true">
           {space.name.slice(0, 1).toUpperCase()}
         </span>
         <div class="copy">
@@ -245,7 +233,6 @@
             >{/if}
           <Button
             size="compact"
-            variant="ghost"
             disabled={!!busy}
             aria-label={m.spaces_settings_edit_label({ name: space.name })}
             onclick={() => edit(space)}>{m.spaces_settings_edit()}</Button
@@ -265,7 +252,7 @@
   {#if failed}<p class="failed" role="alert">{failed}</p>{/if}
 
   <section class="group" aria-labelledby="spaces-import-title">
-    <h3 id="spaces-import-title">{m.spaces_settings_import()}</h3>
+    <h3 id="spaces-import-title">{m.spaces_settings_import_action()}</h3>
     <div class="card">
       <p>{m.spaces_settings_import_body()}</p>
       {#if mine.length < 2}
@@ -286,7 +273,7 @@
             variant="primary"
             pending={importing}
             disabled={!canImport || importing}
-            onclick={() => void runImport()}>{m.spaces_settings_import_action()}</Button
+            onclick={() => void runImport()}>{m.spaces_settings_import_button()}</Button
           >
         </div>
         {#if importStatus === "ok"}<p class="ok" role="status">
@@ -351,8 +338,6 @@
       {/if}
     </div>
   </section>
-
-  <p class="note iso">{m.spaces_settings_isolation()}</p>
 </section>
 
 <Dialog.Root bind:open={editorOpen}>
@@ -517,9 +502,66 @@
     inline-size: 34px;
     block-size: 34px;
     border-radius: var(--radius-row);
-    color: white;
+    background: var(--space-hue);
+    color: var(--space-ink);
     font-size: var(--text-body);
     font-weight: 600;
+  }
+
+  /* The same hue table the editor and the switcher use, so the mark a space
+     wears here is the colour it shows when edited. */
+  .mark[data-space-hue] {
+    --space-hue: var(--color-faint);
+    --space-ink: var(--color-label-secondary);
+  }
+
+  .mark[data-space-hue="1"] {
+    --space-hue: var(--avatar-1-top);
+    --space-ink: var(--avatar-1-bottom);
+  }
+
+  .mark[data-space-hue="2"] {
+    --space-hue: var(--avatar-2-top);
+    --space-ink: var(--avatar-2-bottom);
+  }
+
+  .mark[data-space-hue="3"] {
+    --space-hue: var(--avatar-3-top);
+    --space-ink: var(--avatar-3-bottom);
+  }
+
+  .mark[data-space-hue="4"] {
+    --space-hue: var(--avatar-4-top);
+    --space-ink: var(--avatar-4-bottom);
+  }
+
+  .mark[data-space-hue="5"] {
+    --space-hue: var(--avatar-5-top);
+    --space-ink: var(--avatar-5-bottom);
+  }
+
+  .mark[data-space-hue="6"] {
+    --space-hue: var(--avatar-6-top);
+    --space-ink: var(--avatar-6-bottom);
+  }
+
+  .mark[data-space-hue="7"] {
+    --space-hue: var(--avatar-7-top);
+    --space-ink: var(--avatar-7-bottom);
+  }
+
+  .mark[data-space-hue="8"] {
+    --space-hue: var(--avatar-8-top);
+    --space-ink: var(--avatar-8-bottom);
+  }
+
+  .mark[data-space-hue="9"] {
+    --space-hue: var(--avatar-9-top);
+    --space-ink: var(--avatar-9-bottom);
+  }
+
+  :global(:root[data-theme="dark"]) .mark[data-space-hue]:not([data-space-hue="0"]) {
+    --space-ink: var(--space-hue);
   }
 
   .copy {
@@ -600,10 +642,6 @@
     color: var(--color-muted);
     font-size: var(--text-label);
     line-height: 1.6;
-  }
-
-  .iso {
-    padding-inline: 16px;
   }
 
   .ok {

@@ -80,5 +80,5 @@ test("lists the profile's spaces and starts a new one", async () => {
 
   await expect.element(screen.getByRole("heading", { name: "Other profiles" })).toBeVisible();
   await expect.element(screen.getByRole("heading", { name: "Clear space data" })).toBeVisible();
-  await expect.element(screen.getByRole("heading", { name: "Import…" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { name: "Import bookmarks" })).toBeVisible();
 });

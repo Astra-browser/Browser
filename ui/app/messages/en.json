@@ -3954,5 +3954,6 @@
   "spaces_settings_move_up": "Move {name} up",
   "spaces_settings_move_down": "Move {name} down",
   "spaces_settings_manage_hint": "Name, icon, colour and theme are in Edit.",
-  "spaces_settings_created": "{name} is ready."
+  "spaces_settings_created": "{name} is ready.",
+  "spaces_settings_import_button": "Import"
 }
