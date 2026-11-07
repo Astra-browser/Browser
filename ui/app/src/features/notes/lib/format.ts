@@ -1,7 +1,6 @@
 import * as m from "$shared/i18n/messages";
+import { getLocale } from "$shared/i18n/runtime";
 import type { SectionKey } from "./sections";
-
-const locale = () => (typeof navigator === "undefined" ? "en" : navigator.language);
 
 let formats: {
   time: Intl.DateTimeFormat;
@@ -16,18 +15,18 @@ let formats: {
 
 function f() {
   formats ??= {
-    time: new Intl.DateTimeFormat(locale(), { hour: "numeric", minute: "2-digit" }),
-    weekday: new Intl.DateTimeFormat(locale(), { weekday: "long" }),
-    date: new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short" }),
-    dateYear: new Intl.DateTimeFormat(locale(), {
+    time: new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" }),
+    weekday: new Intl.DateTimeFormat(getLocale(), { weekday: "long" }),
+    date: new Intl.DateTimeFormat(getLocale(), { day: "numeric", month: "short" }),
+    dateYear: new Intl.DateTimeFormat(getLocale(), {
       day: "numeric",
       month: "short",
       year: "numeric",
     }),
-    month: new Intl.DateTimeFormat(locale(), { month: "long" }),
-    monthYear: new Intl.DateTimeFormat(locale(), { month: "long", year: "numeric" }),
-    relative: new Intl.RelativeTimeFormat(locale(), { numeric: "auto" }),
-    plural: new Intl.PluralRules(locale()),
+    month: new Intl.DateTimeFormat(getLocale(), { month: "long" }),
+    monthYear: new Intl.DateTimeFormat(getLocale(), { month: "long", year: "numeric" }),
+    relative: new Intl.RelativeTimeFormat(getLocale(), { numeric: "auto" }),
+    plural: new Intl.PluralRules(getLocale()),
   };
   return formats;
 }

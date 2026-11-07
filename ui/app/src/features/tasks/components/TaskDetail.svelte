@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import type { Snippet } from "svelte";
   import Icon from "$shared/ui/Icon";
   import IconButton from "$shared/ui/IconButton";
@@ -96,7 +97,7 @@
     { id: "none", label: m.task_priority_none },
   ];
   const ESTIMATES = [15, 30, 45, 60, 90, 120, 180, 240, 480];
-  const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+  const dateFormat = new Intl.DateTimeFormat(getLocale(), { dateStyle: "medium" });
 
   const slow = lagging(() => saving);
   // Each property is read out of the task on its own, so typing a title

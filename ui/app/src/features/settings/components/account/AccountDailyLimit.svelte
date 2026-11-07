@@ -13,6 +13,7 @@
   import Field from "$shared/ui/Field";
   import SettingsRow from "$shared/ui/SettingsRow";
   import { explainAccountFault } from "../../lib/account";
+  import { getLocale } from "$shared/i18n/runtime";
 
   const usage = $derived(session.account()?.usage ?? null);
   const per = $derived(usage?.credit_units ?? null);
@@ -24,10 +25,10 @@
   let form = $state<HTMLFormElement | null>(null);
 
   const line = $derived.by(() => {
-    const cap = creditsLeft(limit, per);
+    const cap = creditsLeft(limit, per, getLocale());
     if (!cap) return m.account_daily_none();
     return m.account_daily_value({
-      spent: creditsTotal(usage?.spent_today ?? "0", per) ?? "0",
+      spent: creditsTotal(usage?.spent_today ?? "0", per, getLocale()) ?? "0",
       limit: cap,
     });
   });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { tick } from "svelte";
   import { accountSession as session, planName, priceLabel, shortDate } from "$domain/account";
   import * as m from "$shared/i18n/messages";
@@ -36,17 +37,17 @@
   const expiry = $derived(change?.expires_at ? Date.parse(change.expires_at) : Number.NaN);
   const expired = $derived(quoted && Number.isFinite(expiry) && expiry <= now);
   const recurring = $derived.by(() => {
-    const price = priceLabel(change?.recurring);
+    const price = priceLabel(change?.recurring, getLocale());
     if (!price) return null;
     return change?.interval === "yearly"
       ? m.account_price_year({ price })
       : m.account_price_month({ price });
   });
-  const due = $derived(priceLabel(change?.charge));
-  const effective = $derived(shortDate(change?.effective_at));
+  const due = $derived(priceLabel(change?.charge, getLocale()));
+  const effective = $derived(shortDate(change?.effective_at, undefined, getLocale()));
   const until = $derived(
     Number.isFinite(expiry)
-      ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(expiry)
+      ? new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" }).format(expiry)
       : null,
   );
 

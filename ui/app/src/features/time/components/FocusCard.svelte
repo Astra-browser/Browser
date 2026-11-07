@@ -4,6 +4,7 @@
   put between the two, so starting reads as the dial coming alive.
 -->
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
   import type { IconRef } from "$shared/ipc/bindings";
   import * as m from "$shared/i18n/messages";
@@ -45,7 +46,7 @@
   );
   let ends = $derived(
     session?.phase_ends_at
-      ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
+      ? new Intl.DateTimeFormat(getLocale(), { hour: "numeric", minute: "2-digit" }).format(
           new Date(session.phase_ends_at),
         )
       : "",

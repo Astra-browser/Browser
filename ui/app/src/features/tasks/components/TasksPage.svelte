@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { tick, untrack } from "svelte";
   import { MediaQuery } from "svelte/reactivity";
   import { commands } from "$shared/ipc/bindings";
@@ -92,7 +93,7 @@
     all: m.task_scope_all,
     completed: m.task_scope_completed,
   };
-  const longDate = new Intl.DateTimeFormat(undefined, {
+  const longDate = new Intl.DateTimeFormat(getLocale(), {
     weekday: "long",
     month: "long",
     day: "numeric",

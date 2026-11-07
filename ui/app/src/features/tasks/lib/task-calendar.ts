@@ -1,3 +1,4 @@
+import { getLocale } from "$shared/i18n/runtime";
 /** Calendar arithmetic for the scheduling popover.
  *
  *  Every value here is a `YYYY-MM-DD` calendar day held in UTC. A due date has
@@ -5,15 +6,15 @@
  *  daylight-saving boundary and land a day out.
  */
 const DAY_MS = 86_400_000;
-const MONTH_LABEL = new Intl.DateTimeFormat(undefined, {
+const MONTH_LABEL = new Intl.DateTimeFormat(getLocale(), {
   month: "long",
   year: "numeric",
   timeZone: "UTC",
 });
-const WEEKDAY_SHORT = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
-const WEEKDAY_LONG = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: "UTC" });
-const DAY_NUMBER = new Intl.DateTimeFormat(undefined, { day: "numeric", timeZone: "UTC" });
-const FULL_DAY = new Intl.DateTimeFormat(undefined, {
+const WEEKDAY_SHORT = new Intl.DateTimeFormat(getLocale(), { weekday: "short", timeZone: "UTC" });
+const WEEKDAY_LONG = new Intl.DateTimeFormat(getLocale(), { weekday: "long", timeZone: "UTC" });
+const DAY_NUMBER = new Intl.DateTimeFormat(getLocale(), { day: "numeric", timeZone: "UTC" });
+const FULL_DAY = new Intl.DateTimeFormat(getLocale(), {
   weekday: "long",
   day: "numeric",
   month: "long",

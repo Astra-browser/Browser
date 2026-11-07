@@ -1,6 +1,7 @@
 import type { DownloadView } from "$shared/ipc/bindings";
 import { downloadProgress, formatDownloadBytes } from "$domain/downloads";
 import * as m from "$shared/i18n/messages";
+import { getLocale } from "$shared/i18n/runtime";
 
 /** A smoothed rate per download, so time left settles instead of jumping
  *  with every progress report. */
@@ -32,9 +33,17 @@ export class TransferRate {
 }
 
 const durations = {
-  second: new Intl.NumberFormat(undefined, { style: "unit", unit: "second", unitDisplay: "short" }),
-  minute: new Intl.NumberFormat(undefined, { style: "unit", unit: "minute", unitDisplay: "short" }),
-  hour: new Intl.NumberFormat(undefined, {
+  second: new Intl.NumberFormat(getLocale(), {
+    style: "unit",
+    unit: "second",
+    unitDisplay: "short",
+  }),
+  minute: new Intl.NumberFormat(getLocale(), {
+    style: "unit",
+    unit: "minute",
+    unitDisplay: "short",
+  }),
+  hour: new Intl.NumberFormat(getLocale(), {
     style: "unit",
     unit: "hour",
     unitDisplay: "short",

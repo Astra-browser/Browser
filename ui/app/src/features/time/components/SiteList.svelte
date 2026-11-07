@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { Globe02Icon } from "@hugeicons/core-free-icons";
   import type { SiteTimeView } from "$shared/ipc/bindings";
   import * as m from "$shared/i18n/messages";
@@ -30,7 +31,10 @@
   // the rest read against it rather than against a total they never reach.
   let lead = $derived(sites[0]?.seconds ?? 0);
   let shown = $derived(sites.slice(0, limit));
-  const percent = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 });
+  const percent = new Intl.NumberFormat(getLocale(), {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 </script>
 
 <ul class="sites" class:page={size === "page"} aria-label={m.time_sites()}>

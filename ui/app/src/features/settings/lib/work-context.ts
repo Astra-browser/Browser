@@ -1,4 +1,5 @@
 const DAY = 86_400_000;
+import { getLocale } from "$shared/i18n/runtime";
 
 /** "today", "yesterday", "3 days ago", then a date: how long ago, the way people say it. */
 export function sinceLabel(ms: string | null | undefined, now = Date.now()): string {
@@ -7,7 +8,7 @@ export function sinceLabel(ms: string | null | undefined, now = Date.now()): str
   const days = Math.floor(now / DAY) - Math.floor(at / DAY);
   if (days < 7)
     return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(-days, "day");
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getLocale(), {
     month: "short",
     day: "numeric",
     ...(new Date(at).getFullYear() === new Date(now).getFullYear() ? {} : { year: "numeric" }),

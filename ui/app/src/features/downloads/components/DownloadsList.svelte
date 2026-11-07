@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLocale } from "$shared/i18n/runtime";
   import { untrack } from "svelte";
   import {
     Cancel01Icon,
@@ -54,7 +55,7 @@
     error === "file_too_large";
 
   const rates = new TransferRate();
-  const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+  const day = new Intl.DateTimeFormat(getLocale(), { dateStyle: "medium" });
 
   /** Native sends an ISO timestamp; older callers sent epoch seconds. */
   function timeOf(value: string): number {
