@@ -195,13 +195,13 @@
 
 <section class="spaces" aria-label={m.section_spaces()}>
   <div class="intro">
-    <h2>
+    <p class="eyebrow">
       {current ? m.spaces_settings_current_profile({ name: current.name }) : m.section_spaces()}
-    </h2>
-    <p>{m.spaces_settings_isolation_note()}</p>
+    </p>
+    <p class="lede">{m.spaces_settings_isolation_note()}</p>
   </div>
 
-  <ul class="list">
+  <ul class="list" aria-label={m.section_spaces()}>
     {#each mine as space, index (space.id)}
       {@const here = space.id === active?.id}
       <li class="row" data-current={here || undefined}>
@@ -266,93 +266,99 @@
 
   <section class="group" aria-labelledby="spaces-import-title">
     <h3 id="spaces-import-title">{m.spaces_settings_import()}</h3>
-    <p>{m.spaces_settings_import_body()}</p>
-    {#if mine.length < 2}
-      <p class="note">{m.spaces_settings_import_none()}</p>
-    {:else}
-      <div class="controls">
-        <Select
-          label={m.spaces_settings_import_from()}
-          options={importOptions}
-          bind:value={importFrom}
-        />
-        <Select
-          label={m.spaces_settings_import_into()}
-          options={clearOptions}
-          bind:value={importInto}
-        />
-        <Button
-          variant="primary"
-          pending={importing}
-          disabled={!canImport || importing}
-          onclick={() => void runImport()}>{m.spaces_settings_import_action()}</Button
-        >
-      </div>
-      {#if importStatus === "ok"}<p class="ok" role="status">
-          {m.spaces_settings_imported({ count: importCount })}
-        </p>{:else if importStatus === "truncated"}<p class="ok" role="status">
-          {m.spaces_settings_import_truncated({ count: importCount })}
-        </p>{:else if importStatus === "failed"}<p class="failed" role="alert">
-          {m.spaces_settings_import_failed()}
-        </p>{/if}
-    {/if}
+    <div class="card">
+      <p>{m.spaces_settings_import_body()}</p>
+      {#if mine.length < 2}
+        <p class="note">{m.spaces_settings_import_none()}</p>
+      {:else}
+        <div class="controls">
+          <Select
+            label={m.spaces_settings_import_from()}
+            options={importOptions}
+            bind:value={importFrom}
+          />
+          <Select
+            label={m.spaces_settings_import_into()}
+            options={clearOptions}
+            bind:value={importInto}
+          />
+          <Button
+            variant="primary"
+            pending={importing}
+            disabled={!canImport || importing}
+            onclick={() => void runImport()}>{m.spaces_settings_import_action()}</Button
+          >
+        </div>
+        {#if importStatus === "ok"}<p class="ok" role="status">
+            {m.spaces_settings_imported({ count: importCount })}
+          </p>{:else if importStatus === "truncated"}<p class="ok" role="status">
+            {m.spaces_settings_import_truncated({ count: importCount })}
+          </p>{:else if importStatus === "failed"}<p class="failed" role="alert">
+            {m.spaces_settings_import_failed()}
+          </p>{/if}
+      {/if}
+    </div>
   </section>
 
   <section class="group" aria-labelledby="spaces-data-title">
     <h3 id="spaces-data-title">{m.spaces_settings_clear()}</h3>
-    <p>{m.spaces_settings_clear_body()}</p>
-    <div class="controls">
-      <Select label={m.section_spaces()} options={clearOptions} bind:value={clearSpace} />
-      <Button
-        variant="danger"
-        pending={clearing}
-        disabled={clearSpace === "" || clearing}
-        onclick={() => void clearData()}>{m.spaces_settings_clear_action()}</Button
-      >
+    <div class="card">
+      <p>{m.spaces_settings_clear_body()}</p>
+      <div class="controls">
+        <Select label={m.section_spaces()} options={clearOptions} bind:value={clearSpace} />
+        <Button
+          variant="danger"
+          pending={clearing}
+          disabled={clearSpace === "" || clearing}
+          onclick={() => void clearData()}>{m.spaces_settings_clear_action()}</Button
+        >
+      </div>
+      {#if clearStatus === "ok"}<p class="ok" role="status">
+          {m.spaces_settings_cleared()}
+        </p>{:else if clearStatus === "failed"}<p class="failed" role="alert">
+          {m.spaces_settings_clear_failed()}
+        </p>{/if}
     </div>
-    {#if clearStatus === "ok"}<p class="ok" role="status">
-        {m.spaces_settings_cleared()}
-      </p>{:else if clearStatus === "failed"}<p class="failed" role="alert">
-        {m.spaces_settings_clear_failed()}
-      </p>{/if}
   </section>
 
   <section class="group" aria-labelledby="spaces-profiles-title">
     <h3 id="spaces-profiles-title">{m.spaces_settings_other_profiles()}</h3>
-    <p>{m.spaces_settings_other_note()}</p>
-    {#if others.length === 0}
-      <p class="note">{m.spaces_settings_no_other()}</p>
-    {:else}
-      <ul class="profiles">
-        {#each others as profile (profile.id)}
-          <li>
-            <span>{profile.name}</span>
-            <small
-              >{spaceCount(profile.id) === 1
-                ? m.spaces_settings_space_count_one()
-                : m.spaces_settings_space_count_other({ count: spaceCount(profile.id) })}</small
-            >
-            <Button
-              size="compact"
-              pending={busy === profile.id}
-              disabled={!!busy}
-              aria-label={m.profiles_switch_label({ name: profile.name })}
-              onclick={() => void switchProfile(profile.id)}
-              >{m.spaces_settings_switch_profile()}</Button
-            >
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <div class="card">
+      <p>{m.spaces_settings_other_note()}</p>
+      {#if others.length === 0}
+        <p class="note">{m.spaces_settings_no_other()}</p>
+      {:else}
+        <ul class="profiles">
+          {#each others as profile (profile.id)}
+            <li>
+              <span>{profile.name}</span>
+              <small
+                >{spaceCount(profile.id) === 1
+                  ? m.spaces_settings_space_count_one()
+                  : m.spaces_settings_space_count_other({ count: spaceCount(profile.id) })}</small
+              >
+              <Button
+                size="compact"
+                pending={busy === profile.id}
+                disabled={!!busy}
+                aria-label={m.profiles_switch_label({ name: profile.name })}
+                onclick={() => void switchProfile(profile.id)}
+                >{m.spaces_settings_switch_profile()}</Button
+              >
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </section>
 
-  <p class="note">{m.spaces_settings_isolation()}</p>
+  <p class="note iso">{m.spaces_settings_isolation()}</p>
 </section>
 
 <Dialog.Root bind:open={editorOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class="settings-dialog-overlay" />
-    <Dialog.Content class="settings-dialog-content space-sheet">
+    <Dialog.Content class="settings-dialog spaces-settings-sheet">
       <Dialog.Title class="sr-only"
         >{m.space_edit_label({ name: editorSpace?.name ?? "" })}</Dialog.Title
       >
@@ -374,34 +380,61 @@
 <style>
   .spaces {
     display: grid;
-    gap: 28px;
+    gap: 30px;
   }
 
-  .intro h2 {
-    color: var(--color-text);
-    font-size: var(--text-page-title);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+  .intro {
+    display: grid;
+    gap: 4px;
   }
 
-  .intro p,
-  .group p,
-  .note {
-    margin-block-start: 6px;
-    color: var(--color-muted);
+  .eyebrow {
+    margin: 0;
+    color: var(--color-label-secondary);
     font-size: var(--text-label);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .lede {
+    max-inline-size: 580px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-body);
     line-height: 1.6;
   }
 
   .group {
     display: grid;
-    gap: 10px;
+    gap: 0;
   }
 
+  /* The same group heading the rest of Settings uses: 15/600 over a card,
+     aligned to the row label rather than the card edge. */
   .group h3 {
+    margin: 0 0 10px;
+    padding-inline: 16px;
     color: var(--color-text);
-    font-size: var(--text-page-title);
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.012em;
+  }
+
+  .card {
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-label);
+    line-height: 1.6;
   }
 
   .controls {
@@ -411,8 +444,7 @@
     gap: 10px;
   }
 
-  .list,
-  .profiles {
+  .list {
     overflow: hidden;
     margin: 0;
     padding: 0;
@@ -433,16 +465,41 @@
     padding: 10px 14px 10px 16px;
   }
 
+  .row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .profiles {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   .profiles li {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr auto auto;
     align-items: center;
     gap: 10px;
-    min-block-size: 52px;
-    padding: 8px 14px 8px 16px;
+    min-block-size: 40px;
+    padding: 4px 0;
   }
 
-  li + li::before,
+  .profiles li + li::before {
+    position: absolute;
+    top: 0;
+    block-size: 1px;
+    background: var(--color-border);
+    content: "";
+    inset-inline: 0;
+  }
+
+  .profiles span {
+    font-size: var(--text-body);
+    font-weight: 500;
+  }
+
   .row + .row::before,
   .row + li > .add::before {
     position: absolute;
@@ -453,10 +510,6 @@
     inset-inline: 70px 0;
   }
 
-  .profiles li + li::before {
-    inset-inline: 16px 0;
-  }
-
   .mark {
     display: grid;
     flex: none;
@@ -465,7 +518,7 @@
     block-size: 34px;
     border-radius: var(--radius-row);
     color: white;
-    font-size: 14px;
+    font-size: var(--text-body);
     font-weight: 600;
   }
 
@@ -485,10 +538,10 @@
 
   strong {
     color: var(--color-text);
-    font-size: var(--text-page-title);
-    font-weight: 500;
+    font-size: var(--text-body);
+    font-weight: 550;
     line-height: 19px;
-    letter-spacing: -0.008em;
+    letter-spacing: -0.006em;
   }
 
   small {
@@ -500,7 +553,9 @@
   .actions {
     display: flex;
     flex: none;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 6px;
   }
 
@@ -518,7 +573,8 @@
     background: transparent;
     color: var(--color-text);
     font: inherit;
-    font-size: var(--text-page-title);
+    font-size: var(--text-body);
+    font-weight: 500;
     text-align: start;
     transition: background-color var(--motion-fast) var(--ease-out);
   }
@@ -539,6 +595,17 @@
     color: var(--color-label-secondary);
   }
 
+  .note {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-label);
+    line-height: 1.6;
+  }
+
+  .iso {
+    padding-inline: 16px;
+  }
+
   .ok {
     color: var(--color-text) !important;
   }
@@ -548,13 +615,14 @@
   }
 
   /* The dialog element is rendered by bits-ui, so the page's scoped hash is
-     not on it; the class is unique to this sheet. */
-  :global(.space-sheet) {
+     not on it; the class is unique to this sheet. The editor manages its own
+     scrolling body, so the sheet only provides the frame. */
+  :global(.settings-dialog.spaces-settings-sheet) {
+    display: flex;
+    flex-direction: column;
     inline-size: min(420px, calc(100vw - 32px));
-    max-block-size: min(720px, calc(100vh - 48px));
+    max-block-size: min(760px, calc(100vh - 32px));
     overflow: hidden;
     padding: 0;
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
   }
 </style>
