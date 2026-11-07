@@ -141,7 +141,7 @@ try {
       !!row &&
       (row.textContent ?? "").trim().length > 0 &&
       !!target.querySelector("[data-essentials-drop]") &&
-      !!target.querySelector(".shelf .case, .utility-rail .rail-profile")
+      !!target.querySelector(".shelf .case")
     );
   };
   let gateTimer = 0;

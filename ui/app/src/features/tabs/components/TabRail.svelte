@@ -27,11 +27,14 @@
     entries,
     closable = new Set<string>(),
     onSelect,
+    spaces = true,
   }: {
     entries: TabView[];
     /** Tabs the expanded list shows a close button for. */
     closable?: ReadonlySet<string>;
     onSelect: (id: string) => void;
+    /** False when the column's head already carries the spaces switcher. */
+    spaces?: boolean;
   } = $props();
 
   function handleContextMenu(event: MouseEvent, tab: TabView) {
@@ -123,7 +126,7 @@
   `title` gives a real OS tooltip, which is the only label that can appear
   outside the chrome WebView's rectangle.
 -->
-{#if space}<div class="rail-spaces-slot" data-cascade style:--cascade={0}>
+{#if space && spaces}<div class="rail-spaces-slot" data-cascade style:--cascade={0}>
     <RailSpaces active={space} />
   </div>{/if}
 <div

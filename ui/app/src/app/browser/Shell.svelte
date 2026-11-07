@@ -647,10 +647,7 @@
     >{#snippet browserBody(compact)}
       {#if compact && (inWork || paneled)}
         {#if !inWork}<StoreInstallRail />{/if}
-        {#if paneled && IS_WINDOWS}
-          {#if browserPage.currentPage() === "settings"}<ModeTabs compact standalone />{/if}
-          <div class="rail-search"><SidebarSearch /></div>
-        {:else if paneled}<ModeTabs compact standalone />{/if}
+        {#if paneled}<div class="rail-search"><SidebarSearch /></div>{/if}
       {:else if compact}<StoreInstallRail />
       {:else if !incognito && preferences.enabled("work")}<div class="sidebar-head">
           <ModeTabs />
@@ -659,7 +656,12 @@
            new list settles in where the old one was. -->
       {#key inWork}<div class="sidebar-mode-body" data-arriving={modeSwitched}>
           {#if compact}
-            <TabRail entries={railTabs} closable={railClosable} onSelect={selectTab} />
+            <TabRail
+              entries={railTabs}
+              closable={railClosable}
+              onSelect={selectTab}
+              spaces={false}
+            />
           {:else}
             <!--
             The address field belongs to the main page now, in the bar above

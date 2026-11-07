@@ -9,8 +9,6 @@ const PUT_AWAY: SidebarMode = "hidden";
 
 /** The rail width. Native admits it as a real sidebar width, not a mode flag. */
 export const COMPACT_WIDTH = 56;
-/** The utility rail always stands left of the column, in every shape. */
-export const RAIL_WIDTH = 44;
 export const MIN_EXPANDED_WIDTH = 180;
 export const MAX_EXPANDED_WIDTH = 460;
 
@@ -67,8 +65,9 @@ export const effectiveWidth = () =>
       : // Hidden keeps its width: it comes back over the page at that width.
         expandedWidth;
 
-/** What native insets the page by: the rail and the column together. */
-export const publishedWidth = () => RAIL_WIDTH + effectiveWidth();
+/** What native insets the page by. The tools live inside the column now, so
+ *  the column's own width is the whole sidebar. */
+export const publishedWidth = () => effectiveWidth();
 
 export const hasPanel = () => panelExtent > 0;
 

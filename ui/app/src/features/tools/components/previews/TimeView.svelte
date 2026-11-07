@@ -43,7 +43,6 @@
 <ToolFrame
   {...props}
   caption={false}
-  closable={false}
   filters={[
     { value: "today", label: m.tool_today() },
     { value: "week", label: m.tool_time_week() },

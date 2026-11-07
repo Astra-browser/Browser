@@ -19,7 +19,6 @@ const {
   COMPACT_WIDTH,
   MAX_EXPANDED_WIDTH,
   MIN_EXPANDED_WIDTH,
-  RAIL_WIDTH,
   SNAP_THRESHOLD,
   applyDragWidth,
   adoptResizeWidth,
@@ -70,7 +69,7 @@ describe("resolveDragWidth", () => {
 
 describe("which width changes the page travels with", () => {
   const last = () => native.width.mock.calls.at(-1)?.slice(0, 2) as unknown as [number, boolean];
-  const total = (column: number) => RAIL_WIDTH + column;
+  const total = (column: number) => column;
 
   const hidden = () => native.hidden.mock.calls.at(-1)?.[0];
 
@@ -98,14 +97,14 @@ describe("which width changes the page travels with", () => {
     expect(hidden()).toBe(false);
   });
 
-  it("publishes the rail beside the column, and the panel beside both", () => {
+  it("publishes the column's own width, and the panel beside it", () => {
     expect(publishedWidth()).toBe(total(expanded()));
     setPanelExtent(336);
     expect(publishedWidth()).toBe(total(COMPACT_WIDTH + 8 + 336));
     setPanelExtent(0);
   });
 
-  it("keeps the rail at compact width too", () => {
+  it("keeps the column's width at compact width too", () => {
     setMode("compact");
     expect(publishedWidth()).toBe(total(COMPACT_WIDTH));
     setMode("default");

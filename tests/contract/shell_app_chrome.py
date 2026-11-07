@@ -115,7 +115,7 @@ PROBE = """return JSON.stringify((() => {
         spaceHeader: !!d.querySelector('.space-bar')
           || /\bSpace\b/.test(d.body ? d.body.textContent : ''),
         dropTarget: !!d.querySelector('[data-essentials-drop]'),
-        accountFoot: !!d.querySelector('.shelf .case, .utility-rail .rail-profile'),
+        accountFoot: !!d.querySelector('.shelf .case'),
         tabRow: d.querySelectorAll('[data-astra-tab-id]').length > 0,
         alerts: [...d.querySelectorAll('[role=alert]')].map(a => a.textContent.slice(0, 160)),
       };

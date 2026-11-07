@@ -54,12 +54,12 @@ test("settings publishes the panel's width, and gives it back on the way out", a
 
   emitNativeEvent("uiCommand", "browser.settings");
   await expect.poll(() => surface.currentPage()).toBe("settings");
-  // The panel the sections stand in: the rail, the column, the gap and the panel.
-  await expect.poll(lastWidth).toBe(372);
-  await expect.poll(shownWidth).toBe(372);
+  // The panel the sections stand in: the column, the gap and the panel.
+  await expect.poll(lastWidth).toBe(328);
+  await expect.poll(shownWidth).toBe(328);
 
   emitNativeEvent("uiCommand", "browser.return");
   await expect.poll(() => surface.currentPage()).toBe(null);
-  await expect.poll(lastWidth).toBe(284);
-  await expect.poll(shownWidth).toBe(284);
+  await expect.poll(lastWidth).toBe(240);
+  await expect.poll(shownWidth).toBe(240);
 });

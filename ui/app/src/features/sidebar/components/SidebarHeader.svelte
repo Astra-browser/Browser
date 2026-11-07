@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$shared/i18n/messages";
-  import { EllipsisIcon, SidebarLeftIcon } from "@hugeicons/core-free-icons";
+  import type { Snippet } from "svelte";
+  import { EllipsisIcon } from "@hugeicons/core-free-icons";
   import { tabs } from "$domain/tabs";
   import { blocker, siteMenuState } from "$domain/blocker";
   import { pageSite } from "$domain/site-data";
@@ -9,7 +10,7 @@
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack } from "svelte";
   import { commands } from "$shared/ipc/bindings";
-  import { IS_MAC, IS_WINDOWS } from "$shared/platform";
+  import { IS_MAC } from "$shared/platform";
   import { fullscreen } from "$shared/lib/fullscreen.svelte";
   import IconButton from "$shared/ui/IconButton";
   import ModeTabs from "./ModeTabs.svelte";
@@ -17,19 +18,14 @@
 
   let {
     compact,
-    ontoggle,
     pageControls = true,
-    launcher = false,
-    rail = false,
+    utilities,
   }: {
     compact: boolean;
-    ontoggle: () => void;
     /** Back, forward and reload act on a page; Work shows none. */
     pageControls?: boolean;
-    /** Beside a tool panel, search stands where the shape toggle would. */
-    launcher?: boolean;
-    /** The utility rail already holds the window's leading corner. */
-    rail?: boolean;
+    /** The tools that stand at the column's head, in one row or the rail grid. */
+    utilities?: Snippet;
   } = $props();
 
   let active = $derived(tabs.activeTab());
@@ -130,27 +126,12 @@
   </header>
 {:else}
   <header
-    class="flex shrink-0 items-center gap-px pe-2"
+    class="sidebar-toolbar flex shrink-0 items-center pe-2"
     data-drag-region
-    style:height="var(--titlebar-height)"
-    style:padding-inline-start={lights
-      ? rail
-        ? "max(0px, calc(var(--traffic-light-inset) - var(--rail-width)))"
-        : "var(--traffic-light-inset)"
-      : launcher && IS_WINDOWS
-        ? "0"
-        : "var(--tab-inset)"}
+    style:min-height="var(--titlebar-height)"
+    style:padding-inline-start={lights ? "var(--traffic-light-inset)" : "var(--tab-inset)"}
     aria-label={m.ui_navigation()}
   >
-    <!-- Beside a tool panel the panel's own close button already gives the
-         column back, so a second way to the same shape would only crowd the
-         lights; search stands there instead. -->
-    {#if launcher && IS_WINDOWS}<span class="flex w-14 shrink-0 justify-center"
-        ><ModeTabs compact /></span
-      >{:else if launcher}<span class="ms-1.5 flex"><SidebarSearch /></span>{:else}<IconButton
-        icon={SidebarLeftIcon}
-        label={m.ui_compact_mode()}
-        onclick={ontoggle}
-      />{/if}<span class="flex-1" aria-hidden="true"></span>
+    {#if utilities}{@render utilities()}{/if}
   </header>
 {/if}

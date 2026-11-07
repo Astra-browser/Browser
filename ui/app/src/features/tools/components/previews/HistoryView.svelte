@@ -24,13 +24,7 @@
   }
 </script>
 
-<ToolFrame
-  {...props}
-  caption={false}
-  closable={false}
-  searchLabel={m.history_search()}
-  scrolls={false}
->
+<ToolFrame {...props} caption={false} searchLabel={m.history_search()} scrolls={false}>
   {#snippet actions()}<Menu
       label={m.tool_more()}
       {entries}

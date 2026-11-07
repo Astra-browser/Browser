@@ -11,7 +11,6 @@
     COMPACT_WIDTH,
     MAX_EXPANDED_WIDTH,
     MIN_EXPANDED_WIDTH,
-    RAIL_WIDTH,
   } from "$session/sidebar-mode.svelte";
   import { commands } from "$shared/ipc/bindings";
   import { onDestroy } from "svelte";
@@ -209,10 +208,10 @@
 </div>
 {#if resizing && guide !== null && !nativeGuide}
   <!-- A renderer-only fallback stays inside chrome; page-overlapping guides are native.
-       The rail stands before the column, so the line is drawn from its edge. -->
+       The column starts at the sidebar's own edge. -->
   <span
     aria-hidden="true"
     class="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-accent"
-    style:left={`${RAIL_WIDTH + Math.min(startWidth - 2, guide - 2)}px`}
+    style:left={`${Math.min(startWidth - 2, guide - 2)}px`}
   ></span>
 {/if}

@@ -84,13 +84,13 @@ test("the tasks panel keeps search in view without taking focus from the page", 
   });
   await expect.element(screen.getByRole("region", { name: "Tasks", exact: true })).toBeVisible();
 
-  // The scope is the title; the header carries it and More, and closing lives
-  // in More with the panel's other actions.
+  // The scope is the title; the header carries it, More, and the direct close.
   await expect.element(screen.getByRole("button", { name: /Show/u })).toBeVisible();
   const header = screen.container.querySelector(".shared-tool-header")!;
   expect([...header.querySelectorAll("button")].map((button) => button.ariaLabel)).toEqual([
     "Show",
     "More actions",
+    "Close tool",
   ]);
   expect(header.querySelector(".shared-tool-icon")).toBeNull();
   await screen.getByRole("button", { name: "More actions", exact: true }).click();

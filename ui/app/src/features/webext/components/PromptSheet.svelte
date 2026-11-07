@@ -3,7 +3,6 @@
   import { onDestroy } from "svelte";
   import {
     COMPACT_WIDTH,
-    RAIL_WIDTH,
     effectiveWidth,
     expandBriefly,
     hasPanel,
@@ -47,7 +46,7 @@
     }
   }
 
-  let left = $derived(RAIL_WIDTH + (beside ? COMPACT_WIDTH + INSET : INSET));
+  let left = $derived(beside ? COMPACT_WIDTH + INSET : INSET);
 </script>
 
 <svelte:window {onkeydown} />
@@ -60,7 +59,7 @@
   aria-describedby={describedby}
   class="sheet prompt-sheet"
   style:left={`${left}px`}
-  style:width={`${Math.max(RAIL_WIDTH + effectiveWidth() - left - INSET, 220)}px`}
+  style:width={`${Math.max(effectiveWidth() - left - INSET, 220)}px`}
 >
   {@render children()}
 </div>

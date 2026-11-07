@@ -11,7 +11,6 @@
   import {
     COMPACT_WIDTH,
     PANEL_GAP,
-    RAIL_WIDTH,
     effectiveWidth,
     hasPanel,
     holdShown,
@@ -30,7 +29,7 @@
   import * as shapeMorph from "../lib/shape-morph";
   import { duration, reducedMotion } from "$shared/lib/motion";
   import SidebarResizeHandle from "./SidebarResizeHandle.svelte";
-  import { UtilityRail } from "$features/rail";
+  import { UtilityBar } from "$features/rail";
 
   let {
     settingsNavigation,
@@ -441,9 +440,8 @@
         ? COMPACT_WIDTH
         : effectiveWidth(),
   );
-  // The card holds the rail and the column: what native insets the page by
-  // is both together, while the resize handle still moves only the column.
-  let width = $derived(RAIL_WIDTH + columnWidth);
+  // The card holds the column; native insets the page by exactly the column.
+  let width = $derived(columnWidth);
   // Settings' sections are as much a part of the column as the rail beside
   // them, so the width the shell insets the page by has to carry the panel
   // too: otherwise the page stands under the settings panel and the inset
@@ -563,7 +561,6 @@
   }}
   class="browser-sidebar relative flex shrink-0 flex-row text-text select-none"
 >
-  <UtilityRail {compact} />
   <div class="sidebar-main">
     {#if !navigating && !railPage && tools.activeTool() === null}<SidebarResizeHandle
         width={columnWidth}
@@ -572,13 +569,16 @@
     <!-- Settings stands beside the rail with no head: its panel runs the full
          height and the rail keeps only the lights' row. A tool keeps the head,
          with search and the page's own controls. -->
-    {#if !settings}<SidebarHeader
+    {#if !settings && (!compact || headerCompact)}<SidebarHeader
         compact={headerCompact}
-        launcher={paneled}
-        ontoggle={toggleShape}
         pageControls={!inWork}
-        rail
-      />{/if}
+        >{#snippet utilities()}<UtilityBar ontoggle={toggleShape} />{/snippet}</SidebarHeader
+      >{/if}
+    {#if compact && (!paneled || (settings && settingsExtent === 0))}<div
+        class="sidebar-compact-utilities"
+      >
+        <UtilityBar compact ontoggle={toggleShape} />
+      </div>{/if}
     <div
       bind:this={columns}
       class="sidebar-columns"
@@ -586,14 +586,19 @@
       data-launch={motion.launchState()}
     >
       {#key compact}<div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
-          {#if settings && IS_MAC}<div class="sidebar-lights" aria-hidden="true"></div>{/if}
+          {#if IS_MAC && compact && !headerCompact}<div
+              class="sidebar-lights"
+              aria-hidden="true"
+            ></div>{/if}
           {@render browserBody(compact)}
           {@render dock(compact)}
         </div>{/key}
       {#if settings && settingsExtent > 0}<div class="sidebar-tool-host">
-          {@render settingsNavigation()}
+          <div class="sidebar-tool-utilities"><UtilityBar /></div>
+          <div class="sidebar-tool-panel">{@render settingsNavigation()}</div>
         </div>{:else if tools.activeTool() !== null}<div class="sidebar-tool-host">
-          {@render toolPanel(tools.activeTool()!)}
+          <div class="sidebar-tool-utilities"><UtilityBar /></div>
+          <div class="sidebar-tool-panel">{@render toolPanel(tools.activeTool()!)}</div>
         </div>{/if}
     </div>
   </div>
@@ -705,6 +710,37 @@
     border-radius: inherit;
     box-shadow: inset 0 0 0 1px var(--sidebar-card-edge);
     pointer-events: none;
+  }
+
+  /* In the 56px rail (Work, Tasks) the tools are the narrow grid above the
+     tab list. Beside a panel they move to its head, so the column left of
+     the panel is only the tab rail. */
+  .sidebar-compact-utilities {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sidebar-tool-utilities {
+    display: flex;
+    flex: none;
+    align-items: center;
+    padding: 4px 10px 3px;
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .sidebar-tool-panel {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .sidebar-tool-panel > :global(*) {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
   }
 
   @media (prefers-reduced-motion: reduce) {

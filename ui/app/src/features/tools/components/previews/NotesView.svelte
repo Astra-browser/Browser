@@ -140,7 +140,6 @@
     {...props}
     caption={false}
     scrolls={false}
-    closable={false}
     searchLabel={m.note_search()}
     searchOpen={!note}
     searchFocus={false}

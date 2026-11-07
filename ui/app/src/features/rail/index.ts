@@ -1,1 +1,1 @@
-export { default as UtilityRail } from "./components/UtilityRail.svelte";
+export { default as UtilityBar } from "./components/UtilityBar.svelte";

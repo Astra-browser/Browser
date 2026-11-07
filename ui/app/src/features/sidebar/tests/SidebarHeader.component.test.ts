@@ -52,7 +52,7 @@ async function rail(over: Parameters<typeof tabFixture>[0]) {
     active: tab.id,
     split_group: null,
   });
-  const screen = await render(SidebarHeader, { compact: true, ontoggle: () => {} });
+  const screen = await render(SidebarHeader, { compact: true });
   await screen.getByRole("button", { name: "Sidebar options" }).click();
   return native.menu.mock.calls.at(-1)!;
 }

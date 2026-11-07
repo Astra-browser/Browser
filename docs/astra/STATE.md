@@ -11,7 +11,37 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
-## Owner report: YouTube scriptlet resource fix (2026-11-07, latest)
+## Owner report: sidebar utilities folded into the column head (2026-11-08, latest)
+
+**What changed:** the 44px utility rail beside the sidebar is gone. Media,
+downloads, notes, spaces and sleeping tabs now share the column's own top row,
+with the shape toggle first; at 56px the same entries become a two-column tool
+grid under the head. The page gains the 44px the rail used to hold
+(`publishedWidth()` is the column alone), and the duplicate profile entry that
+sat at the rail's foot is removed — the dock's tools/profile case is the one
+profile surface.
+
+**Motion:** the plates settle in one beat apart (`bar-plate-in`, 18 ms stagger),
+hover/press keep their colour and scale transitions, a media/sleeping dot pops
+in when the list has something in it, and the list rows settle behind each other
+inside a bar popover. Every one of those stands down under reduced motion.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Utility bar | Media, downloads, notes, spaces and sleeping tabs in the column head; the tool entries light while their panel is open and close it again | `ui/app/src/features/rail/components/UtilityBar.svelte`, `SidebarHeader.svelte`, `Sidebar.svelte`; callers unchanged (`$session/tools`, `$features/tabs` spaces, the window's own tab projection) | `tools/marionette-probe/utility-bar-probe.py`: aside `240` (was `284`), bar `x16 y11 w224 h26`, 6 plates, no overflow, no `.utility-rail`; media popover `x16 y43 w224`, inside the column |
+| Tool / settings rail | The panel keeps a 56px tab column (search + tabs + new tab), and the utilities stand in a **horizontal strip across the panel's head**, not a side grid. The duplicate spaces switcher and the mode switch leave the rail. Every tool now carries a direct close control in its header: Notes, History, Tasks and Time no longer hide it behind their overflow menu. | `Sidebar.svelte` (`sidebar-tool-utilities` / `sidebar-tool-panel`, `{#key compact}` column), `TabRail.svelte` (`spaces={false}` from `Shell.svelte`), the four tool previews (`closable` back on) | `utility-bar-probe.py` 27/27: utilities leave the tab column, head the panel, span its width; tab column keeps the search; panel header has "Close tool"; no mode switch; one `.rail-spaces`; panel `x72 y8 w336` |
+| Hide / peek | The shape toggle in the bar follows the same `toggleShape` path (closes a tool first, otherwise hides), and the card/edge behaviour is unchanged | `Sidebar.svelte` `toggleShape`, `sidebar-mode.svelte` `RAIL_WIDTH` removed | `utility-bar-probe.py`: the toggle sets `data-hidden`, the edge event → `data-peek` and the card comes back; `sidebar-probe.py` still PASS |
+| Private / multi-window | The bar reads only the window's projection; media and sleeping stay empty in private windows; no profile history is kept | `rail-model.ts` unchanged guards, `UtilityBar` private branches | `UtilityBar.component.test.ts` private case |
+
+**Verification:** `bun run typecheck`, `lint`, `stylelint`, `format:check`,
+`knip`, 1238 unit tests (2 environment skips), and 56 component tests across
+the rail/sidebar/tabs/tools/Shell suites. Chrome build + `forge overlay` +
+`build --faster` clean; `state-check` and `brand-lint` clean. Pre-existing
+component failures outside this surface (`ShellA11y` stale
+`[data-content-bar]` selector, `SpacesLook` site-info click) are unchanged and
+are not part of `tools/perf/full-suite.sh`.
+
+## Owner report: YouTube scriptlet resource fix (2026-11-07)
 
 **Symptom:** YouTube showed video ads and page ad slots even though the lists
 and cosmetic selectors were installed.

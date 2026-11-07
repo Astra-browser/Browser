@@ -14,15 +14,15 @@ Astra's existing colour scheme unchanged; only the light tokens change.
 |---|---|
 | Window ground | 8px gutter; warm wallpaper behind chrome and card |
 | Main-page bar | 40px, content column only; nav + the existing search field |
-| Sidebar | 240px expanded; 44px utility rail; tab list below the header |
+| Sidebar | 240px expanded; utilities in its top row; tab list below the header |
 | Tab row | 28px high, 8px radius, 8px inset, 2px gap, 16px favicon, 13px/500 |
 | Active row | warm-white pill (`#fffdf9`); hover is 5% ink |
 | Content card | 12px radius, one soft drop, no drawn outline |
-| Utility rail | 44px: Media, Downloads, Notes, Spaces, sleeping tabs, profile |
+| Utility bar | The column's top row; beside a tool or Settings, the panel's head row |
 | Menus | 12px radius, 6px padding, 30–34px rows, 13px label, 11px hint |
 | Motion | 120ms fast, 200ms base, 300ms slow, 400ms page |
 
-Tokens: `--main-bar-height`, `--rail-width`, `--row-tab`, `--radius-tab`,
+Tokens: `--main-bar-height`, `--row-tab`, `--radius-tab`,
 `--tab-inset`, `--tab-gap`, `--window-gutter`, `--shell-ground`.
 
 ## 2. Frozen surfaces — do not restyle
@@ -57,9 +57,9 @@ Merge order: foundation → list → menus → pages → rail → toolbar.
 
 - Every control keeps its existing caller. Restyling never removes an action.
 - The toolbar moves the existing address field; it does not fork it.
-- The rail opens the existing tool panels (`$session/tools`), not new routes.
+- The utility bar opens the existing tool panels (`$session/tools`), not new routes.
 - No new wire types, commands or events.
-- Private windows keep no rail history and no second model.
+- Private windows keep no utility history and no second model.
 - Every listener, observer and timer added by a lane has a teardown.
 
 ## 5. Verification

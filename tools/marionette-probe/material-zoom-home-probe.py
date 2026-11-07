@@ -177,7 +177,7 @@ def main():
         wait(lambda: m.js(app("return d.documentElement.dataset.density;")) == "comfortable")
         comfortable = {
             "row-tab": token("--row-tab").strip(),
-            "rail": token("--rail-width").strip(),
+            "inset": token("--tab-inset").strip(),
             "dock": token("--dock-tile").strip(),
             "bar": token("--main-bar-height").strip(),
             "control": token("--control-height").strip(),
@@ -186,7 +186,7 @@ def main():
         wait(lambda: m.js(app("return d.documentElement.dataset.density;")) == "compact")
         compact = {
             "row-tab": token("--row-tab").strip(),
-            "rail": token("--rail-width").strip(),
+            "inset": token("--tab-inset").strip(),
             "dock": token("--dock-tile").strip(),
             "bar": token("--main-bar-height").strip(),
             "control": token("--control-height").strip(),
@@ -194,7 +194,7 @@ def main():
         check("compact is applied to the root", True)
         changed = [name for name in comfortable if comfortable[name] != compact[name]]
         check(
-            "compact changes tab rows, rail, dock, main bar and controls",
+            "compact changes tab rows, tab inset, dock, main bar and controls",
             changed == list(comfortable),
             {"comfortable": comfortable, "compact": compact, "changed": changed},
         )

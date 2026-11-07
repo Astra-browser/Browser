@@ -107,7 +107,6 @@
   {...props}
   caption={false}
   scrolls={false}
-  closable={false}
   searchLabel={m.tool_search_tasks()}
   searchFocus={false}
   onsearchdismiss={() => props.edit({ query: "" })}

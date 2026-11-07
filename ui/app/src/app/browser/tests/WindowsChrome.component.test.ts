@@ -39,18 +39,29 @@ test("acrylic retains its color wash through the transparent material reset", ()
   expect(getComputedStyle(document.body).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
 });
 
-test("the Windows tool rail puts mode above search without reserving a page title band", async () => {
+test("the Windows tool rail keeps its controls in the column without a title band", async () => {
   await surface.init();
   await tabs.init();
   tools.open("downloads");
   const screen = await render(Shell);
-  const browse = screen.getByRole("button", { name: "Browse", exact: true });
-  const search = screen.getByRole("button", { name: "Search or enter an address", exact: true });
-  await expect.element(browse).toBeVisible();
-  await expect.element(search).toBeVisible();
-  const modeRect = browse.element().getBoundingClientRect();
-  const searchRect = search.element().getBoundingClientRect();
-  expect(modeRect.bottom).toBeLessThanOrEqual(searchRect.top);
+  const rail = screen.container.querySelector<HTMLElement>(".sidebar-browser-column")!;
+  const bar = screen.container.querySelector<HTMLElement>(".utility-bar")!;
+  await expect
+    .poll(() =>
+      screen.container.querySelector('.shared-tool-header button[aria-label="Close tool"]'),
+    )
+    .not.toBeNull();
+  const close = screen.container.querySelector<HTMLButtonElement>(
+    '.shared-tool-header button[aria-label="Close tool"]',
+  );
+  const search = rail.querySelector<HTMLElement>(".rail-search button");
+  expect(bar).not.toBeNull();
+  expect(close).not.toBeNull();
+  expect(search).not.toBeNull();
+  // The utilities head the panel; the tab column keeps only its list/search.
+  expect(rail.querySelector(".utility-bar")).toBeNull();
+  expect(rail.querySelector(".rail-spaces")).toBeNull();
+  expect(screen.container.querySelector(".mode-switch")).toBeNull();
   expect(screen.container.querySelector(".title-band")).toBeNull();
   const stage = screen.container.querySelector(".stage-column")!;
   expect(stage.getBoundingClientRect().top).toBe(8);

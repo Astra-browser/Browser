@@ -1,6 +1,6 @@
 import type { TabView } from "$shared/ipc/bindings";
 
-/** The rail's five utility entries; the profile stands apart at its foot. */
+/** The bar's five utility entries. The profile lives in the dock's shelf. */
 export type RailItemId = "media" | "downloads" | "notes" | "spaces" | "sleeping";
 
 /** The entries that open a tool panel through `$session/tools`. */
