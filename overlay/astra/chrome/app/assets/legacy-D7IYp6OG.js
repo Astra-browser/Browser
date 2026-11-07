@@ -1,1 +1,0 @@
-import{pn as e}from"./chrome-shared-bs9LHi2k.js";e();

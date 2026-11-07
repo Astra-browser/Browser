@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-CfBfEoKp.js";var n=((n={},r={})=>(r.locale??t(),e(586,n)??`Cancel`));export{n as t};

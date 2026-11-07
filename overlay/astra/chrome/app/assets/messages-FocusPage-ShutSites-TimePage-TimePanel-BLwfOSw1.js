@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ixgkyq67-CQJSnpLa.js";import{C as t}from"./chrome-shared-bs9LHi2k.js";var n=((n={},r={})=>(r.locale??t(),e(3162,n)??`Shut during focus`));export{n as t};
