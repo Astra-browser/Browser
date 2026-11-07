@@ -45,6 +45,16 @@
   let deleting = $state<string | null>(null);
   let failed = $state<string | null>(null);
 
+  // A profile switch changes the list under the page; an editor or a pending
+  // confirmation for the profile left behind must not linger on another one.
+  const shownProfile = $derived(current?.id ?? null);
+  $effect(() => {
+    void shownProfile;
+    editing = null;
+    deleting = null;
+    failed = null;
+  });
+
   function lookOf(space: SpaceView): SpaceLookInputV1 {
     return { icon: space.icon, color: space.color, theme: space.theme };
   }
