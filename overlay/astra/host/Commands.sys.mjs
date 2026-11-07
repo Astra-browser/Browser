@@ -69,6 +69,7 @@ const SECTIONS = new Set([
   "focus",
   "performance",
   "profiles",
+  "spaces",
   "work",
   "ai",
   "skills",
