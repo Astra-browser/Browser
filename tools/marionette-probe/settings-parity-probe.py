@@ -217,19 +217,29 @@ def main():
         # --- blocker honesty ----------------------------------------------
         status = host(m, "Blocker.status()")
         check(
-            "the blocker never claims active without a native seam",
-            status.get("protection") in ("disabled", "unavailable"),
+            "the blocker reports the live native state",
+            status.get("protection") in ("active", "degraded", "pending")
+            and status.get("can_enable") is True
+            and status.get("preference") == "authoritative",
             status,
         )
         check(
-            "the blocker reports a reason when unavailable",
-            status.get("protection") != "unavailable" or status.get("failure") is not None,
+            "active protection names the installed generation",
+            status.get("protection") != "active"
+            or (
+                status.get("applied_enabled") is True
+                and isinstance(status.get("retained_generation"), str)
+            ),
             status,
         )
         stats = host(m, "Blocker.stats({profile:'default'})")
         check(
-            "blocker stats never fabricate a count",
-            stats.get("today") is None and stats.get("last7Days") is None,
+            "blocker stats are bounded numbers (0 is a real count)",
+            (stats.get("today") is None or (isinstance(stats.get("today"), int) and stats["today"] >= 0))
+            and (
+                stats.get("last7Days") is None
+                or (isinstance(stats.get("last7Days"), int) and stats["last7Days"] >= 0)
+            ),
             stats,
         )
 

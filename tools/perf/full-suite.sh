@@ -76,6 +76,7 @@ PROBES=(
   "settings_restart:tools/marionette-probe/settings-restart-probe.py"
   "settings_audit:tools/marionette-probe/settings-audit-probe.py"
   "settings_parity:tools/marionette-probe/settings-parity-probe.py"
+  "blocker:tools/marionette-probe/blocker-probe.py"
   "tabs_settings:tools/marionette-probe/tabs-settings-probe.py"
   "material_zoom_home:tools/marionette-probe/material-zoom-home-probe.py"
   "profiles_switch:tools/marionette-probe/profiles-switch-probe.py"

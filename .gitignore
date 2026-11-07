@@ -47,3 +47,6 @@ UI_IDEA
 .worktrees/
 
 ui_inspiration/
+
+# Local release notes (working doc, intentionally not published)
+release.md
