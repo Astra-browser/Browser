@@ -74,7 +74,7 @@ hook moved) → `forge build --jobs 2` → `blocker-probe.py`.
   XPCOM service. No new vendored crates (adblock/serde/cstr were already in
   the tree).
 - `tools/marionette-probe/blocker-probe.py` — **PASS**. On a clean profile:
-  - Host reaches `active` with the bundled seed; 155 226 compiled rules.
+  - Host reaches `active` with the bundled seed; ≈155k compiled rules.
   - Catalog: 80 lists, 10 default-enabled; `configure` persists 6 h and a
     2-list selection.
   - A loopback page's `/ad.png` is cancelled by the network hook (**server
