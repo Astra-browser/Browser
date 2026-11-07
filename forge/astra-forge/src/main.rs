@@ -37,6 +37,21 @@ fn read_upstream(root: &Path) -> std::collections::HashMap<String, String> {
     map
 }
 
+fn run_raw(prog: &str, args: &[&str], dir: &Path) -> Result<String, String> {
+    let out = Command::new(prog)
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .map_err(|e| format!("spawn {prog}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "{prog} failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
 fn run(prog: &str, args: &[&str], dir: &Path) -> Result<String, String> {
     let out = Command::new(prog)
         .args(args)
@@ -66,14 +81,14 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
     let dist = root.join("out").join("dist");
     fs::create_dir_all(&engine).map_err(|e| e.to_string())?;
     fs::create_dir_all(&dist).map_err(|e| e.to_string())?;
-    let tarball = dist.join(
-        url.rsplit('/')
-            .next()
-            .ok_or("bad source url")?,
-    );
+    let tarball = dist.join(url.rsplit('/').next().ok_or("bad source url")?);
     if !tarball.exists() {
         println!("fetch: downloading {url}");
-        run("curl", &["-sSL", "--fail", "-o", &tarball.to_string_lossy(), &url], root)?;
+        run(
+            "curl",
+            &["-sSL", "--fail", "-o", &tarball.to_string_lossy(), &url],
+            root,
+        )?;
     } else {
         println!("fetch: reusing {}", tarball.display());
     }
@@ -90,12 +105,22 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
             root,
         ) {
             Ok(_) => println!("fetch: downloaded signature"),
-            Err(e) => println!("fetch: WARNING no signature ({e}); refusing to continue without one in release builds"),
+            Err(e) => println!(
+                "fetch: WARNING no signature ({e}); refusing to continue without one in release builds"
+            ),
         }
     }
     if asc.exists() {
         println!("fetch: verifying signature");
-        run("gpg", &["--verify", &asc.to_string_lossy(), &tarball.to_string_lossy()], root)?;
+        run(
+            "gpg",
+            &[
+                "--verify",
+                &asc.to_string_lossy(),
+                &tarball.to_string_lossy(),
+            ],
+            root,
+        )?;
         println!("fetch: signature OK");
     }
     // Extract (idempotent marker).
@@ -106,7 +131,13 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
         println!("fetch: extracting to engine/");
         run(
             "tar",
-            &["--strip-components=1", "-xJf", &tarball.to_string_lossy(), "-C", &engine.to_string_lossy()],
+            &[
+                "--strip-components=1",
+                "-xJf",
+                &tarball.to_string_lossy(),
+                "-C",
+                &engine.to_string_lossy(),
+            ],
             root,
         )?;
         fs::write(&marker, want).map_err(|e| e.to_string())?;
@@ -116,7 +147,15 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
             run("git", &["add", "-A"], &engine)?;
             run(
                 "git",
-                &["-c", "user.name=forge", "-c", "user.email=forge@local", "commit", "-qm", &format!("baseline: firefox {version}")],
+                &[
+                    "-c",
+                    "user.name=forge",
+                    "-c",
+                    "user.email=forge@local",
+                    "commit",
+                    "-qm",
+                    &format!("baseline: firefox {version}"),
+                ],
                 &engine,
             )?;
         }
@@ -129,9 +168,20 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
 
 fn cmd_doctor(root: &Path) -> Result<(), String> {
     let mut ok = true;
-    for (prog, why) in [("curl", "downloads"), ("tar", "extraction"), ("gpg", "signatures"), ("git", "patch baseline"), ("rustc", "forge itself"), ("python3", "state-check"), ("bun", "UI workspace (P3)")] {
+    for (prog, why) in [
+        ("curl", "downloads"),
+        ("tar", "extraction"),
+        ("gpg", "signatures"),
+        ("git", "patch baseline"),
+        ("rustc", "forge itself"),
+        ("python3", "state-check"),
+        ("bun", "UI workspace (P3)"),
+    ] {
         match run(prog, &["--version"], root) {
-            Ok(first) => println!("doctor: {prog:8} OK ({}) — {why}", first.lines().next().unwrap_or("")),
+            Ok(first) => println!(
+                "doctor: {prog:8} OK ({}) — {why}",
+                first.lines().next().unwrap_or("")
+            ),
             Err(e) => {
                 println!("doctor: {prog:8} MISSING ({e}) — {why}");
                 ok = false;
@@ -218,7 +268,10 @@ fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
                 .strip_prefix("--enable-")
                 .or_else(|| name.strip_prefix("--disable-"))
             {
-                vec![format!("\"--enable-{stem}\""), format!("\"--disable-{stem}\"")]
+                vec![
+                    format!("\"--enable-{stem}\""),
+                    format!("\"--disable-{stem}\""),
+                ]
             } else if let Some(stem) = name
                 .strip_prefix("--with-")
                 .or_else(|| name.strip_prefix("--without-"))
@@ -240,7 +293,9 @@ fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
                 checked += 1;
                 let needle = format!("env=\"{var}\"");
                 if configure_has(&engine, &needle) {
-                    println!("doctor: mozconfig export OK: {var} (empty disables per options.py:454-456)");
+                    println!(
+                        "doctor: mozconfig export OK: {var} (empty disables per options.py:454-456)"
+                    );
                 } else {
                     bad.push(rest.to_string());
                     println!("doctor: mozconfig export NOT FOUND in pinned source: {rest}");
@@ -259,7 +314,11 @@ fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
         return Err("no mozconfig lines checked".into());
     }
     if !bad.is_empty() {
-        return Err(format!("{} unknown mozconfig entr{}", bad.len(), if bad.len() == 1 { "y" } else { "ies" }));
+        return Err(format!(
+            "{} unknown mozconfig entr{}",
+            bad.len(),
+            if bad.len() == 1 { "y" } else { "ies" }
+        ));
     }
     println!("doctor: mozconfig clean ({checked} lines, see docs/astra/BUILD_FLAGS.md)");
     Ok(())
@@ -273,7 +332,10 @@ fn read_branding(root: &Path) -> Result<std::collections::HashMap<String, String
     for line in text.lines() {
         let line = line.split('#').next().unwrap_or("").trim().to_string();
         if let Some((k, v)) = line.split_once('=') {
-            raw.insert(k.trim().to_string(), v.trim().trim_matches('"').trim().to_string());
+            raw.insert(
+                k.trim().to_string(),
+                v.trim().trim_matches('"').trim().to_string(),
+            );
         }
     }
     let dev = |key: &str, fallback: &str| match raw.get(key) {
@@ -284,15 +346,27 @@ fn read_branding(root: &Path) -> Result<std::collections::HashMap<String, String
         }
     };
     let mut m = std::collections::HashMap::new();
-    let display = raw.get("display_name").cloned().unwrap_or_else(|| "Astra".into());
-    let binary = raw.get("binary_name").cloned().unwrap_or_else(|| "astra".into());
+    let display = raw
+        .get("display_name")
+        .cloned()
+        .unwrap_or_else(|| "Astra".into());
+    let binary = raw
+        .get("binary_name")
+        .cloned()
+        .unwrap_or_else(|| "astra".into());
     m.insert("ASTRA_DISPLAY_NAME".into(), display);
     m.insert("ASTRA_BINARY_NAME".into(), binary.clone());
     m.insert("ASTRA_APP_ID".into(), dev("app_id", "com.astra.dev"));
-    m.insert("ASTRA_VENDOR".into(), dev("vendor", "Astra (dev placeholder)"));
+    m.insert(
+        "ASTRA_VENDOR".into(),
+        dev("vendor", "Astra (dev placeholder)"),
+    );
     m.insert(
         "ASTRA_UPDATE_HOST".into(),
-        dev("update_host", "https://localhost:0/placeholder-astra-update"),
+        dev(
+            "update_host",
+            "https://localhost:0/placeholder-astra-update",
+        ),
     );
     m.insert("ASTRA_WM_CLASS".into(), format!("{binary}-nightly"));
     Ok(m)
@@ -329,12 +403,18 @@ fn render_branding(root: &Path) -> Result<(), String> {
             text = text.replace(&format!("@{k}@"), v);
         }
         if text.contains("@ASTRA_") {
-            return Err(format!("branding: unsubstituted placeholder in {}", t.display()));
+            return Err(format!(
+                "branding: unsubstituted placeholder in {}",
+                t.display()
+            ));
         }
         let dest = t.with_extension("");
         fs::write(&dest, &text).map_err(|e| e.to_string())?;
         fs::remove_file(t).map_err(|e| e.to_string())?;
-        println!("branding: rendered {}", dest.strip_prefix(root).unwrap_or(&dest).display());
+        println!(
+            "branding: rendered {}",
+            dest.strip_prefix(root).unwrap_or(&dest).display()
+        );
     }
     Ok(())
 }
@@ -367,13 +447,20 @@ fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
     // Non-fatal: OWNER_DECISION placeholders block release builds only (D-19).
     for line in brands.lines() {
         if line.contains("OWNER_DECISION") {
-            println!("config: WARNING branding placeholder pending owner decision: {}", line.trim());
+            println!(
+                "config: WARNING branding placeholder pending owner decision: {}",
+                line.trim()
+            );
         }
     }
     let branding_dir = match branding {
         "astra" => "astra/branding",
         "unofficial" => "browser/branding/unofficial",
-        other => return Err(format!("unknown --branding {other} (want astra|unofficial)")),
+        other => {
+            return Err(format!(
+                "unknown --branding {other} (want astra|unofficial)"
+            ));
+        }
     };
     let template = fs::read_to_string(&template_path).map_err(|e| e.to_string())?;
     let rendered = template
@@ -387,12 +474,66 @@ fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
     fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
     let dest = out_dir.join(format!("mozconfig.{os}"));
     fs::write(&dest, &rendered).map_err(|e| e.to_string())?;
-    println!("config: rendered {} (branding={branding} -> {branding_dir})", dest.display());
+    println!(
+        "config: rendered {} (branding={branding} -> {branding_dir})",
+        dest.display()
+    );
     if branding == "astra" && !root.join("engine/astra/branding").exists() {
-        println!("config: WARNING engine/astra/branding absent (lands P1-T03); configure needs `forge config --branding unofficial` until then");
+        println!(
+            "config: WARNING engine/astra/branding absent (lands P1-T03); configure needs `forge config --branding unofficial` until then"
+        );
     }
     println!("config: next: export MOZCONFIG={}", dest.display());
     Ok(())
+}
+
+/// True when every added line of a patch already exists in its target files.
+/// Used only to decide that a rebuilt tree already carries the patch; it is
+/// intentionally conservative (any missing line -> false).
+fn patch_content_present(engine: &Path, patch: &Path) -> bool {
+    let text = match fs::read_to_string(patch) {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    let body = match split_header(&text) {
+        Ok((_, body)) => body,
+        Err(_) => return false,
+    };
+    let mut saw_added = false;
+    for chunk in body.split("\ndiff --git ") {
+        let chunk = if chunk.starts_with("diff --git ") {
+            chunk.to_string()
+        } else {
+            format!("diff --git {chunk}")
+        };
+        let mut target = None;
+        let mut added: Vec<&str> = Vec::new();
+        for line in chunk.lines() {
+            if let Some(rest) = line.strip_prefix("+++ b/") {
+                target = Some(rest.trim().to_string());
+            } else if let Some(rest) = line.strip_prefix('+') {
+                if !line.starts_with("+++") && !rest.trim().is_empty() {
+                    added.push(rest);
+                }
+            }
+        }
+        let Some(target) = target else { continue };
+        if added.is_empty() {
+            continue;
+        }
+        let path = engine.join(&target);
+        let Ok(current) = fs::read_to_string(&path) else {
+            return false;
+        };
+        if !added
+            .iter()
+            .all(|line| current.lines().any(|have| have == *line))
+        {
+            return false;
+        }
+        saw_added = true;
+    }
+    saw_added
 }
 
 // Copy overlay/astra/** into engine/astra/ and apply the P2 hook list (P1-T05).
@@ -411,7 +552,15 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
         fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
     }
     fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
-    run("cp", &["-a", &format!("{}/.", src.to_string_lossy()), &dest.to_string_lossy()], root)?;
+    run(
+        "cp",
+        &[
+            "-a",
+            &format!("{}/.", src.to_string_lossy()),
+            &dest.to_string_lossy(),
+        ],
+        root,
+    )?;
     println!("overlay: copied overlay/astra -> engine/astra");
     // Apply hook patches in order (P2 list; full series handling is P1-T12).
     let mut patches: Vec<std::path::PathBuf> = Vec::new();
@@ -431,8 +580,17 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     for p in &patches {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
         // Already applied? `git apply --reverse --check` exits 0 only then.
+        // Cargo.lock is a derived vendored artifact: later patches and
+        // `mach vendor rust` rewrite it, so reverse-checking it would make an
+        // already-applied patch look unapplied on a rebuilt tree.
         let applied = Command::new("git")
-            .args(["apply", "--reverse", "--check", &p.to_string_lossy()])
+            .args([
+                "apply",
+                "--reverse",
+                "--check",
+                "--exclude=Cargo.lock",
+                &p.to_string_lossy(),
+            ])
             .current_dir(&engine)
             .output()
             .map(|o| o.status.success())
@@ -441,11 +599,29 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
             println!("overlay: {name} already applied, skipping");
             continue;
         }
+        // A rebuilt tree can have later commits that make the exact reverse
+        // check fail (Cargo.lock, regenerated files) while the patch content
+        // is clearly present. Never re-apply over it: the failure mode is a
+        // duplicate hunk/new-file error that hides the real state.
+        if patch_content_present(&engine, p) {
+            println!("overlay: {name} content already present, skipping");
+            continue;
+        }
         run("git", &["apply", "-v", &p.to_string_lossy()], &engine)?;
         println!("overlay: applied {name}");
     }
+    // The blocker's source of truth lives in `blocker/`, never in the patch
+    // body or the fetched engine. Stage it after the series so a fresh tree
+    // gets the patch-created files and an existing tree is refreshed in place.
+    stage_blocker(root, &engine)?;
     // Sanity: the wiring targets must exist after overlay.
-    for f in ["astra/moz.build", "astra/jar.mn", "astra/host/HostAPI.sys.mjs", "astra/chrome/hello.html", "browser/app.mozbuild"] {
+    for f in [
+        "astra/moz.build",
+        "astra/jar.mn",
+        "astra/host/HostAPI.sys.mjs",
+        "astra/chrome/hello.html",
+        "browser/app.mozbuild",
+    ] {
         if !engine.join(f).exists() {
             return Err(format!("overlay: expected {f} missing after apply"));
         }
@@ -455,12 +631,75 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Copy `blocker/engine/**` into the in-tree component and the shipped data
+/// files into `engine/astra/blocker/`. These copies are derived artifacts;
+/// edit `blocker/` and re-run `forge overlay`.
+fn stage_blocker(root: &Path, engine: &Path) -> Result<(), String> {
+    let src = root.join("blocker/engine");
+    if !src.join("src/lib.rs").exists() {
+        return Err("blocker/engine/src/lib.rs missing (source of truth)".into());
+    }
+    let dest = engine.join("toolkit/components/astra_blocker_engine");
+    if dest.exists() {
+        fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+    run(
+        "cp",
+        &[
+            "-a",
+            &format!("{}/.", src.to_string_lossy()),
+            &dest.to_string_lossy(),
+        ],
+        root,
+    )?;
+    println!("overlay: staged blocker/engine -> toolkit/components/astra_blocker_engine");
+
+    let data_dest = engine.join("astra/blocker");
+    if data_dest.exists() {
+        fs::remove_dir_all(&data_dest).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(data_dest.join("seed")).map_err(|e| e.to_string())?;
+    for (from, to) in [
+        ("blocker/lists/catalog.json", "catalog.json"),
+        ("blocker/resources/resources.json", "resources.json"),
+    ] {
+        let source = root.join(from);
+        if !source.exists() {
+            return Err(format!(
+                "overlay: {from} missing (run blocker/tools/sync.py)"
+            ));
+        }
+        fs::copy(&source, data_dest.join(to)).map_err(|e| e.to_string())?;
+    }
+    let seed = root.join("blocker/seed");
+    if seed.exists() {
+        for entry in fs::read_dir(&seed).map_err(|e| e.to_string())? {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.extension().map(|e| e == "gz").unwrap_or(false) {
+                let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                fs::copy(&path, data_dest.join("seed").join(name)).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    println!("overlay: staged blocker data -> astra/blocker (catalog, resources, seed)");
+    Ok(())
+}
+
 // ---- P1-T12: patch series model (§6.3) ----
 // Patch files are `Patch-Id: ASTRA-NNNN` headers (lines up to the first
 // line that is exactly `---`), then a `git diff` body. std-only: no serde.
 
 const REQUIRED_FIELDS: [&str; 9] = [
-    "Patch-Id", "Title", "Tier", "Upstream-Files", "Intent", "Risk", "Test", "Verified-On", "Removal-Plan",
+    "Patch-Id",
+    "Title",
+    "Tier",
+    "Upstream-Files",
+    "Intent",
+    "Risk",
+    "Test",
+    "Verified-On",
+    "Removal-Plan",
 ];
 
 fn list_patches(root: &Path) -> Result<Vec<PathBuf>, String> {
@@ -497,7 +736,8 @@ fn header_map(header: &[String]) -> std::collections::HashMap<String, String> {
     let mut m = std::collections::HashMap::new();
     for l in header {
         if let Some((k, v)) = l.split_once(':') {
-            m.entry(k.trim().to_string()).or_insert(v.trim().to_string());
+            m.entry(k.trim().to_string())
+                .or_insert(v.trim().to_string());
         }
     }
     m
@@ -530,7 +770,11 @@ fn patch_adds_new_file(body: &str, path: &str) -> bool {
                 return true;
             }
             new_file = false;
-        } else if !line.starts_with("+++") && !line.starts_with("---") && !line.starts_with("diff ") && !line.starts_with("index ") {
+        } else if !line.starts_with("+++")
+            && !line.starts_with("---")
+            && !line.starts_with("diff ")
+            && !line.starts_with("index ")
+        {
             new_file = false;
         }
     }
@@ -540,7 +784,11 @@ fn patch_adds_new_file(body: &str, path: &str) -> bool {
 // Root (baseline) commit of the engine/ git repo — the `forge fetch`
 // `baseline: firefox <version>` commit. Falls back to the root commit.
 fn find_baseline(engine: &Path) -> Result<String, String> {
-    if let Ok(h) = run("git", &["log", "--format=%H", "--grep=^baseline:", "--reverse"], engine) {
+    if let Ok(h) = run(
+        "git",
+        &["log", "--format=%H", "--grep=^baseline:", "--reverse"],
+        engine,
+    ) {
         if let Some(first) = h.lines().next().filter(|s| !s.is_empty()) {
             return Ok(first.to_string());
         }
@@ -595,7 +843,11 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
     let pinned = up.get("version").cloned().unwrap_or_default();
     let engine = root.join("engine");
     let have_engine_git = engine.join(".git").exists();
-    let baseline = if have_engine_git { find_baseline(&engine).ok() } else { None };
+    let baseline = if have_engine_git {
+        find_baseline(&engine).ok()
+    } else {
+        None
+    };
     let mut ok = true;
     let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let mut ids: Vec<String> = Vec::new();
@@ -634,14 +886,22 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
             }
             ids.push(id);
         }
-        let tier = map.get("Tier").map(|s| s.trim().to_string()).unwrap_or_default();
+        let tier = map
+            .get("Tier")
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
         if !["P0", "P1", "P2", "P3"].contains(&tier.as_str()) {
             println!("lint: {name}: bad Tier {tier}");
             ok = false;
         } else if tier == "P3" {
-            let rp = map.get("Removal-Plan").map(|s| s.to_lowercase()).unwrap_or_default();
+            let rp = map
+                .get("Removal-Plan")
+                .map(|s| s.to_lowercase())
+                .unwrap_or_default();
             if rp.is_empty() || rp.starts_with("none") || rp == "tbd" || rp == "n/a" {
-                println!("lint: {name}: Tier P3 (experimental) needs a real Removal-Plan, not {rp:?}");
+                println!(
+                    "lint: {name}: Tier P3 (experimental) needs a real Removal-Plan, not {rp:?}"
+                );
                 ok = false;
             }
         }
@@ -668,7 +928,9 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
                     ok = false;
                 }
             } else if !have_engine_git && !engine.join(f).exists() {
-                println!("lint: {name}: (no engine checkout) cannot verify Upstream-Files entry: {f}");
+                println!(
+                    "lint: {name}: (no engine checkout) cannot verify Upstream-Files entry: {f}"
+                );
             }
         }
         if !pinned.is_empty() && pinned != "UNVERIFIED" {
@@ -685,9 +947,25 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
         if engine.join("mach").exists() {
             let pstr = p.to_string_lossy().into_owned();
             let clean = git_check(&engine, &["apply", "--check", &pstr]);
-            let applied = git_check(&engine, &["apply", "--reverse", "--check", &pstr]);
+            let applied = git_check(
+                &engine,
+                &[
+                    "apply",
+                    "--reverse",
+                    "--check",
+                    "--exclude=Cargo.lock",
+                    &pstr,
+                ],
+            );
             if clean || applied {
-                println!("lint: {name}: applies {}", if applied { "(already applied)" } else { "cleanly" });
+                println!(
+                    "lint: {name}: applies {}",
+                    if applied {
+                        "(already applied)"
+                    } else {
+                        "cleanly"
+                    }
+                );
             } else {
                 println!("lint: {name}: DOES NOT APPLY");
                 ok = false;
@@ -719,7 +997,9 @@ fn cmd_export(root: &Path) -> Result<(), String> {
     }
     let entries = list_patches(root)?;
     if entries.is_empty() {
-        return Err("no patches/*.patch yet: create the first ASTRA-0001 header, then export".into());
+        return Err(
+            "no patches/*.patch yet: create the first ASTRA-0001 header, then export".into(),
+        );
     }
     let baseline = find_baseline(&engine)?;
     struct Item {
@@ -742,7 +1022,12 @@ fn cmd_export(root: &Path) -> Result<(), String> {
         for f in &files {
             covered.entry(f.clone()).or_insert_with(|| name.clone());
         }
-        items.push(Item { path: p.clone(), name, header, files });
+        items.push(Item {
+            path: p.clone(),
+            name,
+            header,
+            files,
+        });
     }
     // Untouched-by-baseline new files are invisible to `git diff` until they
     // are intent-to-add: register every listed Upstream-File that exists in
@@ -769,7 +1054,11 @@ fn cmd_export(root: &Path) -> Result<(), String> {
     }
     // Fail fast on uncovered drift (before rewriting anything).
     let short = baseline.chars().take(12).collect::<String>();
-    let touched = run("git", &["diff", "--name-only", &baseline, "--", "."], &engine)?;
+    let touched = run(
+        "git",
+        &["diff", "--name-only", &baseline, "--", "."],
+        &engine,
+    )?;
     let uncovered: Vec<&str> = touched
         .lines()
         .map(str::trim)
@@ -785,13 +1074,14 @@ fn cmd_export(root: &Path) -> Result<(), String> {
         })
         .collect();
     if !uncovered.is_empty() {
-        let mut msg = format!(
-            "export: engine/ has changes no patch covers (diff vs baseline {short}):\n"
-        );
+        let mut msg =
+            format!("export: engine/ has changes no patch covers (diff vs baseline {short}):\n");
         for f in uncovered {
             msg.push_str(&format!("  {f}\n"));
         }
-        msg.push_str("create patches/ASTRA-00NN-<slug>.patch with a §6.3 header, then re-run export");
+        msg.push_str(
+            "create patches/ASTRA-00NN-<slug>.patch with a §6.3 header, then re-run export",
+        );
         return Err(msg);
     }
     let mut refreshed = 0;
@@ -800,20 +1090,33 @@ fn cmd_export(root: &Path) -> Result<(), String> {
         let owned: Vec<String> = it.files.clone();
         let refs: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
         args.extend(refs);
-        let body = run("git", &args, &engine)?;
+        let body = run_raw("git", &args, &engine)?;
         if body.trim().is_empty() {
-            println!("export: {}: no live diff vs baseline, keeping existing body", it.name);
+            println!(
+                "export: {}: no live diff vs baseline, keeping existing body",
+                it.name
+            );
             continue;
         }
         let mut out = it.header.join("\n");
         out.push_str("\n---\n");
-        out.push_str(body.trim_end());
+        // Trim only the trailing newlines, never a final blank context line:
+        // a hunk whose last line is a blank context line is still part of the
+        // hunk and stripping its space corrupts the patch.
+        out.push_str(body.trim_end_matches('\n'));
         out.push('\n');
         fs::write(&it.path, &out).map_err(|e| e.to_string())?;
-        println!("export: {}: body refreshed ({} file(s))", it.name, it.files.len());
+        println!(
+            "export: {}: body refreshed ({} file(s))",
+            it.name,
+            it.files.len()
+        );
         refreshed += 1;
     }
-    println!("export: done ({refreshed}/{} patch bodies from engine@{short})", items.len());
+    println!(
+        "export: done ({refreshed}/{} patch bodies from engine@{short})",
+        items.len()
+    );
     Ok(())
 }
 
@@ -849,7 +1152,10 @@ fn patch_dryrun_detail(engine: &Path, patch_abs: &str) -> String {
         .lines()
         .filter(|l| {
             let l = l.to_lowercase();
-            l.contains("offset") || l.contains("fuzz") || l.contains("succeed") || l.contains("fail")
+            l.contains("offset")
+                || l.contains("fuzz")
+                || l.contains("succeed")
+                || l.contains("fail")
         })
         .take(3)
         .collect();
@@ -859,7 +1165,11 @@ fn patch_dryrun_detail(engine: &Path, patch_abs: &str) -> String {
     let d: Vec<String> = hits.into_iter().map(|s| s.trim().to_string()).collect();
     let mut s = d.join(" / ");
     if s.is_empty() {
-        s = if out.status.success() { "dry-run ok".into() } else { "dry-run failed".into() };
+        s = if out.status.success() {
+            "dry-run ok".into()
+        } else {
+            "dry-run failed".into()
+        };
     }
     if s.len() > 300 {
         s.truncate(300);
@@ -901,14 +1211,21 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
     let mut conflicts = 0;
     for p in &entries {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
-        let pabs = fs::canonicalize(p).map_err(|e| e.to_string())?.to_string_lossy().into_owned();
+        let pabs = fs::canonicalize(p)
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .into_owned();
         let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
         let (header, body) = match split_header(&text) {
             Ok(v) => v,
             Err(e) => {
                 report.push(PatchStatus {
-                    id: name.clone(), file: name.clone(), tier: "?".into(),
-                    status: "bad-header".into(), detail: e, added: 0,
+                    id: name.clone(),
+                    file: name.clone(),
+                    tier: "?".into(),
+                    status: "bad-header".into(),
+                    detail: e,
+                    added: 0,
                 });
                 conflicts += 1;
                 continue;
@@ -920,8 +1237,12 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
         let (added, _) = count_added(&body);
         let mut push = |status: &str, detail: String| {
             report.push(PatchStatus {
-                id: id.clone(), file: name.clone(), tier: tier.clone(),
-                status: status.into(), detail, added,
+                id: id.clone(),
+                file: name.clone(),
+                tier: tier.clone(),
+                status: status.into(),
+                detail,
+                added,
             });
         };
         if git_check(&engine, &["apply", "--reverse", "--check", &pabs]) {
@@ -969,10 +1290,15 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
     }
     write_health_json(root, &baseline, &report)?;
     if conflicts > 0 {
-        return Err(format!("import: {conflicts} patch(es) conflicted (see out/patch-health.json)"));
+        return Err(format!(
+            "import: {conflicts} patch(es) conflicted (see out/patch-health.json)"
+        ));
     }
     if check_only {
-        println!("import: check only, engine/ untouched ({} patch(es) classified)", report.len());
+        println!(
+            "import: check only, engine/ untouched ({} patch(es) classified)",
+            report.len()
+        );
         return Ok(());
     }
     match update_docs_hook(root, &report) {
@@ -1000,12 +1326,19 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
             Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
             Ok(o) => println!(
                 "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
-                String::from_utf8_lossy(&o.stderr).trim().lines().last().unwrap_or("")
+                String::from_utf8_lossy(&o.stderr)
+                    .trim()
+                    .lines()
+                    .last()
+                    .unwrap_or("")
             ),
             Err(e) => println!("import: WARNING vendor skipped ({e})"),
         }
     }
-    println!("import: done ({} patch(es), health in out/patch-health.json)", report.len());
+    println!(
+        "import: done ({} patch(es), health in out/patch-health.json)",
+        report.len()
+    );
     Ok(())
 }
 
@@ -1026,10 +1359,14 @@ fn write_health_json(root: &Path, baseline: &str, report: &[PatchStatus]) -> Res
             if i + 1 == report.len() { "" } else { "," }
         ));
     }
-    let n_conflict = report.iter().filter(|r| r.status == "conflict" || r.status == "bad-header").count();
+    let n_conflict = report
+        .iter()
+        .filter(|r| r.status == "conflict" || r.status == "bad-header")
+        .count();
     s.push_str(&format!(
         "  ],\n  \"summary\": {{\"total\": {}, \"conflicts\": {}}}\n}}\n",
-        report.len(), n_conflict
+        report.len(),
+        n_conflict
     ));
     fs::write(out_dir.join("patch-health.json"), &s).map_err(|e| e.to_string())?;
     println!("import: wrote out/patch-health.json");
@@ -1056,7 +1393,11 @@ fn refresh_status_cell(cell: &str, status: &str, date: &str) -> String {
         let rest = s[after..].to_string();
         let is_date = rest.len() >= 10
             && rest.chars().take(10).enumerate().all(|(i, c)| {
-                if i == 4 || i == 7 { c == '-' } else { c.is_ascii_digit() }
+                if i == 4 || i == 7 {
+                    c == '-'
+                } else {
+                    c.is_ascii_digit()
+                }
             });
         if is_date {
             s.replace_range(after..after + 10, date);
@@ -1151,9 +1492,16 @@ fn update_docs_hook(root: &Path, report: &[PatchStatus]) -> Result<usize, String
                     // Table health reads `clean` when the patch is applied
                     // (already or just now); the precise import status stays
                     // in out/patch-health.json.
-                    let shown = if r.status == "already-applied" { "clean" } else { r.status.as_str() };
+                    let shown = if r.status == "already-applied" {
+                        "clean"
+                    } else {
+                        r.status.as_str()
+                    };
                     let status = refresh_status_cell(cells[4], shown, date.trim());
-                    out.push(format!("|{}|{}|{}| {status} |", cells[1], cells[2], cells[3]));
+                    out.push(format!(
+                        "|{}|{}|{}| {status} |",
+                        cells[1], cells[2], cells[3]
+                    ));
                     touched += 1;
                     continue;
                 }
@@ -1182,10 +1530,12 @@ fn compute_footprint(root: &Path) -> Result<Footprint, String> {
     for p in &entries {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
         let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
-        let (header, body) = split_header(&text)
-            .map_err(|e| format!("footprint: {name}: {e}"))?;
+        let (header, body) = split_header(&text).map_err(|e| format!("footprint: {name}: {e}"))?;
         let map = header_map(&header);
-        let tier = map.get("Tier").map(|s| s.trim().to_string()).unwrap_or_default();
+        let tier = map
+            .get("Tier")
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
         let (added, removed) = count_added(&body);
         if tier == "P2" || tier == "P3" {
             lines += added + removed;
@@ -1194,13 +1544,22 @@ fn compute_footprint(root: &Path) -> Result<Footprint, String> {
             p3 += 1;
         }
     }
-    Ok(Footprint { lines_p2_p3: lines, patches: entries.len(), p3 })
+    Ok(Footprint {
+        lines_p2_p3: lines,
+        patches: entries.len(),
+        p3,
+    })
 }
 
 // `forge footprint`: enforce the §6.7 budget (defaults ≤1500 lines P2/P3,
 // ≤60 patches, ≤8 P3). Always writes out/footprint.json; exits 1 over
 // budget with the offending dimensions named.
-fn cmd_footprint(root: &Path, max_lines: usize, max_patches: usize, max_p3: usize) -> Result<(), String> {
+fn cmd_footprint(
+    root: &Path,
+    max_lines: usize,
+    max_patches: usize,
+    max_p3: usize,
+) -> Result<(), String> {
     let fp = compute_footprint(root)?;
     let out_dir = root.join("out");
     fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
@@ -1225,7 +1584,10 @@ fn cmd_footprint(root: &Path, max_lines: usize, max_patches: usize, max_p3: usiz
         if fp.p3 > max_p3 {
             over.push(format!("P3 {} > {}", fp.p3, max_p3));
         }
-        return Err(format!("footprint: OVER BUDGET ({}) — see out/footprint.json", over.join(", ")));
+        return Err(format!(
+            "footprint: OVER BUDGET ({}) — see out/footprint.json",
+            over.join(", ")
+        ));
     }
     println!("footprint: within budget (report in out/footprint.json)");
     Ok(())
@@ -1253,7 +1615,9 @@ fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String
             cmd.env("MOZCONFIG", &rendered);
             println!("build: MOZCONFIG defaulted to {}", rendered.display());
         } else {
-            println!("build: WARNING no MOZCONFIG set and out/mozconfig.linux absent (run `forge config`)");
+            println!(
+                "build: WARNING no MOZCONFIG set and out/mozconfig.linux absent (run `forge config`)"
+            );
         }
     }
     if std::env::var("SCCACHE_DIR").is_err() {
@@ -1325,7 +1689,11 @@ fn cmd_test(root: &Path, mode: &str) -> Result<(), String> {
         "full" => "--full",
         "smoke" => "--smoke",
         "fixture-only" => "--fixture-only",
-        other => return Err(format!("unknown test mode {other} (want --smoke|--fixture-only)")),
+        other => {
+            return Err(format!(
+                "unknown test mode {other} (want --smoke|--fixture-only)"
+            ));
+        }
     };
     let st = Command::new("python3")
         .args([&runner.to_string_lossy() as &str, mode_arg])
@@ -1337,13 +1705,18 @@ fn cmd_test(root: &Path, mode: &str) -> Result<(), String> {
             println!("test: PASS");
             Ok(())
         }
-        Some(2) => Err("test: SKIP — built binary absent (run a full build first); see out/contract-p1t11-*/".into()),
+        Some(2) => Err(
+            "test: SKIP — built binary absent (run a full build first); see out/contract-p1t11-*/"
+                .into(),
+        ),
         _ => Err("test: FAIL (see out/contract-p1t11-*/results.json + geckodriver.log)".into()),
     }
 }
 
 fn usage() -> ! {
-    eprintln!("usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>");
+    eprintln!(
+        "usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>"
+    );
     std::process::exit(2);
 }
 

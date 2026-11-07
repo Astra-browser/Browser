@@ -1,3 +1,10 @@
+> **Superseded by [`BLOCKER.md`](BLOCKER.md) (D-42, 2026-11-07).** The
+> management seam this document called "future" now exists
+> (`nsIAstraBlockerService`), the engine sources live in `blocker/engine/`, and
+> the build checklist in §5 is closed. Keep this file for the patch-series
+> background and the in-tree feasibility argument; use `BLOCKER.md` for the
+> live contract, settings, update pipeline and verification.
+>
 # P4-T02 — In-tree network-hook wiring (blocker)
 
 > Owner: worker-vendor · Branch: `agent/P4-T02-network` · Status: wired, build-pending

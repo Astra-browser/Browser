@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Embedded EasyList/EasyPrivacy seed (CC BY-SA 3.0, see `seed/v1/NOTICE`).
+//! Embedded EasyList/EasyPrivacy seed (CC BY-SA 3.0, see `blocker/seed/NOTICE`).
 //!
 //! The `.gz` assets are the unmodified upstream subscription texts; only the
 //! storage representation (deterministic gzip) differs from upstream.
@@ -17,8 +17,8 @@ pub const SEED_EASYLIST_VERSION: &str = "202610281352";
 /// Upstream version stamp of the embedded EasyPrivacy seed.
 pub const SEED_EASYPRIVACY_VERSION: &str = "202610281345";
 
-const EASYLIST_GZ: &[u8] = include_bytes!("../seed/v1/easylist.txt.gz");
-const EASYPRIVACY_GZ: &[u8] = include_bytes!("../seed/v1/easyprivacy.txt.gz");
+const EASYLIST_GZ: &[u8] = include_bytes!("../../../blocker/seed/easylist.txt.gz");
+const EASYPRIVACY_GZ: &[u8] = include_bytes!("../../../blocker/seed/easyprivacy.txt.gz");
 
 /// Seed load failures.
 #[derive(Debug, Error)]

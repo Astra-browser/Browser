@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 267,
+  "count": 270,
   "commands": {
     "about_info": {
       "ts": "aboutInfo",
@@ -626,6 +626,57 @@
         "rust": "bool"
       }
     },
+    "blocker_configure": {
+      "ts": "blockerConfigure",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "list_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "update_hours": {
+            "type": "integer"
+          },
+          "auto_update": {
+            "type": "boolean"
+          },
+          "cosmetic": {
+            "type": "boolean"
+          },
+          "scriptlets": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_lists": {
+      "ts": "blockerLists",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::BlockerListsView"
+        },
+        "ts": "unknown",
+        "rust": "Result<prev_ipc::BlockerListsView, ()>"
+      }
+    },
     "blocker_picker": {
       "ts": "blockerPicker",
       "rust": "d:lib.rs",
@@ -655,6 +706,22 @@
     },
     "blocker_refresh_sources": {
       "ts": "blockerRefreshSources",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::OperationAdmission"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::OperationAdmission"
+      }
+    },
+    "blocker_reset_stats": {
+      "ts": "blockerResetStats",
       "rust": "d:lib.rs",
       "payload": {
         "type": "object",

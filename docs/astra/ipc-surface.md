@@ -11,7 +11,7 @@ camelCase TS wrappers. 8 event channels carry a previous-product prefix and **mu
 Legend: `prev_` / `prev:` / `Prev` mark verbatim source identifiers carrying the
 previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels, types).
 
-## Commands (267)
+## Commands (270)
 
 | Wire name | TS wrapper | Rust fn (file) | Params (minus caller) | Returns |
 |---|---|---|---|---|
@@ -46,8 +46,11 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `account_usage_history` | `accountUsageHistory` | `d:account.rs` | `async caller: WebviewWindow, cursor: Option<String>,` | `AccountHistoryV1` |
 | `account_verify` | `accountVerify` | `d:account.rs` | `async caller: WebviewWindow, code: String` | `AccountReplyV1` |
 | `add_menu_popup` | `addMenuPopup` | `d:lib.rs` | `caller: WebviewWindow, app: tauri::AppHandle, x: f64, y: f64, can_split: bool,` | `bool` |
+| `blocker_configure` | `blockerConfigure` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, list_ids: Option<Vec<String>>, update_hours: Option<u32>, auto_update: Option<bool>, cosmetic: Option<bool>, scriptlets: Option<bool>,` | `prev_ipc::OperationAdmission` |
+| `blocker_lists` | `blockerLists` | `d:lib.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>,` | `Result<prev_ipc::BlockerListsView, ()>` |
 | `blocker_picker` | `blockerPicker` | `d:lib.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, context: prev_ipc::BlockerSiteContext, action: prev_ipc::BlockerPickerAction,` | `Result<Option<prev_ipc::BlockerPickerView>, ()>` |
 | `blocker_refresh_sources` | `blockerRefreshSources` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>,` | `prev_ipc::OperationAdmission` |
+| `blocker_reset_stats` | `blockerResetStats` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>,` | `prev_ipc::OperationAdmission` |
 | `blocker_retry` | `blockerRetry` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, failed_generation: String,` | `prev_ipc::OperationAdmission` |
 | `blocker_set_enabled` | `blockerSetEnabled` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, enabled: bool,` | `prev_ipc::OperationAdmission` |
 | `blocker_site_change` | `blockerSiteChange` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, context: prev_ipc::BlockerSiteContext, action: prev_ipc::BlockerSiteAction,` | `prev_ipc::OperationAdmission` |

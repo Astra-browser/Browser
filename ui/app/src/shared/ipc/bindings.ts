@@ -404,6 +404,20 @@ export const commands = {
 	sitePermissionSet: (origin: string, kind: SitePermissionKindView, decision: "allow" | "block" | null) => __TAURI_INVOKE<OperationAdmission>("site_permission_set", { origin, kind, decision }),
 	blockerStatus: () => typedError<BlockerStatusView, null>(__TAURI_INVOKE("blocker_status")),
 	blockerStats: (profile: string) => typedError<BlockerStatsView, null>(__TAURI_INVOKE("blocker_stats", { profile })),
+	/**
+	 *  The filter-list catalog plus the scheduler, cosmetic switches and
+	 *  bounded counters. Reads the running engine; every list carries its
+	 *  upstream URL and licence.
+	 */
+	blockerLists: () => typedError<BlockerListsView, null>(__TAURI_INVOKE("blocker_lists")),
+	/**
+	 *  Change list membership and the other blocker parameters atomically.
+	 *  Null leaves a field unchanged. List membership triggers one reinstall
+	 *  from the on-disk cache.
+	 */
+	blockerConfigure: (listIds: string[] | null, updateHours: number | null, autoUpdate: boolean | null, cosmetic: boolean | null, scriptlets: boolean | null) => __TAURI_INVOKE<OperationAdmission>("blocker_configure", { listIds, updateHours, autoUpdate, cosmetic, scriptlets }),
+	/** Clear the bounded counters. Rules and list state are untouched. */
+	blockerResetStats: () => __TAURI_INVOKE<OperationAdmission>("blocker_reset_stats"),
 	blockerSetEnabled: (enabled: boolean) => __TAURI_INVOKE<OperationAdmission>("blocker_set_enabled", { enabled }),
 	blockerSiteChange: (context: BlockerSiteContext, action: BlockerSiteAction) => __TAURI_INVOKE<OperationAdmission>("blocker_site_change", { context, action }),
 	blockerPicker: (context: BlockerSiteContext, action: BlockerPickerAction) => typedError<{
@@ -1105,6 +1119,38 @@ export type BlockerSourcePhase = "not_configured" | "durable_activation_unsuppor
 
 /**  Authority which admitted the displayed filter package. */
 export type BlockerSourceProvenance = "release_bundle" | "tuf_repository" | "official_https";
+
+/** One upstream filter list in the Astra catalog. */
+export type BlockerListEntry = {
+	id: string,
+	title: string,
+	group: string,
+	enabled: boolean,
+	bundled: boolean,
+	source_url: string,
+	support_url: string,
+	license: string,
+	updated_unix: number | null,
+	bytes: number | null,
+};
+
+/**
+ *  The Settings page's source of truth for the blocker: the catalog and what
+ *  is actually enabled, the update schedule, cosmetic switches and the
+ *  bounded block counters. No URL, origin or rule identity is included.
+ */
+export type BlockerListsView = {
+	available: boolean,
+	lists: BlockerListEntry[],
+	update_hours: number,
+	auto_update: boolean,
+	cosmetic: boolean,
+	scriptlets: boolean,
+	last_update_unix: number | null,
+	next_update_unix: number | null,
+	installed_rules: number,
+	stats: BlockerStatsView,
+};
 
 export type BlockerStatsView = {
 	today: number | null,

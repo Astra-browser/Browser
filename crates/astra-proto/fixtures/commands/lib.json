@@ -10,6 +10,14 @@
       }
     },
     {
+      "command": "blocker_configure",
+      "payload": {}
+    },
+    {
+      "command": "blocker_lists",
+      "payload": {}
+    },
+    {
       "command": "blocker_picker",
       "payload": {
         "context": {},
@@ -18,6 +26,10 @@
     },
     {
       "command": "blocker_refresh_sources",
+      "payload": {}
+    },
+    {
+      "command": "blocker_reset_stats",
       "payload": {}
     },
     {

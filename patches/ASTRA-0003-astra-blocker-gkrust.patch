@@ -9,10 +9,10 @@ Verified-On: 153.6.0
 Removal-Plan: drop both lines if the blocker moves out of tree (fallback proxy); keep if ESR rebase preserves the gkrust layout
 ---
 diff --git a/Cargo.lock b/Cargo.lock
-index 7286a0abdf..d2f4a90576 100644
+index 7286a0abdf..b222165535 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -304,6 +304,17 @@ dependencies = [
+@@ -304,6 +304,19 @@ dependencies = [
   "serde_json",
  ]
  
@@ -24,13 +24,15 @@ index 7286a0abdf..d2f4a90576 100644
 + "cstr",
 + "nserror",
 + "nsstring",
++ "serde",
++ "serde_json",
 + "xpcom",
 +]
 +
  [[package]]
  name = "async-task"
  version = "4.3.0"
-@@ -2899,6 +2910,7 @@ dependencies = [
+@@ -2899,6 +2912,7 @@ dependencies = [
   "abridged_certs",
   "adblock",
   "app_collator_glue",

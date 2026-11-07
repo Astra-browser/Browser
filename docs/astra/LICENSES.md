@@ -32,3 +32,12 @@ CI by cargo-about/cargo deny once crates land (P0-T08 job fails on unknown).
 | ulid | 3.0.0 | MIT |
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | wry | 0.57.1 | Apache-2.0 OR MIT |
+
+## Blocker (D-42)
+
+`adblock 0.12.1` (Brave `adblock-rust`) is MPL-2.0 and is already part of the
+Gecko vendored set. The generic scriptlet resources are MPL-2.0 / uBlock
+Origin-derived GPL-3.0-or-later. Shipped filter lists keep their own licences
+(EasyList CC BY-SA 3.0, uBlock Origin GPL-3.0-or-later, URLhaus CC BY-SA 4.0,
+AdGuard GPL-3.0-or-later, others per `blocker/lists/catalog.json`). Full
+attribution: `blocker/NOTICE.md`.

@@ -1,0 +1,41 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra blocker engine (source of truth: blocker/engine/).
+# The Rust crate is linked into libxul via gkrust (ASTRA-0003); this file
+# builds the C++ network bridge and the XPCOM management service, compiles
+# the IDL the service exposes to chrome JS, and generates the FFI header.
+
+XPIDL_MODULE = "astra_blocker"
+
+XPIDL_SOURCES += [
+    "nsIAstraBlockerService.idl",
+]
+
+XPCOM_MANIFESTS += [
+    "components.conf",
+]
+
+UNIFIED_SOURCES += [
+    "AstraBlocker.cpp",
+    "AstraBlockerService.cpp",
+]
+
+LOCAL_INCLUDES += [
+    "/toolkit/components/astra_blocker_engine",
+]
+
+FINAL_LIBRARY = "xul"
+
+if CONFIG["COMPILE_ENVIRONMENT"]:
+    CbindgenHeader(
+        "astra_blocker_ffi.h",
+        inputs=["/toolkit/components/astra_blocker_engine"],
+    )
+
+    EXPORTS.mozilla += [
+        "!astra_blocker_ffi.h",
+        "AstraBlocker.h",
+        "AstraBlockerService.h",
+    ]

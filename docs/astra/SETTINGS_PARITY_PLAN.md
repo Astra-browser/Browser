@@ -54,8 +54,8 @@ integration branch, never committed from a lane.
 
 | Setting | Current state | Native owner | Change |
 |---|---|---|---|
-| Block ads and trackers | disabled; no `Blocker.sys.mjs`; engine C++ hook exists | `mozilla::AstraBlocker`, `astra.blocker.enabled`, `InstallRules` | Add Blocker module + routes (`blocker_status/set_enabled/refresh_sources/retry/site_change/stats`), install parsed rules, emit status. Live: a known EasyList request is cancelled. |
-| Filter lists | button disabled; refresh unrouted | `astra-blocker` seed fetch/validate | Same module; `source_phase` progress. Live: refresh leaves idle and installs a revision. |
+| Block ads and trackers | **live** (D-42): `Blocker.sys.mjs` installs the Brave-derived catalog through `@astra/blocker;1`; the C++ hook cancels pre-connect | `mozilla::AstraBlocker`, `astra.blocker.enabled`, `nsIAstraBlockerService` | Done: status/shield/site pause/stats + catalog (`blocker_lists`) and parameters (`blocker_configure`). Live: `blocker-probe.py` — loopback ad image cancelled (0 server hits), cosmetic hide, settings render. |
+| Filter lists | **live** (D-42): catalog + cache + HTTPS refresh; "Update lists now" and the 24 h default schedule | `blocker/` catalog, `Blocker.sys.mjs`, native service | Done: list membership, interval, cosmetic/scriptlet switches, stats reset; failed updates keep the previous engine. Live: `blocker-probe.py` (80 lists, 155 226 rules, schedule round-trip). |
 | Site settings | “unavailable”; `site_permissions`/`site_permission_set` unrouted | `SitePermissions.getAllByPrincipal/getForPrincipal/setForPrincipal/removeFromPrincipal` | Add list/set host methods + routes. Live: seed a camera decision, see/deny it. |
 | Clear browsing data | `browsing_data_call` unrouted | `ClearDataService`, `Sanitizer` | Add BrowsingData module for the five ranges + history/downloads/cookies. Live: counts before/after. |
 

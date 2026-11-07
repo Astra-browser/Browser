@@ -7,7 +7,7 @@
 //! The engine owns compiled network/cosmetic rules, a global on/off switch,
 //! per-site (per-host) toggles, and the list-update mechanism. Seed lists are
 //! the unmodified EasyList/EasyPrivacy subscription texts (CC BY-SA 3.0, see
-//! `seed/v1/NOTICE`); only the storage representation (gzip) differs.
+//! `blocker/seed/NOTICE`); only the storage representation (gzip) differs.
 //!
 //! Out of scope (matches the base snapshot): scriptlets, procedural-action
 //! execution, redirect-resource replacement, and response mutation. Cosmetic

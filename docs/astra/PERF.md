@@ -81,8 +81,9 @@ exit 1 only on FAIL, SKIP when the toolchain is absent).
 - `tools/perf/bench_blocker.py` — builds `blocker-probe/` (Rust bin linking
   `crates/astra-blocker` by path; no crate changes) and runs it 3×: seed load
   + 30k in-process `Blocker::check()` calls over a deterministic 4k-URL
-  corpus, mean/p50/p95/p99. Browser-level blocking latency is NOT measured
-  here — it needs the P4-T02 in-tree network hook; §6 records the method.
+  corpus, mean/p50/p95/p99. Browser-level blocking latency is measured by
+  `tools/marionette-probe/blocker-probe.py` (correctness) and belongs to the
+  future `bench_blocker_hook.py` (§6).
 - `tools/perf/run_all.py` — runs all four, writes `results.json` +
   `SUMMARY.md` into `out/perf-<UTC>`, exit 1 only on FAIL (SKIP = no
   browser/toolchain, recorded not faked).
@@ -132,9 +133,9 @@ Deliberately NOT measured in this task: pulling a ~large stock Firefox ESR
 
 ## 6. Follow-ups (not this task)
 
-- P4-T02: after the network hook lands, add `bench_blocker_hook.py` reusing
-  the fixture server + WebDriver: time navigation with hook on vs off, set
-  the p95 overhead budget (proposal: ≤ 2 ms p95 per request on desktop).
+- The in-tree hook is live (D-42). Add `bench_blocker_hook.py` reusing the
+  fixture server + WebDriver: time navigation with the hook on vs off, set the
+  p95 overhead budget (proposal: ≤ 2 ms p95 per request on desktop).
 - First-paint: MozAfterPaint probe via BiDi (P6 E2E harness) for a
   content-visible startup number to complement the Marionette-listen proxy.
 - Scroll/tab-switch budgets: propose after 7-night trend exists

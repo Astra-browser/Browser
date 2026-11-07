@@ -8,7 +8,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 267 command wire names. */
+/** All 270 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -41,8 +41,11 @@ export type CommandName =
   | "account_usage_history"
   | "account_verify"
   | "add_menu_popup"
+  | "blocker_configure"
+  | "blocker_lists"
   | "blocker_picker"
   | "blocker_refresh_sources"
+  | "blocker_reset_stats"
   | "blocker_retry"
   | "blocker_set_enabled"
   | "blocker_site_change"
@@ -311,8 +314,11 @@ export const COMMANDS: readonly CommandName[] = [
   "account_usage_history",
   "account_verify",
   "add_menu_popup",
+  "blocker_configure",
+  "blocker_lists",
   "blocker_picker",
   "blocker_refresh_sources",
+  "blocker_reset_stats",
   "blocker_retry",
   "blocker_set_enabled",
   "blocker_site_change",
@@ -814,6 +820,18 @@ export interface AddMenuPopupPayload {
   y: number;
   can_split: boolean;
 }
+/** `blocker_configure` (blockerConfigure, d:lib.rs). */
+export interface BlockerConfigurePayload {
+  list_ids?: Array<string>;
+  update_hours?: number;
+  auto_update?: boolean;
+  cosmetic?: boolean;
+  scriptlets?: boolean;
+}
+/** `blocker_lists` (blockerLists, d:lib.rs). */
+export interface BlockerListsPayload {
+  [key: string]: unknown;
+}
 /** `blocker_picker` (blockerPicker, d:lib.rs). */
 export interface BlockerPickerPayload {
   context: unknown; // prev_ipc::BlockerSiteContext
@@ -821,6 +839,10 @@ export interface BlockerPickerPayload {
 }
 /** `blocker_refresh_sources` (blockerRefreshSources, d:lib.rs). */
 export interface BlockerRefreshSourcesPayload {
+  [key: string]: unknown;
+}
+/** `blocker_reset_stats` (blockerResetStats, d:lib.rs). */
+export interface BlockerResetStatsPayload {
   [key: string]: unknown;
 }
 /** `blocker_retry` (blockerRetry, d:lib.rs). */
@@ -1984,8 +2006,11 @@ export interface CommandPayloads {
   "account_usage_history": AccountUsageHistoryPayload;
   "account_verify": AccountVerifyPayload;
   "add_menu_popup": AddMenuPopupPayload;
+  "blocker_configure": BlockerConfigurePayload;
+  "blocker_lists": BlockerListsPayload;
   "blocker_picker": BlockerPickerPayload;
   "blocker_refresh_sources": BlockerRefreshSourcesPayload;
+  "blocker_reset_stats": BlockerResetStatsPayload;
   "blocker_retry": BlockerRetryPayload;
   "blocker_set_enabled": BlockerSetEnabledPayload;
   "blocker_site_change": BlockerSiteChangePayload;

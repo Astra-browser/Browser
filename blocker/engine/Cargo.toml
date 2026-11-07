@@ -1,0 +1,21 @@
+[package]
+name = "astra_blocker_engine"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Astra in-tree ad/tracker blocker: Brave adblock-rust engine, management XPCOM service and channel-hook verdicts"
+
+[dependencies]
+# Pinned to the exact adblock revision already vendored in third_party/rust
+# and covered by the safe-to-deploy audit in supply-chain/audits.toml.
+# Feature set mirrors content_classifier_engine exactly
+# (full-regex-handling + single-thread, no embedded-domain-resolver): the
+# unified gkrust build compiles one adblock instance, so any divergence
+# would leak into the classifier.
+adblock = { version = "=0.12.1", default-features = false, features = ["full-regex-handling", "single-thread"] }
+cstr = "0.2"
+nserror = { path = "../../../xpcom/rust/nserror" }
+nsstring = { path = "../../../xpcom/rust/nsstring" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+xpcom = { path = "../../../xpcom/rust/xpcom" }

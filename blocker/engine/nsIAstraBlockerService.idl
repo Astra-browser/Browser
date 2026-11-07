@@ -1,0 +1,56 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * Chrome-facing management seam for the Astra ad/tracker blocker.
+ *
+ * The engine itself is Rust (`astra_blocker_engine`, Brave adblock-rust);
+ * this interface is the thin in-tree bridge chrome JS uses to install
+ * filter text and cosmetic resources, read bounded statistics and ask for
+ * the selectors a page should hide. Verdicts on the network path are made
+ * natively (`mozilla::AstraBlocker::ShouldBlockChannel`), not here.
+ *
+ * Every string result is JSON. Unknown fields are ignored by callers, and
+ * failures answer an empty string/an nsresult rather than throwing when
+ * the engine is simply not installed yet (fail-open).
+ */
+[scriptable, uuid(7e1f8a16-4d2d-4c1f-9f4b-2a6d3c5e8b70)]
+interface nsIAstraBlockerService : nsISupports {
+  /** True once at least one rule set has been compiled. */
+  readonly attribute boolean initialized;
+
+  /** True when the `astra.blocker.enabled` pref is on and rules exist. */
+  readonly attribute boolean enabled;
+
+  /** Engine/version/rule counts as JSON. */
+  ACString status();
+
+  /** Install newline-separated filter-list text. Replaces the engine only
+   *  after the candidate compiles; a failure keeps the previous engine. */
+  void installRules(in ACString rules);
+
+  /** Install (or replace) the scriptlet/redirect resources as the Brave
+   *  `resources.json` array. Applies to an already-installed engine too. */
+  void setResources(in ACString resourcesJson);
+
+  /** Global switch; writes the same pref the network hook reads. */
+  void setEnabled(in boolean enabled);
+
+  /** Per-site pause/resume (host key, lower-cased by the engine). */
+  void setSiteEnabled(in ACString host, in boolean enabled);
+  boolean isSiteEnabled(in ACString host);
+
+  /** Hosts currently paused, as a JSON string array. */
+  ACString siteExceptions();
+
+  /** CSS selectors plus the scriptlet payload for one page, as JSON.
+   *  `classesJson` / `idsJson` are JSON string arrays observed on the page. */
+  ACString cosmeticFor(in ACString url, in ACString classesJson, in ACString idsJson);
+
+  /** Bounded block/decision counters as JSON (no URLs, no origins). */
+  ACString stats();
+  void resetStats();
+};

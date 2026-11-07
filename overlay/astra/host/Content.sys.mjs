@@ -30,6 +30,7 @@ import {
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { Blocker } from "./Blocker.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { releaseSpaceContext, userContextForSpace } from "./Containers.sys.mjs";
 import {
@@ -372,6 +373,13 @@ export const Content = {
       throw new Error("mountNative: gBrowser unavailable");
     }
     const doc = container.ownerDocument;
+    // The live cosmetic provider is the native engine. The actor injects the
+    // per-page result in the content process; this seam keeps ContentHide's
+    // click-to-hide passes reading the same rules.
+    this.wireHiding({
+      cosmeticSelectors: (url, classes, ids) =>
+        Blocker.cosmeticPayload(url, classes, ids).selectors,
+    });
     const principal = systemPrincipalOf(container);
     const tabOf = new Map(); // astra_tab_id -> native tab
     const idOf = new WeakMap(); // native tab -> astra_tab_id

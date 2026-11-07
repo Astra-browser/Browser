@@ -1,5 +1,9 @@
 folder_context
 engine/
+# The blocker component sources are part of the repo; only the fetched
+# upstream tree at the repo root is generated.
+!blocker/engine/
+!blocker/engine/**
 out/
 target/
 ui/node_modules/

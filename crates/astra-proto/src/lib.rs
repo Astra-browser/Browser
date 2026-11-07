@@ -14,7 +14,7 @@
 //!   `deny_unknown_fields`), so either side can add fields freely;
 //! * an unknown protocol version **fails fast** via [`check_version`];
 //! * command/event names are the generated [`CommandName`] / [`EventChannel`]
-//!   registries in [`generated`] (267 commands + 35 events from
+//!   registries in [`generated`] (270 commands + 35 events from
 //!   `docs/astra/ipc-surface.md` via `schemas/*.json`).
 
 pub mod generated;
@@ -182,7 +182,7 @@ mod tests {
     fn registry_counts_match_surface() {
         assert_eq!(COMMANDS.len(), COMMAND_COUNT);
         assert_eq!(EVENTS.len(), EVENT_COUNT);
-        assert_eq!(COMMAND_COUNT, 267);
+        assert_eq!(COMMAND_COUNT, 270);
         assert_eq!(EVENT_COUNT, 35);
         assert!(COMMANDS.contains(&"tabs_navigate"));
         assert!(EVENTS.contains(&"tab-changed"));

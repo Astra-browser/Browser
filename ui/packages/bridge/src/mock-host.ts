@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// In-memory MOCK host (P2-T08). Answers every command of the 267-command
+// In-memory MOCK host (P2-T08). Answers every command of the 270-command
 // surface without Firefox so the UI runs standalone (goldens/dev). Known
 // commands return shaped fixtures (mirroring
 // `crates/astra-proto/fixtures/`); everything else returns `{ ok: true }`
@@ -204,7 +204,7 @@ export class MockHost {
   }
 }
 
-/** Every command the bridge accepts (267 wire names from `astra-proto`). */
+/** Every command the bridge accepts (270 wire names from `astra-proto`). */
 export function mockCommandNames(): readonly CommandName[] {
   return COMMANDS;
 }

@@ -1,4 +1,4 @@
-import type { BlockerStatusView, OperationAdmission } from "$shared/ipc/bindings";
+import type { BlockerListsView, BlockerStatusView, OperationAdmission } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { BLOCKER_ZERO_REVISION, initialBlockerStatus, newestBlockerStatus } from "./blocker-model";
@@ -173,6 +173,37 @@ export const retry = (failedGeneration: string) =>
   settleMutation(() => commands.blockerRetry(failedGeneration));
 
 export const refreshSources = () => settleMutation(() => commands.blockerRefreshSources());
+
+export const resetStats = () => settleMutation(() => commands.blockerResetStats());
+
+export type BlockerConfiguration = {
+  listIds: string[] | null;
+  updateHours: number | null;
+  autoUpdate: boolean | null;
+  cosmetic: boolean | null;
+  scriptlets: boolean | null;
+};
+
+export const configure = (input: BlockerConfiguration) =>
+  settleMutation(() =>
+    commands.blockerConfigure(
+      input.listIds,
+      input.updateHours,
+      input.autoUpdate,
+      input.cosmetic,
+      input.scriptlets,
+    ),
+  );
+
+/** The Settings page reads lists, schedule and counters through this. */
+export async function lists(): Promise<BlockerListsView | null> {
+  try {
+    const response = await boundedIpc(commands.blockerLists(), IPC_ATTEMPT_TIMEOUT_MS);
+    return response.status === "ok" ? response.data : null;
+  } catch {
+    return null;
+  }
+}
 
 export function dispose() {
   if (!initialized && initializing === null && reconciling === null && unlisten === null) {

@@ -14,10 +14,12 @@ and carries `host_api_version: 1`; failures return
 1. `collectObserved(doc)` gathers the page's classes/ids across the main
    document, same-origin iframes, and open shadow roots.
 2. The injected cosmetic provider resolves them — production passes
-   `astra-blocker`'s `cosmetic_selectors(url, classes, ids)`
-   (`crates/astra-blocker`), which merges URL-specific selectors with the
-   generic rules matching the observed classes/ids (hostname exceptions
-   and `$generichide` honoured inside the engine).
+   `Blocker.cosmeticPayload(url, classes, ids)`, which reads the in-tree
+   engine's `cosmeticFor` (`blocker/engine`, Brave `adblock-rust`). It merges
+   URL-specific selectors with the generic rules matching the observed
+   classes/ids (hostname exceptions and `$generichide` honoured inside the
+   engine). The same payload feeds the `AstraBlocker` page actor, which
+   injects the CSS and scriptlets in the content process.
 3. Stored per-site overrides for the page host are merged in, and
    `applySelectors` hides every match (`display: none` + marking via
    `data-astra-hide="1"`, so repeat sweeps are idempotent).

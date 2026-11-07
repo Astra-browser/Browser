@@ -476,16 +476,16 @@ fn seed_lists_load_and_block_consistently() {
 #[test]
 fn seed_attribution_files_present() {
     for file in [
-        "seed/v1/NOTICE",
-        "seed/v1/LICENSE-CC-BY-SA-3.0.txt",
-        "seed/v1/catalog.json",
-        "seed/v1/release-seed.json",
+        "../../blocker/seed/NOTICE",
+        "../../blocker/seed/LICENSE-CC-BY-SA-3.0.txt",
+        "../../blocker/seed/catalog.json",
+        "../../blocker/seed/release-seed.json",
     ] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
         assert!(path.is_file(), "missing seed attribution file {file}");
     }
     let notice = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("seed/v1/NOTICE"),
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../blocker/seed/NOTICE"),
     )
     .expect("NOTICE must be readable");
     assert!(notice.contains("EasyList"));

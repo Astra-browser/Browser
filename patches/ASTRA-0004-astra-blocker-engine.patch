@@ -1,19 +1,19 @@
 Patch-Id: ASTRA-0004
-Title: New crate toolkit/components/astra_blocker_engine (adblock-rust FFI + C++ bridge)
+Title: New crate toolkit/components/astra_blocker_engine (Brave adblock-rust engine, C++ hook bridge, Rust/XPCOM management service)
 Tier: P2
-Upstream-Files: toolkit/components/moz.build, toolkit/components/astra_blocker_engine/Cargo.toml, toolkit/components/astra_blocker_engine/moz.build, toolkit/components/astra_blocker_engine/cbindgen.toml, toolkit/components/astra_blocker_engine/src/lib.rs, toolkit/components/astra_blocker_engine/AstraBlocker.h, toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-Intent: add the Astra blocker engine crate (new files, no upstream code touched except the one DIRS registration line); mirrors toolkit/components/content-classifier/content_classifier_engine one-to-one (Cargo/moz.build/cbindgen/FFI/C++ bridge) but serves Astra verdicts for first- and third-party loads with rules installed from the Host API Net module
-Risk: medium (new code, but self-contained in one directory + one DIRS line; adblock 0.12.1 already vendored and audited, so `mach vendor rust` is a no-op)
-Test: tools/blocker-wiring-check.sh; full-build proof in follow-up (docs/astra/BLOCKER_WIRING.md section 5)
+Upstream-Files: toolkit/components/moz.build, toolkit/components/astra_blocker_engine/Cargo.toml, toolkit/components/astra_blocker_engine/moz.build, toolkit/components/astra_blocker_engine/cbindgen.toml, toolkit/components/astra_blocker_engine/components.conf, toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl, toolkit/components/astra_blocker_engine/src/lib.rs, toolkit/components/astra_blocker_engine/AstraBlocker.h, toolkit/components/astra_blocker_engine/AstraBlocker.cpp, toolkit/components/astra_blocker_engine/AstraBlockerService.h, toolkit/components/astra_blocker_engine/AstraBlockerService.cpp
+Intent: add the Astra blocker engine crate (new files, no upstream code touched except the one DIRS registration line); mirrors toolkit/components/content-classifier/content_classifier_engine for the adblock 0.12.1 dependency and cbindgen FFI, but serves first- and third-party Astra verdicts, stores scriptlet/redirect resources, exposes cosmetic selectors and bounded stats through nsIAstraBlockerService, and installs rules from the Host API Blocker module. Engine logic and list/resource parsing live in Rust; the C++ files are the channel hook and the XPCOM glue the pinned Gecko ABI requires.
+Risk: medium (new code, but self-contained in one directory + one DIRS line; adblock 0.12.1 already vendored and audited, so `mach vendor rust` is a no-op; the XPCOM service is a singleton registered by components.conf)
+Test: tools/blocker-wiring-check.sh; `mach build -j2`; live probe `tools/marionette-probe/blocker-probe.py`; see docs/astra/BLOCKER.md
 Verified-On: 153.6.0
 Removal-Plan: delete the directory + the DIRS line if the blocker moves out of tree (fallback proxy); new-file entries need the forge lint new-file carve-out (see BLOCKER_WIRING.md section 6)
 ---
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.cpp b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
 new file mode 100644
-index 0000000000..95970aa350
+index 0000000000..c4e527d6a9
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlocker.cpp
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,244 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -22,7 +22,7 @@ index 0000000000..95970aa350
 +
 +#include "astra_blocker_ffi.h"
 +
-+#include "mozilla/Mutex.h"
++#include "mozilla/OriginAttributes.h"
 +#include "mozilla/Preferences.h"
 +#include "nsCOMPtr.h"
 +#include "nsIChannel.h"
@@ -31,25 +31,28 @@ index 0000000000..95970aa350
 +#include "nsIPrincipal.h"
 +#include "nsIURI.h"
 +
-+namespace mozilla {
-+namespace AstraBlocker {
++namespace mozilla::AstraBlocker {
 +
-+// Must match the pref registered by the Astra overlay (default false: no
-+// rules installed at first boot means no blocks until the Host API Net
-+// module pushes the seed — fail-closed arming, fail-open verdicts).
++// Registered by the Astra overlay. Default false: no rules installed at
++// first boot means no blocks until the Host module pushes a rule set.
 +static const char* kEnabledPref = "astra.blocker.enabled";
 +
-+// Engine instance owned by the hook (mirrors the content classifier: the
-+// Rust side Box-leaks per-instance engines, C++ owns the pointer, so no
-+// Sync bound on Engine is required and the unified single-thread adblock
-+// build is unaffected).
-+static Mutex sEngineLock("AstraBlockerEngine");
-+static AstraBlockerEngine* sEngine = nullptr;
++namespace {
 +
-+// Maps Gecko content-policy types to adblock-rust request types. Mirrors the
-+// mapping in ContentClassifierEngine.cpp so both engines classify resources
-+// the same way.
-+static void RequestTypeForPolicy(ExtContentPolicyType aType, nsACString& aOut) {
++void TakeString(char* aText, nsACString& aOut) {
++  if (!aText) {
++    aOut.Truncate();
++    return;
++  }
++  aOut.Assign(aText);
++  astra_blocker_string_free(aText);
++}
++
++bool ReportOk(const nsACString& aReport) {
++  return aReport.Find("{\"ok\":true") == 0;
++}
++
++void RequestTypeForPolicy(ExtContentPolicyType aType, nsACString& aOut) {
 +  switch (aType) {
 +    case ExtContentPolicyType::TYPE_CSP_REPORT:
 +      aOut.AssignLiteral("csp_report");
@@ -95,16 +98,20 @@ index 0000000000..95970aa350
 +  }
 +}
 +
-+bool IsInitialized() {
-+  // Rules arrive from the Host API Net module after boot; before that every
-+  // verdict fails open. The pointer check keeps C++ and Rust consistent by
-+  // construction (no mirrored state to drift).
-+  MutexAutoLock lock(sEngineLock);
-+  return sEngine != nullptr;
++bool IsBrowserInternalScheme(nsIURI* aURI) {
++  return aURI->SchemeIs("about") || aURI->SchemeIs("chrome") ||
++         aURI->SchemeIs("resource") || aURI->SchemeIs("moz-extension") ||
++         aURI->SchemeIs("moz-page-mod") || aURI->SchemeIs("data") ||
++         aURI->SchemeIs("blob") || aURI->SchemeIs("file") ||
++         aURI->SchemeIs("view-source");
 +}
 +
++}  // namespace
++
++bool IsInitialized() { return astra_blocker_engine_is_installed(); }
++
 +bool IsEnabled() {
-+  // Cheap pref gate first so disabled builds skip the FFI round-trip.
++  // Pref gate first so disabled builds skip the FFI round-trip.
 +  return Preferences::GetBool(kEnabledPref, false) && IsInitialized();
 +}
 +
@@ -114,16 +121,16 @@ index 0000000000..95970aa350
 +  }
 +
 +  nsCOMPtr<nsIURI> uri;
-+  if (NS_FAILED(aChannel->GetURI(getter_AddRefs(uri))) || !uri) {
++  if (NS_FAILED(aChannel->GetURI(getter_AddRefs(uri))) || !uri ||
++      IsBrowserInternalScheme(uri)) {
 +    return false;
 +  }
++
 +  nsCString url;
 +  if (NS_FAILED(uri->GetAsciiSpec(url))) {
 +    return false;
 +  }
 +
-+  // System/chrome loads have no content principal: never block browser
-+  // internals, updater pings, or extension machinery on Astra rules.
 +  nsCOMPtr<nsILoadInfo> loadInfo;
 +  if (NS_FAILED(aChannel->GetLoadInfo(getter_AddRefs(loadInfo))) || !loadInfo) {
 +    return false;
@@ -143,53 +150,120 @@ index 0000000000..95970aa350
 +  nsCString requestType;
 +  RequestTypeForPolicy(loadInfo->GetExternalContentPolicyType(), requestType);
 +
++  bool isPrivate = loadInfo->GetOriginAttributes().IsPrivateBrowsing();
++
 +  bool block = false;
-+  {
-+    MutexAutoLock lock(sEngineLock);
-+    if (!sEngine) {
-+      return false;
-+    }
-+    nsresult rv = astra_blocker_engine_should_block(
-+        sEngine, url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
-+        requestType.get(), requestType.Length(), &block);
-+    if (NS_FAILED(rv)) {
-+      return false;
-+    }
++  nsresult rv = astra_blocker_engine_should_block(
++      url.get(), url.Length(), sourceSpec.get(), sourceSpec.Length(),
++      requestType.get(), requestType.Length(), !isPrivate, &block);
++  if (NS_FAILED(rv)) {
++    return false;
 +  }
 +  return block;
 +}
 +
 +nsresult InstallRules(const nsACString& aRules) {
-+  AstraBlockerEngine* fresh = nullptr;
-+  nsresult rv = astra_blocker_engine_from_rules(
-+      aRules.BeginReading(), aRules.Length(), &fresh);
-+  if (NS_FAILED(rv) || !fresh) {
++  char* report =
++      astra_blocker_engine_install(aRules.BeginReading(), aRules.Length());
++  if (!report) {
 +    return NS_ERROR_FAILURE;
 +  }
-+  MutexAutoLock lock(sEngineLock);
-+  if (sEngine) {
-+    astra_blocker_engine_destroy(sEngine);
++  nsCString text;
++  TakeString(report, text);
++  if (!ReportOk(text)) {
++    NS_WARNING("AstraBlocker: rule compilation failed; previous engine kept");
++    return NS_ERROR_FAILURE;
 +  }
-+  sEngine = fresh;
 +  return NS_OK;
++}
++
++nsresult InstallResources(const nsACString& aResourcesJson) {
++  char* report = astra_blocker_engine_set_resources(aResourcesJson.BeginReading(),
++                                                    aResourcesJson.Length());
++  if (!report) {
++    return NS_ERROR_FAILURE;
++  }
++  nsCString text;
++  TakeString(report, text);
++  return ReportOk(text) ? NS_OK : NS_ERROR_FAILURE;
 +}
 +
 +void SetEnabled(bool aEnabled) {
 +  Preferences::SetBool(kEnabledPref, aEnabled);
 +}
 +
-+void SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
-+  astra_blocker_set_site_enabled(aHost.BeginReading(), aHost.Length(), aEnabled);
++nsresult SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
++  return astra_blocker_set_site_enabled(aHost.BeginReading(), aHost.Length(),
++                                        aEnabled);
 +}
 +
-+}  // namespace AstraBlocker
-+}  // namespace mozilla
++bool IsSiteEnabled(const nsACString& aHost) {
++  return astra_blocker_is_site_enabled(aHost.BeginReading(), aHost.Length());
++}
++
++nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
++                     const nsACString& aIdsJson, nsACString& aOutJson) {
++  char* json = astra_blocker_engine_cosmetic(
++      aUrl.BeginReading(), aUrl.Length(), aClassesJson.BeginReading(),
++      aClassesJson.Length(), aIdsJson.BeginReading(), aIdsJson.Length());
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult StatusJson(nsACString& aOutJson) {
++  nsCString version;
++  nsresult rv = VersionJson(version);
++  if (NS_FAILED(rv)) {
++    return rv;
++  }
++  aOutJson.Truncate();
++  aOutJson.AppendPrintf("{\"initialized\":%s,\"enabled\":%s,\"version\":",
++                        IsInitialized() ? "true" : "false",
++                        IsEnabled() ? "true" : "false");
++  aOutJson.Append(version);
++  aOutJson.AppendLiteral("}");
++  return NS_OK;
++}
++
++nsresult StatsJson(nsACString& aOutJson) {
++  char* json = astra_blocker_engine_stats_json();
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult VersionJson(nsACString& aOutJson) {
++  char* json = astra_blocker_engine_version_json();
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++nsresult SiteExceptionsJson(nsACString& aOutJson) {
++  char* json = astra_blocker_site_exceptions_json();
++  if (!json) {
++    return NS_ERROR_FAILURE;
++  }
++  TakeString(json, aOutJson);
++  return NS_OK;
++}
++
++void ResetStats() { astra_blocker_engine_reset_stats(); }
++
++}  // namespace mozilla::AstraBlocker
 diff --git a/toolkit/components/astra_blocker_engine/AstraBlocker.h b/toolkit/components/astra_blocker_engine/AstraBlocker.h
 new file mode 100644
-index 0000000000..ac7a04531e
+index 0000000000..abe142f3f8
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/AstraBlocker.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,37 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -202,40 +276,163 @@ index 0000000000..ac7a04531e
 +
 +class nsIChannel;
 +
-+namespace mozilla {
++namespace mozilla::AstraBlocker {
 +
-+// In-tree verdict interface for the Astra ad/tracker blocker (P4-T02).
-+// Implemented in AstraBlocker.cpp; verdicts come from the
-+// astra_blocker_engine Rust crate (adblock-rust) via astra_blocker_ffi.h.
-+namespace AstraBlocker {
-+
-+// True once compiled rules have been installed (via InstallRules).
 +bool IsInitialized();
 +
-+// True when blocking is armed: the astra.blocker.enabled pref is on AND
-+// rules are installed. Cheap; safe to call per channel.
 +bool IsEnabled();
 +
-+// Verdict for one channel: global switch, per-site toggle, then the
-+// adblock-rust network match. Fail-open on any error. First- and
-+// third-party loads are both classified (unlike the content classifier,
-+// which exempts first-party loads for webcompat).
 +bool ShouldBlockChannel(nsIChannel* aChannel);
 +
-+// Management entry points. Rules and toggles originate in astra-core and
-+// cross the Host API Net module; the JS bridge calls these (directly or via
-+// a future nsIAstraBlockerService XPCOM wrapper).
 +nsresult InstallRules(const nsACString& aRules);
++nsresult InstallResources(const nsACString& aResourcesJson);
 +void SetEnabled(bool aEnabled);
-+void SetSiteEnabled(const nsACString& aHost, bool aEnabled);
++nsresult SetSiteEnabled(const nsACString& aHost, bool aEnabled);
++bool IsSiteEnabled(const nsACString& aHost);
++nsresult CosmeticFor(const nsACString& aUrl, const nsACString& aClassesJson,
++                     const nsACString& aIdsJson, nsACString& aOutJson);
 +
-+}  // namespace AstraBlocker
-+}  // namespace mozilla
++nsresult StatusJson(nsACString& aOutJson);
++nsresult StatsJson(nsACString& aOutJson);
++nsresult VersionJson(nsACString& aOutJson);
++nsresult SiteExceptionsJson(nsACString& aOutJson);
++void ResetStats();
++
++}  // namespace mozilla::AstraBlocker
 +
 +#endif  // mozilla_AstraBlocker_h
+diff --git a/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp b/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp
+new file mode 100644
+index 0000000000..1492c390c8
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/AstraBlockerService.cpp
+@@ -0,0 +1,90 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "AstraBlockerService.h"
++
++#include "mozilla/AstraBlocker.h"
++#include "mozilla/RefPtr.h"
++
++namespace mozilla {
++
++NS_IMPL_ISUPPORTS(AstraBlockerService, nsIAstraBlockerService)
++
++NS_IMETHODIMP
++AstraBlockerService::GetInitialized(bool* aResult) {
++  NS_ENSURE_ARG_POINTER(aResult);
++  *aResult = AstraBlocker::IsInitialized();
++  return NS_OK;
++}
++
++NS_IMETHODIMP
++AstraBlockerService::GetEnabled(bool* aResult) {
++  NS_ENSURE_ARG_POINTER(aResult);
++  *aResult = AstraBlocker::IsEnabled();
++  return NS_OK;
++}
++
++NS_IMETHODIMP
++AstraBlockerService::Status(nsACString& aResult) {
++  return AstraBlocker::StatusJson(aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::InstallRules(const nsACString& aRules) {
++  return AstraBlocker::InstallRules(aRules);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SetResources(const nsACString& aResourcesJson) {
++  return AstraBlocker::InstallResources(aResourcesJson);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SetEnabled(bool aEnabled) {
++  AstraBlocker::SetEnabled(aEnabled);
++  return NS_OK;
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SetSiteEnabled(const nsACString& aHost, bool aEnabled) {
++  return AstraBlocker::SetSiteEnabled(aHost, aEnabled);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::IsSiteEnabled(const nsACString& aHost, bool* aResult) {
++  NS_ENSURE_ARG_POINTER(aResult);
++  *aResult = AstraBlocker::IsSiteEnabled(aHost);
++  return NS_OK;
++}
++
++NS_IMETHODIMP
++AstraBlockerService::SiteExceptions(nsACString& aResult) {
++  return AstraBlocker::SiteExceptionsJson(aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::CosmeticFor(const nsACString& aUrl,
++                                 const nsACString& aClassesJson,
++                                 const nsACString& aIdsJson,
++                                 nsACString& aResult) {
++  return AstraBlocker::CosmeticFor(aUrl, aClassesJson, aIdsJson, aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::Stats(nsACString& aResult) {
++  return AstraBlocker::StatsJson(aResult);
++}
++
++NS_IMETHODIMP
++AstraBlockerService::ResetStats() {
++  AstraBlocker::ResetStats();
++  return NS_OK;
++}
++
++already_AddRefed<nsIAstraBlockerService> AstraBlockerServiceConstructor() {
++  RefPtr<AstraBlockerService> service = new AstraBlockerService();
++  return service.forget().downcast<nsIAstraBlockerService>();
++}
++
++}  // namespace mozilla
+diff --git a/toolkit/components/astra_blocker_engine/AstraBlockerService.h b/toolkit/components/astra_blocker_engine/AstraBlockerService.h
+new file mode 100644
+index 0000000000..7fc6db6059
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/AstraBlockerService.h
+@@ -0,0 +1,27 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef mozilla_AstraBlockerService_h
++#define mozilla_AstraBlockerService_h
++
++#include "nsIAstraBlockerService.h"
++
++namespace mozilla {
++
++class AstraBlockerService final : public nsIAstraBlockerService {
++ public:
++  NS_DECL_ISUPPORTS
++  NS_DECL_NSIASTRABLOCKERSERVICE
++
++  AstraBlockerService() = default;
++
++ private:
++  ~AstraBlockerService() = default;
++};
++
++already_AddRefed<nsIAstraBlockerService> AstraBlockerServiceConstructor();
++
++}  // namespace mozilla
++
++#endif  // mozilla_AstraBlockerService_h
 diff --git a/toolkit/components/astra_blocker_engine/Cargo.toml b/toolkit/components/astra_blocker_engine/Cargo.toml
 new file mode 100644
-index 0000000000..a7d1f633a4
+index 0000000000..31ef917f46
 --- /dev/null
 +++ b/toolkit/components/astra_blocker_engine/Cargo.toml
 @@ -0,0 +1,21 @@
@@ -244,7 +441,7 @@ index 0000000000..a7d1f633a4
 +version = "0.1.0"
 +edition = "2021"
 +license = "MPL-2.0"
-+description = "Astra in-tree network-hook engine: adblock-rust verdicts for the Gecko network layer (P4-T02)"
++description = "Astra in-tree ad/tracker blocker: Brave adblock-rust engine, management XPCOM service and channel-hook verdicts"
 +
 +[dependencies]
 +# Pinned to the exact adblock revision already vendored in third_party/rust
@@ -252,13 +449,13 @@ index 0000000000..a7d1f633a4
 +# Feature set mirrors content_classifier_engine exactly
 +# (full-regex-handling + single-thread, no embedded-domain-resolver): the
 +# unified gkrust build compiles one adblock instance, so any divergence
-+# would leak into the classifier (missing set_domain_resolver) or into us
-+# (non-Sync Engine under single-thread breaks statics — which is why this
-+# crate holds engines behind Box-leaked pointers instead).
++# would leak into the classifier.
 +adblock = { version = "=0.12.1", default-features = false, features = ["full-regex-handling", "single-thread"] }
-+nserror = { path = "../../../xpcom/rust/nserror" }
 +cstr = "0.2"
++nserror = { path = "../../../xpcom/rust/nserror" }
 +nsstring = { path = "../../../xpcom/rust/nsstring" }
++serde = { version = "1", features = ["derive"] }
++serde_json = "1"
 +xpcom = { path = "../../../xpcom/rust/xpcom" }
 diff --git a/toolkit/components/astra_blocker_engine/cbindgen.toml b/toolkit/components/astra_blocker_engine/cbindgen.toml
 new file mode 100644
@@ -278,22 +475,54 @@ index 0000000000..1a153a7dd2
 +language = "C++"
 +namespaces = []
 +includes = ["nsError.h"]
-diff --git a/toolkit/components/astra_blocker_engine/moz.build b/toolkit/components/astra_blocker_engine/moz.build
+diff --git a/toolkit/components/astra_blocker_engine/components.conf b/toolkit/components/astra_blocker_engine/components.conf
 new file mode 100644
-index 0000000000..e965248008
+index 0000000000..fccc479698
 --- /dev/null
-+++ b/toolkit/components/astra_blocker_engine/moz.build
-@@ -0,0 +1,28 @@
++++ b/toolkit/components/astra_blocker_engine/components.conf
+@@ -0,0 +1,14 @@
 +# This Source Code Form is subject to the terms of the Mozilla Public
 +# License, v. 2.0. If a copy of the MPL was not distributed with this
 +# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 +
-+# P4-T02 Astra blocker engine (mirrors content_classifier_engine setup).
-+# The Rust crate itself is linked into libxul via gkrust (ASTRA-0003);
-+# this file builds the C++ bridge and generates the FFI header.
++Classes = [
++    {
++        'cid': '{b5f5a6f5-9e2e-4a58-9d5f-9a4c0d0b7a11}',
++        'contract_ids': ['@astra/blocker;1'],
++        'type': 'nsIAstraBlockerService',
++        'constructor': 'mozilla::AstraBlockerServiceConstructor',
++        'singleton': True,
++        'headers': ['/toolkit/components/astra_blocker_engine/AstraBlockerService.h'],
++    },
++]
+diff --git a/toolkit/components/astra_blocker_engine/moz.build b/toolkit/components/astra_blocker_engine/moz.build
+new file mode 100644
+index 0000000000..64a0b42cc8
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/moz.build
+@@ -0,0 +1,41 @@
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++# Astra blocker engine (source of truth: blocker/engine/).
++# The Rust crate is linked into libxul via gkrust (ASTRA-0003); this file
++# builds the C++ network bridge and the XPCOM management service, compiles
++# the IDL the service exposes to chrome JS, and generates the FFI header.
++
++XPIDL_MODULE = "astra_blocker"
++
++XPIDL_SOURCES += [
++    "nsIAstraBlockerService.idl",
++]
++
++XPCOM_MANIFESTS += [
++    "components.conf",
++]
 +
 +UNIFIED_SOURCES += [
 +    "AstraBlocker.cpp",
++    "AstraBlockerService.cpp",
 +]
 +
 +LOCAL_INCLUDES += [
@@ -311,107 +540,108 @@ index 0000000000..e965248008
 +    EXPORTS.mozilla += [
 +        "!astra_blocker_ffi.h",
 +        "AstraBlocker.h",
++        "AstraBlockerService.h",
 +    ]
-diff --git a/toolkit/components/astra_blocker_engine/src/lib.rs b/toolkit/components/astra_blocker_engine/src/lib.rs
+diff --git a/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl b/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl
 new file mode 100644
-index 0000000000..8a3cce84de
+index 0000000000..dc7f661138
 --- /dev/null
-+++ b/toolkit/components/astra_blocker_engine/src/lib.rs
-@@ -0,0 +1,377 @@
++++ b/toolkit/components/astra_blocker_engine/nsIAstraBlockerService.idl
+@@ -0,0 +1,56 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 +
-+//! `astra_blocker_engine`: in-tree Gecko network-hook engine for the Astra
-+//! ad/tracker blocker (P4-T02).
++#include "nsISupports.idl"
++
++/**
++ * Chrome-facing management seam for the Astra ad/tracker blocker.
++ *
++ * The engine itself is Rust (`astra_blocker_engine`, Brave adblock-rust);
++ * this interface is the thin in-tree bridge chrome JS uses to install
++ * filter text and cosmetic resources, read bounded statistics and ask for
++ * the selectors a page should hide. Verdicts on the network path are made
++ * natively (`mozilla::AstraBlocker::ShouldBlockChannel`), not here.
++ *
++ * Every string result is JSON. Unknown fields are ignored by callers, and
++ * failures answer an empty string/an nsresult rather than throwing when
++ * the engine is simply not installed yet (fail-open).
++ */
++[scriptable, uuid(7e1f8a16-4d2d-4c1f-9f4b-2a6d3c5e8b70)]
++interface nsIAstraBlockerService : nsISupports {
++  /** True once at least one rule set has been compiled. */
++  readonly attribute boolean initialized;
++
++  /** True when the `astra.blocker.enabled` pref is on and rules exist. */
++  readonly attribute boolean enabled;
++
++  /** Engine/version/rule counts as JSON. */
++  ACString status();
++
++  /** Install newline-separated filter-list text. Replaces the engine only
++   *  after the candidate compiles; a failure keeps the previous engine. */
++  void installRules(in ACString rules);
++
++  /** Install (or replace) the scriptlet/redirect resources as the Brave
++   *  `resources.json` array. Applies to an already-installed engine too. */
++  void setResources(in ACString resourcesJson);
++
++  /** Global switch; writes the same pref the network hook reads. */
++  void setEnabled(in boolean enabled);
++
++  /** Per-site pause/resume (host key, lower-cased by the engine). */
++  void setSiteEnabled(in ACString host, in boolean enabled);
++  boolean isSiteEnabled(in ACString host);
++
++  /** Hosts currently paused, as a JSON string array. */
++  ACString siteExceptions();
++
++  /** CSS selectors plus the scriptlet payload for one page, as JSON.
++   *  `classesJson` / `idsJson` are JSON string arrays observed on the page. */
++  ACString cosmeticFor(in ACString url, in ACString classesJson, in ACString idsJson);
++
++  /** Bounded block/decision counters as JSON (no URLs, no origins). */
++  ACString stats();
++  void resetStats();
++};
+diff --git a/toolkit/components/astra_blocker_engine/src/lib.rs b/toolkit/components/astra_blocker_engine/src/lib.rs
+new file mode 100644
+index 0000000000..6e25a740f1
+--- /dev/null
++++ b/toolkit/components/astra_blocker_engine/src/lib.rs
+@@ -0,0 +1,669 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++//! `astra_blocker_engine`: the native heart of Astra's ad/tracker blocker.
 +//!
-+//! This crate mirrors `content_classifier_engine` (same adblock-rust
-+//! dependency, same cbindgen FFI shape) but serves Astra verdicts instead of
-+//! tracking-protection classification:
-+//!   * first- AND third-party loads are classified (no third-party-only
-+//!     exemption — a full adblocker must catch same-host ad delivery);
-+//!   * rules come from the Astra EasyList/EasyPrivacy seed installed via the
-+//!     Host API `Net` module (P4-T01 `astra-blocker` owns the seed bytes and
-+//!     list-update mechanism; this crate only holds the compiled engine);
-+//!   * global on/off plus per-site (per-host) toggles mirror the
-+//!     `astra-blocker` semantics so the sidecar and the hook agree.
 +//!
-+//! Ownership model (mirrors `content_classifier_engine` deliberately):
-+//! engine instances are Box-leaked and owned by the C++ hook — there is
-+//! deliberately NO `Engine` in a Rust static. A static `Mutex<Option<Engine>>`
-+//! would require `Engine: Sync`, but the unified gkrust feature set includes
-+//! the content classifier's `single-thread` feature, under which `Engine`
-+//! holds `Rc` state and is not `Sync`. Box ownership needs no such bound,
-+//! and requesting exactly the classifier's feature set
-+//! (`full-regex-handling` + `single-thread`, no `embedded-domain-resolver`)
-+//! keeps the unified build identical to stock, so upstream code is unaffected.
-+//!
-+//! Version note: adblock is pinned to `=0.12.1`, the revision vendored in
-+//! `third_party/rust` and audited in `supply-chain/audits.toml`. The sidecar
-+//! crate (`astra-blocker`) uses 0.13.5; both expose identical verdict
-+//! behaviour on the shared fixture corpus (see `tools/blocker-wiring-check.sh`).
-+//! In 0.12.1 `Request::new` takes 3 arguments (no http-method parameter yet)
-+//! and `BlockerResult` has no `should_block()` helper — the verdict here is
-+//! `matched && exception.is_none()`.
++//! `Engine` is not `Sync` under the unified gkrust `single-thread` feature, so
++//! it lives in a main-thread-guarded `Mutex<Slot>`; every entry point checks
++//! `NS_IsMainThread()` and fails open otherwise. Fail-open is a hard rule: no
++//! rules, a bad request, a poisoned lock, a compile error or an off-thread
++//! caller all answer "allow" and never take the browser down.
 +
 +use std::collections::HashSet;
++use std::ffi::CString;
 +use std::os::raw::c_char;
++use std::panic::{catch_unwind, AssertUnwindSafe};
++use std::ptr;
 +use std::sync::{Mutex, OnceLock};
 +
 +use adblock::lists::ParseOptions;
 +use adblock::request::Request;
-+use adblock::Engine;
++use adblock::resources::Resource;
++use adblock::{Engine, FilterSet};
 +use cstr::cstr;
-+use nserror::{nsresult, NS_ERROR_INVALID_ARG, NS_ERROR_SERVICE_NOT_AVAILABLE, NS_OK};
-+use nsstring::nsCString;
++use nserror::{nsresult, NS_ERROR_INVALID_ARG, NS_OK};
++use serde::Serialize;
 +use xpcom::interfaces::nsIEffectiveTLDService;
 +
-+/// Compiled network rules for one installed rule set. Owned by the C++
-+/// hook via `Box::into_raw` (see `AstraBlocker.cpp`); never in a Rust
-+/// static, so no `Sync` bound on `Engine` is required.
-+pub struct AstraBlockerEngine {
-+    engine: Engine,
-+}
++pub const ADBLOCK_VERSION: &str = "0.12.1";
 +
 +static ETLD_SERVICE: Mutex<Option<xpcom::RefPtr<nsIEffectiveTLDService>>> = Mutex::new(None);
-+
-+/// Lower-cased hosts (no trailing dot) where protection is paused.
-+/// `HashSet<String>` is `Sync`, so this static is feature-independent.
-+static DISABLED_HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-+
-+fn hosts_slot() -> &'static Mutex<HashSet<String>> {
-+    DISABLED_HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
-+}
-+
-+/// Lower-cases and trims a host for toggle comparisons.
-+fn normalize_host(host: &str) -> String {
-+    host.trim().trim_end_matches('.').to_lowercase()
-+}
-+
-+/// Extracts the host from a URL for per-site checks. Returns `""` when the
-+/// URL has no parseable host (mirrors `astra-blocker::host_of_url`).
-+fn host_of_url(url: &str) -> String {
-+    let after_scheme = url.split("://").nth(1).unwrap_or(url);
-+    let authority = after_scheme
-+        .split('/')
-+        .next()
-+        .unwrap_or("")
-+        .split('@')
-+        .next_back()
-+        .unwrap_or("");
-+    let host = authority.split(':').next().unwrap_or("");
-+    normalize_host(host)
-+}
-+
-+/// Copies `(ptr, len)` into an owned `String` (lossy). A null input pointer
-+/// reads as empty; a null `out` pointer is handled by callers.
-+fn read_str(ptr: *const c_char, len: usize) -> String {
-+    if ptr.is_null() || len == 0 {
-+        return String::new();
-+    }
-+    let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
-+    String::from_utf8_lossy(bytes).into_owned()
-+}
 +
 +struct SchemelessSiteResolver {}
 +
@@ -426,11 +656,10 @@ index 0000000000..8a3cce84de
 +            None => return (0, host.len()),
 +        };
 +
-+        let mut host_cstring = nsCString::new();
++        let mut host_cstring = nsstring::nsCString::new();
 +        host_cstring.assign(host);
 +
-+        let mut base_domain = nsCString::new();
-+
++        let mut base_domain = nsstring::nsCString::new();
 +        unsafe {
 +            if etld_service
 +                .GetBaseDomainFromHost(&*host_cstring, 0, &mut *base_domain)
@@ -442,56 +671,508 @@ index 0000000000..8a3cce84de
 +                }
 +            }
 +        }
-+
 +        (0, host.len())
 +    }
 +}
 +
-+/// Points adblock's global domain resolver at the eTLD service. Idempotent:
-+/// a previously installed resolver is kept (`set` fails) rather than
-+/// replaced. Called from `engine_from_rules` so no separate init ordering
-+/// is required (unlike the classifier's explicit init entry point).
 +fn ensure_domain_resolver() {
-+    let etld_service = match xpcom::get_service::<nsIEffectiveTLDService>(cstr!(
++    if let Some(etld_service) = xpcom::get_service::<nsIEffectiveTLDService>(cstr!(
 +        "@mozilla.org/network/effective-tld-service;1"
 +    )) {
-+        Some(s) => s,
-+        None => return,
-+    };
-+    if let Ok(mut guard) = ETLD_SERVICE.lock() {
-+        guard.replace(etld_service);
++        if let Ok(mut guard) = ETLD_SERVICE.lock() {
++            guard.replace(etld_service);
++        }
 +    }
-+    let resolver = Box::new(SchemelessSiteResolver {});
-+    let _ = adblock::url_parser::set_domain_resolver(resolver);
++    // Always install a resolver. adblock's parser `expect`s one on the first
++    // Request::new; without it a missing eTLD service would unwind across the
++    // C ABI and abort the browser. The fallback treats every host as its own
++    // registrable domain, which is conservative for third-party matching.
++    let _ = adblock::url_parser::set_domain_resolver(Box::new(SchemelessSiteResolver {}));
 +}
 +
-+/// Installs `rules` (newline-separated filter-list text), handing ownership
-+/// of a new engine instance to the caller (`Box::into_raw`). The caller
-+/// replaces any previous instance (destroying it first). Fail-open boot is
-+/// preserved: with no instance installed, every verdict allows.
++static DISABLED_HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
++
++fn hosts_slot() -> &'static Mutex<HashSet<String>> {
++    DISABLED_HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
++}
++
++fn normalize_host(host: &str) -> String {
++    host.trim().trim_end_matches('.').to_lowercase()
++}
++
++fn host_of_url(url: &str) -> String {
++    let after_scheme = url.split("://").nth(1).unwrap_or(url);
++    let authority = after_scheme
++        .split('/')
++        .next()
++        .unwrap_or("")
++        .split('@')
++        .next_back()
++        .unwrap_or("");
++    normalize_host(authority.split(':').next().unwrap_or(""))
++}
++
++const STAT_DAYS: usize = 8;
++
++#[derive(Default)]
++struct Stats {
++    blocks: u64,
++    decisions: u64,
++    cosmetic_pages: u64,
++    days: [u64; STAT_DAYS],
++    day: u64,
++}
++
++static STATS: Mutex<Stats> = Mutex::new(Stats {
++    blocks: 0,
++    decisions: 0,
++    cosmetic_pages: 0,
++    days: [0; STAT_DAYS],
++    day: 0,
++});
++
++fn unix_day() -> u64 {
++    std::time::SystemTime::now()
++        .duration_since(std::time::UNIX_EPOCH)
++        .map(|d| d.as_secs() / 86_400)
++        .unwrap_or(0)
++}
++
++fn record_block() {
++    let now = unix_day();
++    if let Ok(mut stats) = STATS.lock() {
++        if now > stats.day {
++            let shift = (now - stats.day).min(STAT_DAYS as u64) as usize;
++            if shift >= STAT_DAYS {
++                stats.days = [0; STAT_DAYS];
++            } else {
++                let mut next = [0u64; STAT_DAYS];
++                for i in 0..STAT_DAYS - shift {
++                    next[i] = stats.days[i + shift];
++                }
++                stats.days = next;
++            }
++            stats.day = now;
++        }
++        stats.blocks = stats.blocks.saturating_add(1);
++        stats.days[STAT_DAYS - 1] = stats.days[STAT_DAYS - 1].saturating_add(1);
++    }
++}
++
++fn record_decision() {
++    if let Ok(mut stats) = STATS.lock() {
++        stats.decisions = stats.decisions.saturating_add(1);
++    }
++}
++
++#[derive(Serialize)]
++struct StatsView {
++    blocks: u64,
++    decisions: u64,
++    cosmetic_pages: u64,
++    today: u64,
++    last_7_days: u64,
++    days: Vec<u64>,
++}
++
++fn stats_view() -> StatsView {
++    let now = unix_day();
++    let stats = STATS.lock().ok();
++    let mut days = [0u64; STAT_DAYS];
++    let (blocks, decisions, cosmetic_pages) = match stats.as_ref() {
++        Some(s) => (s.blocks, s.decisions, s.cosmetic_pages),
++        None => (0, 0, 0),
++    };
++    if let Some(s) = stats.as_ref() {
++        days = s.days;
++    }
++    // A stale ring (browser left running across midnight) still answers the
++    // last recorded day; the next block rotates it.
++    let today = if stats.as_ref().map(|s| s.day).unwrap_or(0) == now {
++        days[STAT_DAYS - 1]
++    } else {
++        0
++    };
++    let last_7_days = days[1..].iter().sum();
++    StatsView {
++        blocks,
++        decisions,
++        cosmetic_pages,
++        today,
++        last_7_days,
++        days: days.to_vec(),
++    }
++}
++
++#[derive(Default, Clone)]
++struct CosmeticCache {
++    url: String,
++    hide: Vec<String>,
++    exceptions: Vec<String>,
++    generichide: bool,
++    script: String,
++    procedural: Vec<String>,
++}
++
++struct Slot {
++    engine: Option<Box<Engine>>,
++    rule_count: usize,
++    resources: Option<Vec<Resource>>,
++    resource_count: usize,
++    cosmetic: Option<CosmeticCache>,
++}
++
++/// Safety: every access is guarded by `moz_task::is_main_thread()` and the
++/// slot mutex. `Engine` is `!Send` under `single-thread`, but the value is
++/// created, used and dropped only on Gecko's main thread.
++unsafe impl Send for Slot {}
++
++static SLOT: Mutex<Slot> = Mutex::new(Slot {
++    engine: None,
++    rule_count: 0,
++    resources: None,
++    resource_count: 0,
++    cosmetic: None,
++});
++
++extern "C" {
++    // Exported by libxul (xpcom/threads/nsThreadUtils.h). Kept as a direct
++    // declaration so this crate does not pull the mozbuild build script.
++    fn NS_IsMainThread() -> bool;
++}
++
++fn is_main_thread() -> bool {
++    unsafe { NS_IsMainThread() }
++}
++
++fn with_slot<R>(f: impl FnOnce(&mut Slot) -> R) -> Option<R> {
++    if !is_main_thread() {
++        return None;
++    }
++    let mut slot = SLOT.lock().ok()?;
++    Some(f(&mut slot))
++}
++
++pub fn is_installed() -> bool {
++    with_slot(|slot| slot.engine.is_some()).unwrap_or(false)
++}
++
++pub fn rule_count() -> u64 {
++    with_slot(|slot| slot.rule_count as u64).unwrap_or(0)
++}
++
++fn count_rules(text: &str) -> usize {
++    text.lines()
++        .map(str::trim)
++        .filter(|line| !line.is_empty() && !line.starts_with('!') && !line.starts_with('['))
++        .count()
++}
++
++#[derive(Serialize)]
++struct InstallReport {
++    ok: bool,
++    failure: String,
++    rules: usize,
++    resources: usize,
++    adblock: &'static str,
++}
++
++fn install_rules(rules: &str) -> InstallReport {
++    ensure_domain_resolver();
++    let report = |ok: bool, failure: &str, slot: &Slot| InstallReport {
++        ok,
++        failure: failure.to_string(),
++        rules: slot.rule_count,
++        resources: slot.resource_count,
++        adblock: ADBLOCK_VERSION,
++    };
++
++    if rules.trim().is_empty() {
++        return with_slot(|slot| report(false, "empty_rules", slot))
++            .unwrap_or_else(|| InstallReport {
++                ok: false,
++                failure: "main_thread_required".into(),
++                rules: 0,
++                resources: 0,
++                adblock: ADBLOCK_VERSION,
++            });
++    }
++
++    let outcome = catch_unwind(AssertUnwindSafe(|| {
++        let mut set = FilterSet::new(false);
++        set.add_filter_list(rules, ParseOptions::default());
++        Engine::from_filter_set(set, true)
++    }));
++
++    match outcome {
++        Ok(mut engine) => with_slot(|slot| {
++            if let Some(resources) = slot.resources.as_ref() {
++                engine.use_resources(resources.clone());
++            }
++            let rules = count_rules(rules);
++            slot.engine = Some(Box::new(engine));
++            slot.rule_count = rules;
++            slot.cosmetic = None;
++            report(true, "", slot)
++        })
++        .unwrap_or_else(|| InstallReport {
++            ok: false,
++            failure: "main_thread_required".into(),
++            rules: 0,
++            resources: 0,
++            adblock: ADBLOCK_VERSION,
++        }),
++        Err(_) => with_slot(|slot| report(false, "compile_panic", slot))
++            .unwrap_or_else(|| InstallReport {
++                ok: false,
++                failure: "compile_panic".into(),
++                rules: 0,
++                resources: 0,
++                adblock: ADBLOCK_VERSION,
++            }),
++    }
++}
++
++#[derive(Serialize)]
++struct ResourceReport {
++    ok: bool,
++    failure: String,
++    resources: usize,
++}
++
++fn install_resources(json: &str) -> ResourceReport {
++    let parsed: Result<Vec<Resource>, _> = serde_json::from_str(json);
++    match parsed {
++        Ok(resources) => with_slot(|slot| {
++            if let Some(engine) = slot.engine.as_mut() {
++                engine.use_resources(resources.clone());
++                slot.cosmetic = None;
++            }
++            slot.resource_count = resources.len();
++            slot.resources = Some(resources);
++            ResourceReport {
++                ok: true,
++                failure: String::new(),
++                resources: slot.resource_count,
++            }
++        })
++        .unwrap_or(ResourceReport {
++            ok: false,
++            failure: "main_thread_required".into(),
++            resources: 0,
++        }),
++        Err(error) => ResourceReport {
++            ok: false,
++            failure: format!("invalid_resources: {error}"),
++            resources: 0,
++        },
++    }
++}
++
++fn clear() {
++    with_slot(|slot| {
++        slot.engine = None;
++        slot.rule_count = 0;
++        slot.cosmetic = None;
++        slot.resources = None;
++        slot.resource_count = 0;
++    });
++}
++
++fn should_block(url: &str, source_url: &str, request_type: &str, record: bool) -> bool {
++    if record {
++        record_decision();
++    }
++    let result = catch_unwind(AssertUnwindSafe(|| {
++        should_block_inner(url, source_url, request_type)
++    }));
++    let blocked = result.unwrap_or(false);
++    if blocked && record {
++        record_block();
++    }
++    blocked
++}
++
++fn should_block_inner(url: &str, source_url: &str, request_type: &str) -> bool {
++    let disabled = match hosts_slot().lock() {
++        Ok(hosts) => hosts.contains(&host_of_url(source_url)),
++        Err(_) => return false,
++    };
++    if disabled {
++        return false;
++    }
++    with_slot(|slot| {
++        let Some(engine) = slot.engine.as_ref() else {
++            return false;
++        };
++        let Ok(request) = Request::new(url, source_url, request_type) else {
++            return false;
++        };
++        // adblock 0.12.1 has no should_block() helper: matched with no
++        // exception means block (same rule the content classifier applies).
++        let result = engine.check_network_request(&request);
++        result.matched && result.exception.is_none()
++    })
++    .unwrap_or(false)
++}
++
++#[derive(Serialize)]
++struct CosmeticView {
++    url: String,
++    selectors: Vec<String>,
++    script: String,
++    procedural: Vec<String>,
++    generichide: bool,
++    exceptions: Vec<String>,
++}
++
++fn empty_cosmetic(url: &str) -> CosmeticView {
++    CosmeticView {
++        url: url.to_string(),
++        selectors: vec![],
++        script: String::new(),
++        procedural: vec![],
++        generichide: false,
++        exceptions: vec![],
++    }
++}
++
++fn cosmetic_for(url: &str, classes: &[String], ids: &[String]) -> CosmeticView {
++    let result = catch_unwind(AssertUnwindSafe(|| cosmetic_for_inner(url, classes, ids)));
++    result.unwrap_or_else(|_| empty_cosmetic(url))
++}
++
++fn cosmetic_for_inner(url: &str, classes: &[String], ids: &[String]) -> CosmeticView {
++    let Some(view) = with_slot(|slot| {
++        let Some(engine) = slot.engine.as_ref() else {
++            return empty_cosmetic(url);
++        };
++        let base = match slot.cosmetic.as_ref().filter(|cache| cache.url == url) {
++            Some(cache) => cache.clone(),
++            None => {
++                let resources = engine.url_cosmetic_resources(url);
++                let cache = CosmeticCache {
++                    url: url.to_string(),
++                    hide: resources.hide_selectors.into_iter().collect(),
++                    exceptions: resources.exceptions.into_iter().collect(),
++                    generichide: resources.generichide,
++                    script: resources.injected_script,
++                    procedural: resources.procedural_actions.into_iter().collect(),
++                };
++                slot.cosmetic = Some(cache.clone());
++                cache
++            }
++        };
++
++        let exceptions: HashSet<String> = base.exceptions.iter().cloned().collect();
++        let mut selectors: Vec<String> = base
++            .hide
++            .iter()
++            .filter(|selector| !exceptions.contains(*selector))
++            .cloned()
++            .collect();
++        if !base.generichide && (!classes.is_empty() || !ids.is_empty()) {
++            selectors.extend(engine.hidden_class_id_selectors(
++                classes.iter().map(String::as_str),
++                ids.iter().map(String::as_str),
++                &exceptions,
++            ));
++        }
++        selectors.sort();
++        selectors.dedup();
++        let mut procedural = base.procedural.clone();
++        procedural.sort();
++        procedural.dedup();
++        let mut exceptions = base.exceptions.clone();
++        exceptions.sort();
++        CosmeticView {
++            url: url.to_string(),
++            selectors,
++            script: base.script,
++            procedural,
++            generichide: base.generichide,
++            exceptions,
++        }
++    }) else {
++        return empty_cosmetic(url);
++    };
++    view
++}
++
++#[derive(Serialize)]
++struct VersionView {
++    engine: &'static str,
++    version: &'static str,
++    crate_version: &'static str,
++    rules: u64,
++    resources: usize,
++}
++
++fn version_view() -> VersionView {
++    VersionView {
++        engine: "adblock-rust",
++        version: ADBLOCK_VERSION,
++        crate_version: env!("CARGO_PKG_VERSION"),
++        rules: rule_count(),
++        resources: with_slot(|slot| slot.resource_count).unwrap_or(0),
++    }
++}
++
++fn to_c_string(value: String) -> *mut c_char {
++    match CString::new(value) {
++        Ok(text) => text.into_raw(),
++        Err(_) => ptr::null_mut(),
++    }
++}
++
++fn json_ptr<T: Serialize>(value: &T) -> *mut c_char {
++    match serde_json::to_string(value) {
++        Ok(text) => to_c_string(text),
++        Err(_) => ptr::null_mut(),
++    }
++}
++
++fn read_str(ptr: *const c_char, len: usize) -> String {
++    if ptr.is_null() || len == 0 {
++        return String::new();
++    }
++    let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
++    String::from_utf8_lossy(bytes).into_owned()
++}
++
++/// Compiles newline-separated filter text. Returns a JSON report, or null on
++/// an internal error. The active engine is only replaced on success.
 +#[no_mangle]
-+pub unsafe extern "C" fn astra_blocker_engine_from_rules(
++pub unsafe extern "C" fn astra_blocker_engine_install(
 +    rules: *const c_char,
 +    rules_len: usize,
-+    out_engine: *mut *mut AstraBlockerEngine,
-+) -> nsresult {
-+    if out_engine.is_null() {
-+        return NS_ERROR_INVALID_ARG;
-+    }
-+    ensure_domain_resolver();
++) -> *mut c_char {
 +    let text = read_str(rules, rules_len);
-+    let engine = Engine::from_rules(text.lines().map(str::to_owned), ParseOptions::default());
-+    let boxed = Box::new(AstraBlockerEngine { engine });
-+    *out_engine = Box::into_raw(boxed);
-+    NS_OK
++    json_ptr(&install_rules(&text))
 +}
 +
-+/// Destroys an instance created by `astra_blocker_engine_from_rules`.
 +#[no_mangle]
-+pub unsafe extern "C" fn astra_blocker_engine_destroy(engine: *mut AstraBlockerEngine) {
-+    if !engine.is_null() {
-+        drop(Box::from_raw(engine));
-+    }
++pub unsafe extern "C" fn astra_blocker_engine_set_resources(
++    json: *const c_char,
++    json_len: usize,
++) -> *mut c_char {
++    let text = read_str(json, json_len);
++    json_ptr(&install_resources(&text))
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_is_installed() -> bool {
++    is_installed()
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_rule_count() -> u64 {
++    rule_count()
++}
++
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_clear() {
++    clear();
 +}
 +
 +/// Pauses (`false`) or resumes (`true`) protection for one site (host).
@@ -515,184 +1196,87 @@ index 0000000000..8a3cce84de
 +    }
 +}
 +
-+/// Reports whether `engine` looks usable (non-null instance). The C++ hook
-+/// combines this with the `astra.blocker.enabled` pref.
 +#[no_mangle]
-+pub unsafe extern "C" fn astra_blocker_engine_is_installed(
-+    engine: *const AstraBlockerEngine,
++pub extern "C" fn astra_blocker_is_site_enabled(
++    host: *const c_char,
++    host_len: usize,
 +) -> bool {
-+    !engine.is_null()
++    let key = normalize_host(&read_str(host, host_len));
++    hosts_slot()
++        .lock()
++        .map(|hosts| !hosts.contains(&key))
++        .unwrap_or(true)
 +}
 +
-+/// Verdict for one request against one installed instance. Fail-open: allow
-+/// when protection is paused for the source host or the request cannot be
-+/// parsed (mirrors `astra-blocker::Blocker::check`).
-+fn should_block(engine: &Engine, url: &str, source_url: &str, request_type: &str) -> bool {
-+    let disabled = match hosts_slot().lock() {
-+        Ok(hosts) => hosts.contains(&host_of_url(source_url)),
-+        Err(_) => return false,
-+    };
-+    if disabled {
-+        return false;
-+    }
-+    let Ok(request) = Request::new(url, source_url, request_type) else {
-+        return false;
-+    };
-+    // adblock 0.12.1 has no should_block() helper: matched with no
-+    // exception means block (same rule the content classifier applies).
-+    let result = engine.check_network_request(&request);
-+    result.matched && result.exception.is_none()
++#[no_mangle]
++pub extern "C" fn astra_blocker_site_exceptions_json() -> *mut c_char {
++    let mut hosts: Vec<String> = hosts_slot()
++        .lock()
++        .map(|hosts| hosts.iter().cloned().collect())
++        .unwrap_or_default();
++    hosts.sort();
++    json_ptr(&hosts)
 +}
 +
-+/// FFI verdict entry point for `AstraBlocker::ShouldBlockChannel`.
 +#[no_mangle]
 +pub unsafe extern "C" fn astra_blocker_engine_should_block(
-+    engine: *const AstraBlockerEngine,
 +    url: *const c_char,
 +    url_len: usize,
 +    source_url: *const c_char,
 +    source_url_len: usize,
 +    request_type: *const c_char,
 +    request_type_len: usize,
++    record: bool,
 +    out_block: *mut bool,
 +) -> nsresult {
-+    if engine.is_null() || out_block.is_null() {
++    if out_block.is_null() {
 +        return NS_ERROR_INVALID_ARG;
 +    }
-+    let block = should_block(
-+        &(*engine).engine,
++    *out_block = should_block(
 +        &read_str(url, url_len),
 +        &read_str(source_url, source_url_len),
 +        &read_str(request_type, request_type_len),
++        record,
 +    );
-+    *out_block = block;
 +    NS_OK
 +}
 +
-+/// Test-only resolver that treats every host as its own registrable domain.
-+/// The eTLD service is unavailable outside the browser; without any
-+/// resolver installed, third-party classification may panic.
-+#[cfg(test)]
-+fn install_test_resolver() {
-+    struct TestResolver;
-+    impl adblock::url_parser::ResolvesDomain for TestResolver {
-+        fn get_host_domain(&self, host: &str) -> (usize, usize) {
-+            (0, host.len())
-+        }
-+    }
-+    static INSTALLED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
-+    INSTALLED.get_or_init(|| {
-+        let _ = adblock::url_parser::set_domain_resolver(Box::new(TestResolver));
-+    });
++#[no_mangle]
++pub unsafe extern "C" fn astra_blocker_engine_cosmetic(
++    url: *const c_char,
++    url_len: usize,
++    classes_json: *const c_char,
++    classes_len: usize,
++    ids_json: *const c_char,
++    ids_len: usize,
++) -> *mut c_char {
++    let classes: Vec<String> =
++        serde_json::from_str(&read_str(classes_json, classes_len)).unwrap_or_default();
++    let ids: Vec<String> = serde_json::from_str(&read_str(ids_json, ids_len)).unwrap_or_default();
++    json_ptr(&cosmetic_for(&read_str(url, url_len), &classes, &ids))
 +}
 +
-+#[cfg(test)]
-+mod tests {
-+    use super::*;
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_stats_json() -> *mut c_char {
++    json_ptr(&stats_view())
++}
 +
-+    /// Same-shape fixture list as the `astra-blocker` (P4-T01) corpus:
-+    /// basic blocks, exceptions, `$important` overrides. The shared
-+    /// `tools/blocker-wiring-check.sh` parity run keeps both engines honest.
-+    const FIXTURE_RULES: &str = "\
-+||ads.fixture.invalid^\n\
-+@@||allow.fixture.invalid^\n\
-+||stern.fixture.invalid^\n\
-+@@||stern.fixture.invalid^\n\
-+||stern.fixture.invalid^$important\n";
-+
-+    fn engine_from_fixtures() -> Engine {
-+        Engine::from_rules(
-+            FIXTURE_RULES.lines().map(str::to_owned),
-+            ParseOptions::default(),
-+        )
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_reset_stats() {
++    if let Ok(mut stats) = STATS.lock() {
++        *stats = Stats::default();
 +    }
++}
 +
-+    fn check_with(engine: &Engine, url: &str, source: &str, kind: &str) -> bool {
-+        install_test_resolver();
-+        let Ok(request) = Request::new(url, source, kind) else {
-+            return false;
-+        };
-+        let result = engine.check_network_request(&request);
-+        result.matched && result.exception.is_none()
-+    }
++#[no_mangle]
++pub extern "C" fn astra_blocker_engine_version_json() -> *mut c_char {
++    json_ptr(&version_view())
++}
 +
-+    #[test]
-+    fn fixture_verdict_parity() {
-+        let engine = engine_from_fixtures();
-+        // Basic block vs unlisted allow.
-+        assert!(check_with(
-+            &engine,
-+            "https://ads.fixture.invalid/pixel.gif",
-+            "https://shop.fixture.invalid/",
-+            "image"
-+        ));
-+        assert!(!check_with(
-+            &engine,
-+            "https://cdn.fixture.invalid/app.js",
-+            "https://shop.fixture.invalid/",
-+            "script"
-+        ));
-+        // Exception allow-lists the match.
-+        assert!(!check_with(
-+            &engine,
-+            "https://allow.fixture.invalid/a.js",
-+            "https://shop.fixture.invalid/",
-+            "script"
-+        ));
-+        // `$important` overrides the exception.
-+        assert!(check_with(
-+            &engine,
-+            "https://stern.fixture.invalid/x.js",
-+            "https://shop.fixture.invalid/",
-+            "script"
-+        ));
-+    }
-+
-+    #[test]
-+    fn host_helpers_match_sidecar_semantics() {
-+        assert_eq!(
-+            host_of_url("https://shop.fixture.invalid:443/a?b=c"),
-+            "shop.fixture.invalid"
-+        );
-+        assert_eq!(
-+            host_of_url("https://user@ads.fixture.invalid/x"),
-+            "ads.fixture.invalid"
-+        );
-+        assert_eq!(host_of_url("SHOP.FIXTURE.INVALID."), "shop.fixture.invalid");
-+        assert_eq!(host_of_url(":::"), "");
-+        assert_eq!(normalize_host("  Example.COM. "), "example.com");
-+    }
-+
-+    #[test]
-+    fn ffi_round_trip_install_check_destroy() {
-+        install_test_resolver();
-+        let mut ptr: *mut AstraBlockerEngine = std::ptr::null_mut();
-+        let rules = FIXTURE_RULES.as_bytes();
-+        let rv = unsafe {
-+            astra_blocker_engine_from_rules(rules.as_ptr() as *const c_char, rules.len(), &mut ptr)
-+        };
-+        assert_eq!(rv, NS_OK);
-+        assert!(!ptr.is_null());
-+        assert!(unsafe { astra_blocker_engine_is_installed(ptr) });
-+        let url = b"https://ads.fixture.invalid/pixel.gif";
-+        let src = b"https://shop.fixture.invalid/";
-+        let kind = b"image";
-+        let mut block = false;
-+        let rv = unsafe {
-+            astra_blocker_engine_should_block(
-+                ptr,
-+                url.as_ptr() as *const c_char,
-+                url.len(),
-+                src.as_ptr() as *const c_char,
-+                src.len(),
-+                kind.as_ptr() as *const c_char,
-+                kind.len(),
-+                &mut block,
-+            )
-+        };
-+        assert_eq!(rv, NS_OK);
-+        assert!(block);
-+        unsafe { astra_blocker_engine_destroy(ptr) };
++#[no_mangle]
++pub unsafe extern "C" fn astra_blocker_string_free(value: *mut c_char) {
++    if !value.is_null() {
++        drop(CString::from_raw(value));
 +    }
 +}
 diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build

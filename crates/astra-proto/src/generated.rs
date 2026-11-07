@@ -6,8 +6,8 @@
 //! Source of truth: docs/astra/ipc-surface.md via schemas/*.json.
 //! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.
 
-/// Number of commands in the v1 surface (ipc-surface.md: 267).
-pub const COMMAND_COUNT: usize = 267;
+/// Number of commands in the v1 surface (ipc-surface.md: 270).
+pub const COMMAND_COUNT: usize = 270;
 /// Number of event channels in the v1 surface (ipc-surface.md: 35).
 pub const EVENT_COUNT: usize = 35;
 
@@ -45,8 +45,11 @@ pub enum CommandName {
     AccountUsageHistory,
     AccountVerify,
     AddMenuPopup,
+    BlockerConfigure,
+    BlockerLists,
     BlockerPicker,
     BlockerRefreshSources,
+    BlockerResetStats,
     BlockerRetry,
     BlockerSetEnabled,
     BlockerSiteChange,
@@ -356,8 +359,11 @@ pub const COMMANDS: &[&str] = &[
     "account_usage_history",
     "account_verify",
     "add_menu_popup",
+    "blocker_configure",
+    "blocker_lists",
     "blocker_picker",
     "blocker_refresh_sources",
+    "blocker_reset_stats",
     "blocker_retry",
     "blocker_set_enabled",
     "blocker_site_change",
@@ -667,8 +673,11 @@ impl CommandName {
             CommandName::AccountUsageHistory => "account_usage_history",
             CommandName::AccountVerify => "account_verify",
             CommandName::AddMenuPopup => "add_menu_popup",
+            CommandName::BlockerConfigure => "blocker_configure",
+            CommandName::BlockerLists => "blocker_lists",
             CommandName::BlockerPicker => "blocker_picker",
             CommandName::BlockerRefreshSources => "blocker_refresh_sources",
+            CommandName::BlockerResetStats => "blocker_reset_stats",
             CommandName::BlockerRetry => "blocker_retry",
             CommandName::BlockerSetEnabled => "blocker_set_enabled",
             CommandName::BlockerSiteChange => "blocker_site_change",
@@ -678,9 +687,7 @@ impl CommandName {
             CommandName::BookmarkMenuPopup => "bookmark_menu_popup",
             CommandName::BrowserCredentialCapability => "browser_credential_capability",
             CommandName::BrowserOpenUrl => "browser_open_url",
-            CommandName::BrowserPasskeyAuthorizationRequest => {
-                "browser_passkey_authorization_request"
-            }
+            CommandName::BrowserPasskeyAuthorizationRequest => "browser_passkey_authorization_request",
             CommandName::BrowsingDataCall => "browsing_data_call",
             CommandName::ChromeMenuPopup => "chrome_menu_popup",
             CommandName::DefaultBrowserRequest => "default_browser_request",
@@ -941,8 +948,11 @@ impl CommandName {
             "account_usage_history" => Some(CommandName::AccountUsageHistory),
             "account_verify" => Some(CommandName::AccountVerify),
             "add_menu_popup" => Some(CommandName::AddMenuPopup),
+            "blocker_configure" => Some(CommandName::BlockerConfigure),
+            "blocker_lists" => Some(CommandName::BlockerLists),
             "blocker_picker" => Some(CommandName::BlockerPicker),
             "blocker_refresh_sources" => Some(CommandName::BlockerRefreshSources),
+            "blocker_reset_stats" => Some(CommandName::BlockerResetStats),
             "blocker_retry" => Some(CommandName::BlockerRetry),
             "blocker_set_enabled" => Some(CommandName::BlockerSetEnabled),
             "blocker_site_change" => Some(CommandName::BlockerSiteChange),
@@ -952,9 +962,7 @@ impl CommandName {
             "bookmark_menu_popup" => Some(CommandName::BookmarkMenuPopup),
             "browser_credential_capability" => Some(CommandName::BrowserCredentialCapability),
             "browser_open_url" => Some(CommandName::BrowserOpenUrl),
-            "browser_passkey_authorization_request" => {
-                Some(CommandName::BrowserPasskeyAuthorizationRequest)
-            }
+            "browser_passkey_authorization_request" => Some(CommandName::BrowserPasskeyAuthorizationRequest),
             "browsing_data_call" => Some(CommandName::BrowsingDataCall),
             "chrome_menu_popup" => Some(CommandName::ChromeMenuPopup),
             "default_browser_request" => Some(CommandName::DefaultBrowserRequest),
@@ -1189,9 +1197,7 @@ impl EventChannel {
     pub fn as_str(self) -> &'static str {
         match self {
             EventChannel::EvtBlockerStatusChanged => "blocker-status-changed",
-            EventChannel::EvtBrowserCredentialCapabilityChanged => {
-                "browser-credential-capability-changed"
-            }
+            EventChannel::EvtBrowserCredentialCapabilityChanged => "browser-credential-capability-changed",
             EventChannel::EvtDownloadsChanged => "downloads-changed",
             EventChannel::EvtExtensionActionFailed => "extension-action-failed",
             EventChannel::EvtExtensionActionShortcut => "extension-action-shortcut",
@@ -1222,9 +1228,7 @@ impl EventChannel {
             EventChannel::EvtAstraSwipe => "astra:swipe",
             EventChannel::EvtAstraVoiceChanged => "astra:voice-changed",
             EventChannel::EvtAstraVoiceLevels => "astra:voice-levels",
-            EventChannel::EvtAstraWorkDecisionPreferenceChanged => {
-                "astra:work-decision-preference-changed"
-            }
+            EventChannel::EvtAstraWorkDecisionPreferenceChanged => "astra:work-decision-preference-changed",
             EventChannel::EvtAstraWorkHumanChanged => "astra:work-human-changed",
             EventChannel::EvtAstraWorkModelsChanged => "astra:work-models-changed",
         }

@@ -4,7 +4,7 @@
 
 // P2-T02 TS tests (run: `bun test gen/` from crates/astra-proto).
 // Mirrors the Rust unit tests: envelope version gate, unknown-field
-// tolerance, and registry completeness (267 commands + 35 events).
+// tolerance, and registry completeness (270 commands + 35 events).
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -56,9 +56,9 @@ describe("envelope round trip", () => {
 });
 
 describe("registry completeness", () => {
-  test("267 commands", () => {
-    expect(COMMANDS.length).toBe(267);
-    expect(new Set(COMMANDS).size).toBe(267);
+  test("270 commands", () => {
+    expect(COMMANDS.length).toBe(270);
+    expect(new Set(COMMANDS).size).toBe(270);
     expect(COMMANDS).toContain("tabs_navigate");
     expect(COMMANDS).toContain("work_call");
   });

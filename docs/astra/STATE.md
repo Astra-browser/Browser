@@ -11,6 +11,21 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: Brave-derived blocker, settings and schedule (2026-11-07)
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Ad/tracker blocking | Every normal and private window blocks matching network requests before connect, first- and third-party. The engine is Brave `adblock-rust` (the audited `0.12.1` vendored by Gecko), one instance shared by the hook and chrome. | `blocker/engine/src/lib.rs` (Rust), `AstraBlocker.cpp` (channel hook), `patches/ASTRA-0003/0004/0005`, `overlay/astra/host/Blocker.sys.mjs` | `blocker-probe.py`: loopback `/ad.png` cancelled with **0 server hits**; 155 226 compiled rules on the bundled seed; private flags excluded from counts |
+| Filter lists and updates | 80-list catalog (uBO/EasyList/EasyPrivacy/URLhaus + optional annoyances/regional), per-list toggles, on-disk cache, HTTPS refresh, 24 h default schedule, update-on-start, "Update lists now"; failed updates keep the previous engine. | `blocker/lists/catalog.json`, `blocker/tools/sync.py`, `Blocker.sys.mjs`, `nsIAstraBlockerService` | `blocker-probe.py`: catalog 80/10 defaults, `configure` persists 6 h + 2 lists, update path installs a new revision |
+| Settings | Privacy → Ad, tracker and malware protection renders the status, catalog, schedule, element-hiding/scriptlet switches, counters and reset. | `ui/app/src/features/settings/components/ProtectionControls.svelte`, `domain/blocker`, `blocker_lists`/`blocker_configure`/`blocker_reset_stats` | `blocker-probe.py`: section + 18 visible catalog checkboxes + interval selector in the real app frame |
+| Cosmetic filtering | The page actor injects CSS/scriptlet/procedural payloads from the engine; click-to-hide still uses the same provider. | `overlay/astra/actors/AstraBlocker{Parent,Child}.sys.mjs`, `Content.sys.mjs` `wireHiding` | `blocker-probe.py`: `.astra-test-ad` computed `display:none`; native lookup returns the selector |
+| Branding / telemetry | Brave-owned list sources and `brave-*`/SugarCoat resources are dropped; no rewards, telemetry, P3A, sync or update host. Every list keeps its upstream URL/licence. | `blocker/tools/sync.py`, `blocker/NOTICE.md`, `docs/astra/BLOCKER_UPSTREAM.md` | `sync.py --check`, `brand-lint`, catalog inspection |
+
+Deferred and recorded in `docs/astra/BLOCKER.md`: `$redirect` response-body
+substitution, rare multi-operator procedural filters, and worker-thread
+compilation (would require dropping the `single-thread` feature shared with
+the content classifier).
+
 ## Verification pass — 2026-11-06 (all gates green)
 
 Everything below was re-run against the freshly packed dev build.
@@ -198,17 +213,17 @@ recorded below; this list is what is still genuinely unwired.
   defers the process-actor unregistration past the teardown turn and stops the
   late-resource lookup error (bugs 2044741/1944477); the probe's
   `upstream_noise` is now 0/0/0.
-- **The remaining unrouted command ids.** 200 of the 280 generated commands
-  still have no Host route (account, Work models/human/sites, blocker, page
+- **The remaining unrouted command ids.** 200 of the 270 generated commands
+  still have no Host route (account, Work models/human/sites, page
   assist, voice, profiles, import/export, updates, menus, split/drag-drop,
   downloads manager, media import). They are recorded in
   `tests/contract/wire_baseline.json`; `wire_coverage` fails on any new gap.
   Add each with a UI caller, a route-table entry, a contract test and a live
   probe.
-- **New Tab tracker figure.** `blocker_stats` is still unrouted (Lane 3 owns
-  the blocker). The New Tab figure now hides until a real count arrives instead
-  of drawing `0`; it appears only when the reply is `status: "ok"`. This is a
-  presentation-side guard, not blocker wiring. `media_import` is routed: the
+- **New Tab tracker figure.** `blocker_stats` is now routed to the live
+  engine (D-42); the New Tab figure appears only when the reply is
+  `status: "ok"`, so a missing count is hidden rather than drawn as `0`.
+  `media_import` is routed: the
   picker stores an admitted image in `<ProfD>/astra-media/<profile>/<digest>`
   and the host serves it over `astra-media://localhost/`.
 - **Host projection ownership.** `overlay/astra/host/Tabs.sys.mjs` still derives

@@ -18,7 +18,7 @@ has an owner phase; none is a silent fallback.
 Popup blocking and external-protocol cards have no producer yet, so the
 PageRequestCard only appears for HTTP auth; `Tabs.answerPageRequest` is wired
 and refuses an answer for a card that is not on screen. `Work` author/query/execute, human takeover, model providers, accounts, voice,
-page assist, blocker, browser import/export, updates, profiles, downloads
+page assist, browser import/export, updates, profiles, downloads
 manager, resource media, notes `reveal`, and the tasks/notes Rust store. The
 wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 `unknown_command` for any of these is a product gap, not a deferral to ship.
@@ -73,3 +73,11 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
   pass for pixel parity.
 - Performance budgets for tab-switch/scroll are proposals (p95 ≤ 100 ms / 32 ms);
   the latest run is recorded in `out/perf-final`.
+
+## Blocker (D-42)
+
+The ad/tracker blocker is live (see `BLOCKER.md`). Remaining limits are
+specific, not "unwired": `$redirect` blocks but does not substitute a redirect
+body; rare multi-operator procedural filters are ignored; compilation is
+synchronous on the main thread at install/update. Private windows block but
+never count. No Brave rewards, telemetry, P3A or update host is present.

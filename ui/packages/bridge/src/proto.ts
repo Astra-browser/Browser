@@ -16,7 +16,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 267 command wire names. */
+/** All 270 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -49,8 +49,11 @@ export type CommandName =
   | "account_usage_history"
   | "account_verify"
   | "add_menu_popup"
+  | "blocker_configure"
+  | "blocker_lists"
   | "blocker_picker"
   | "blocker_refresh_sources"
+  | "blocker_reset_stats"
   | "blocker_retry"
   | "blocker_set_enabled"
   | "blocker_site_change"
@@ -319,8 +322,11 @@ export const COMMANDS: readonly CommandName[] = [
   "account_usage_history",
   "account_verify",
   "add_menu_popup",
+  "blocker_configure",
+  "blocker_lists",
   "blocker_picker",
   "blocker_refresh_sources",
+  "blocker_reset_stats",
   "blocker_retry",
   "blocker_set_enabled",
   "blocker_site_change",

@@ -17,6 +17,20 @@ vi.mock("$domain/blocker", () => ({
     refresh: vi.fn().mockResolvedValue(undefined),
     setEnabled: vi.fn(),
     refreshSources: vi.fn(),
+    resetStats: vi.fn(),
+    configure: vi.fn(),
+    lists: vi.fn().mockResolvedValue({
+      available: true,
+      lists: [],
+      update_hours: 24,
+      auto_update: true,
+      cosmetic: true,
+      scriptlets: true,
+      last_update_unix: null,
+      next_update_unix: null,
+      installed_rules: 2,
+      stats: { today: 0, last7Days: 0, days: [] },
+    }),
   },
 }));
 
@@ -50,7 +64,7 @@ test("filter refresh uses the real updater and reports pending settlement", asyn
     operation_id: "refresh",
   });
   const screen = await render(ProtectionControls);
-  await screen.getByRole("button", { name: "Check for updates" }).click();
+  await screen.getByRole("button", { name: "Update lists now" }).click();
   expect(blocker.refreshSources).toHaveBeenCalledExactlyOnceWith();
   await expect.element(screen.getByRole("status")).toHaveTextContent("still being applied");
 });

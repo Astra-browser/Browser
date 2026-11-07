@@ -41,6 +41,25 @@ import { emit } from "./Events.sys.mjs";
 import { admit, refuse } from "./Operations.sys.mjs";
 
 const PREF = "astra.blocker.enabled";
+const LISTS_PREF = "astra.blocker.lists";
+const SCHEDULE_PREF = "astra.blocker.update-hours";
+const AUTO_UPDATE_PREF = "astra.blocker.update-on-startup";
+const COSMETIC_PREF = "astra.blocker.cosmetic";
+const SCRIPTLETS_PREF = "astra.blocker.scriptlets";
+const LAST_UPDATE_PREF = "astra.blocker.last-update";
+const MANIFEST_PREF = "astra.blocker.installed";
+const SITE_EXCEPTIONS_PREF = "astra.blocker.site-exceptions";
+
+// One list is capped at 16 MiB; a whole bundle at 48 MiB. These match the
+// engine's realistic upper bound (uBO + EasyList + privacy) with room for a
+// regional subscription, and keep a hostile URL from exhausting memory.
+const MAX_LIST_BYTES = 16 * 1024 * 1024;
+const MAX_BUNDLE_BYTES = 48 * 1024 * 1024;
+const MAX_LISTS = 128;
+const FETCH_TIMEOUT_MS = 30_000;
+const DEFAULT_UPDATE_HOURS = 24;
+const DEFAULT_ENABLED = true;
+const DATA_ROOT = "resource://astra/blocker/";
 const HEX16 = /^[0-9a-f]{16}$/u;
 
 /** Failure categories the UI understands; unknown values are never echoed. */
@@ -122,6 +141,9 @@ let _installed = false;
 let _revision = 0;
 let _generationSeq = 0;
 let _installing = null;
+let _refreshTimer = null;
+let _startupTimer = null;
+let _actorRegistered = false;
 
 /** Test-only: swap the native/pref adapter. */
 export function __setBlockerBackend(backend) {
@@ -237,47 +259,30 @@ function safeSourcePhase(value) {
     : "not_configured";
 }
 
-/** The C++ management seam, if a later engine patch publishes one. */
+/** The live native seam: `@astra/blocker;1` from ASTRA-0004. */
 function resolveNative() {
   try {
-    if (
-      typeof Services !== "undefined" &&
-      Services?.astraBlocker &&
-      typeof Services.astraBlocker.installRules === "function"
-    ) {
-      return Services.astraBlocker;
-    }
+    if (typeof Cc === "undefined" || typeof Ci === "undefined") return null;
+    const service = Cc["@astra/blocker;1"]?.getService(Ci.nsIAstraBlockerService);
+    if (!service) return null;
+    return {
+      installRules: (rules) => service.installRules(rules),
+      setResources: (json) => service.setResources(json),
+      setEnabled: (enabled) => service.setEnabled(enabled),
+      setSiteEnabled: (host, enabled) => service.setSiteEnabled(host, enabled),
+      isSiteEnabled: (host) => service.isSiteEnabled(host) === true,
+      isInitialized: () => service.initialized === true,
+      isEnabled: () => service.enabled === true,
+      statusJson: () => service.status(),
+      statsJson: () => service.stats(),
+      resetStats: () => service.resetStats(),
+      siteExceptionsJson: () => service.siteExceptions(),
+      cosmeticFor: (url, classesJson, idsJson) =>
+        service.cosmeticFor(String(url), classesJson, idsJson),
+    };
   } catch {
-    // No published object.
+    return null;
   }
-  try {
-    if (typeof Cc !== "undefined" && typeof Ci !== "undefined") {
-      const service = Cc["@astra/blocker;1"]?.getService(
-        Ci.nsIAstraBlockerService
-      );
-      if (service) {
-        // Normalise the XPCOM service onto the same small shape as the
-        // published object. Only methods the engine actually exposes are
-        // required; everything optional is probed at call time.
-        return {
-          installRules: (rules) => service.installRules(rules),
-          setEnabled: (enabled) => service.setEnabled(enabled),
-          setSiteEnabled: (host, enabled) => service.setSiteEnabled(host, enabled),
-          isSiteEnabled: (host) => service.isSiteEnabled?.(host) ?? true,
-          isInitialized: () => service.isInitialized === true,
-          isEnabled: () => service.isEnabled === true,
-          coverage: () => service.coverage ?? null,
-          diagnostics: () => service.diagnostics ?? null,
-          stats: (profile) => service.stats?.(profile) ?? null,
-          refreshSources: () => service.refreshSources?.() ?? null,
-          picker: (context, action) => service.picker?.(context, action) ?? null,
-        };
-      }
-    }
-  } catch {
-    // No XPCOM seam in this build (the expected state; see the header).
-  }
-  return null;
 }
 
 function nativeState(backend) {
@@ -335,6 +340,517 @@ function emptyBackend() {
   };
 }
 
+// --- Filter source pipeline ------------------------------------------------
+// The native service only compiles what it is handed. The Host owns the
+// catalog, the on-disk cache and the network, so an engine update is one
+// native install and a list failure never removes working rules.
+
+let _catalogCache = null;
+
+function chromeScope() {
+  try {
+    if (
+      typeof ChromeUtils !== "undefined" &&
+      typeof Services !== "undefined" &&
+      typeof Cc !== "undefined" &&
+      typeof Ci !== "undefined"
+    ) {
+      return { ChromeUtils, Services, Cc, Ci };
+    }
+  } catch {
+    // Node contract tests have no chrome globals.
+  }
+  return null;
+}
+
+function prefBool(name, fallback) {
+  try {
+    return Services.prefs.getBoolPref(name, fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+function prefInt(name, fallback) {
+  try {
+    return Services.prefs.getIntPref(name, fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+function prefString(name, fallback) {
+  try {
+    return Services.prefs.getStringPref(name, fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+function writePrefString(name, value) {
+  try {
+    Services.prefs.setStringPref(name, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function importGecko(path) {
+  try {
+    return ChromeUtils.importESModule(path);
+  } catch {
+    return null;
+  }
+}
+
+async function readResourceText(url) {
+  const chrome = chromeScope();
+  if (!chrome) throw new Error("no_chrome");
+  if (typeof fetch === "function") {
+    const response = await fetch(url, { credentials: "omit" });
+    if (!response.ok) throw new Error(`http_${response.status}`);
+    return await response.text();
+  }
+  const { NetUtil } = importGecko("resource://gre/modules/NetUtil.sys.mjs") ?? {};
+  if (!NetUtil) throw new Error("no_netutil");
+  return await new Promise((resolve, reject) => {
+    NetUtil.asyncFetch(
+      { uri: url, loadUsingSystemPrincipal: true },
+      (stream, status) => {
+        try {
+          if (!Components.isSuccessCode(status)) {
+            return reject(new Error(`status_${status}`));
+          }
+          resolve(
+            NetUtil.readInputStreamToString(stream, stream.available(), {
+              charset: "utf-8",
+            }),
+          );
+        } catch (error) {
+          reject(error);
+        }
+      },
+    );
+  });
+}
+
+async function readResourceGzipText(url) {
+  if (typeof fetch !== "function" || typeof DecompressionStream !== "function") {
+    throw new Error("gzip_unavailable");
+  }
+  const response = await fetch(url, { credentials: "omit" });
+  if (!response.ok) throw new Error(`http_${response.status}`);
+  const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(stream).text();
+}
+
+/** Reads a response body, refusing to buffer more than `max` bytes. */
+async function readCapped(response, max) {
+  const length = Number(response.headers?.get?.("content-length"));
+  if (Number.isFinite(length) && length > max) throw new Error("too_large");
+  if (!response.body?.getReader) {
+    const text = await response.text();
+    if (text.length > max) throw new Error("too_large");
+    return text;
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > max) {
+        await reader.cancel();
+        throw new Error("too_large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function fetchListText(url) {
+  if (typeof fetch !== "function") throw new Error("transport");
+  if (!/^https:\/\//iu.test(url)) throw new Error("insecure_source");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      credentials: "omit",
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`http_${response.status}`);
+    // A source that starts on HTTPS must stay on HTTPS; a downgraded body is
+    // scriptlet input and is not trusted.
+    if (response.url && !/^https:/iu.test(response.url)) {
+      throw new Error("insecure_redirect");
+    }
+    const text = await readCapped(response, MAX_LIST_BYTES);
+    if (text.length === 0) throw new Error("empty");
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function cachePaths() {
+  const chrome = chromeScope();
+  if (!chrome) return null;
+  const { PathUtils } = importGecko("resource://gre/modules/PathUtils.sys.mjs") ?? {};
+  const { IOUtils } = importGecko("resource://gre/modules/IOUtils.sys.mjs") ?? {};
+  if (!PathUtils || !IOUtils) return null;
+  const dir = PathUtils.join(PathUtils.profileDir, "astra", "blocker", "lists");
+  return { IOUtils, PathUtils, dir };
+}
+
+async function readCachedList(id) {
+  const cache = cachePaths();
+  if (!cache) return "";
+  try {
+    const text = await cache.IOUtils.readUTF8(
+      cache.PathUtils.join(cache.dir, `${id}.txt`),
+    );
+    if (!text || text.length > MAX_LIST_BYTES) return "";
+    return text;
+  } catch {
+    return "";
+  }
+}
+
+async function writeCachedList(id, text) {
+  const cache = cachePaths();
+  if (!cache) return false;
+  try {
+    await cache.IOUtils.makeDirectory(cache.dir, { ignoreExisting: true });
+    await cache.IOUtils.writeUTF8(
+      cache.PathUtils.join(cache.dir, `${id}.txt`),
+      text,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadCatalog() {
+  if (_catalogCache) return _catalogCache;
+  const text = await readResourceText(`${DATA_ROOT}catalog.json`);
+  const parsed = JSON.parse(text);
+  if (
+    !parsed ||
+    parsed.schema_version !== 1 ||
+    !Array.isArray(parsed.lists) ||
+    parsed.lists.length === 0
+  ) {
+    throw new Error("bad_catalog");
+  }
+  _catalogCache = parsed;
+  return parsed;
+}
+
+function selectedListIds(catalog) {
+  const known = new Set(catalog.lists.map((entry) => entry.id));
+  const raw = prefString(LISTS_PREF, "");
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((id) => typeof id === "string" && known.has(id));
+      }
+    } catch {
+      // Fall through to defaults.
+    }
+  }
+  return catalog.lists
+    .filter((entry) => entry.default_enabled === true)
+    .map((entry) => entry.id);
+}
+
+function countRules(text) {
+  let count = 0;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("!") && !trimmed.startsWith("[")) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+async function sha256Hex(text) {
+  try {
+    if (typeof crypto?.subtle?.digest === "function") {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(text),
+      );
+      return Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+    }
+  } catch {
+    // Fall through to a cheap deterministic revision.
+  }
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${hash.toString(16).padStart(8, "0")}${text.length
+    .toString(16)
+    .padStart(8, "0")}`;
+}
+
+async function loadOneList(entry, { refresh = false } = {}) {
+  let text = "";
+  let from = "cache";
+  if (!refresh) {
+    text = await readCachedList(entry.id);
+  }
+  if (!text) {
+    try {
+      text = await fetchListText(entry.source_url);
+      from = "network";
+    } catch {
+      // A failed refresh must fall back to the last good cache, not to an
+      // older bundled seed that would silently downgrade a list.
+      from = "cache";
+      text = await readCachedList(entry.id);
+      if (!text && entry.bundled) {
+        from = "bundled";
+        try {
+          text = await readResourceGzipText(
+            `${DATA_ROOT}seed/${entry.id}.txt.gz`,
+          );
+          if (text.length > MAX_LIST_BYTES) text = "";
+        } catch {
+          text = "";
+        }
+      }
+    }
+  }
+  if (text) {
+    await writeCachedList(entry.id, text);
+  }
+  return { id: entry.id, text, from, bytes: text.length };
+}
+
+async function buildBundle({ refresh = false } = {}) {
+  const catalog = await loadCatalog();
+  const ids = selectedListIds(catalog).slice(0, MAX_LISTS);
+  const byId = new Map(ids.map((id) => [id, catalog.lists.find((l) => l.id === id)]));
+  const sources = [];
+  const manifest = {};
+  const missing = [];
+  let totalBytes = 0;
+  let totalRules = 0;
+
+  // Bounded concurrency: four sources at a time keeps the network and the
+  // parse buffers small; a slow subscription cannot stall the rest.
+  const queue = [...byId.values()].filter(Boolean);
+  const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const entry = queue.shift();
+      const loaded = await loadOneList(entry, { refresh });
+      if (!loaded.text) {
+        missing.push(entry.id);
+        continue;
+      }
+      if (totalBytes + loaded.bytes > MAX_BUNDLE_BYTES) continue;
+      totalBytes += loaded.bytes;
+      totalRules += countRules(loaded.text);
+      sources.push(loaded);
+      manifest[loaded.id] = {
+        bytes: loaded.bytes,
+        from: loaded.from,
+        sha256: (await sha256Hex(loaded.text)).slice(0, 64),
+      };
+    }
+  });
+  await Promise.all(workers);
+
+  if (sources.length === 0) {
+    return {
+      ok: false,
+      failure: "transport",
+      rules: "",
+      count: 0,
+      bytes: 0,
+      missing,
+    };
+  }
+  sources.sort((left, right) => left.id.localeCompare(right.id));
+  const rules = sources
+    .map((source) => `! ==== astra:${source.id} ====\n${source.text}`)
+    .join("\n");
+  return {
+    ok: true,
+    failure: null,
+    rules,
+    count: sources.length,
+    bytes: totalBytes,
+    compiledRules: totalRules,
+    manifest,
+    missing,
+    revision: (await sha256Hex(rules)).slice(0, 16),
+  };
+}
+
+function readManifest() {
+  try {
+    const parsed = JSON.parse(prefString(MANIFEST_PREF, ""));
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordInstall(bundle) {
+  const now = Math.floor(Date.now() / 1000);
+  _state.sourcePhase = "fresh";
+  _state.sourceFailure = null;
+  _state.sourceCount = bundle.count;
+  _state.sourceBytes = bundle.bytes;
+  _state.sourcePackageRevision = bundle.revision;
+  _state.sourceInstalledRevision = bundle.revision;
+  _state.sourcePackageProvenance = "official_https";
+  _state.sourceInstalledProvenance = "official_https";
+  _state.sourcePackageCreatedUnix = String(now);
+  _state.sourcePackageExpiresUnix = String(now + 86_400 * 2);
+  _state.sourcePackageStale = false;
+  _state.sourceRefreshDue = false;
+  try {
+    Services.prefs.setIntPref(LAST_UPDATE_PREF, now);
+  } catch {
+    // A locked pref is not fatal: the manifest still carries the revision.
+  }
+  writePrefString(
+    MANIFEST_PREF,
+    JSON.stringify({
+      revision: bundle.revision,
+      updated_unix: now,
+      count: bundle.count,
+      bytes: bundle.bytes,
+      lists: bundle.manifest,
+    }),
+  );
+}
+
+function hydrateState() {
+  const manifest = readManifest();
+  if (!manifest) return;
+  if (typeof manifest.revision === "string" && HEX16.test(manifest.revision)) {
+    _state.sourcePackageRevision = manifest.revision;
+    _state.sourceInstalledRevision = manifest.revision;
+    _state.sourcePackageProvenance = "official_https";
+    _state.sourceInstalledProvenance = "official_https";
+  }
+  if (Number.isSafeInteger(manifest.count)) _state.sourceCount = manifest.count;
+  if (Number.isSafeInteger(manifest.bytes)) _state.sourceBytes = manifest.bytes;
+  if (Number.isSafeInteger(manifest.updated_unix)) {
+    _state.sourcePackageCreatedUnix = String(manifest.updated_unix);
+    _state.sourcePhase = "stale";
+  }
+}
+
+function readSiteExceptions() {
+  try {
+    const parsed = JSON.parse(prefString(SITE_EXCEPTIONS_PREF, "[]"));
+    return Array.isArray(parsed)
+      ? parsed.filter((host) => typeof host === "string" && host !== "")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSiteException(host, paused) {
+  const site = String(host ?? "").trim().toLowerCase();
+  if (!site) return false;
+  const current = new Set(readSiteExceptions());
+  if (paused) current.add(site);
+  else current.delete(site);
+  return writePrefString(
+    SITE_EXCEPTIONS_PREF,
+    JSON.stringify([...current].sort()),
+  );
+}
+
+function applySiteExceptions(native) {
+  for (const host of readSiteExceptions()) {
+    try {
+      native.setSiteEnabled(host, false);
+    } catch {
+      // A single bad host must not stop the install.
+    }
+  }
+}
+
+async function installNative(native) {
+  await Promise.resolve();
+  try {
+    const resources = await readResourceText(`${DATA_ROOT}resources.json`);
+    if (resources) native.setResources(resources);
+  } catch {
+    // Cosmetic resources are an enhancement; network blocking still installs.
+  }
+  const bundle = await buildBundle({ refresh: false });
+  if (!bundle.ok) return { ok: false, failure: bundle.failure ?? "transport" };
+  applySiteExceptions(native);
+  try {
+    native.installRules(bundle.rules);
+  } catch {
+    return { ok: false, failure: "native_installation" };
+  }
+  recordInstall(bundle);
+  return {
+    ok: true,
+    generation: mintGeneration(),
+    coverage: null,
+    missing: bundle.missing,
+  };
+}
+
+async function refreshNative(native) {
+  const bundle = await buildBundle({ refresh: true });
+  if (!bundle.ok) return { ok: false, failure: bundle.failure ?? "transport" };
+  try {
+    const resources = await readResourceText(`${DATA_ROOT}resources.json`);
+    if (resources) native.setResources(resources);
+  } catch {
+    // Keep the previous resource set.
+  }
+  applySiteExceptions(native);
+  try {
+    native.installRules(bundle.rules);
+  } catch {
+    return { ok: false, failure: "native_installation" };
+  }
+  recordInstall(bundle);
+  return {
+    ok: true,
+    generation: mintGeneration(),
+    coverage: null,
+    revision: bundle.revision,
+    count: bundle.count,
+    bytes: bundle.bytes,
+    provenance: "official_https",
+    missing: bundle.missing,
+  };
+}
+
 function liveBackend() {
   if (_live) return _live;
   if (typeof ChromeUtils === "undefined" || typeof Services === "undefined") {
@@ -360,7 +876,10 @@ function liveBackend() {
   _live = {
     readEnabled() {
       try {
-        return Services.prefs.getBoolPref(PREF, false);
+        if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
+          return DEFAULT_ENABLED;
+        }
+        return Services.prefs.getBoolPref(PREF, DEFAULT_ENABLED);
       } catch {
         return null;
       }
@@ -386,112 +905,38 @@ function liveBackend() {
           failure: "native_unsupported",
         };
       }
-      let initialized = false;
-      let enabled = false;
+      let info = {};
       try {
-        initialized = native.isInitialized?.() === true;
+        info = JSON.parse(native.statusJson() || "{}");
       } catch {
-        initialized = false;
+        info = {};
       }
-      try {
-        enabled = native.isEnabled?.() === true;
-      } catch {
-        enabled = false;
-      }
-      let cov = null;
-      let diag = null;
-      try {
-        cov = coverage(native.coverage?.());
-      } catch {
-        cov = null;
-      }
-      try {
-        diag = diagnostics(native.diagnostics?.());
-      } catch {
-        diag = null;
-      }
+      const initialized = info.initialized === true;
+      const enabled = info.enabled === true;
       return {
         available: true,
         ready: initialized,
         initialized,
         enabled,
-        coverage: cov,
-        diagnostics: diag,
+        coverage: null,
+        diagnostics: null,
         failure: null,
       };
     },
     async installRules() {
       const native = resolveNative();
       if (!native) return { ok: false, failure: "native_unsupported" };
-      let rules = null;
-      if (typeof native.readRules === "function") {
-        try {
-          rules = await Promise.resolve(native.readRules());
-        } catch {
-          rules = null;
-        }
-        if (typeof rules !== "string" || rules.trim() === "") {
-          return { ok: false, failure: "compile_source_unavailable" };
-        }
-        if (rules.length > 64 * 1024 * 1024) {
-          return { ok: false, failure: "compile_resource_limit" };
-        }
-      }
       try {
-        const result = await Promise.resolve(native.installRules(rules ?? undefined));
-        if (typeof result === "number") {
-          // A future XPCOM wrapper may return nsresult; 0 is success.
-          if (result !== 0) return { ok: false, failure: "native_installation" };
-          return { ok: true, generation: null, coverage: null };
-        }
-        if (result && result.ok === false) {
-          return {
-            ok: false,
-            failure: failure(result.failure) ?? "native_installation",
-          };
-        }
-        const generation =
-          typeof result?.generation === "string" && HEX16.test(result.generation)
-            ? result.generation
-            : null;
-        return {
-          ok: true,
-          generation,
-          coverage: coverage(result?.coverage),
-        };
+        return await installNative(native);
       } catch {
         return { ok: false, failure: "native_installation" };
       }
     },
     async refreshSources() {
       const native = resolveNative();
-      if (!native || typeof native.refreshSources !== "function") {
-        return { ok: false, failure: "internal" };
-      }
+      if (!native) return { ok: false, failure: "native_unsupported" };
       try {
-        const result = await Promise.resolve(native.refreshSources());
-        if (typeof result === "number") {
-          if (result !== 0) return { ok: false, failure: "internal" };
-          return { ok: true, generation: null, coverage: null };
-        }
-        if (!result || result.ok !== true) {
-          return { ok: false, failure: sourceFailure(result?.failure) ?? "internal" };
-        }
-        return {
-          ok: true,
-          generation:
-            typeof result.generation === "string" && HEX16.test(result.generation)
-              ? result.generation
-              : null,
-          coverage: coverage(result.coverage),
-          revision:
-            typeof result.revision === "string" && HEX16.test(result.revision)
-              ? result.revision
-              : null,
-          count: integer(result.count),
-          bytes: integer(result.bytes),
-          provenance: provenance(result.provenance),
-        };
+        return await refreshNative(native);
       } catch {
         return { ok: false, failure: "internal" };
       }
@@ -510,7 +955,7 @@ function liveBackend() {
         const native = resolveNative();
         if (!native?.setSiteEnabled) return false;
         native.setSiteEnabled(site, enabled);
-        return true;
+        return writeSiteException(site, enabled === false);
       } catch {
         return false;
       }
@@ -547,7 +992,7 @@ function liveBackend() {
       const profile = privateWindow() ? "incognito" : "default";
       let paused = false;
       try {
-        if (native.isSiteEnabled) paused = native.isSiteEnabled(site) === false;
+        paused = native.isSiteEnabled(site) === false;
       } catch {
         paused = false;
       }
@@ -565,26 +1010,33 @@ function liveBackend() {
         },
         paused,
         private_session: profile === "incognito",
-        ready: native.isInitialized?.() === true,
+        ready: native.isInitialized() === true,
         busy: false,
         hides: [],
       };
     },
     stats(profile) {
+      // Private windows are blocked but never recorded (D-41).
+      if (profile === "incognito") {
+        return { today: null, last7Days: null, days: [] };
+      }
       try {
         const native = resolveNative();
-        return native?.stats?.(profile) ?? null;
+        if (!native) return null;
+        const parsed = JSON.parse(native.statsJson() || "{}");
+        return {
+          today: integer(parsed.today),
+          last7Days: integer(parsed.last_7_days ?? parsed.last7Days),
+          days: Array.isArray(parsed.days)
+            ? parsed.days.map((value) => integer(value))
+            : [],
+        };
       } catch {
         return null;
       }
     },
-    async picker(context, action) {
-      try {
-        const native = resolveNative();
-        return native?.picker?.(context, action) ?? null;
-      } catch {
-        return null;
-      }
+    async picker() {
+      return null;
     },
   };
   return _live;
@@ -753,7 +1205,8 @@ async function installRules(backend) {
     _state.failure = null;
     return { ok: true, generation: installed };
   }
-  _state.applied = null;
+  // The Rust side keeps the previous engine on a failed compile; keep the
+  // retained generation here too so status does not claim protection vanished.
   _state.failure = failure(result?.failure) ?? "native_installation";
   return { ok: false, failure: _state.failure };
 }
@@ -825,11 +1278,15 @@ export function install() {
       try {
         if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
           // Define the gate the C++ hook reads; a user value still wins.
-          Services.prefs.getDefaultBranch("").setBoolPref(PREF, false);
+          Services.prefs.getDefaultBranch("").setBoolPref(PREF, DEFAULT_ENABLED);
         }
       } catch {
         // A locked default is fine: the read below reports what exists.
       }
+      hydrateState();
+      registerActor();
+      scheduleRefresh();
+      scheduleStartupRefresh();
       _installed = true;
     }
   } catch {
@@ -838,9 +1295,95 @@ export function install() {
   return _installed;
 }
 
+function scheduleRefresh() {
+  if (_refreshTimer !== null) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
+  const chrome = chromeScope();
+  if (!chrome) return;
+  if (prefBool(AUTO_UPDATE_PREF, true) !== true) return;
+  const hours = Math.min(720, Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)));
+  if (hours <= 0) return;
+  // Clamp to the 32-bit timer ceiling; a chained timer re-arms for longer
+  // intervals instead of wrapping to a near-zero delay.
+  const interval = Math.min(hours * 60 * 60 * 1000, 2_147_483_647);
+  _refreshTimer = setInterval(() => {
+    void autoRefresh("scheduled").catch(() => {
+      // The next scheduled run retries; a failed refresh keeps the engine.
+    });
+  }, interval);
+}
+
+function scheduleStartupRefresh() {
+  if (_startupTimer !== null) return;
+  const chrome = chromeScope();
+  if (!chrome || prefBool(AUTO_UPDATE_PREF, true) !== true) return;
+  const hours = Math.min(720, Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)));
+  if (hours <= 0) return;
+  const now = Math.floor(Date.now() / 1000);
+  const last = prefInt(LAST_UPDATE_PREF, 0);
+  if (last > 0 && now - last < hours * 3600) return;
+  // Let the window and the first page settle before the updater competes
+  // with boot; the timer is cleared on uninstall.
+  _startupTimer = setTimeout(() => {
+    _startupTimer = null;
+    void autoRefresh("startup").catch(() => {});
+  }, 20_000);
+}
+
+async function autoRefresh(reason) {
+  if (prefBool(AUTO_UPDATE_PREF, true) !== true) return;
+  const backend = getBackend();
+  if (readEnabled(backend) !== true) return;
+  if (!nativeState(backend).available) return;
+  const result = await refreshAndInstall(backend);
+  publish();
+  return { reason, ...result };
+}
+
+function registerActor() {
+  const chrome = chromeScope();
+  if (!chrome || _actorRegistered) return;
+  try {
+    chrome.ChromeUtils.registerWindowActor("AstraBlocker", {
+      parent: {
+        esModuleURI: "resource://astra/actors/AstraBlockerParent.sys.mjs",
+      },
+      child: {
+        esModuleURI: "resource://astra/actors/AstraBlockerChild.sys.mjs",
+        events: { DOMContentLoaded: {} },
+      },
+      allFrames: true,
+      includeChrome: false,
+    });
+    _actorRegistered = true;
+  } catch {
+    // Already registered by another window, or an older engine without
+    // dynamic actors. Network blocking does not depend on the actor.
+    _actorRegistered = false;
+  }
+}
+
 export function uninstall() {
   if (!_installed) return;
   _installed = false;
+  if (_refreshTimer !== null) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
+  if (_startupTimer !== null) {
+    clearTimeout(_startupTimer);
+    _startupTimer = null;
+  }
+  if (_actorRegistered) {
+    try {
+      ChromeUtils.unregisterWindowActor("AstraBlocker");
+    } catch {
+      // The actor was never registered in this process.
+    }
+    _actorRegistered = false;
+  }
   try {
     Services.prefs.removeObserver(PREF, OBSERVER);
   } catch {
@@ -1001,6 +1544,11 @@ export const Blocker = {
     if (!nativeState(backend).available) {
       return refuse("native_dispatch_rejected");
     }
+    if (context.profile !== "default") {
+      // The native site switch is process-wide; a private pause must not
+      // leak into normal windows or the shared exception pref.
+      return refuse("invalid_scope");
+    }
     const current = siteView(backend);
     if (
       !current ||
@@ -1025,7 +1573,11 @@ export const Blocker = {
       return admit({ outcome: "applied", reason: "mutation_applied" });
     }
     if (action.kind === "retry") {
-      const result = await retryGeneration(backend, context.revision);
+      const token =
+        _state.desired?.generation ??
+        _state.applied?.generation ??
+        context.revision;
+      const result = await retryGeneration(backend, token);
       publish();
       if (result.ok) {
         return admit({ outcome: "applied", reason: "mutation_applied" });
@@ -1037,9 +1589,233 @@ export const Blocker = {
     return refuse("unsupported_command");
   },
 
-  /** Picker controls are not wired while the native seam is missing. */
+  /** Picker controls are owned by ContentHide; the blocker itself has none. */
   async picker() {
     return null;
+  },
+
+  /**
+   * The Settings page's source of truth: catalog entries, which ones are
+   * enabled, the scheduler and the bounded counters. Reads the running
+   * native engine; never invents a list or a count.
+   */
+  async lists() {
+    install();
+    let catalog = null;
+    try {
+      catalog = await loadCatalog();
+    } catch {
+      catalog = null;
+    }
+    const backend = getBackend();
+    const native = nativeState(backend);
+    const manifest = readManifest();
+    const selected = catalog ? new Set(selectedListIds(catalog)) : new Set();
+    const stats = await Blocker.stats({ profile: "default" });
+    const hours = Math.max(
+      0,
+      Math.min(720, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)),
+    );
+    const last = prefInt(LAST_UPDATE_PREF, 0);
+    let installedRules = 0;
+    try {
+      const service = resolveNative();
+      const info = service ? JSON.parse(service.statusJson() || "{}") : {};
+      installedRules = Number.isSafeInteger(info?.version?.rules)
+        ? info.version.rules
+        : 0;
+    } catch {
+      installedRules = 0;
+    }
+    return {
+      available: catalog !== null && native.available,
+      lists: catalog
+        ? catalog.lists.map((entry) => {
+            const installed = manifest?.lists?.[entry.id] ?? null;
+            return {
+              id: entry.id,
+              title: entry.title,
+              group: entry.group,
+              enabled: selected.has(entry.id),
+              bundled: entry.bundled === true,
+              source_url: entry.source_url,
+              support_url: entry.support_url ?? "",
+              license: entry.license?.license_expression ?? "",
+              updated_unix:
+                installed && Number.isSafeInteger(manifest?.updated_unix)
+                  ? manifest.updated_unix
+                  : null,
+              bytes:
+                installed && Number.isSafeInteger(installed.bytes)
+                  ? installed.bytes
+                  : null,
+            };
+          })
+        : [],
+      update_hours: hours,
+      auto_update: prefBool(AUTO_UPDATE_PREF, true),
+      cosmetic: prefBool(COSMETIC_PREF, true),
+      scriptlets: prefBool(SCRIPTLETS_PREF, true),
+      last_update_unix: last > 0 ? last : null,
+      next_update_unix:
+        hours > 0
+          ? last > 0
+            ? last + hours * 3600
+            : Math.floor(Date.now() / 1000) + hours * 3600
+          : null,
+      installed_rules: installedRules,
+      stats,
+    };
+  },
+
+  /**
+   * Update the user-facing parameters. List membership triggers one
+   * reinstall from the on-disk cache (network only if a list was never
+   * fetched); the other switches take effect in the running engine and the
+   * actor immediately. Validation happens before any pref is written.
+   */
+  async configure({
+    list_ids = null,
+    update_hours = null,
+    auto_update = null,
+    cosmetic = null,
+    scriptlets = null,
+  } = {}) {
+    install();
+    if (
+      (list_ids !== null &&
+        (!Array.isArray(list_ids) ||
+          list_ids.length > MAX_LISTS ||
+          list_ids.some((id) => typeof id !== "string" || id === ""))) ||
+      (update_hours !== null &&
+        (!Number.isSafeInteger(update_hours) ||
+          update_hours < 0 ||
+          update_hours > 720)) ||
+      (auto_update !== null && typeof auto_update !== "boolean") ||
+      (cosmetic !== null && typeof cosmetic !== "boolean") ||
+      (scriptlets !== null && typeof scriptlets !== "boolean")
+    ) {
+      return refuse("invalid_input");
+    }
+    const chrome = chromeScope();
+    if (!chrome) return refuse("unsupported_command");
+    const native = nativeState(getBackend());
+    if (!native.available || typeof getBackend().installRules !== "function") {
+      return refuse("native_dispatch_rejected");
+    }
+    let ids = null;
+    if (list_ids !== null) {
+      try {
+        const catalog = await loadCatalog();
+        const known = new Set(catalog.lists.map((entry) => entry.id));
+        ids = [...new Set(list_ids)].filter((id) => known.has(id));
+        if (ids.length === 0) return refuse("invalid_input");
+      } catch {
+        return refuse("store_admission_rejected");
+      }
+    }
+    const previous = (() => {
+      try {
+        return new Set(JSON.parse(prefString(LISTS_PREF, "[]")));
+      } catch {
+        return new Set();
+      }
+    })();
+    let listsChanged = false;
+    try {
+      if (ids !== null) {
+        if (!writePrefString(LISTS_PREF, JSON.stringify(ids))) {
+          return refuse("store_admission_rejected");
+        }
+        listsChanged =
+          ids.length !== previous.size ||
+          ids.some((id) => !previous.has(id));
+      }
+      if (update_hours !== null) {
+        Services.prefs.setIntPref(SCHEDULE_PREF, update_hours);
+      }
+      if (auto_update !== null) {
+        Services.prefs.setBoolPref(AUTO_UPDATE_PREF, auto_update);
+      }
+      if (cosmetic !== null) {
+        Services.prefs.setBoolPref(COSMETIC_PREF, cosmetic);
+      }
+      if (scriptlets !== null) {
+        Services.prefs.setBoolPref(SCRIPTLETS_PREF, scriptlets);
+      }
+    } catch {
+      return refuse("store_admission_rejected");
+    }
+    scheduleRefresh();
+    if (listsChanged) {
+      const result = await ensureInstalled(getBackend());
+      publish();
+      if (!result.ok) return refuse("native_work_pending");
+      if (Array.isArray(result.missing) && result.missing.length > 0) {
+        return refuse("native_work_pending");
+      }
+    } else {
+      publish();
+    }
+    return admit({ outcome: "applied", reason: "mutation_applied" });
+  },
+
+  /** Clear the bounded counters (settings action; never touches rules). */
+  async resetStats() {
+    install();
+    const native = resolveNative();
+    if (!native || typeof native.resetStats !== "function") {
+      return refuse("native_dispatch_rejected");
+    }
+    try {
+      native.resetStats();
+    } catch {
+      return refuse("native_work_pending");
+    }
+    publish();
+    return admit({ outcome: "applied", reason: "mutation_applied" });
+  },
+
+  /**
+   * CSS selectors the page at `url` should hide, plus the scriptlet payload.
+   * Synchronous on purpose: the ContentHide provider and the actor both read
+   * it per page and per mutation batch. Empty when cosmetic filtering is
+   * off, the engine is absent or the lookup fails.
+   */
+  cosmeticPayload(url, classes = [], ids = []) {
+    const empty = { selectors: [], script: "", procedural: [] };
+    try {
+      if (!prefBool(COSMETIC_PREF, true)) return empty;
+      const native = resolveNative();
+      if (!native) return empty;
+      const parsed = JSON.parse(
+        native.cosmeticFor(
+          String(url ?? ""),
+          JSON.stringify(Array.isArray(classes) ? classes.slice(0, 512) : []),
+          JSON.stringify(Array.isArray(ids) ? ids.slice(0, 512) : []),
+        ) || "{}",
+      );
+      return {
+        selectors: Array.isArray(parsed.selectors) ? parsed.selectors : [],
+        script: prefBool(SCRIPTLETS_PREF, true)
+          ? typeof parsed.script === "string"
+            ? parsed.script
+            : ""
+          : "",
+        procedural: Array.isArray(parsed.procedural) ? parsed.procedural : [],
+      };
+    } catch {
+      return empty;
+    }
+  },
+
+  cosmeticSelectors(url, classes = [], ids = []) {
+    return Blocker.cosmeticPayload(url, classes, ids).selectors;
+  },
+
+  /** "Check for updates now" (same path as the scheduler). */
+  async updateNow() {
+    return Blocker.refreshSources();
   },
 
   install,
