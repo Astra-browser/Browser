@@ -69,6 +69,13 @@ Additional properties:
   profiles.
 - A private window records no spaces; the private scope never writes a
   snapshot.
+- **Trust boundary.** The space boundary is against web content: a page in one
+  space cannot read another space's cookies, storage or session. An installed
+  extension runs at profile scope, as in any single-process browser, and can
+  read the spaces of the profile that installed it; install only trusted
+  extensions. OS-level malware is outside the browser boundary. This is why the
+  global credential stores are off: a stolen or hostile page has no browser
+  password store to read.
 - A space's ownership is immutable after adoption. The only exception is the
   one-time adoption of spaces saved before ownership existed, which the running
   profile performs on the first Profiles read.
