@@ -81,3 +81,10 @@ specific, not "unwired": `$redirect` blocks but does not substitute a redirect
 body; rare multi-operator procedural filters are ignored; compilation is
 synchronous on the main thread at install/update. Private windows block but
 never count. No Brave rewards, telemetry, P3A or update host is present.
+
+## Fingerprinting (D-43)
+
+FPP is on with a strengthened target set (`FINGERPRINTING.md`). It does not
+spoof the user agent, timezone or screen because that breaks real layouts and
+some sites; RFP remains opt-in. FPP reduces the cheap high-entropy surfaces
+(canvas, GPU, audio, fonts, display metrics), not unlinkability as a whole.

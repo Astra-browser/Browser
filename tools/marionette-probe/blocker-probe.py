@@ -253,6 +253,7 @@ try:
         title: text.includes('Ad, tracker and malware protection'),
         lists: text.includes('Filter lists'),
         schedule: text.includes('Check interval'),
+        fingerprint: (doc.body?.textContent ?? '').includes('Fingerprinting protection'),
         boxes,
         snippet: text.slice(Math.max(0, text.indexOf('Filter lists')), Math.max(0, text.indexOf('Filter lists')) + 400),
       });
@@ -273,6 +274,7 @@ try:
     check("settings page renders the blocker section", view.get("title") is True, settings)
     check("settings page renders the list catalog", view.get("lists") is True and view.get("boxes", 0) > 0, settings)
     check("settings page renders the schedule", view.get("schedule") is True, settings)
+    check("settings page renders the fingerprinting switch", view.get("fingerprint") is True, settings)
 
     print("HITS", HITS)
 finally:

@@ -110,3 +110,23 @@ hook moved) → `forge build --jobs 2` → `blocker-probe.py`.
 - **List sources are HTTPS URLs.** A future release can add a signed manifest
   / pinned mirror; the current update validates size, emptiness and a bundle
   byte cap, and never removes the last working engine.
+
+## Real-web smoke (2026-11-07, optional network probe)
+
+`tools/marionette-probe/real-sites-probe.py` loads ad-heavy pages in a
+throwaway hard-muted profile (global `media.volume_scale="0.0"`, every tab
+`audioMuted`, video `muted` before play). It is not part of the canonical gate
+because it depends on the live web, but it is the evidence for "works on real
+sites":
+
+| Site | Blocked | Decisions | Trackers with `transferSize=0` | Visible ad slots | Media |
+|---|---:|---:|---|---:|---|
+| speedtest.net | 9 | 103 | doubleclick, googletagmanager | 0 | — |
+| theverge.com | 46 | 247 | doubleclick, amazon-adsystem, googletagservices | 0 | — |
+| edition.cnn.com | 28 | 132 | optimizely, adnxs, rubicon, doubleclick, chartbeat | 0 | — |
+| forbes.com | 22 | 133 | amazon-adsystem, doubleclick, googletagmanager | 0 | — |
+| youtube.com (Rick Astley) | 15 | 243 | none requested | 0 | plays muted, `ad-showing=false`, no ad overlay |
+
+"Trackers with `transferSize=0`" means the resource-timing entry exists but no
+body crossed the network — the channel hook cancelled it before connect. A
+visible ad slot of 0 means the engine's cosmetic pass hid the containers.

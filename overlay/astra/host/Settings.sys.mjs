@@ -322,6 +322,16 @@ const NATIVE = {
     },
   },
 
+  "privacy.fingerprinting": {
+    prefs: ["privacy.fingerprintingProtection"],
+    read: (prefs) => flag(boolPref(prefs, "privacy.fingerprintingProtection", true)),
+    write: (prefs, value) => {
+      const enabled = parseFlag(value);
+      if (enabled === null) return false;
+      prefs.setBoolPref("privacy.fingerprintingProtection", enabled);
+      return true;
+    },
+  },
   "privacy.cleanup": {
     prefs: ["privacy.sanitize.sanitizeOnShutdown"],
     read: (prefs) => flag(boolPref(prefs, "privacy.sanitize.sanitizeOnShutdown", false)),

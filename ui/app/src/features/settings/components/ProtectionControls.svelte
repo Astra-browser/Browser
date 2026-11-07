@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { blocker } from "$domain/blocker";
+  import { preferences } from "$domain/preferences";
   import type { BlockerListEntry, BlockerListsView } from "$shared/ipc/bindings";
   import SettingsGroup from "$shared/ui/SettingsGroup";
   import SettingsRow from "$shared/ui/SettingsRow";
@@ -336,6 +337,24 @@
     {/if}
   </div>
   {#if message}<p class="feedback" role="status">{message}</p>{/if}
+</SettingsGroup>
+
+<SettingsGroup
+  title="Fingerprinting and tracking"
+  description="Firefox's fingerprinting protection randomizes the signals pages use to identify a device. Astra's filter lists already block the trackers; this is the second layer."
+>
+  <SettingsRow
+    title="Fingerprinting protection"
+    description="Randomizes canvas and audio signals, hides the GPU model, tiers hardware concurrency, and limits font/display metrics. Low-breakage: the user agent and timezone are not spoofed."
+  >
+    <Switch
+      label="Fingerprinting protection"
+      labelHidden
+      checked={preferences.value("privacy.fingerprinting") === "true"}
+      disabled={preferences.saving()}
+      onchange={(enabled) => void preferences.set("privacy.fingerprinting", String(enabled))}
+    />
+  </SettingsRow>
 </SettingsGroup>
 
 <style>

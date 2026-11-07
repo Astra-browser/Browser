@@ -75,3 +75,20 @@ chrome context (needs `-remote-allow-system-access`; ESR 153 removed
 `Services.policies.status == ACTIVE(1)`, telemetry pref locked,
 `app.normandy.enabled` locked false. Run:
 `python3 tests/contract/p1t06-prefs.py`.
+
+## Browser-wide fingerprinting protection (D-43, 2026-11-07)
+
+These are the only new privacy defaults. They are set with `defaultPref()` so a
+user value (the Settings switch) wins on every restart; `pref()` would rewrite
+the user value each boot.
+
+| Pref | Value | Why |
+|---|---|---|
+| `privacy.fingerprintingProtection` | `true` | Low-breakage FPP in normal windows |
+| `privacy.fingerprintingProtection.pbmode` | `true` | Same in private windows |
+| `privacy.fingerprintingProtection.overrides` | `+WebGLRenderInfo,+WebGLVendorSanitize,+WebGLRendererConstant,+AudioContext,+AudioSampleRate,+MediaCapabilities,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision` | Hide GPU/audio/font/display surfaces while leaving UA/timezone/screen intact |
+
+Tracker blocking is the Astra filter-list engine (`BLOCKER.md`), not native
+tracking protection. See `FINGERPRINTING.md` for the measured surfaces and the
+limits. `media.volume_scale` is a **string** pref (`"0.0"`), used by probes
+only, never by the product.

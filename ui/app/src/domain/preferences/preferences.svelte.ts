@@ -69,6 +69,7 @@ const defaults = {
   "zoom.default": "100",
   "privacy.smartscreen": "true",
   "privacy.cleanup": "false",
+  "privacy.fingerprinting": "true",
   "privacy.camera": "Ask",
   "privacy.microphone": "Ask",
   "privacy.location": "Ask",
