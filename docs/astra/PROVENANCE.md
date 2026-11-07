@@ -26,11 +26,13 @@
 - Engine: Brave `adblock-rust` (MPL-2.0), used through the audited
   `adblock 0.12.1` crate already vendored by Gecko. Copyright Brave Software,
   Inc. and contributors. The crate source is not modified by Astra.
-- Resources: `brave/adblock-resources` (MPL-2.0; generic uBlock-derived
-  scriptlets only). Catalog: `brave/adblock-lists` +
+- Resources: `brave/adblock-resources` (`dist/resources.json`, MPL-2.0) for
+  browser-compat scriptlets, plus `brave/adblock-rust`
+  (`data/brave/brave-resources.json`, MPL-2.0) for the generic uBlock Origin
+  scriptlet set and its `.fn` dependencies. Catalog: `brave/adblock-lists` +
   `brave/adblock-lists-mirror` for structure/provenance. Brave-owned list
-  sources and `brave-*` resources are excluded; see `blocker/NOTICE.md` and
-  `docs/astra/BLOCKER_UPSTREAM.md`.
+  sources, `brave-*` and `async-sugarcoat-*` resources are excluded; see
+  `blocker/NOTICE.md` and `docs/astra/BLOCKER_UPSTREAM.md`.
 - Filter lists keep their own licences (EasyList CC BY-SA 3.0, uBlock Origin
   GPL-3.0-or-later, URLhaus CC BY-SA 4.0, AdGuard GPL-3.0-or-later, others as
   recorded per list in `blocker/lists/catalog.json`).

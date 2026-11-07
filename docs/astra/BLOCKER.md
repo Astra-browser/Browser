@@ -111,6 +111,20 @@ script canaries), and YouTube playback with no `.ad-showing` and no visible ad
 module across 24 one-second samples. Evidence: `out/adblock-benchmark/`
 (`report.json`, `turtlecute.png`, `youtube.png`).
 
+**YouTube scriptlets (2026-11-07, regression fix).** The resource bundle now
+carries the generic uBlock Origin scriptlet set and its `.fn` dependencies from
+`adblock-rust/data/brave/brave-resources.json` (199 resources after dropping
+`brave-*` / `async-sugarcoat-*`). Before the fix it held only 10 entries, so
+every `##+js(...)` rule compiled to an empty payload:
+`cosmeticFor("https://www.youtube.com/watch?v=…")` returned `script_len=0` and
+YouTube's ad JSON was never pruned, which is why video and page ads played.
+After the fix the same lookup returns a ~96 KB payload; a live player reports
+`ytInitialPlayerResponse.adPlacements`, `.playerAds` and `.adSlots` as
+`undefined` with `.ad-showing` false. `tools/blocker-wiring-check.sh` now
+fails if `json-prune.js`, `json-prune-fetch-response.js`,
+`json-prune-xhr-response.js`, `trusted-replace-xhr-response.js` or their
+dependencies are missing from the bundle.
+
 - `cargo check` of the component against vendored adblock 0.12.1: clean.
 - `./mach build -j2` (`forge build --jobs 2`): libxul links the crate, IDL and
   XPCOM service. No new vendored crates (adblock/serde/cstr were already in

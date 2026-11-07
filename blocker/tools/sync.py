@@ -64,6 +64,8 @@ BRAVE_SOURCE_RE = re.compile(
 
 # Resource families that are Brave product features, not generic adblock data.
 DROP_RESOURCE_PREFIXES = ("brave-", "async-sugarcoat-")
+# Browser-compat resources that live in adblock-resources rather than the
+# generic uBO scriptlet set.
 KEEP_RESOURCES = {
     "de-amp.js",
     "touch-fix.js",
@@ -71,6 +73,13 @@ KEEP_RESOURCES = {
     "vaft-ublock-origin.js",
     "video-swap-new-ublock-origin.js",
 }
+
+# adblock-rust ships the complete uBlock Origin scriptlet/resource set (211
+# entries, including dependencies such as `safe-self.fn` and `object-prune.fn`).
+# Without it, every `##+js(...)` rule in the uBO lists compiles to an empty
+# injected script: YouTube's ad JSON is never pruned and the video ads play.
+# Path is relative to the adblock-rust reference clone.
+RUST_RESOURCE_SET = os.path.join("data", "brave", "brave-resources.json")
 
 # Strings that must never appear in shipped list metadata or resource names.
 BANNED = re.compile(r"(?i)\b(?:brave|rewards|telemetry|p3a|analytics)\b")
@@ -371,34 +380,49 @@ ASTRA_RESOURCES = [
     },
 ]
 
+def _resource_allowed(resource: dict) -> bool:
+    name = resource.get("name", "")
+    if not name or name.startswith(DROP_RESOURCE_PREFIXES):
+        return False
+    if BANNED.search(name):
+        return False
+    content = resource.get("content", "")
+    # Content is base64. Decode only to check for Brave product strings; the
+    # generic scriptlets have none.
+    try:
+        import base64
+
+        text = base64.b64decode(content).decode("utf-8", errors="ignore")
+    except Exception:
+        text = ""
+    return not re.search(r"(?i)brave\.(?:com|software)", text)
+
+
 def build_resources(root: str) -> list[dict]:
+    # Browser-compat resources (de-amp, touch-fix, Twitch video swap, ...).
     path = os.path.join(root, "folder_context", "adblock-resources", "dist", "resources.json")
     with open(path, encoding="utf-8") as handle:
-        brave = json.load(handle)
-    out = []
-    for resource in brave:
-        name = resource.get("name", "")
-        if name in DROP_RESOURCE_PREFIXES or name.startswith("brave-"):
-            continue
-        if name not in KEEP_RESOURCES:
-            continue
-        if BANNED.search(name):
-            continue
-        content = resource.get("content", "")
-        # Content is base64. Decode only to check for Brave product strings;
-        # the generic scriptlets have none.
-        try:
-            import base64
+        compat = json.load(handle)
 
-            text = base64.b64decode(content).decode("utf-8", errors="ignore")
-        except Exception:
-            text = ""
-        if re.search(r"(?i)brave\.(?:com|software)", text):
-            continue
-        out.append(resource)
-    out.extend(ASTRA_RESOURCES)
-    out.sort(key=lambda row: row["name"])
-    return out
+    out: dict[str, dict] = {}
+    for resource in compat:
+        if resource.get("name") in KEEP_RESOURCES and _resource_allowed(resource):
+            out[resource["name"]] = resource
+
+    # Generic uBlock Origin scriptlets + their `.fn` dependencies. This is the
+    # set that makes `##+js(json-prune, ...)` and friends actually run, which is
+    # what removes YouTube's ad placements before the player sees them.
+    rust_path = os.path.join(root, "folder_context", "adblock-rust", RUST_RESOURCE_SET)
+    with open(rust_path, encoding="utf-8") as handle:
+        scriptlets = json.load(handle)
+    for resource in scriptlets:
+        if resource.get("name") not in out and _resource_allowed(resource):
+            out[resource["name"]] = resource
+
+    for resource in ASTRA_RESOURCES:
+        out[resource["name"]] = resource
+
+    return sorted(out.values(), key=lambda row: row["name"])
 
 
 def seed_sources(root: str) -> list[tuple[str, str]]:

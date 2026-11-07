@@ -11,6 +11,36 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: YouTube scriptlet resource fix (2026-11-07, latest)
+
+**Symptom:** YouTube showed video ads and page ad slots even though the lists
+and cosmetic selectors were installed.
+
+**Root cause:** `blocker/resources/resources.json` shipped only 10 resources
+(the Brave browser-compat set plus Astra's redirect placeholders). The generic
+uBlock Origin scriptlets that the default lists reference (`json-prune`,
+`json-prune-fetch-response`, `json-prune-xhr-response`, `trusted-replace-xhr-
+response`, and their `.fn` dependencies) were absent. `adblock-rust` therefore
+compiled every `##+js(...)` rule to nothing: `cosmeticFor(youtube)` returned
+`script_len=0`, so the ad JSON was never pruned.
+
+**Fix:** `blocker/tools/sync.py` now merges the complete generic scriptlet set
+from `adblock-rust/data/brave/brave-resources.json`, still dropping `brave-*`
+and `async-sugarcoat-*`. The bundle is 199 resources. `sync.py --check` and
+`tools/blocker-wiring-check.sh` now fail if the required scriptlets are
+missing.
+
+**Evidence (packaged dev build, fresh profile):**
+- `cosmeticFor("https://www.youtube.com/watch?v=QzqaZshQcJI")` → 96 010-byte
+  script payload containing `jsonPrune`, `trustedReplaceXhrResponse` and
+  `safeSelf` (was 0 bytes).
+- Live player: `ytInitialPlayerResponse.adPlacements`, `.playerAds`,
+  `.adSlots` are `undefined`; `.ad-showing` false; page `XMLHttpRequest` is
+  replaced by `json-prune-xhr-response`.
+- `adblock-benchmark-probe.py` → PASS; `blocker-wiring-check.sh` → 40/40.
+- Rebuild was `forge overlay` → `build --faster`; restart the browser to load
+  the new resource bundle.
+
 ## Owner report: shields parity features (2026-11-07, later)
 
 Every row below is live in the packaged dev build. The engine now returns a

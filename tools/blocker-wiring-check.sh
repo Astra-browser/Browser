@@ -112,8 +112,8 @@ for method in installRules setResources setEnabled setSiteEnabled isSiteEnabled 
   grep -q "$method" "$HOST" && grep -q "$method" "$SRC/nsIAstraBlockerService.idl" \
     && ok "Host + IDL expose $method" || bad "Host/IDL method $method missing"
 done
-grep -q "AstraBlocker::ShouldBlockChannel" "$ENGINE_DIR/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp" \
-  && ok "channel hook calls AstraBlocker::ShouldBlockChannel" || bad "channel hook missing"
+grep -qE "AstraBlocker::(ShouldBlockChannel|ApplyChannelAction)" "$ENGINE_DIR/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp" \
+  && ok "channel hook calls AstraBlocker" || bad "channel hook missing"
 
 # 6. branding / telemetry in shipped data ----------------------------------
 python3 - "$ROOT" <<'EOF' || FAIL=$((FAIL+1))
@@ -123,8 +123,13 @@ root = Path(sys.argv[1])
 catalog = json.loads((root / "blocker/lists/catalog.json").read_text())
 resources = json.loads((root / "blocker/resources/resources.json").read_text())
 banned = re.compile(r"(?i)\b(?:brave|rewards|telemetry|p3a|analytics)\b")
+# `astra-telemetry` is Astra's own supplemental block-list; its title names
+# what it blocks, it is not a Brave source or a telemetry implementation.
+ASTRA_OWNED = {"astra-telemetry"}
 bad = []
 for entry in catalog["lists"]:
+    if entry.get("id") in ASTRA_OWNED:
+        continue
     if banned.search(entry.get("title", "")) or banned.search(entry.get("source_url", "")):
         bad.append(entry.get("id", "?"))
     if "brave" in entry.get("source_url", "").lower():
@@ -135,6 +140,20 @@ for resource in resources:
         bad.append(name)
 if bad:
     print("FAIL: shipped blocker data still carries a banned brand/source: " + ", ".join(sorted(set(bad))))
+    sys.exit(1)
+# Regression: the uBO scriptlets are what make `##+js(...)` rules run at all.
+# Without them YouTube's ad JSON is never pruned (script_len == 0).
+required = {
+    "json-prune.js",
+    "json-prune-fetch-response.js",
+    "json-prune-xhr-response.js",
+    "trusted-replace-xhr-response.js",
+    "safe-self.fn",
+    "object-prune.fn",
+}
+missing = sorted(required - {row.get("name") for row in resources})
+if missing:
+    print("FAIL: resource bundle is missing uBO scriptlets: " + ", ".join(missing))
     sys.exit(1)
 print(f"PASS: shipped catalog ({len(catalog['lists'])} lists) and resources ({len(resources)}) are Astra-clean")
 EOF

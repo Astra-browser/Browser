@@ -14,12 +14,21 @@ nothing is relicensed by being packaged with Astra.
 
 ## 2. Scriptlet / redirect resources
 
-The resources in `resources/resources.json` come from
-<https://github.com/brave/adblock-resources> (`dist/resources.json`). Only
-generic uBlock-Origin-derived resources are kept; Brave product resources are
-excluded. Upstream licence: MPL-2.0. The scriptlet code itself is derived from
-uBlock Origin (`GPL-3.0-or-later`); attribution and the upstream link are kept
-in the resource name and in this notice.
+The resources in `resources/resources.json` come from two upstream files:
+
+- <https://github.com/brave/adblock-resources> (`dist/resources.json`) for the
+  browser-compat resources (`de-amp`, `touch-fix`, `trusted_types`,
+  `vaft-ublock-origin`, `video-swap-new-ublock-origin`);
+- <https://github.com/brave/adblock-rust> (`data/brave/brave-resources.json`)
+  for the generic uBlock Origin scriptlet set and its `.fn` dependencies. This
+  is what makes `##+js(...)` rules actually execute (including YouTube's
+  `json-prune*` ad rules); without it the engine injects an empty payload.
+
+Only generic uBlock-Origin-derived resources are kept; Brave product resources,
+`brave-*` and `async-sugarcoat-*` are excluded. Upstream licence: MPL-2.0. The
+scriptlet code itself is derived from uBlock Origin (`GPL-3.0-or-later`);
+attribution and the upstream link are kept in the resource name and in this
+notice.
 
 Astra also ships five tiny neutral redirect resources of its own
 (`1x1-transparent.gif`, `2x2-transparent.png`, `noop.js`, `noop.txt`,
