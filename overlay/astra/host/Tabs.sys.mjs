@@ -537,6 +537,8 @@ const _profileNames = new Map([[DEFAULT_PROFILE_ID, "Personal"]]);
  * membership order so a split reads as one row in the sidebar.
  */
 let _splitGroup = null;
+/** Every native split view in this window, active or suspended. */
+let _splitGroups = [];
 
 /** Native tab-group membership, keyed by Astra tab id. Content writes it. */
 const _groups = new Map();
@@ -576,6 +578,28 @@ export function __setSplitGroup(members) {
 /** The split membership the projection currently carries. */
 export function __splitGroupState() {
   return _splitGroup === null ? null : { members: [..._splitGroup.members] };
+}
+
+/** Replace the set of split views the sidebar may render as cards. */
+export function __setSplitGroups(groups) {
+  const next = [];
+  const seen = new Set();
+  for (const group of Array.isArray(groups) ? groups : []) {
+    const members = (group?.members ?? []).filter(
+      (id) => typeof id === "string" && id !== "" && !seen.has(id),
+    );
+    if (members.length < 2) continue;
+    for (const id of members) seen.add(id);
+    next.push({ members });
+  }
+  const before = JSON.stringify(_splitGroups);
+  _splitGroups = next;
+  return before !== JSON.stringify(next);
+}
+
+/** Test/read helper for the card list. */
+export function __splitGroupsState() {
+  return _splitGroups.map((group) => ({ members: [...group.members] }));
 }
 
 /** The active space without building a projection (and without bumping its
@@ -766,6 +790,14 @@ export function __itemsSnapshot() {
       _splitGroup.members.every((id) => _tabs.has(id))
         ? { members: [..._splitGroup.members] }
         : null,
+    split_groups:
+      _splitGroups
+        .filter(
+          (group) =>
+            group.members.length > 1 && group.members.every((id) => _tabs.has(id)),
+        )
+        .map((group) => ({ members: [...group.members] }))
+        .filter((group) => group.members.length > 1) || null,
   };
 }
 
@@ -1609,6 +1641,7 @@ export function __resetTabsForTests() {
   _activeSpaceId = DEFAULT_SPACE_ID;
   _activeProfileId = DEFAULT_PROFILE_ID;
   _splitGroup = null;
+  _splitGroups = [];
   _groups.clear();
   _profileNames.clear();
   _profileNames.set(DEFAULT_PROFILE_ID, "Personal");

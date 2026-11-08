@@ -154,39 +154,52 @@ export function sidebarDisplayUnits(
   entries: readonly SidebarEntry[],
   splitGroup: SplitGroupView | null,
   showGroups = true,
+  splitGroups: readonly SplitGroupView[] | null = null,
 ): SidebarDisplayUnit[] {
   let units: SidebarDisplayUnit[] = [...entries];
 
-  if (splitGroup !== null && splitGroup.members.length >= 2) {
+  const candidates =
+    splitGroups && splitGroups.length > 0 ? splitGroups : splitGroup ? [splitGroup] : [];
+  if (candidates.length > 0) {
     const positions = new Map<string, SidebarTabEntry>();
     for (const entry of entries) {
       if (entry.kind === "tab") positions.set(entry.tab.id, entry);
     }
 
     const ids = new Set<string>();
-    const members: SidebarTabEntry[] = [];
-    let valid = true;
-    for (const id of splitGroup.members) {
-      const member = positions.get(id);
-      if (member === undefined || ids.has(id)) {
-        valid = false;
-        break;
+    const cards: SidebarDisplayUnit[] = [];
+    for (const candidate of candidates) {
+      if (candidate.members.length < 2) continue;
+      const members: SidebarTabEntry[] = [];
+      let valid = true;
+      for (const id of candidate.members) {
+        const member = positions.get(id);
+        if (member === undefined || ids.has(id)) {
+          valid = false;
+          break;
+        }
+        ids.add(id);
+        members.push(member);
       }
-      ids.add(id);
-      members.push(member);
+      if (!valid) {
+        // Roll back a partially claimed group so its tabs stay independent.
+        for (const member of members) ids.delete(member.tab.id);
+        continue;
+      }
+      cards.push({
+        kind: "split",
+        key: `split:${section}:${candidate.members[0]}`,
+        tabs: members,
+        depth: Math.min(...members.map((member) => member.depth)),
+      });
     }
 
-    if (valid) {
-      // Split views sit at the head of the section, one card per split. A
-      // hairline separates them from every ordinary tab below.
+    if (cards.length > 0) {
+      // Split cards sit at the head of the section behind one hairline; every
+      // ordinary tab stays below it.
       const rest = entries.filter((entry) => entry.kind !== "tab" || !ids.has(entry.tab.id));
       units = [
-        {
-          kind: "split",
-          key: `split:${section}`,
-          tabs: members,
-          depth: Math.min(...members.map((member) => member.depth)),
-        },
+        ...cards,
         { kind: "separator", key: `split-separator:${section}`, depth: 0 },
         ...rest,
       ];

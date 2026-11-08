@@ -1808,6 +1808,8 @@ export type ItemsState = {
 	tabs: TabView[],
 	active: string | null,
 	split_group: SplitGroupView | null,
+	/** Every native split view in the window, active or suspended. */
+	split_groups?: SplitGroupView[] | null,
 };
 
 /**  The keymap changed; read it again. */

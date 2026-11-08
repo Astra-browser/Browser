@@ -23,6 +23,7 @@ import {
   HOST_API_VERSION,
   __activeSpaceId,
   __setSplitGroup,
+  __setSplitGroups,
   __tabsState,
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
@@ -361,6 +362,12 @@ function refresh(binding) {
     const splitview = tab?.splitview ?? null;
     syncResizers(binding, splitview);
     const members = splitview ? splitview.tabs.map((t) => idOf(binding, t)).filter(Boolean) : [];
+    const allGroups = splitViewsIn(binding)
+      .map((sv) => ({
+        members: sv.tabs.map((t) => idOf(binding, t)).filter(Boolean),
+      }))
+      .filter((group) => group.members.length > 1);
+    __setSplitGroups(allGroups);
     const changed = __setSplitGroup(members);
     if (changed) {
       emitItemsChanged();

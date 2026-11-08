@@ -95,6 +95,18 @@ describe("authoritative sidebar model", () => {
     expect(units.map((unit) => unit.kind)).toEqual(["tab"]);
   });
 
+  it("stacks every split card above one separator", () => {
+    const tree = sidebarTree(
+      [tabNode("a"), tabNode("b"), tabNode("c"), tabNode("d"), tabNode("e")],
+      [tab("a"), tab("b"), tab("c"), tab("d"), tab("e")],
+    );
+    const first: SplitGroupView = { members: ["a", "b"] };
+    const second: SplitGroupView = { members: ["c", "d"] };
+    const units = sidebarDisplayUnits("today", tree.today, first, true, [first, second]);
+    expect(units.map((unit) => unit.kind)).toEqual(["split", "split", "separator", "tab"]);
+    expect(units.at(-1)?.kind === "tab" ? units.at(-1)!.tab.id : "").toBe("e");
+  });
+
   it("fails a cross-section or unknown split back to independent rows", () => {
     const tree = sidebarTree([tabNode("a", "pinned"), tabNode("b")], [tab("a"), tab("b")]);
     expect(

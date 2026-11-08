@@ -51,6 +51,7 @@
       entries,
       tabs.splitGroup(),
       preferences.value("split.groups") !== "false",
+      tabs.splitGroups(),
     ),
   );
   // The close-button choice is one setting for both the Today list and the

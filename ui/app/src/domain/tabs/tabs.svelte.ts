@@ -14,6 +14,9 @@ let state = $state.raw<ItemsState>(model.value);
 export const tabs = () => state.tabs;
 export const activeId = () => state.active;
 export const splitGroup = () => state.split_group;
+/** Every split card the sidebar draws; the active one is still `split_group`. */
+export const splitGroups = () =>
+  state.split_groups ?? (state.split_group ? [state.split_group] : []);
 export const profile = () => state.profile;
 export const spaces = () => state.spaces;
 export const activeSpaceId = () => state.active_space_id;
