@@ -11,6 +11,11 @@
   } from "@hugeicons/core-free-icons";
   import type { BookmarkView } from "$shared/ipc/bindings";
   import { commands } from "$shared/ipc/bindings";
+  import { openAt } from "$features/menus";
+  import { splitOpenUrl, splitReplaceUrl } from "$shared/ipc/surfaces";
+  import { tabs } from "$domain/tabs";
+  import { preferences } from "$domain/preferences";
+  import { peek } from "$domain/peek";
   import { favicons } from "$domain/favicons";
   import { keymap } from "$domain/keymap";
   import { uiCommands } from "$domain/ui-commands";
@@ -227,14 +232,88 @@
     return () => clearTimeout(timer);
   });
 
+  let bookmarkPeekTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function peekUrl(url: string): string {
+    try {
+      return new URL(url).href;
+    } catch {
+      return url;
+    }
+  }
+
+  function cancelBookmarkPeek(): void {
+    if (bookmarkPeekTimer !== null) clearTimeout(bookmarkPeekTimer);
+    bookmarkPeekTimer = null;
+  }
+
+  function enterBookmark(item: BookmarkView): void {
+    if (!item.url || preferences.value("peek.bookmarks") !== "true") return;
+    const settings = peek.settings();
+    if (!settings.enabled || !settings.trigger.includes("hover")) return;
+    cancelBookmarkPeek();
+    bookmarkPeekTimer = setTimeout(
+      () => {
+        bookmarkPeekTimer = null;
+        if (item.url)
+          void peek.open({ url: peekUrl(item.url), title: item.title, source: "bookmark-hover" });
+      },
+      Math.max(80, Number(settings.delay) || 420),
+    );
+  }
+
+  function leaveBookmark(item: BookmarkView): void {
+    cancelBookmarkPeek();
+    if (!item.url) return;
+    const card = peek.state().find((entry) => entry.id === `url:${peekUrl(item.url!)}`);
+    if (card?.source === "bookmark-hover" && peek.settings().closeOnLeave) peek.close(card.id);
+  }
+
   function openMenu(event: MouseEvent, item: BookmarkView) {
     event.preventDefault();
     if (renaming !== null) return;
     menuTarget = item;
-    void commands.bookmarkMenuPopup(event.clientX, event.clientY, item.url === null).catch(() => {
-      menuTarget = null;
+    const folder = item.url === null;
+    const rows = folder
+      ? [
+          { kind: "item" as const, id: "open", label: "Open Folder" },
+          { kind: "item" as const, id: "rename", label: "Rename" },
+          { kind: "separator" as const },
+          { kind: "item" as const, id: "removeFolder", label: "Delete Folder", danger: true },
+        ]
+      : [
+          { kind: "item" as const, id: "open", label: "Open" },
+          { kind: "item" as const, id: "openNewTab", label: "Open in New Tab" },
+          { kind: "item" as const, id: "openSplit", label: "Open in Split View" },
+          ...(tabs.splitMembers().length > 1
+            ? [{ kind: "item" as const, id: "replacePane", label: "Replace active pane" }]
+            : []),
+          { kind: "item" as const, id: "preview", label: "Preview" },
+          { kind: "separator" as const },
+          { kind: "item" as const, id: "copyLink", label: "Copy Link" },
+          { kind: "item" as const, id: "rename", label: "Rename" },
+          { kind: "separator" as const },
+          { kind: "item" as const, id: "remove", label: "Delete", danger: true },
+        ];
+    openAt({ x: event.clientX, y: event.clientY, items: rows }, (action) => {
+      if (action === "openSplit" && item.url) {
+        void splitOpenUrl(item.url).catch(() => {});
+        return;
+      }
+      if (action === "replacePane" && item.url) {
+        const pane = tabs.activeId();
+        if (pane) void splitReplaceUrl(pane, item.url).catch(() => {});
+        return;
+      }
+      if (action === "preview" && item.url) {
+        void peek.open({ url: item.url!, title: item.title, source: "bookmark" });
+        return;
+      }
+      runMenu(action);
     });
   }
+
+  $effect(() => () => cancelBookmarkPeek());
 
   function runMenu(action: string) {
     const item = menuTarget;
@@ -457,6 +536,8 @@
                 if (event.button === 1) activate(item, event);
               }}
               oncontextmenu={(event) => openMenu(event, item)}
+              onpointerenter={() => enterBookmark(item)}
+              onpointerleave={() => leaveBookmark(item)}
               onpointerdown={(event) => press(event, item)}
               onpointermove={drag.move}
               onpointerup={drag.end}
