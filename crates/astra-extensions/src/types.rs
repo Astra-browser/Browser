@@ -151,12 +151,13 @@ pub struct ApiFinding {
 /// The compatibility verdict shown in the review. `verdict` is deliberately
 /// one of five states; a package is never called "supported" because its
 /// manifest parsed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Verdict {
     Full,
     Limited,
     Adapted,
+    #[default]
     Unsupported,
     Blocked,
 }
@@ -178,12 +179,6 @@ pub struct Compatibility {
     pub compat_prelude: bool,
 }
 
-impl Default for Verdict {
-    fn default() -> Self {
-        Verdict::Unsupported
-    }
-}
-
 /// One security signal. `id` is stable so the UI and tests can name it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecurityFinding {
@@ -200,9 +195,10 @@ pub struct SecurityFinding {
 /// How the install should be handled. `None`..`Low` install normally with a
 /// notice; `Medium`/`High` ask for an explicit confirmation; `Critical`
 /// asks with a stronger warning; `Blocked` refuses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SecurityLevel {
+    #[default]
     None,
     Info,
     Low,
@@ -221,12 +217,6 @@ pub struct SecurityReport {
     /// Set when installation must be refused automatically.
     pub blocked: bool,
     pub summary: String,
-}
-
-impl Default for SecurityLevel {
-    fn default() -> Self {
-        SecurityLevel::None
-    }
 }
 
 /// Bounded package inventory.

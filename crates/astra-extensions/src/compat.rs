@@ -341,7 +341,7 @@ pub fn needs_prelude(
     }
     // MV3 gives the extension the promise-only alias as `chrome.*`.
     if kind == crate::manifest::ManifestKind::ChromeMv3 {
-        return uses.iter().any(|u| u.namespace != "");
+        return uses.iter().any(|u| !u.namespace.is_empty());
     }
     false
 }

@@ -169,6 +169,7 @@ fn scan_directory(dir: &Path) -> Result<PackageScan, ExtensionsError> {
     let mut total = 0u64;
     let mut scan_total = 0u64;
 
+    #[allow(clippy::too_many_arguments)]
     fn walk(
         root: &Path,
         dir: &Path,
@@ -565,7 +566,6 @@ fn analyze(path: &Path, source: Source) -> Result<Analysis, ExtensionsError> {
             (Some(bytes), None, scan, None)
         }
     };
-    let scan = scan;
 
     let manifest_bytes = scan.manifest.clone();
     let parsed = manifest::parse(&manifest_bytes, source != Source::Firefox)?;

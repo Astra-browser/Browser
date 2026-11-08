@@ -251,7 +251,7 @@ retry.
 
 | Gate | Command | Result |
 |---|---|---|
-| Rust unit + integration | `cargo test -p astra-extensions --offline` | 38 + 1 passed |
+| Rust unit + integration | `cargo test -p astra-extensions --offline` | 39 + 1 passed |
 | Host contract | `node tests/contract/chrome_extensions.mjs` | 38 checks |
 | Synthetic live probe | `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | **55/55**, inspect 2.2 ms, install 81 ms |
 | Real packages (opt-in network) | `ASTRA_REAL_EXTENSIONS=1 … real_extensions_probe.py` | **57/57**, 5 packages |
