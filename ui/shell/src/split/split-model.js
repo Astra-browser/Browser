@@ -8,7 +8,7 @@
 // identity for life and only the *tab binding* moves, so `swapSlots`
 // exchanges bindings, never positions.
 
-export const MAX_SLOTS = 4;
+export const MAX_SLOTS = 3;
 export const MIN_RATIO = 0.05;
 export const MAX_RATIO = 0.95;
 export const LAYOUT_VERSION = 1;

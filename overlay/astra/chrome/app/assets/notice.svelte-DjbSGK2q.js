@@ -1,0 +1,1 @@
+import{$t as e,_n as t,yn as n}from"./chrome-shared--U5g7wmB.js";var r=n(null),i=0,a=()=>e(r);function o(e,n=`link`){i+=1,t(r,{id:i,text:e,kind:n})}function s(n){e(r)?.id===n&&t(r,null)}export{a as n,o as r,s as t};

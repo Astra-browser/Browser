@@ -1,0 +1,1 @@
+import{Rn as e}from"./chrome-shared--U5g7wmB.js";e();

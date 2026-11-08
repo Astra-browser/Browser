@@ -13,7 +13,7 @@
 
 /// Engine split views accept more tabs than the product exposes; Astra caps
 /// the arrangement at four panes.
-pub const MAX_PANES: usize = 4;
+pub const MAX_PANES: usize = 3;
 
 /// Divider share band. A sibling absorbs the difference; the axis always sums
 /// to one.

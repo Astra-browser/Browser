@@ -104,7 +104,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 
 | # | Surface | Required behaviour | Status |
 |---|---|---|---|
-| S1 | Side-by-side browsing | 2–4 real tabs share the content stage via one native split view; resize persists per arrangement | done |
+| S1 | Side-by-side browsing | 2–3 real tabs share the content stage via one native split view; resize persists per arrangement | done |
 | S2 | Tab-based split | Tab menu and sidebar choose mode call `tabs_split`; never `unknown_command` | done |
 | S3 | Drag-and-drop split | Dragging a tab onto the page's left/right edge opens it as a pane; drop inside reorders/leaves | done |
 | S4 | Bookmark split | Bookmark row menu opens the bookmark beside the current page | done |
@@ -119,7 +119,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 
 | # | Surface | Required behaviour | Status |
 |---|---|---|---|
-| P1 | Floating preview | Astra-owned floating card shows a real page capture; native preview UI never appears | done |
+| P1 | Floating preview | A window-like Astra popup shows a real page capture, with close, bookmark, open-tab and open-split controls; native preview UI never appears | done |
 | P2 | Shift-click preview | Shift-click on a tab/bookmark opens the peek without switching | done |
 | P3 | Context-menu preview | Tab/bookmark/link menus have “Preview” | done |
 | P4 | Automatic bookmark preview | Hover a bookmark (delay setting) shows peek | done |
@@ -129,6 +129,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 | P8 | Independent peek per tab | Each peek binds to its own target tab/URL; two peeks never share state | done |
 | P9 | Session restoration | Open peeks restore after relaunch (opt-in, private never) | done |
 | P10 | Peek configuration | Category with delay, size, position, capture scale, auto-hover, restore, close-on-leave | done |
+| P11 | Peek bookmark | The preview’s star adds the page to the active space’s bookmarks; closing frees the capture | done |
 
 ### 3.3 Space isolation
 
@@ -176,7 +177,7 @@ outside a category.
 
 | Category | Rows |
 |---|---|
-| **Tabs → Split view** | enable split view; maximum panes (2/3/4); restore arrangements on startup; remember per-window width; show pane titles; show pane close controls; open link target (same pane / new pane); drag-edge action; double-click divider to reset |
+| **Tabs → Split view** | enable split view; maximum panes (2/3); restore arrangements on startup; remember per-window width; show pane titles; show pane close controls; open link target (same pane / new pane); drag-edge action; double-click divider to reset |
 | **Tabs → Peeks** | enable peeks; trigger (hover/shift-click/context menu/both); hover delay (ms); card size; card position; capture scale; restore open peeks; close when pointer leaves; show URL; show title |
 | **Privacy → History** | history scope (`this space` default / shared profile), per-space search; clear this space's history; show other spaces' history (off by default) |
 | **Extensions → Per space** | enable per-space extension sets; default for new spaces; copy set from current space; show profile-scope limitation |
@@ -244,8 +245,8 @@ light/dark measurements. Screenshots for both themes are written to
 
 | Date | Change | Evidence |
 |---|---|---|
-| 2026-11-08 | Native split-view port (2–4 panes, ratio, replace, leave, drag-edge, arrangement save/restore) | `native-surfaces-probe.py` 27/27; native panels 244/421 px; four panes live |
-| 2026-11-08 | Peek (real capture, hover/shift/menu, open tab/split, restore, settings) | same probe: 31 kB PNG capture, `.peek-card` drawn; light/dark measured |
+| 2026-11-08 | Native split-view port (2–3 panes, ratio, replace, leave, drag-edge, arrangement save/restore, background-tab load) | `native-surfaces-probe.py` 39/39; background pane commits its URL; 3 panes, 4th refused; arrangement restores 3 |
+| 2026-11-08 | Peek (real capture, window popup with bookmark/open-tab/open-split, hover/shift/menu, restore, settings) | same probe: 31 kB PNG capture, `.peek-window` above the page with an inset clip; light/dark measured |
 | 2026-11-08 | Per-space history, per-space extension sets, cross-space clone | same probe: scoped visits, extension read, clone into `space-1`; `native_surfaces.mjs` 118 checks |
 | 2026-11-08 | Native tab groups projected and drawn | same probe: group created, 2 members projected, `.tab-group-head` drawn |
 | 2026-11-08 | Full gates | typecheck, lint, stylelint, format, knip, 1238 unit tests, 95 settings controls, adblock benchmark PASS, `wire_coverage` PASS |

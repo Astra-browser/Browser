@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { preferences } from "$domain/preferences";
+import { tabs } from "$domain/tabs";
+import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import {
   peekCapture,
@@ -112,6 +114,29 @@ export const peek = {
   capture: (id: string) => void peekCapture(id).catch(() => {}),
   openTab: (id: string) => void peekOpenTab(id).catch(() => {}),
   openSplit: (id: string) => void peekOpenSplit(id).catch(() => {}),
+
+  /** Bookmark the previewed page in the active space's tree. */
+  async bookmark(id: string): Promise<boolean> {
+    const entry = peeks.find((row) => row.id === id);
+    if (!entry?.url) return false;
+    try {
+      const reply = await commands.bookmarkCall(tabs.profile()?.id ?? "default", {
+        kind: "add_link",
+        parent: null,
+        title: entry.title || entry.url,
+        url: entry.url,
+      });
+      return reply?.kind === "saved";
+    } catch {
+      return false;
+    }
+  },
+
+  /** Drop the card immediately; the host then frees its capture. */
+  discard(id: string): void {
+    peeks = peeks.filter((row) => row.id !== id);
+    void peekClose(id).catch(() => {});
+  },
 
   async configure(next: Partial<PeekConfig>) {
     config = { ...config, ...next };

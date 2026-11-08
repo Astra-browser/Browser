@@ -1,1 +1,0 @@
-export{t as default}from"./AskCard-DyELtLvs.js";

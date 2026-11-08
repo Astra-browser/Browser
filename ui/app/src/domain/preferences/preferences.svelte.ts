@@ -77,7 +77,7 @@ const defaults = {
   "privacy.notifications": "Ask",
   // Native split view (engine owns the panes; these are the product's rules).
   "split.enabled": "true",
-  "split.max-panes": "4",
+  "split.max-panes": "3",
   "split.restore": "true",
   "split.remember-width": "true",
   "split.link-target": "split",

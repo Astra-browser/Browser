@@ -20,6 +20,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
 HOST, PORT = "127.0.0.1", 2828
@@ -117,6 +118,21 @@ const done = arguments[arguments.length - 1];
         panels: sv.panels.map((p) => p.getBoundingClientRect().width),
       };
     })();
+    // A background tab has not loaded its page yet. Splitting it must load it,
+    // not show a blank pane.
+    const bg = await host.Tabs.create({
+      request_id: "probe-bg",
+      url: "https://www.iana.org/",
+      background: true,
+    });
+    await sleep(500);
+    out.bgSplit = await host.SplitView.open({ request_id: "probe-bg-split", other: bg.astra_tab_id });
+    await sleep(2500);
+    out.bgPaneUrls = (() => {
+      const sv = gBrowser.selectedTab.splitview;
+      return sv ? sv.tabs.map((t) => { try { return t.linkedBrowser.currentURI.spec; } catch (e) { return ""; } }) : [];
+    })();
+    out.bgLeave = await host.SplitView.leave({ request_id: "probe-bg-leave", id: bg.astra_tab_id });
     out.ratio = await host.SplitView.ratio({ request_id: "probe-ratio", ratio: 0.36 });
     await sleep(300);
     out.widths = (() => {
@@ -132,11 +148,11 @@ const done = arguments[arguments.length - 1];
     await sleep(400);
     out.uiPeek = (() => {
       const f = document.querySelector("iframe[data-astra-app-frame]");
-      return f?.contentDocument?.querySelectorAll(".peek-card").length ?? 0;
+      return f?.contentDocument?.querySelectorAll(".peek-window").length ?? 0;
     })();
     out.peekOverlay = (() => {
       const f = document.querySelector("iframe[data-astra-app-frame]");
-      const card = f?.contentDocument?.querySelector(".peek-card");
+      const card = f?.contentDocument?.querySelector(".peek-window");
       const frame = document.querySelector(".astra-frame");
       if (!f || !card) return null;
       const box = card.getBoundingClientRect();
@@ -186,26 +202,26 @@ const done = arguments[arguments.length - 1];
     out.drop = await host.SplitView.drop({ request_id: "probe-drop", id: third.astra_tab_id, x: 4, y: 320 });
     await sleep(600);
     out.afterDrop = await host.SplitView.state({ request_id: "probe-state-d" });
-    // Two more panes make the native four-pane arrangement.
+    // A third pane is the product cap; a fourth request must not create one.
     out.thirdPane = await host.SplitView.openUrl({ request_id: "probe-p3",
       url: "https://iana.org/?pane=4", mode: "split", placement: "right" });
-    await sleep(2500);
+    await sleep(3000);
     out.fourthPane = await host.SplitView.openUrl({ request_id: "probe-p4",
       url: "https://iana.org/?pane=5", mode: "split", placement: "right" });
-    await sleep(3500);
-    out.four = await host.SplitView.state({ request_id: "probe-state-4" });
-    out.fourNative = (() => {
+    await sleep(2500);
+    out.three = await host.SplitView.state({ request_id: "probe-state-3" });
+    out.threeNative = (() => {
       const sv = gBrowser.selectedTab.splitview;
       return sv ? sv.tabs.length : 0;
     })();
-    out.savedFour = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe four" });
-    for (let attempt = 0; attempt < 10 && out.savedFour?.error; attempt += 1) {
+    out.savedThree = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe three" });
+    for (let attempt = 0; attempt < 10 && out.savedThree?.error; attempt += 1) {
       await sleep(1200);
-      out.savedFour = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe four" });
+      out.savedThree = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe three" });
     }
     await host.SplitView.unsplit({ request_id: "probe-unsplit4" });
-    out.restored = out.savedFour?.arrangement
-      ? await host.SplitView.bookmarkRestore({ request_id: "probe-restore", id: out.savedFour.arrangement.id })
+    out.restored = out.savedThree?.arrangement
+      ? await host.SplitView.bookmarkRestore({ request_id: "probe-restore", id: out.savedThree.arrangement.id })
       : null;
     await sleep(900);
     out.restoredState = await host.SplitView.state({ request_id: "probe-state-restored" });
@@ -318,7 +334,10 @@ def check(results, name, cond, detail=""):
 
 
 def main():
-    profile, outdir = sys.argv[1], sys.argv[2]
+    # The full suite calls a probe with no positional args; unit runs pass an
+    # explicit profile and output directory.
+    profile = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix="astra-native-")
+    outdir = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix="astra-native-out-")
     os.makedirs(outdir, exist_ok=True)
     subprocess.run(["rm", "-rf", profile], check=True)
     os.makedirs(profile, exist_ok=True)
@@ -384,6 +403,9 @@ def main():
                             len(widths) == 2 and widths[0] < widths[1],
                             json.dumps(widths)))
         peek = results.get("peek") or {}
+        checks.append(check(results, "a background tab loads when split",
+                            any("iana.org" in u for u in (results.get("bgPaneUrls") or [])),
+                            json.dumps(results.get("bgPaneUrls"))[:300]))
         checks.append(check(results, "peek captured a real page",
                             isinstance((peek.get("peek") or {}).get("image"), str)
                             and len((peek.get("peek") or {}).get("image") or "") > 2000,
@@ -435,12 +457,17 @@ def main():
                             (results.get("drop") or {}).get("accepted") is True
                             and (results.get("afterDrop") or {}).get("panes") == 2,
                             json.dumps(results.get("drop"))[:300]))
-        checks.append(check(results, "four native panes are live",
-                            (results.get("four") or {}).get("panes") == 4
-                            and results.get("fourNative") == 4,
-                            json.dumps(results.get("four"))[:300]))
-        checks.append(check(results, "an arrangement restores all four panes",
-                            (results.get("restoredState") or {}).get("panes") == 4,
+        checks.append(check(results, "three native panes are live",
+                            (results.get("three") or {}).get("panes") == 3
+                            and results.get("threeNative") == 3,
+                            json.dumps(results.get("three"))[:300]))
+        fourth = results.get("fourthPane") or {}
+        checks.append(check(results, "a fourth pane is refused",
+                            fourth.get("split") is False
+                            or fourth.get("error", {}).get("code") == "pane_limit",
+                            json.dumps(fourth)[:300]))
+        checks.append(check(results, "an arrangement restores all three panes",
+                            (results.get("restoredState") or {}).get("panes") == 3,
                             json.dumps(results.get("restoredState"))[:300]))
         checks.append(check(results, "a native group is created and projected",
                             (results.get("group") or {}).get("created") is True

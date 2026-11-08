@@ -143,6 +143,12 @@ def run(name, port, extra_prefs):
             if m.js("return !!Services?.astraHost;"):
                 break
             time.sleep(1)
+        # A control profile's user pref can be shadowed by the autoconfig
+        # default; set it on the live pref branch after boot as well.
+        for key, value in extra_prefs.items():
+            m.js(
+                f"Services.prefs.setBoolPref({json.dumps(key)}, {str(bool(value)).lower()}); return true;"
+            )
         tab = m.js("return Services.astraHost.Tabs.list({request_id:'fp'}).then(r=>r.selected_tab_id);")
         m.cmd("WebDriver:ExecuteScript", {"script": "return Services.astraHost.Navigation.loadURL({request_id:'fp', astra_tab_id:arguments[0], url:arguments[1]});", "args": [tab, URL]})
         time.sleep(4)

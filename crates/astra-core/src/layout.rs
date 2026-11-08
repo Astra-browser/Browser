@@ -26,7 +26,7 @@ pub const LAYOUT_SNAPSHOT_VERSION: u32 = 1;
 
 /// Fixed pool size from S-01 (`MAX_SLOTS`): one remote `<browser>` per cell,
 /// visibility only — never created, moved, or destroyed by layout switches.
-pub const MAX_SPLIT_SLOTS: usize = 4;
+pub const MAX_SPLIT_SLOTS: usize = 3;
 
 /// Minimum/maximum share of the split axis one slot may hold. Resizes clamp
 /// into this band and siblings absorb the difference proportionally.

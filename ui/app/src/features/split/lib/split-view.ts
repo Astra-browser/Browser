@@ -7,7 +7,7 @@
  * session snapshot's `layout` key.
  */
 
-export const MAX_SPLIT_SLOTS = 4;
+export const MAX_SPLIT_SLOTS = 3;
 export const MIN_SPLIT_RATIO = 0.05;
 export const MAX_SPLIT_RATIO = 0.95;
 export const SPLIT_LAYOUT_VERSION = 1;

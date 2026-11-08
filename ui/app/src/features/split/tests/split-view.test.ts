@@ -38,13 +38,12 @@ describe("layoutVariant", () => {
 });
 
 describe("openSplitPane", () => {
-  it("grows 1 -> 2 -> 4 and caps the pool", () => {
+  it("grows 1 -> 2 -> 3 and caps the pool", () => {
     let state = blankSplitState();
     state = openSplitPane(state, "tab-a");
     expect(state.slots).toHaveLength(2);
     expect(state.activeId).toBe("slot-2");
     state = openSplitPane(state, "tab-b");
-    state = openSplitPane(state, "tab-c");
     expect(state.slots).toHaveLength(MAX_SPLIT_SLOTS);
     expect(layoutVariant(state.slots.length)).toBe("grid-2x2");
     expect(() => openSplitPane(state, "tab-d")).toThrow(SplitLayoutError);

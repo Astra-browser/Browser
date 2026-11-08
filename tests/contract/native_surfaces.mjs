@@ -37,7 +37,7 @@ HostAPI.__resetForTests();
 check("ratio clamps low", SplitView.clampRatio(0.001) === SplitView.MIN_RATIO);
 check("ratio clamps high", SplitView.clampRatio(0.999) === SplitView.MAX_RATIO);
 check("ratio rejects NaN", SplitView.clampRatio(Number.NaN) === null);
-check("pane count caps at four", SplitView.paneCount(9) === 4);
+check("pane count caps at three", SplitView.paneCount(9) === 3);
 check("pane count refuses one", SplitView.paneCount(1) === 2);
 check("pane order right", JSON.stringify(SplitView.paneOrder({ source: "a", target: "b" })) === '["a","b"]');
 check("pane order left", JSON.stringify(SplitView.paneOrder({ source: "a", target: "b", placement: "left" })) === '["b","a"]');

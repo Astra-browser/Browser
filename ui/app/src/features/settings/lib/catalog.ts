@@ -364,11 +364,10 @@ export const fields = {
     section: "tabs",
     label: () => "Maximum panes",
     description: () => "How many pages one split view may hold.",
-    initial: "4",
+    initial: "3",
     options: [
       { value: "2", label: () => "2 panes" },
       { value: "3", label: () => "3 panes" },
-      { value: "4", label: () => "4 panes" },
     ],
   },
   "split.restore": {

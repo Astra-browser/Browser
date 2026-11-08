@@ -27,7 +27,7 @@ import {
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
 
-export const MAX_PANES = 4;
+export const MAX_PANES = 3;
 export const MIN_RATIO = 0.05;
 export const MAX_RATIO = 0.95;
 export const ARRANGEMENTS_PREF = "astra.split.arrangements.v1";
@@ -427,11 +427,30 @@ function splitViewsIn(binding) {
   return out;
 }
 
+/** A background tab can still be about:blank; a split must show its page. */
+function ensurePaneLoaded(binding, tab) {
+  const id = idOf(binding, tab);
+  const url = id ? __tabsState()?.tabs?.get(id)?.url : "";
+  if (!tab || !/^https?:/u.test(url ?? "")) return;
+  try {
+    const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
+    if (spec && spec !== "about:blank" && !spec.startsWith("chrome://browser/content/blanktab")) {
+      return;
+    }
+    tab.linkedBrowser?.fixupAndLoadURIString(url, {
+      triggeringPrincipal: systemPrincipal(),
+    });
+  } catch {
+    // A tab that is still being created loads on its own activation.
+  }
+}
+
 function addToSplit(binding, tabs) {
   const gb = binding.gb;
   if (!gb || tabs.length < 2) return null;
   const container = tabs[0]?.userContextId ?? 0;
   if (tabs.some((tab) => (tab.userContextId ?? 0) !== container)) return null;
+  for (const tab of tabs) ensurePaneLoaded(binding, tab);
   const existing = tabs[0]?.splitview ?? null;
   if (existing) {
     const current = existing.tabs;
@@ -451,6 +470,27 @@ function sameSpace(binding, a, b) {
   // Native userContextId is the authoritative container. Model ids can be
   // stale across a move; the containers cannot be.
   return (a.userContextId ?? 0) === (b.userContextId ?? 0);
+}
+
+/** Visit each pane once so a background tab's pending URL is committed. */
+async function warmPanes(binding, splitview, sourceId) {
+  if (!splitview) return;
+  for (const paneTab of splitview.tabs) {
+    const id = idOf(binding, paneTab);
+    if (!id || id === sourceId) continue;
+    try {
+      await Tabs.select({ request_id: `split-warm-${id}`, astra_tab_id: id });
+    } catch {
+      // A pane that cannot be selected still loads on its own first commit.
+    }
+  }
+  if (sourceId) {
+    try {
+      await Tabs.select({ request_id: `split-source-${sourceId}`, astra_tab_id: sourceId });
+    } catch {
+      // Keep the native selection.
+    }
+  }
 }
 
 function focusTab(binding, tab) {
@@ -551,6 +591,7 @@ export const SplitView = {
       placement === "left" ? [otherTab, sourceTab] : [sourceTab, otherTab];
     const splitview = addToSplit(binding, ordered);
     if (!splitview) return err(request_id, "split_refused", "the engine refused this split view");
+    await warmPanes(binding, splitview, idOf(binding, sourceTab));
     focusTab(binding, sourceTab);
     applyRatio(binding, binding.ratio);
     scheduleRefresh(binding);
@@ -586,6 +627,12 @@ export const SplitView = {
       focusTab(binding, tab);
       scheduleRefresh(binding);
       return ok(request_id, { opened: true, astra_tab_id: idOf(binding, tab) });
+    }
+    // Refuse before creating a tab: a rejected fourth pane must not steal the
+    // front tab or add an orphan tab to the strip.
+    const prospectiveSource = nativeTab(binding, pane) ?? selectedTab(binding);
+    if (prospectiveSource?.splitview && prospectiveSource.splitview.tabs.length >= configuredPanes()) {
+      return err(request_id, "pane_limit", `at most ${configuredPanes()} panes`);
     }
     // A split pane keeps the front tab's container, so a link from a private
     // or space tab cannot land in a different partition.
@@ -793,6 +840,7 @@ export const SplitView = {
       splitview = addToSplit(binding, ordered);
     }
     if (!splitview) return ok(request_id, { accepted: false, reason: "split_refused" });
+    await warmPanes(binding, splitview, idOf(binding, source));
     focusTab(binding, source);
     scheduleRefresh(binding);
     return ok(request_id, {
