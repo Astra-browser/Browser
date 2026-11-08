@@ -152,4 +152,21 @@ some sites; RFP remains opt-in. FPP reduces the cheap high-entropy surfaces
 - **Chrome packages do not poll a store for updates in the background.** An
   update is fetched and reviewed on request; adapted XPIs do not use the AMO
   update channel.
+- **Chrome Web Store pages say “Switch to Chrome”.** That page feature is not
+  used and cannot be trusted to install in Gecko. Astra draws its own
+  always-visible “Add to Astra” callout at the top of the sidebar and installs
+  the same CRX3 package itself. No Chrome user-agent spoof or page shim is
+  installed.
+- **Google CAPTCHA is not bypassed.** Google may show an image challenge to a
+  fresh or automated session. New profiles default to DuckDuckGo; Google stays
+  selectable. Astra does not solve, outsource or bypass CAPTCHAs.
+- **A Chrome package can ship a Firefox id and root-relative paths.** Astra
+  forces the Chrome-derived id, normalizes every extension-relative path and
+  maps `chrome-extension://` web-accessible-resource matches to Gecko
+  `extension_ids`; a package that still fails Gecko manifest validation is
+  reported with the engine's exact validation error.
+- **Large legitimate packages are allowed.** The uncompressed cap is 512 MiB
+  with a 96 MiB container cap; AdBlock Plus (317 MiB uncompressed, 71 MiB CRX)
+  installs. The XPI writer streams entry by entry and the sidecar call allows
+  180 s for inspect/stage.
 

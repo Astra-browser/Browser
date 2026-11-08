@@ -25,16 +25,16 @@ evidence and whether the package survives a restart.
 
 | Surface | What works | Wiring / files | Live evidence |
 |---|---|---|---|
-| Chrome package intake | CRX3 signature + id from key, CRX2/ECDSA refusal, safe ZIP, 96 MiB/256 MiB bounds, traversal/symlink/duplicate refusal | `crates/astra-extensions/src/{crx,package,pipeline,security,manifest,compat}.rs`; `astra-core` `extensions.inspect`/`extensions.stage` | Rust 39+1 tests; `chrome_ext_probe.py` 55/55; inspect 2.2 ms |
-| Manifest adaptation | MV3 worker → event page, static `importScripts` expanded, `side_panel` → `sidebar_action`, MV3 callback prelude, unsupported permissions removed and reported, stable `<chrome-id>@chrome.astra` id | `manifest.rs`, `compat.rs`, `jar.mn` | probe checks adapted bg/sidebar/permissions and fault containment; real Tampermonkey 1024-bit key verifies |
+| Chrome package intake | CRX3 signature + id from key, CRX2/ECDSA refusal, safe ZIP, 96 MiB/512 MiB bounds, traversal/symlink/duplicate refusal | `crates/astra-extensions/src/{crx,package,pipeline,security,manifest,compat}.rs`; `astra-core` `extensions.inspect`/`extensions.stage` | Rust 41+1 tests; `chrome_ext_probe.py` 55/55; inspect 2.2 ms |
+| Manifest adaptation | MV3 worker → event page, static `importScripts` expanded, `side_panel` → `sidebar_action`, MV3 callback prelude, unsupported permissions removed and reported, stable `<chrome-id>@chrome.astra` id | `manifest.rs`, `compat.rs`, `jar.mn` | probe checks adapted bg/sidebar/permissions and fault containment; real Tampermonkey 1024-bit key verifies; 55-package corpus 55/55 |
 | Lifecycle | install, update (same id, version 1.1.0), disable/enable, restart restore, uninstall, record/package cleanup | `overlay/astra/host/ChromeExtensions.sys.mjs`, `WebExtensions.sys.mjs` | probe: update/restart/disable/enable/uninstall and a crashing extension all pass; 3-cycle PSS growth 10.2 MiB |
-| Store + file | Add on a Chrome Web Store listing; `.crx`/`.zip` file and drop; signed `.xpi` unchanged | `storeIdFromUrl`, `downloadCrx`, `prepare`, `prepareFile`, `chooseFile` | real packages 57/57: uBO Lite, Dark Reader, Tampermonkey, Stylus, Firefox uBO |
+| Store + file | Always-visible top-of-sidebar “Add to Astra” on a store listing (the store says “Switch to Chrome”; Astra installs it itself); `.crx`/`.zip` file and drop; signed `.xpi` unchanged | `StoreInstallBanner.svelte`, `storeIdFromUrl`, `downloadCrx`, `prepare`, `prepareFile`, `chooseFile` | visible live run 5/5 from store pages; real packages 57/57 |
 | Security | lexical evidence with file/line; proximity combinations; auto-block only miner+exfiltration/privilege; clean ≠ safe | `security.rs`; review `security` block | malicious fixture blocked before staging; tampered CRX and traversal ZIP refused |
 | UI | source + signature line, compatibility badge, limitations, security evidence list, persistence line; row source/security marker | `WebExtensionReview.svelte`, `ExtensionRow.svelte`, `bindings.ts`, `messages/en.json` | typecheck 0, webext unit/component 21 tests |
 
-**Verification:** `cargo test -p astra-extensions` 39+1; `node
-tests/contract/chrome_extensions.mjs` 38; `chrome_ext_probe.py` 55/55;
-`real_extensions_probe.py` 57/57 on 5 real packages;
+**Verification:** `cargo test -p astra-extensions` 41+1; `node
+tests/contract/chrome_extensions.mjs` 39; `chrome_ext_probe.py` 55/55;
+`real_extensions_probe.py` 57/57 on 5 real packages; `extension_corpus_probe.py` 55/55 on the broad corpus; visible live store run 5/5;
 `extension_bench.py` PASS (startup 1.85 s, idle CPU 4.9 %, 60 s PSS growth
 24.7 MiB, 3-cycle 10.2 MiB). Evidence in `out/chrome-ext/`,
 `out/real-extensions/`, `out/extension-bench/`.

@@ -41,3 +41,6 @@ media probe: the hidden display has no audio device), not a failure.
 
 The synthetic and real probes set no `xpinstall.signatures.required=false`:
 they exercise the signed build's temporary-add-on + Astra restore path.
+| `ASTRA_EXTENSION_CORPUS=1 tools/perf/hidden-display.sh python3 tools/perf/stress/extension_corpus_probe.py out/extension-corpus` | The 55-package corpus installs, runs, exposes its background/content scripts/DNR/permissions and uninstalls (55/55; network, opt-in) |
+| `python3 tools/perf/stress/live_store_probe.py` | Opens the packaged build on the real display, opens Chrome Web Store listings, downloads each CRX through Astra, installs it, opens the Extensions page, checks it and removes or keeps it; screenshots in `out/live-store/` (5/5) |
+| `python3 tools/perf/stress/extension_corpus_fetch.py out/extension-corpus` | Rebuilds the corpus (68 store ids tried, 55 usable CRX3 packages) |

@@ -91,7 +91,9 @@ the engine cannot read or run, and the review lists every change.
 | MV2 `action` | `browser_action` | MV2 key name |
 | `key`, `update_url`, `minimum_chrome_version` | removed | identity is in `browser_specific_settings.gecko.id`; updates are Astra's path |
 | Chrome-only permissions (`sidePanel`, `offscreen`, `tabCapture`, `desktopCapture`, `system.*`, `tts`, `fontSettings`, …) | removed and listed | the engine cannot grant them; never silently kept |
-| `browser_specific_settings.gecko.id` | added when absent | stable identity for `AddonManager` |
+| `browser_specific_settings.gecko.id` | always set to `<chrome-id>@chrome.astra` for a Chrome source, overriding a Firefox id the package may ship | the Host API and the XPI must agree; a Chrome build is not the Firefox add-on with the same name |
+| root-relative paths (`/js/a.js`, `/settings.html`, action/sidebar/options/devtools/DNR/WAR/icons) | normalized to package-relative paths | `ExtensionURL` and the ZIP lookup are relative |
+| `web_accessible_resources[].matches: ["chrome-extension://<id>/*"]` | `extension_ids: ["<id>@chrome.astra"]` | Gecko's MatchPattern has no `chrome-extension` scheme; the manifest would be invalid |
 | `/js/background.js` (root-relative) | `js/background.js` | the XPI and extension URLs are relative |
 | `content_scripts[].js` | compatibility prelude prepended when needed | callback form and `sidePanel` exist in content scripts too |
 
@@ -152,7 +154,7 @@ process boundary, site-permission prompts, private-window rules or CSP.
 The intake adds:
 
 - **Bounds before allocation**: package ≤ 96 MiB, ≤ 20 000 entries,
-  uncompressed ≤ 256 MiB, entry ≤ 64 MiB, manifest ≤ 2 MiB, scan ≤ 24 MiB
+  uncompressed ≤ 512 MiB, entry ≤ 64 MiB, manifest ≤ 2 MiB, scan ≤ 24 MiB
   (3 MiB per file), compression-ratio refusal. Malformed lengths cannot drive
   an unbounded allocation.
 - **Path safety**: absolute paths, `..` segments, backslashes, drive letters,
@@ -251,9 +253,11 @@ retry.
 
 | Gate | Command | Result |
 |---|---|---|
-| Rust unit + integration | `cargo test -p astra-extensions --offline` | 39 + 1 passed |
+| Rust unit + integration | `cargo test -p astra-extensions --offline` | 41 + 1 passed |
 | Host contract | `node tests/contract/chrome_extensions.mjs` | 38 checks |
 | Synthetic live probe | `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | **55/55**, inspect ~2 ms, install ~0.1 s |
+| 55-package corpus | `ASTRA_EXTENSION_CORPUS=1 … extension_corpus_probe.py` | **55/55** installed, active, background running, content scripts/DNR read, removed |
+| Visible live store run | `python3 tools/perf/stress/live_store_probe.py` | **5/5** downloaded from store pages and installed in the live browser; screenshots in `out/live-store/` |
 | Real packages (opt-in network) | `ASTRA_REAL_EXTENSIONS=1 … real_extensions_probe.py` | **57/57**, 5 packages |
 | Benchmark (opt-in) | `ASTRA_EXT_BENCH=1 … extension_bench.py` | PASS; see `out/extension-bench/result.json` |
 
