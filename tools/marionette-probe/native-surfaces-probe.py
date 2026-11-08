@@ -173,6 +173,12 @@ const done = arguments[arguments.length - 1];
         over,
       };
     })();
+    out.peekClose = appFrame
+      ? await appFrame.__astraInvoke("peek_close", { id: out.peek.id })
+      : null;
+    out.peekAfterClose = appFrame
+      ? await appFrame.__astraInvoke("peek_list", {})
+      : null;
     out.history = await host.SpaceHistory.status({ request_id: "probe-hist" });
     out.extensions = await host.SpaceExtensions.list({ request_id: "probe-ext" });
 
@@ -413,8 +419,11 @@ def main():
         checks.append(check(results, "peek is listed", len((results.get("peekList") or {}).get("peeks", [])) >= 1))
         checks.append(check(results, "Astra draws the split group", (results.get("uiSplit") or 0) >= 1,
                             str(results.get("uiSplit"))))
-        checks.append(check(results, "Astra draws the peek card", (results.get("uiPeek") or 0) >= 1,
+        checks.append(check(results, "Astra draws the peek window", (results.get("uiPeek") or 0) >= 1,
                             str(results.get("uiPeek"))))
+        checks.append(check(results, "closing the peek frees it",
+                            len((results.get("peekAfterClose") or {}).get("peeks", [])) == 0,
+                            json.dumps(results.get("peekAfterClose"))[:300]))
         peek_overlay = results.get("peekOverlay") or {}
         checks.append(check(results, "the peek is above the page",
                             peek_overlay.get("over") is True

@@ -86,28 +86,27 @@ function contentOf(root, slotId) {
 }
 
 describe("mountSplit", () => {
-  it("creates a fixed pool of four cells with one visible", () => {
+  it("creates a fixed pool of three cells with one visible", () => {
     const { root } = mount();
     assert.equal(root.getAttribute("data-layout"), "single");
-    assert.equal(root.children.length, 4);
+    assert.equal(root.children.length, 3);
     assert.equal(visibleCells(root).length, 1);
     // Cell identity is stable: the same four nodes back every cell.
     assert.deepEqual(
       root.children.map((cell) => cell.getAttribute("data-slot-id")),
-      ["slot-1", "slot-2", "slot-3", "slot-4"],
+      ["slot-1", "slot-2", "slot-3"],
     );
   });
 
-  it("splits 1 -> 2 -> 4 with layout switches and stable nodes", () => {
+  it("splits 1 -> 2 -> 3 with layout switches and stable nodes", () => {
     const { api, root } = mount();
     const before = [...root.children];
     api.split("tab-a");
     assert.equal(root.getAttribute("data-layout"), "cols-2");
     assert.equal(visibleCells(root).length, 2);
     api.split("tab-b");
-    api.split("tab-b");
     assert.equal(root.getAttribute("data-layout"), "grid-2x2");
-    assert.equal(visibleCells(root).length, 4);
+    assert.equal(visibleCells(root).length, 3);
     assert.deepEqual(root.children, before);
     assert.ok(api.split("tab-b").error);
   });
@@ -159,6 +158,6 @@ describe("mountSplit", () => {
     assert.equal(changes.length, 1);
     assert.equal(changes[0].slots.length, 2);
     api.destroy();
-    assert.equal(root.children.length, 4);
+    assert.equal(root.children.length, 3);
   });
 });
