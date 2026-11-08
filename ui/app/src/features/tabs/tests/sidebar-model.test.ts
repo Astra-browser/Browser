@@ -104,7 +104,8 @@ describe("authoritative sidebar model", () => {
     const second: SplitGroupView = { members: ["c", "d"] };
     const units = sidebarDisplayUnits("today", tree.today, first, true, [first, second]);
     expect(units.map((unit) => unit.kind)).toEqual(["split", "split", "separator", "tab"]);
-    expect(units.at(-1)?.kind === "tab" ? units.at(-1)!.tab.id : "").toBe("e");
+    const last = units.at(-1);
+    expect(last?.kind === "tab" ? last.tab.id : "").toBe("e");
   });
 
   it("fails a cross-section or unknown split back to independent rows", () => {
