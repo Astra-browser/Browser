@@ -1,9 +1,21 @@
 # Extensions gallery (P4-T04, X-01)
 
-Curated Firefox/AMO gallery replacing Chrome Web Store install. The base
-snapshot's UI catalog (`ui/app/src/features/webext/lib/catalog.ts`) lists
-45 unique Chrome Web Store ids (code wins: the README's "20 verified" claim
-and PARITY.md's "47" count are both stale). Every one is mapped below.
+This page is the **gallery mapping** for the 45 Chrome Web Store ids in the
+base catalog. It is not the whole extension platform: real Chrome packages
+(CRX3) and Chrome Web Store listings are now a first-class source alongside
+signed Firefox XPI. The intake, manifest adaptation, compatibility verdicts,
+security policy, install persistence and verification live in
+[`EXTENSIONS_COMPAT.md`](EXTENSIONS_COMPAT.md).
+
+The gallery still prefers the same vendor's AMO build because it is signed,
+updates through the engine, and is the path with the fewest differences. A
+Chrome-only package can be installed from the store listing (Add) or from a
+`.crx`/`.zip` file; the review states the verdict and every limitation before
+anything is installed.
+
+The base snapshot's UI catalog (`ui/app/src/features/webext/lib/catalog.ts`)
+lists 45 unique Chrome Web Store ids (code wins: the README's "20 verified"
+claim and PARITY.md's "47" count are both stale). Every one is mapped below.
 
 Machine-readable source: `crates/astra-extensions/gallery.json` (verified
 2026-11-02 against the live addons.mozilla.org API v5). The UI mirror

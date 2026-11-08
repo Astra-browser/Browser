@@ -11,6 +11,42 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: extension platform — Chrome CRX3 + Firefox XPI (2026-11-08, latest)
+
+**What changed:** Chrome packages are a real extension source next to signed
+Firefox XPI. `astra-core` (Rust) verifies the CRX3 RSA proof and ZIP digest,
+unpacks with traversal/size/ratio bounds, adapts the manifest to Gecko 153,
+inventories the APIs the package calls, scans behavioural signals, and writes
+a deterministic XPI. The Host API installs that exact XPI through the engine's
+own `AddonManager`, records the package/report hashes, and restores session
+packages at startup. The UI's existing Chrome Web Store Add button now reaches
+this path; the review shows source, signature, verdict, limitations, security
+evidence and whether the package survives a restart.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Chrome package intake | CRX3 signature + id from key, CRX2/ECDSA refusal, safe ZIP, 96 MiB/256 MiB bounds, traversal/symlink/duplicate refusal | `crates/astra-extensions/src/{crx,package,pipeline,security,manifest,compat}.rs`; `astra-core` `extensions.inspect`/`extensions.stage` | Rust 38+1 tests; `chrome_ext_probe.py` 49/49; inspect 2.2 ms |
+| Manifest adaptation | MV3 worker → event page, static `importScripts` expanded, `side_panel` → `sidebar_action`, MV3 callback prelude, unsupported permissions removed and reported, stable `<chrome-id>@chrome.astra` id | `manifest.rs`, `compat.rs`, `jar.mn` | probe checks adapted bg/sidebar/permissions; real Tampermonkey 1024-bit key verifies |
+| Lifecycle | install, update (same id, version 1.1.0), disable/enable, restart restore, uninstall, record/package cleanup | `overlay/astra/host/ChromeExtensions.sys.mjs`, `WebExtensions.sys.mjs` | probe: update/restart/disable/enable/uninstall all pass; 3-cycle PSS growth 10.2 MiB |
+| Store + file | Add on a Chrome Web Store listing; `.crx`/`.zip` file and drop; signed `.xpi` unchanged | `storeIdFromUrl`, `downloadCrx`, `prepare`, `prepareFile`, `chooseFile` | real packages 57/57: uBO Lite, Dark Reader, Tampermonkey, Stylus, Firefox uBO |
+| Security | lexical evidence with file/line; proximity combinations; auto-block only miner+exfiltration/privilege; clean ≠ safe | `security.rs`; review `security` block | malicious fixture blocked before staging; tampered CRX and traversal ZIP refused |
+| UI | source + signature line, compatibility badge, limitations, security evidence list, persistence line; row source/security marker | `WebExtensionReview.svelte`, `ExtensionRow.svelte`, `bindings.ts`, `messages/en.json` | typecheck 0, webext unit/component 21 tests |
+
+**Verification:** `cargo test -p astra-extensions` 38+1; `node
+tests/contract/chrome_extensions.mjs` 38; `chrome_ext_probe.py` 49/49;
+`real_extensions_probe.py` 57/57 on 5 real packages;
+`extension_bench.py` PASS (startup 1.85 s, idle CPU 4.9 %, 60 s PSS growth
+24.7 MiB, 3-cycle 10.2 MiB). Evidence in `out/chrome-ext/`,
+`out/real-extensions/`, `out/extension-bench/`.
+
+**Limit:** this build requires Mozilla signatures, so an adapted Chrome XPI is
+installed as a temporary add-on and restored at each start; it does not use
+AMO's update channel. MV3 service workers run as event pages; true worker
+globals, dynamic `importScripts` and Chrome-only APIs (`debugger`,
+`offscreen`, `tabCapture`, `system.*`, …) remain unsupported. The store
+acquisition endpoint is not an official API. Full contract and limitations:
+`docs/astra/EXTENSIONS_COMPAT.md`.
+
 ## Owner report: native surfaces — split view, peek, space isolation (2026-11-08, latest)
 
 **What changed:** the split grid, page previews, per-space history, per-space

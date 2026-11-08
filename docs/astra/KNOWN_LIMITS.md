@@ -108,3 +108,36 @@ FPP is on with a strengthened target set (`FINGERPRINTING.md`). It does not
 spoof the user agent, timezone or screen because that breaks real layouts and
 some sites; RFP remains opt-in. FPP reduces the cheap high-entropy surfaces
 (canvas, GPU, audio, fonts, display metrics), not unlinkability as a whole.
+
+## Extension platform (Chrome + Firefox, 2026-11-08)
+
+- **MV3 service workers are event pages.** `extensions.backgroundServiceWorker.enabled`
+  is locked off in this engine. The adapter moves the worker to
+  `background.scripts`; `clients`, `skipWaiting`, `waitUntil` and
+  `install`/`activate` are best-effort shims, not a real ServiceWorkerGlobalScope.
+  True worker-only behaviour (fetch interception, persistent worker state) does
+  not run.
+- **Dynamic `importScripts` cannot be expanded.** Static string-literal calls
+  are resolved into ordered background scripts; a computed argument is reported
+  as a limitation and the call will fail where it runs.
+- **Temporary install is the signed-build policy.** An adapted Chrome XPI is
+  not Mozilla-signed, so this build installs it as a temporary add-on and
+  restores it at each start. It does not use the AMO update channel; Astra
+  stages each update itself. A build that allows unsigned add-ons installs
+  persistently.
+- **Chrome-only APIs remain missing**, including `debugger`,
+  `desktopCapture`, `tabCapture`, `offscreen`, `system.*`, `tts`,
+  `fontSettings` and the ChromeOS namespaces. The review names the ones the
+  package actually calls and the verdict becomes Limited.
+- **Store acquisition is not an official API.** The Chrome Web Store package is
+  fetched through Chrome's update service; Google can change it. The CRX3
+  signature and package digest are verified, and file import is the supported
+  fallback. No Google store-policy or publisher-identity trust is claimed
+  beyond the signing key.
+- **V8/SpiderMonkey differences are not translated.** Syntax and runtime
+  semantics the engine does not implement stay unsupported.
+- **Firefox add-ons still follow the engine's signature and update model**;
+  the Chrome intake does not replace or weaken it.
+- **The compatibility scan is lexical.** It inventories API names and
+  behavioural strings; it does not execute code or prove a code path runs. A
+  clean security report is explicitly not a safety guarantee.

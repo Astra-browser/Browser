@@ -198,3 +198,39 @@ source = "live audit 2026-11-01 (idle); engine/toolkit/components/search/SearchS
 # search.services.mozilla.com, aus-stage: zero hits in engine/ (browser/,
 # toolkit/, services/, modules/, dom/). Third-party guides referencing them
 # are stale for this ESR.
+
+[[endpoint]]
+host = "addons.mozilla.org"
+match = "suffix"
+class = "KEEP"
+reason = "Signed Firefox extension packages and listings; only a person-initiated install or gallery visit, no background traffic."
+disable = ""
+owner_signoff = false
+source = "overlay/astra/host/WebExtensions.sys.mjs prepare(); UI gallery"
+
+[[endpoint]]
+host = "chromewebstore.google.com"
+match = "suffix"
+class = "KEEP"
+reason = "Chrome Web Store listing pages the person opens; the Add action is user-initiated and the package is CRX3-verified before staging."
+disable = ""
+owner_signoff = false
+source = "overlay/astra/host/ChromeExtensions.sys.mjs storeIdFromUrl"
+
+[[endpoint]]
+host = "chrome.google.com"
+match = "suffix"
+class = "KEEP"
+reason = "Legacy Chrome Web Store listing path; same user-initiated rule as chromewebstore.google.com."
+disable = ""
+owner_signoff = false
+source = "overlay/astra/host/ChromeExtensions.sys.mjs storeIdFromUrl"
+
+[[endpoint]]
+host = "clients2.google.com"
+match = "suffix"
+class = "KEEP"
+reason = "User-initiated Chrome package acquisition over Chrome's update service. The CRX3 signature and ZIP digest are verified; an unsigned or unverifiable package is refused. Unversioned endpoint, file import is the documented fallback."
+disable = ""
+owner_signoff = false
+source = "overlay/astra/host/ChromeExtensions.sys.mjs downloadCrx"

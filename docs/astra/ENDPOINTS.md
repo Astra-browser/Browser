@@ -57,6 +57,9 @@ the 4 newly observed hosts, the gate re-run is PASS.
 | `phish-error.mozilla.com` | REMOVE | `...reportPhishMistakeURL` blank if needed (`all.js:3392`) |
 | `shavar.services.mozilla.com`, `safebrowsing.google.com` | KEEP | Security-critical SafeBrowsing (D-15 allow-list) |
 | `versioncheck.addons.mozilla.org` | KEEP | Extension updates until Phase 4 gallery (`extensions.update.url`) |
+| `addons.mozilla.org` | KEEP | Signed Firefox package download / listing, only when a person installs or opens the gallery |
+| `chromewebstore.google.com`, `chrome.google.com` | KEEP | Chrome Web Store listing pages and the Add action; no background traffic |
+| `clients2.google.com` | KEEP | User-initiated Chrome package acquisition (CRX3 verified before staging); unversioned endpoint, file import is the fallback |
 | `aus5.mozilla.org` | REPLACE | `MOZ_APPUPDATE_HOST=<astra-host>` at build time (`build/moz.build:95-97`); covers GMP (`all.js:3474`) |
 | `firefox.settings.services.mozilla.com` + `content-signature-2.cdn.mozilla.net` + `firefox-settings-attachments.cdn.mozilla.net` | REPLACE | `services.settings.server=<astra-mirror>` — owner decision pending |
 | `ciscobinary.openh264.org` | REPLACE | `media.gmp-manager.url` repoint or disable — owner decision (`gmp-sources/openh264.json`) |
