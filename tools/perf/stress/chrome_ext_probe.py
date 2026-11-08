@@ -18,6 +18,8 @@ Astra dev build over Marionette:
   restart -> the package is restored from Astra's record and runs again
   remove  -> uninstall, record and package directory are gone
   refuse  -> blocked package, tampered CRX and traversal ZIP never install
+  fault   -> a crashing background registers, the browser and a healthy
+             extension keep working, and the faulty package is removable
 
 Run headed on a private compositor:
   tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext
@@ -188,17 +190,43 @@ CONTENT_JS = """(() => {
 
 SIDE_PANEL = "<!doctype html><title>Astra panel</title><p>panel</p>"
 
+# A second key so the fault extension has its own id.
+FAULT_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+FAULT_SPKI = FAULT_KEY.public_key().public_bytes(
+    serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+)
+
+FAULT_MANIFEST = {
+    "manifest_version": 3,
+    "name": "Astra Fault Probe",
+    "version": "1.0.0",
+    "background": {"service_worker": "sw.js"},
+    "content_scripts": [{"matches": ["<all_urls>"], "js": ["cs.js"], "run_at": "document_idle"}],
+    "permissions": ["storage"],
+    "key": __import__("base64").b64encode(FAULT_SPKI).decode(),
+}
+FAULT_SW = "throw new Error('intentional background failure');\n"
+# Only claim the title if the healthy extension did not: a failure in one
+# extension must not stop the other one's content script.
+FAULT_CS = """setTimeout(() => {
+  if (!document.title.startsWith('ASTRA-PROBE:')) document.title = 'FAULT-CONTENT';
+}, 1500);
+"""
+
 
 def write_fixtures(directory):
     v1 = make_crx(manifest_for("1.0.0"), {"sw.js": worker_js("1.0.0"), "lib.js": LIB_JS, "cs.js": CONTENT_JS, "panel.html": SIDE_PANEL})
     v2 = make_crx(manifest_for("1.1.0"), {"sw.js": worker_js("1.1.0"), "lib.js": LIB_JS, "cs.js": CONTENT_JS, "panel.html": SIDE_PANEL})
+    fault = make_crx(FAULT_MANIFEST, {"sw.js": FAULT_SW, "cs.js": FAULT_CS}, key=FAULT_KEY, spki=FAULT_SPKI)
     paths = {
+        "fault": os.path.join(directory, "fault.crx"),
         "v1": os.path.join(directory, "probe-v1.crx"),
         "v2": os.path.join(directory, "probe-v2.crx"),
         "tampered": os.path.join(directory, "tampered.crx"),
         "malicious": os.path.join(directory, "malicious.zip"),
         "traversal": os.path.join(directory, "traversal.zip"),
     }
+    open(paths["fault"], "wb").write(fault)
     open(paths["v1"], "wb").write(v1)
     open(paths["v2"], "wb").write(v2)
     tampered = bytearray(v1)
@@ -225,7 +253,7 @@ def write_fixtures(directory):
     with zipfile.ZipFile(paths["traversal"], "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("manifest.json", json.dumps({"manifest_version": 3, "name": "Escape", "version": "1.0.0"}))
         archive.writestr("../escape.js", "console.log('escape');")
-    return paths, extension_id()
+    return paths, extension_id(), extension_id(FAULT_SPKI)
 
 
 RUN = r"""
@@ -378,7 +406,40 @@ const done = arguments[arguments.length - 1];
     try { await host.WebExtensions.prepareFile({ path: "__TRAVERSAL__" }); } catch (e) { traversal = String(e); }
     step("a traversal ZIP is refused", traversal !== null, traversal);
 
-    // 8. record and package directory ------------------------------------
+    // 8. fault containment -------------------------------------------------
+    const faultReview = await host.WebExtensions.prepareFile({ path: "__FAULT__" });
+    await host.WebExtensions.confirm({ id: faultReview.id, reviewId: faultReview.review_id });
+    let faultAddon = null;
+    for (let i = 0; i < 120; i += 1) {
+      faultAddon = await AddonManager.getAddonByID("__FAULT_ID__");
+      if (faultAddon) break;
+      await wait(250);
+    }
+    step("a crashing background still registers", faultAddon !== null, faultAddon?.version ?? null);
+    const alive = await host.Tabs.list({ request_id: "fault-alive" });
+    step("the browser still answers the Host API", !alive?.error && Array.isArray(alive?.tabs));
+    gBrowser.reload();
+    let faultTitle = "";
+    for (let i = 0; i < 100; i += 1) {
+      try { faultTitle = gBrowser.selectedBrowser.contentTitle ?? ""; } catch { faultTitle = ""; }
+      if (faultTitle.startsWith("ASTRA-PROBE:")) break;
+      await wait(250);
+    }
+    step("the healthy extension is unaffected by the faulty one", faultTitle.startsWith("ASTRA-PROBE:"), faultTitle);
+    const healthy = await AddonManager.getAddonByID(id);
+    step("the healthy extension is still active", healthy?.isActive === true);
+    await host.WebExtensions.uninstall({ id: "__FAULT_ID__" });
+    let faultGone = null;
+    for (let i = 0; i < 120; i += 1) {
+      faultGone = await AddonManager.getAddonByID("__FAULT_ID__");
+      if (!faultGone) break;
+      await wait(250);
+    }
+    step("the faulty extension is removable", faultGone === null);
+    const still = await AddonManager.getAddonByID(id);
+    step("removing it leaves the healthy one installed", still !== null);
+
+    // 9. record and package directory ------------------------------------
     const finalRecord = await host.ChromeExtensions.record({ id });
     step("the install record is present", finalRecord !== null && finalRecord.xpi_sha256?.length === 64, finalRecord);
     step("the record names the source", finalRecord?.source === "chrome");
@@ -498,8 +559,9 @@ def stop(proc, log):
 def main():
     os.makedirs(OUT, exist_ok=True)
     profile = tempfile.mkdtemp(prefix="astra-chrome-ext-")
-    fixtures, chrome_id = write_fixtures(profile)
+    fixtures, chrome_id, fault_id = write_fixtures(profile)
     install_id = f"{chrome_id}@chrome.astra"
+    fault_install_id = f"{fault_id}@chrome.astra"
     server, port = serve()
     page = f"http://127.0.0.1:{port}/probe"
     with open(os.path.join(profile, "user.js"), "w") as fh:
@@ -522,6 +584,8 @@ def main():
             RUN.replace("__ID__", install_id)
             .replace("__V1__", fixtures["v1"])
             .replace("__V2__", fixtures["v2"])
+            .replace("__FAULT__", fixtures["fault"])
+            .replace("__FAULT_ID__", fault_install_id)
             .replace("__MAL__", fixtures["malicious"])
             .replace("__TAMPERED__", fixtures["tampered"])
             .replace("__TRAVERSAL__", fixtures["traversal"])

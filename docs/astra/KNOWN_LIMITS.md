@@ -141,3 +141,15 @@ some sites; RFP remains opt-in. FPP reduces the cheap high-entropy surfaces
 - **The compatibility scan is lexical.** It inventories API names and
   behavioural strings; it does not execute code or prove a code path runs. A
   clean security report is explicitly not a safety guarantee.
+- **Chrome native-messaging host manifests are not imported.** Gecko reads
+  Firefox's host directories, not Chrome's. A host registered only for Chrome
+  is not found; `connectNative` fails rather than returning a fake port.
+- **Cross-extension/cross-profile isolation is the engine's boundary.** The
+  platform does not weaken it, but it does not reimplement it. The fault probe
+  covers a crashing extension leaving the browser and a healthy extension
+  working; it does not inject OS-level process kills or test another profile's
+  private data.
+- **Chrome packages do not poll a store for updates in the background.** An
+  update is fetched and reviewed on request; adapted XPIs do not use the AMO
+  update channel.
+

@@ -35,7 +35,7 @@ media probe: the hidden display has no audio device), not a failure.
 | Command | What it proves |
 |---|---|
 | `node tests/contract/chrome_extensions.mjs` | Store URL rule, review mapping, blocked refusal, Host method surface (38 checks; no browser) |
-| `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | A signed CRX3 installs, adapts, runs background + content scripts + messaging + storage, survives disable/enable and a restart, updates, uninstalls; blocked/tampered/traversal packages are refused (49 checks) |
+| `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | A signed CRX3 installs, adapts, runs background + content scripts + messaging + storage, survives disable/enable and a restart, updates, uninstalls; blocked/tampered/traversal packages are refused (55 checks) |
 | `ASTRA_REAL_EXTENSIONS=1 tools/perf/hidden-display.sh python3 tools/perf/stress/real_extensions_probe.py out/real-extensions` | uBlock Origin Lite, Dark Reader, Tampermonkey, Stylus (Chrome) and uBlock Origin (signed AMO XPI) install, run, expose permissions/content scripts/DNR and uninstall (57 checks; network, opt-in) |
 | `ASTRA_EXT_BENCH=1 tools/perf/hidden-display.sh python3 tools/perf/stress/extension_bench.py out/extension-bench` | Startup, per-extension inspect/install time, PSS baseline/after/remove, idle CPU, 60 s growth, 3-cycle install/remove growth (opt-in) |
 

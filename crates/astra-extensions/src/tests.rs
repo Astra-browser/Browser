@@ -187,6 +187,35 @@ fn a_missing_manifest_is_an_error_not_an_empty_report() {
 }
 
 #[test]
+fn arbitrary_bytes_never_panic_the_parsers() {
+    // A cheap deterministic corpus: lengths and bytes vary, and every third
+    // buffer carries the CRX magic so the header/zip paths are exercised.
+    let mut state = 0x9e37_79b9_7f4a_7c15u64;
+    for step in 0..768usize {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let len = (state as usize >> 33) % 512;
+        let mut buffer = vec![0u8; len];
+        for byte in &mut buffer {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            *byte = (state >> 33) as u8;
+        }
+        if step % 3 == 0 && buffer.len() >= 12 {
+            buffer[..4].copy_from_slice(b"Cr24");
+            buffer[4..8].copy_from_slice(&3u32.to_le_bytes());
+            let header = (buffer.len() - 12).min(64) as u32;
+            buffer[8..12].copy_from_slice(&header.to_le_bytes());
+        }
+        let _ = Crx::parse(&buffer);
+        let _ = crate::manifest::parse(&buffer, true);
+        let _ = crate::package::scan_zip(&buffer);
+    }
+}
+
+#[test]
 fn a_tampered_signature_is_refused() {
     let dir = tempfile::tempdir().expect("temp");
     let path = dir.path().join("bad.crx");
