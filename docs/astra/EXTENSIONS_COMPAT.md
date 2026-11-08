@@ -139,7 +139,7 @@ called supported.
 **Verdicts** (`compatibility.verdict`): `full`, `limited` (some called APIs are
 missing), `adapted` (the package shape changed but the called APIs are
 present), `unsupported` (cannot run at all), `blocked` (security refusal).
-The nine real packages tested below are `adapted` or `limited`, and the review
+The five real packages tested below are `adapted` or `limited`, and the review
 shows the exact list.
 
 ## Security model
@@ -253,7 +253,7 @@ retry.
 |---|---|---|
 | Rust unit + integration | `cargo test -p astra-extensions --offline` | 39 + 1 passed |
 | Host contract | `node tests/contract/chrome_extensions.mjs` | 38 checks |
-| Synthetic live probe | `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | **55/55**, inspect 2.2 ms, install 81 ms |
+| Synthetic live probe | `tools/perf/hidden-display.sh python3 tools/perf/stress/chrome_ext_probe.py out/chrome-ext` | **55/55**, inspect ~2 ms, install ~0.1 s |
 | Real packages (opt-in network) | `ASTRA_REAL_EXTENSIONS=1 … real_extensions_probe.py` | **57/57**, 5 packages |
 | Benchmark (opt-in) | `ASTRA_EXT_BENCH=1 … extension_bench.py` | PASS; see `out/extension-bench/result.json` |
 
