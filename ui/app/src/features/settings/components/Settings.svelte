@@ -40,14 +40,14 @@
     account: () => import("./sections/AccountPage.svelte"),
     about: () => import("./sections/AboutPage.svelte"),
   };
-  // A section this build does not offer opens the first one instead; one
-  // that left with Work and AI opens the Work page, where they come back.
+  // A section this build does not offer opens another in its group; when the
+  // whole group is gone it opens the first page instead.
   let offered = $derived(shownSections());
   let current = $derived.by(() => {
     const wanted = sections.find((section) => section.id === state.section());
     return (
       offered.find((section) => section === wanted) ??
-      offered.find((section) => wanted?.group === "work" && section.id === "work") ??
+      offered.find((section) => section.group === wanted?.group) ??
       offered[0]!
     );
   });

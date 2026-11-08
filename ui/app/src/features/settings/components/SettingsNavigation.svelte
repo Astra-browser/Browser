@@ -15,6 +15,11 @@
   // The current page's plate travels to the next one, as a tab's does.
   let nav = $state<HTMLElement>();
   let current = $derived(settings.query() ? null : settings.section());
+  // A group whose pages all left with a feature is not a heading with nothing
+  // under it: it is not drawn at all.
+  let groupsShown = $derived(
+    groups.filter((group) => shownSections().some((item) => item.group === group.id)),
+  );
   let shown: string | null | undefined;
   let origin: Origin | null = null;
   const plate = () => nav?.querySelector<HTMLElement>('[data-plate][aria-current="page"]') ?? null;
@@ -61,7 +66,7 @@
     />
   </div>
   <div class="settings-navigation-list" data-glide-scroller>
-    {#each groups as group (group.id)}<div class="settings-nav-group">
+    {#each groupsShown as group (group.id)}<div class="settings-nav-group">
         <h2>{group.label()}</h2>
         {#each shownSections().filter((item) => item.group === group.id) as item (item.id)}<button
             type="button"

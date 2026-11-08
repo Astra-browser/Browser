@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$shared/i18n/messages";
   import { tabs } from "$domain/tabs";
+  import { flags } from "$shared/flags";
   import Button from "$shared/ui/Button";
   import Icon from "$shared/ui/Icon";
   import { commands, type PageAssistBlockV1 } from "$shared/ipc/bindings";
@@ -124,7 +125,7 @@
           ontoggle={(enabled) => style.id && void session.toggleStyle(style.id, enabled)}
           onremove={() => style.id && void session.removeStyle(style.id)}
         />
-      {:else if block.kind === "handoff"}
+      {:else if block.kind === "handoff" && flags.work}
         <HandoffCard
           handoff={block.handoff}
           oncontinue={() => void session.continueWork(reply.id, index)}

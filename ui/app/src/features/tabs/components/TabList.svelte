@@ -31,6 +31,7 @@
     cascadeFrom = 0,
     columns,
     onSelect,
+    activeId,
   }: {
     /** Lay the tiles out in rows of this many even columns, filling upwards. */
     columns?: number;
@@ -43,7 +44,11 @@
     label: string;
     splitting: boolean;
     onSelect: (id: string) => void;
+    /** Which row reads as the tab in front; null while a page tab is in front. */
+    activeId?: string | null;
   } = $props();
+
+  let inFront = $derived(activeId === undefined ? tabs.activeId() : activeId);
 
   let displayUnits = $derived(
     sidebarDisplayUnits(
@@ -61,7 +66,7 @@
   // setting never invents a way to close a kept site.
   let closeButtons = $derived(preferences.value("tabs.close-button"));
   const folded = new SvelteSet<string>();
-  let hiddenUnits = $derived(collapsedSidebarUnits(displayUnits, folded, tabs.activeId()));
+  let hiddenUnits = $derived(collapsedSidebarUnits(displayUnits, folded, inFront));
   // A collapsed native group hides its rows unless one of them owns the page
   // in front; the heading stays so it can be expanded again.
   let collapsedHidden = $derived.by(() => {
@@ -74,8 +79,8 @@
         continue;
       }
       if (collapsed === null) continue;
-      if (unit.kind === "tab" && unit.tab.id !== tabs.activeId()) hidden.add(unit.key);
-      if (unit.kind === "split" && !unit.tabs.some((entry) => entry.tab.id === tabs.activeId())) {
+      if (unit.kind === "tab" && unit.tab.id !== inFront) hidden.add(unit.key);
+      if (unit.kind === "split" && !unit.tabs.some((entry) => entry.tab.id === inFront)) {
         hidden.add(unit.key);
       }
     }
@@ -239,7 +244,7 @@
         <SplitGroupRow
           motionKey={unit.key}
           tabs={unit.tabs.map((entry) => entry.tab)}
-          activeId={tabs.activeId()}
+          activeId={inFront}
           {splitting}
           closable={section === "today"}
           class={[
@@ -257,8 +262,8 @@
       {:else if variant === "essentials" && unit.depth === 0 && essentialTile}
         {@render essentialTile({
           tab: unit.tab,
-          active: unit.tab.id === tabs.activeId(),
-          splitCandidate: splitting && unit.tab.id !== tabs.activeId(),
+          active: unit.tab.id === inFront,
+          splitCandidate: splitting && unit.tab.id !== inFront,
           onSelect: select,
           onContextMenu: handleContextMenu,
           onPointerDown: handlePointerDown,
@@ -270,14 +275,14 @@
         <TabRow
           cascade={cascadeFrom + index}
           tab={unit.tab}
-          active={unit.tab.id === tabs.activeId()}
+          active={unit.tab.id === inFront}
           depth={unit.depth}
           closable={section === "today" && !tabs.loneNewTab(unit.tab.id)}
           class={[
             variant === "essentials" ? "col-span-full" : "",
             hiddenUnits.has(unit.key) || collapsedHidden.has(unit.key) ? "hidden" : "",
           ].join(" ")}
-          splitCandidate={splitting && unit.tab.id !== tabs.activeId()}
+          splitCandidate={splitting && unit.tab.id !== inFront}
           autoPeek={section === "favorites"}
           onSelect={select}
           onClose={tabs.close}

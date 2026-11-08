@@ -1,5 +1,6 @@
 import * as m from "$shared/i18n/messages";
 import { preferences } from "$domain/preferences";
+import { flags } from "$shared/flags";
 import { fields } from "./catalog";
 import { IS_WINDOWS } from "$shared/platform";
 import {
@@ -181,8 +182,18 @@ export type SettingsSection = (typeof allSections)[number]["id"];
 export const showPreviews = import.meta.env.DEV;
 /** Sections that hold nothing but placeholders today. */
 const previewSections = new Set<SettingsSection>();
+/** Pages that leave with a build flag: they are not shipped at all. */
+const flagSections: Partial<Record<SettingsSection, () => boolean>> = {
+  work: () => flags.work,
+};
+/** Fields that leave with a build flag, so search does not offer them. */
+const flagFields: Partial<Record<keyof typeof fields, () => boolean>> = {
+  "work.enabled": () => flags.work,
+};
+const fieldAvailable = (id: string) => flagFields[id as keyof typeof fields]?.() ?? true;
 export const sections = allSections.filter(
-  (section) => showPreviews || !previewSections.has(section.id),
+  (section) =>
+    (flagSections[section.id]?.() ?? true) && (showPreviews || !previewSections.has(section.id)),
 );
 /** Pages that leave with their feature's switch. */
 const featureSections: Partial<Record<SettingsSection, () => boolean>> = {
@@ -198,7 +209,11 @@ export const shownSections = () =>
   sections.filter((section) => featureSections[section.id]?.() ?? true);
 export const groups = [
   { id: "browser", label: m.settings_browser },
-  { id: "work", label: m.section_work },
+  {
+    id: "work",
+    // With Work off the group holds only AI pages; it is not a Work group.
+    label: () => (flags.work ? m.section_work() : m.feature_ai_title()),
+  },
   { id: "app", label: m.settings_application },
 ] as const;
 export function searchSettings(query: string) {
@@ -208,7 +223,8 @@ export function searchSettings(query: string) {
   const shown = new Set<string>(offered.map((section) => section.id));
   const preferences = Object.entries(fields)
     .filter(
-      ([, field]) =>
+      ([id, field]) =>
+        fieldAvailable(id) &&
         shown.has(field.section) &&
         (showPreviews || !("preview" in field)) &&
         (!("windowsOnly" in field) || IS_WINDOWS) &&
@@ -242,14 +258,15 @@ export function searchSections(query: string) {
       [
         section.title(),
         section.description(),
-        ...Object.values(fields)
+        ...Object.entries(fields)
           .filter(
-            (f) =>
+            ([id, f]) =>
+              fieldAvailable(id) &&
               f.section === section.id &&
               (showPreviews || !("preview" in f)) &&
               (!("windowsOnly" in f) || IS_WINDOWS),
           )
-          .flatMap((f) => [f.label(), f.description()]),
+          .flatMap(([, f]) => [f.label(), f.description()]),
       ]
         .join(" ")
         .toLocaleLowerCase()

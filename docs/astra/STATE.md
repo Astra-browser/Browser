@@ -11,7 +11,89 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
-## Owner report: extension platform — Chrome CRX3 + Firefox XPI (2026-11-08, latest)
+## Owner report: browser pages are tabs (2026-11-09)
+
+**What changed:** Settings and the Extensions manager now wear their own row in
+the tab list. Choosing a web tab parks the page instead of forcing a Back trip;
+the page row stays in the list and choosing it returns to the page. Closing the
+row dismisses the page. The same rule applies to every browser page when a tab
+is chosen, and Work remains a mode that stays where it is. The Get button on
+the Extensions page now opens its store tab in front immediately because the
+page parks on the native active-tab change.
+
+| Surface | Wiring / files | Live evidence |
+|---|---|---|
+| Page tab row | `ui/app/src/features/tabs/components/PageTabRow.svelte`, `lib/page-tab.ts`, `SidebarBody.svelte`, `TabRail.svelte`, `tab-icon.ts` | probe: Settings row exists and reads `aria-current=page`; row label `Settings`; page row appears in both rail and expanded list |
+| Park / return | `ui/app/src/domain/surface/surface.svelte.ts` (`selected`, `pageTab`, `park`, `selectPage`, `dismiss`), `Shell.svelte` (`shownActiveId`, `selectTab`) | probe: click a web tab → `data-astra-surface=browse`; row remains; click the row → Settings returns |
+| Extensions Get | same parking path; `WebExtensionManager` keeps `browserOpenUrl(url, true)` | probe: Extensions row → click Get → tabs 1→2, store tab shown at once, Extensions row stays parked |
+
+**Verification:** `bun run typecheck` 0/0; `eslint` clean; `stylelint` clean;
+`prettier --check` clean; 1246 unit tests pass (2 environment skips); 77
+component tests across tabs/sidebar/Settings; live probe
+`/tmp/opencode/page-tab-probe.py` 14/14 on the packaged dev build.
+
+**Limit:** the page row is a chrome tab, not a native web tab: it does not
+persist across restart and is not draggable or split-capable.
+
+## Owner change: Work is off for Beta 1 (2026-11-09)
+
+Work is a build-time product flag now, not a user switch (D-48).
+`ui/app/src/shared/flags.ts` reads `VITE_ASTRA_WORK`; only `"true"` turns it
+on and the shipped build does not set it. With the flag off the Browse/Work
+rail switch, the Work canvas, the Work Settings page, its Features switch, the
+`work.enabled` search entry, the onboarding Work demo and any `browser.work`
+navigation are absent — not disabled. A profile that stored
+`work.enabled=true` in an earlier build stays off. The runtime preference
+remains for the build that ships Work, but cannot override the flag. Develop
+Work with `VITE_ASTRA_WORK=true` (the Vitest projects set it). Verification:
+`shared/flags.test.ts` and `features/settings/tests/work-flag.test.ts`; live
+`tools/marionette-probe/work-off-probe.py` PASS — no rail switch,
+`browser.work` leaves the surface on Browse, Settings groups are
+Browser/AI/App and Features offers only AI, Notes, Tasks and Time.
+
+## Owner report: Now playing + Astra picture-in-picture (2026-11-09, latest)
+
+**What changed:** the sidebar's Now playing card was one shared projection, so
+every tab's media event overwrote it and a silent tab's `null` view could clear
+a playing one. Content now chooses one tab from the live controllers (newest
+playback first; the current tab while nothing plays), projects only that, and
+keeps a suppressed card closed until its tab starts playing again. The tab
+audio flag was read from `browser.audioPlaybackActive`, which this engine does
+not have, so the rail's media list stayed empty; it now reads the native
+`tab.soundPlaying` and the controller's `isAudible`.
+
+**Picture-in-picture:** the engine's media PiP window now opens as a dependent
+dialog from its opener on Linux. A tiling Wayland compositor floats a transient
+dialog instead of giving it a tile (Hyprland proof: `floating: true`, 640×360).
+Astra's `PipPlayer` module adds the player stylesheet, copies the interface's
+light/dark theme and follows changes live, and puts the site title in a slim
+head strip. The video, scrubber, transport, resize margins and always-on-top
+behavior are still Gecko's own; every observer, listener and injected node is
+released on the player's unload.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Now playing picker | silent tab cannot clear a playing one; newest playback takes the card; paused card stays; close sticks until that tab plays again | `overlay/astra/host/MediaSelection.sys.mjs`, `Content.sys.mjs` (`projectCurrentMedia`, `mediaSuppressed`) | `tests/contract/media_selection.mjs` 10/10; `now-playing-probe.py` PASS: card named, silent switch kept, second tone took it, close stuck, pause kept it, no card after close |
+| Rail audio | the media list marks a playing tab and its item projection carries `audio` | `Content.sys.mjs` (`projectAudible` → `tab.soundPlaying` / `controller.isAudible`) | same probe: `audible: true`, `items-changed` had 2 audio rows |
+| Floating PiP | opens as a dependent dialog, floater under Hyprland, aspect-locked and resizable by the native margins | `patches/ASTRA-0013-float-astra-pip.patch` (`PLAYER_FEATURES`, `parentWin.open`) | `pip-player-probe.py`: `hyprctl` `floating: true`, size 640×360 |
+| Astra player face | Astra stylesheet (resource URL; a chrome-provider CSS inside a chrome://global document loads empty), head strip with the site title, theme follows the interface live | `overlay/astra/pip/PipPlayer.sys.mjs`, `overlay/astra/chrome/pip/player.css`, `jar.mn`, `player.xhtml` link | same probe: `resource://astra/pip/player.css` 24 rules, `data-astra-pip`, head “Astra”, dark→light→dark followed live, Astra ground painted |
+| Resources | one observer + one title listener per player window; stylesheet/head removed on unload; no new wire command or event | same files | probe closes the window with no residue; `media_model` 58/58; `hostapi_v1` 327/327; `wire_coverage` 50/50 |
+
+**Verification:** `node tests/contract/media_selection.mjs` 10/10, `media_model`
+58/58, `hostapi_v1` 327/327, `wire_coverage` 50/50, `bun run --filter
+@astra/frame check` 1246 passed / 2 environment skips, `forge lint` 13/13 clean,
+`state-check` and `brand-lint` clean; live `now-playing-probe.py` and
+`pip-player-probe.py` PASS on Hyprland. Patch: `ASTRA-0013` applies and
+reverse-checks against baseline `61e41ec4`.
+
+**Limit:** `forge footprint` is already over its 1500-line P2/P3 budget on this
+branch (ASTRA-0004 alone is 2235 lines); this change adds 49 patch lines. The
+PiP floating proof needs a tiling compositor; under the hidden Weston display
+the Astra face is still checkable but the floater assertion is a reasoned SKIP.
+`window.resizeTo` from the opener is ignored by the player (upstream behavior);
+resizing is the native window's own edge/margin path, unchanged.
+
+## Owner report: extension platform — Chrome CRX3 + Firefox XPI (2026-11-08)
 
 **What changed:** Chrome packages are a real extension source next to signed
 Firefox XPI. `astra-core` (Rust) verifies the CRX3 RSA proof and ZIP digest,

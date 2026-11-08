@@ -3,6 +3,7 @@
   import type { ToolHostProps } from "$session/tool-drafts.svelte";
   import { tabs } from "$domain/tabs";
   import { surface } from "$domain/surface";
+  import { flags } from "$shared/flags";
   import { commands } from "$shared/ipc/bindings";
   import { events } from "$shared/ipc/native-events";
   import * as m from "$shared/i18n/messages";
@@ -88,6 +89,7 @@
 
   /** A started Work opens in Work mode, on that Work. */
   async function openWork(work: string) {
+    if (!flags.work) return;
     const current = session?.space;
     if (current) {
       const { environmentSession } = await import("$domain/work-environment");

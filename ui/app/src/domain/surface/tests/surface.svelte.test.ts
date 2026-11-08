@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => ({
   listener: null as null | ((event: { payload: string }) => void),
+  items: null as null | ((event: { payload: { active: string | null } }) => void),
   run: vi.fn(),
   wait: vi.fn(),
 }));
@@ -13,6 +14,12 @@ vi.mock("$domain/operations/operations", () => ({ waitForDisposition: harness.wa
 vi.mock("$shared/ipc/native-events", () => ({
   events: {
     browserReturn: { listen: () => Promise.resolve(() => {}) },
+    itemsChanged: {
+      listen: (listener: typeof harness.items) => {
+        harness.items = listener;
+        return Promise.resolve(() => {});
+      },
+    },
     uiCommand: {
       listen: (listener: typeof harness.listener) => {
         harness.listener = listener;
@@ -69,6 +76,40 @@ it("shares initialization and does not report a disposed navigation as a new fai
   await navigation;
   expect(page.currentPage()).toBeNull();
   expect(page.navigationFailed()).toBe(false);
+});
+
+describe("page tabs", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    harness.listener = null;
+    harness.items = null;
+    harness.run.mockReset();
+    harness.run.mockResolvedValue({ accepted: true, operation_id: null });
+  });
+  it("parks the page when another tab comes forward and brings it back by its row", async () => {
+    const page = await import("../surface.svelte");
+    await page.init();
+    harness.items?.({ payload: { active: "tab-1" } });
+    harness.listener?.({ payload: "browser.settings" });
+    expect(page.currentPage()).toBe("settings");
+    expect(page.pageTab()).toBe("settings");
+    // Choosing another tab gives it the window; the page keeps its own row.
+    harness.items?.({ payload: { active: "tab-2" } });
+    expect(page.currentPage()).toBeNull();
+    expect(page.hasPage()).toBe(true);
+    expect(page.pageTab()).toBe("settings");
+    expect(page.pageTabSelected()).toBe(false);
+    // Choosing the page row brings it back without touching the native tab.
+    page.selectPage();
+    expect(page.currentPage()).toBe("settings");
+    expect(page.pageTabSelected()).toBe(true);
+    // Closing from its row clears it rather than entering Work.
+    await page.dismiss();
+    harness.listener?.({ payload: "browser.return" });
+    expect(page.hasPage()).toBe(false);
+    expect(page.currentPage()).toBeNull();
+    page.dispose();
+  });
 });
 
 describe("closing a page", () => {

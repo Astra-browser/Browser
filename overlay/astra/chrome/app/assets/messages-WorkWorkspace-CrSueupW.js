@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";import{Y as t}from"./chrome-shared-CZI7G5DT.js";var n=((n={},r={})=>(r.locale??t(),e(1988,n)??`The browser action could not be confirmed. Your Work is still here.`));export{n as t};

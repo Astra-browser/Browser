@@ -48,6 +48,7 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
+          env: { VITE_ASTRA_WORK: "true" },
           setupFiles: ["./vitest.setup.ts"],
           include: ["src/**/*.test.ts", "*.test.ts"],
           exclude: ["**/*.component.test.ts"],
@@ -155,6 +156,7 @@ export default defineConfig({
             },
           },
           setupFiles: ["./vitest.component.setup.ts"],
+          env: { VITE_ASTRA_WORK: "true" },
           include: ["src/**/*.component.test.ts"],
           // Playwright retires the oldest of 10,000 live requests. Parallel
           // files flood that window while a slow manual mock is still being

@@ -1,4 +1,5 @@
 import { observe, pause } from "$shared/lib/observe";
+import { flags } from "$shared/flags";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
@@ -123,8 +124,11 @@ export const saveFailed = () => failed;
 /** AI: models, agents and dictation. Off, no AI surface is shown. */
 export const aiEnabled = () => values["ai.enabled"] !== "false";
 export type Feature = "work" | "notes" | "tasks" | "time";
-/** A feature switch: off, the feature leaves the app; its data stays. */
-export const enabled = (feature: Feature) => values[`${feature}.enabled`] !== "false";
+/** A feature switch: off, the feature leaves the app; its data stays. A
+ *  build flag that is off removes the feature even if a profile kept a
+ *  stored "on" value from an earlier build. */
+export const enabled = (feature: Feature) =>
+  (feature !== "work" || flags.work) && values[`${feature}.enabled`] !== "false";
 /** The feature a command belongs to. Mirrors `astra_core::commands::feature_of`. */
 function featureOf(command: string): Feature | "ai" | null {
   if (["work.dictate", "tool.ai", "mode.choose"].includes(command)) return "ai";

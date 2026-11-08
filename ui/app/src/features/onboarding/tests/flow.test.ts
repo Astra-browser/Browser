@@ -27,3 +27,16 @@ describe("flow without Work and AI", () => {
     expect(neighbour("ready", -1, false)).toBe("launcher");
   });
 });
+
+describe("flow when the build does not ship Work", () => {
+  it("keeps AI's step and drops only the Work demo", () => {
+    expect(stepsFor(true, false)).toEqual([
+      "welcome",
+      "import",
+      "essentials",
+      "launcher",
+      "ai",
+      "ready",
+    ]);
+  });
+});

@@ -34,6 +34,7 @@
   import { SidebarBody } from "$features/tabs";
   import { TabList } from "$features/tabs";
   import { TabRail } from "$features/tabs";
+  import { PageTabRow, pageTabView } from "$features/tabs";
   import { loadNavigationError, loadTabCapacityState } from "$features/tabs";
   import { selectionGlide } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
@@ -76,6 +77,7 @@
   } from "$features/sidebar";
   import { ContentBar } from "$features/toolbar";
   import { IS_WINDOWS } from "$shared/platform";
+  import { flags } from "$shared/flags";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
   import { ContextMenu, install as installShellMenu, openAt } from "$features/menus";
   import { installTabMenuPresenter } from "./tab-menu";
@@ -297,6 +299,12 @@
     });
   });
   let tree = $derived(sidebarTree(tabs.sidebarNodes(), tabs.tabs()));
+  // A browser page is a tab of its own: its row stays in the list after a web
+  // tab is chosen, and choosing the row again brings the page back.
+  let pageTabKind = $derived(browserPage.pageTab());
+  let pageTabRow = $derived(pageTabKind === null ? null : pageTabView(pageTabKind));
+  // While the page tab is in front, no web tab is the current row.
+  let shownActiveId = $derived(browserPage.pageTabSelected() ? null : tabs.activeId());
   let keptBeside = $derived(tree.favorites.slice(0, beside));
   let keptAbove = $derived(tree.favorites.slice(beside));
   // The rail shows one flat list. Folders and split grouping are shapes that
@@ -599,6 +607,9 @@
     });
   });
   function selectTab(id: string) {
+    // Choosing any web tab gives it the window: a page open over it is put
+    // behind its own tab row instead of making the person back out first.
+    if (browserPage.pageSelected()) browserPage.park();
     const pane = tabs.replacePane();
     if (pane !== null) {
       tabs.replaceWith(pane, id);
@@ -673,11 +684,19 @@
            new list settles in where the old one was. -->
       {#key inWork}<div class="sidebar-mode-body" data-arriving={modeSwitched}>
           {#if compact}
+            {#if pageTabRow}<PageTabRow
+                tab={pageTabRow}
+                active={browserPage.pageTabSelected()}
+                compact
+                onSelect={() => browserPage.selectPage()}
+                onClose={() => void browserPage.dismiss()}
+              />{/if}
             <TabRail
               entries={railTabs}
               closable={railClosable}
               onSelect={selectTab}
               spaces={false}
+              activeId={shownActiveId}
             />
           {:else}
             <!--
@@ -697,7 +716,19 @@
               >
                 Choose a tab to replace this pane. Press Escape to cancel.
               </p>{/if}
-            <SidebarBody pinned={tree.pinned} today={tree.today} {splitting} onSelect={selectTab}>
+            <SidebarBody
+              pinned={tree.pinned}
+              today={tree.today}
+              {splitting}
+              onSelect={selectTab}
+              activeId={shownActiveId}
+            >
+              {#snippet pageTab()}{#if pageTabRow}<PageTabRow
+                    tab={pageTabRow}
+                    active={browserPage.pageTabSelected()}
+                    onSelect={() => browserPage.selectPage()}
+                    onClose={() => void browserPage.dismiss()}
+                  />{/if}{/snippet}
               {#snippet extras()}<PinnedExtensions />{/snippet}
             </SidebarBody>
             <!-- Brief notices and downloads sit at the foot of the column, by the dock. -->
@@ -961,7 +992,7 @@
                   retryLabel={m.surface_retry()}
                   >{#snippet children(View)}<View />{/snippet}</LazyView
                 >
-              {:else if browserPage.currentPage() === "work"}
+              {:else if flags.work && browserPage.currentPage() === "work"}
                 {#key tabs.profile()?.id}<LazyView
                     loader={loadWorkWorkspace}
                     loadingLabel={m.surface_loading()}

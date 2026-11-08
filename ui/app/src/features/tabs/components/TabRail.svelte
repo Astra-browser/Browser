@@ -28,6 +28,7 @@
     closable = new Set<string>(),
     onSelect,
     spaces = true,
+    activeId,
   }: {
     entries: TabView[];
     /** Tabs the expanded list shows a close button for. */
@@ -35,7 +36,11 @@
     onSelect: (id: string) => void;
     /** False when the column's head already carries the spaces switcher. */
     spaces?: boolean;
+    /** Which row reads as the tab in front; null while a page tab is in front. */
+    activeId?: string | null;
   } = $props();
+
+  let inFront = $derived(activeId === undefined ? tabs.activeId() : activeId);
 
   function handleContextMenu(event: MouseEvent, tab: TabView) {
     event.preventDefault();
@@ -146,7 +151,7 @@
     >
       <ul bind:this={list} class="rail-list" data-tabs-drop role="list" aria-label={m.open_tabs()}>
         {#each entries as tab, index (tab.id)}
-          {@const active = tab.id === tabs.activeId()}
+          {@const active = tab.id === inFront}
           <li
             data-cascade
             style:--cascade={index + 1}

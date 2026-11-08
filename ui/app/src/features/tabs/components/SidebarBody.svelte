@@ -17,12 +17,18 @@
     today,
     splitting,
     onSelect,
+    activeId,
+    pageTab,
     extras,
   }: {
     pinned: SidebarEntry[];
     today: SidebarEntry[];
     splitting: boolean;
     onSelect: (id: string) => void;
+    /** Which row reads as the tab in front; null while a page tab is in front. */
+    activeId?: string | null;
+    /** The browser page's own tab row, when one is open. */
+    pageTab?: Snippet;
     /** Set beside the way to open a tab: pinned extensions. */
     extras?: Snippet;
   } = $props();
@@ -103,11 +109,16 @@
         label={m.pinned_tabs()}
         cascadeFrom={1}
         {splitting}
+        {activeId}
         {onSelect}
       />
 
       {#if pinned.length > 0}
         <div class="tab-section-gap" aria-hidden="true"></div>
+      {/if}
+
+      {#if pageTab}
+        {@render pageTab()}
       {/if}
 
       <TabList
@@ -116,6 +127,7 @@
         label={m.open_tabs()}
         cascadeFrom={pinned.length + 1}
         {splitting}
+        {activeId}
         {onSelect}
       />
 

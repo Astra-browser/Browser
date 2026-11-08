@@ -15,6 +15,7 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     pagePermissionCardHost: async () => {},
     tabsBootstrap: async () => {},
+    tabsActivate: async () => ({ accepted: true, operation_id: null }),
     sidebarSetHidden: async () => {},
     sidebarSetWidth: async () => {},
   });
@@ -53,6 +54,18 @@ test("Settings stands beside the tab rail and returns to the same web tab", asyn
     .not.toBeNull();
   // The tab stays one click away in the rail beside the settings panel.
   expect(screen.container.querySelector(`[data-astra-tab-id="${tab.id}"]`)).not.toBeNull();
+  // The page has its own row: choosing the web tab leaves Settings without a
+  // Back trip, and choosing the page row brings it straight back.
+  expect(
+    screen.container.querySelector('[data-astra-tab-id="astra-page:settings"]'),
+  ).not.toBeNull();
+  screen.container.querySelector<HTMLElement>(`[data-astra-tab-id="${tab.id}"] button`)!.click();
+  await expect.poll(() => surface.currentPage()).toBeNull();
+  expect(surface.hasPage()).toBe(true);
+  screen.container
+    .querySelector<HTMLElement>('[data-astra-tab-id="astra-page:settings"] button')!
+    .click();
+  await expect.poll(() => surface.currentPage()).toBe("settings");
   emitNativeEvent("browserReturn", { ...items, projection_revision: revision(11) });
   expect(screen.container.querySelector('[data-astra-surface="browse"]')).not.toBeNull();
   const rows = screen.container.querySelectorAll(`[data-astra-tab-id="${tab.id}"]`);

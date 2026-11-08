@@ -38,6 +38,19 @@ It runs `engine/obj-astra-linux/dist/bin/firefox` with `-no-remote` and a
 profile in `out/dev-profile`, and prints the build command if the binary is
 missing.
 
+### Product flags
+
+Work is off in the shipped build (D-48). To build the frame with Work for
+development, set the flag for the frame build or dev server:
+
+```sh
+VITE_ASTRA_WORK=true bun run --filter @astra/frame build:chrome
+VITE_ASTRA_WORK=true bun run --filter @astra/frame dev
+```
+
+The flag is read at build time, so changing it needs a rebuild. Beta 1 ships
+without it.
+
 ## Rebuild loop
 
 | Changed | Command | Time |
