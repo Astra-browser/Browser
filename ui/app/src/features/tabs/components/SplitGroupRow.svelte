@@ -23,7 +23,7 @@
     closable?: boolean;
     motionKey?: string;
     class?: string;
-    onSelect: (id: string) => void;
+    onSelect: (id: string, event?: MouseEvent) => void;
     onClose: (id: string) => void;
     onContextMenu: (event: MouseEvent, tab: TabView) => void;
     onPointerDown: (event: PointerEvent, tab: TabView) => void;

@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-Vsn24tXl.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-bbkz7y02-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3167,n)??`These sites stay closed while a focus round runs. Breaks open them again.`)),r=((n={},r={})=>(r.locale??e(),t(3118,n)??`Time`));export{n,r as t};

@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as tabDrag from "$session/tab-drag.svelte";
   import { SvelteSet } from "svelte/reactivity";
+  import { collapseTabGroup } from "$shared/ipc/surfaces";
   import type { SidebarSectionView, TabView } from "$shared/ipc/bindings";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
@@ -44,7 +45,14 @@
     onSelect: (id: string) => void;
   } = $props();
 
-  let displayUnits = $derived(sidebarDisplayUnits(section, entries, tabs.splitGroup()));
+  let displayUnits = $derived(
+    sidebarDisplayUnits(
+      section,
+      entries,
+      tabs.splitGroup(),
+      preferences.value("split.groups") !== "false",
+    ),
+  );
   // The close-button choice is one setting for both the Today list and the
   // Essentials dock. `always` reveals the control on every closable row;
   // `hover` leaves the row's own rule in charge. Pinned/essential rows have
@@ -53,6 +61,25 @@
   let closeButtons = $derived(preferences.value("tabs.close-button"));
   const folded = new SvelteSet<string>();
   let hiddenUnits = $derived(collapsedSidebarUnits(displayUnits, folded, tabs.activeId()));
+  // A collapsed native group hides its rows unless one of them owns the page
+  // in front; the heading stays so it can be expanded again.
+  let collapsedHidden = $derived.by(() => {
+    const hidden = new SvelteSet<string>();
+    if (preferences.value("split.group-collapse") !== "true") return hidden;
+    let collapsed: string | null = null;
+    for (const unit of displayUnits) {
+      if (unit.kind === "group") {
+        collapsed = unit.group.collapsed ? unit.group.id : null;
+        continue;
+      }
+      if (collapsed === null) continue;
+      if (unit.kind === "tab" && unit.tab.id !== tabs.activeId()) hidden.add(unit.key);
+      if (unit.kind === "split" && !unit.tabs.some((entry) => entry.tab.id === tabs.activeId())) {
+        hidden.add(unit.key);
+      }
+    }
+    return hidden;
+  });
 
   const drag = new RowDrag({
     list: () => list,
@@ -125,8 +152,16 @@
     tabs.openTabMenu(tab.id, event.clientX, event.clientY);
   }
 
-  function select(id: string) {
+  function select(id: string, event?: MouseEvent) {
     if (drag.swallowClick()) return;
+    // Shift-click peeks without changing the page in front.
+    if (event?.shiftKey) {
+      import("$domain/peek").then(({ peek }) => {
+        if (!peek.settings().trigger.includes("shift")) return;
+        peek.open({ tab_id: id, source: "shift-click" });
+      });
+      return;
+    }
     onSelect(id);
   }
 
@@ -177,9 +212,26 @@
           depth={unit.depth}
           class={[
             variant === "essentials" ? "col-span-full" : "",
-            hiddenUnits.has(unit.key) ? "hidden" : "",
+            hiddenUnits.has(unit.key) || collapsedHidden.has(unit.key) ? "hidden" : "",
           ].join(" ")}
         />
+      {:else if unit.kind === "group"}
+        <li class="tab-group-row" data-motion-key={unit.key}>
+          <button
+            type="button"
+            class="tab-group-head"
+            data-group-id={unit.group.id}
+            style:--group-color={unit.group.color ?? "var(--color-accent)"}
+            aria-label={`${unit.group.collapsed ? "Expand" : "Collapse"} group ${unit.group.label || "tab group"}`}
+            aria-expanded={!unit.group.collapsed}
+            onclick={() =>
+              void collapseTabGroup(unit.group.id, !unit.group.collapsed).catch(() => {})}
+          >
+            <span class="tab-group-dot" aria-hidden="true"></span>
+            <span class="tab-group-name">{unit.group.label || "Tab group"}</span>
+            {#if unit.group.collapsed}<span class="tab-group-state">collapsed</span>{/if}
+          </button>
+        </li>
       {:else if unit.kind === "split"}
         <SplitGroupRow
           motionKey={unit.key}
@@ -189,7 +241,7 @@
           closable={section === "today"}
           class={[
             variant === "essentials" ? "col-span-full" : "",
-            hiddenUnits.has(unit.key) ? "hidden" : "",
+            hiddenUnits.has(unit.key) || collapsedHidden.has(unit.key) ? "hidden" : "",
           ].join(" ")}
           onSelect={select}
           onClose={tabs.close}
@@ -220,9 +272,10 @@
           closable={section === "today" && !tabs.loneNewTab(unit.tab.id)}
           class={[
             variant === "essentials" ? "col-span-full" : "",
-            hiddenUnits.has(unit.key) ? "hidden" : "",
+            hiddenUnits.has(unit.key) || collapsedHidden.has(unit.key) ? "hidden" : "",
           ].join(" ")}
           splitCandidate={splitting && unit.tab.id !== tabs.activeId()}
+          autoPeek={section === "favorites"}
           onSelect={select}
           onClose={tabs.close}
           onContextMenu={handleContextMenu}
@@ -294,5 +347,57 @@
   /* One pixel between rows read as a stack of stripes rather than a list. */
   .tab-list-rows {
     gap: var(--tab-gap);
+  }
+
+  /* A native tab-group heading: small, coloured and quiet, so the group is
+     legible without becoming a second tab strip. */
+  .tab-group-row {
+    list-style: none;
+  }
+
+  .tab-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    inline-size: 100%;
+    min-block-size: 20px;
+    padding: 4px 8px 1px;
+    border: 0;
+    background: transparent;
+    color: var(--color-faint);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: start;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .tab-group-head:hover,
+  .tab-group-head:focus-visible {
+    color: var(--color-label-secondary);
+  }
+
+  .tab-group-dot {
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 999px;
+    background: var(--group-color, var(--color-accent));
+    flex: none;
+  }
+
+  .tab-group-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tab-group-state {
+    margin-inline-start: auto;
+    color: var(--color-faint);
+    font-size: 9px;
+    letter-spacing: 0.02em;
+    text-transform: none;
   }
 </style>

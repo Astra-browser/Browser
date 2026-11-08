@@ -96,6 +96,16 @@ try {
   setWindowLabel(SURFACE);
 
   const bridge = await ensureBridge(SURFACE, window.location.search);
+  // Probe seam: the live route table, not a direct Host module call. Chrome
+  // code already has this capability; it adds no new privilege.
+  try {
+    (window as unknown as Record<string, unknown>).__astraInvoke = (
+      name: string,
+      args: Record<string, unknown> = {},
+    ) => bridge.invoke(name, args);
+  } catch {
+    // A locked-down window keeps the app; the probe reports the missing seam.
+  }
   if (getCurrentWindow().label !== SURFACE) {
     throw new Error("unexpected native surface");
   }
@@ -194,6 +204,7 @@ try {
     "note-open-requested": "astra:note-open-requested",
     "browser-return": "astra:browser-return",
     "presentation-tab": "astra:presentation-tab",
+    "peek-changed": "astra:peek",
   };
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {

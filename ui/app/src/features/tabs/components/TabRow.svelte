@@ -5,6 +5,7 @@
 </script>
 
 <script lang="ts">
+  import { onMount } from "svelte";
   import * as m from "$shared/i18n/messages";
   import { Cancel01Icon } from "@hugeicons/core-free-icons";
   import { tabFallbackIcon } from "../lib/tab-icon";
@@ -15,6 +16,8 @@
   import CaptureControl from "$shared/ui/CaptureControl";
   import AudioControl from "$shared/ui/AudioControl";
   import { tabs } from "$domain/tabs";
+  import { preferences } from "$domain/preferences";
+  import { peek } from "$domain/peek";
   import { closeOnMiddleClick } from "../lib/middle-click";
 
   let {
@@ -26,6 +29,7 @@
     closable = true,
     class: className = "",
     splitCandidate,
+    autoPeek = false,
     onSelect,
     onClose,
     onContextMenu,
@@ -43,7 +47,9 @@
     closable?: boolean;
     class?: string;
     splitCandidate: boolean;
-    onSelect: (id: string) => void;
+    /** A kept (pinned) tab previews itself after the configured hover delay. */
+    autoPeek?: boolean;
+    onSelect: (id: string, event?: MouseEvent) => void;
     onClose: (id: string) => void;
     onContextMenu: (event: MouseEvent, tab: TabView) => void;
     onPointerDown: (event: PointerEvent, tab: TabView) => void;
@@ -65,6 +71,41 @@
   // positions itself with.
   let steps = $derived(grouped ? 0 : Math.min(depth, 8) * 13);
   let indent = $derived(8 + steps);
+
+  // Automatic hover preview, only for a kept tab and only while the setting
+  // asks for it. One timer per row; leaving cancels it and closes only a card
+  // this row opened.
+  let peekTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function cancelPeek(): void {
+    if (peekTimer !== null) clearTimeout(peekTimer);
+    peekTimer = null;
+  }
+
+  function enterRow(): void {
+    if (!autoPeek || preferences.value("peek.pinned") !== "true") return;
+    const settings = peek.settings();
+    if (!settings.enabled || !settings.trigger.includes("hover")) return;
+    const id = `tab:${tab.id}`;
+    if (peek.has(id)) return;
+    cancelPeek();
+    peekTimer = setTimeout(
+      () => {
+        peekTimer = null;
+        void peek.open({ tab_id: tab.id, source: "hover" });
+      },
+      Math.max(80, Number(settings.delay) || 420),
+    );
+  }
+
+  function leaveRow(): void {
+    cancelPeek();
+    const id = `tab:${tab.id}`;
+    const card = peek.state().find((entry) => entry.id === id);
+    if (card?.source === "hover" && peek.settings().closeOnLeave) peek.close(id);
+  }
+
+  onMount(() => cancelPeek);
 </script>
 
 <li
@@ -91,7 +132,9 @@
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
     onpointercancel={onPointerCancel}
-    onclick={() => onSelect(tab.id)}
+    onpointerenter={enterRow}
+    onpointerleave={leaveRow}
+    onclick={(event) => onSelect(tab.id, event)}
     {...closable ? closeOnMiddleClick(() => onClose(tab.id)) : {}}
   >
     <FavIcon

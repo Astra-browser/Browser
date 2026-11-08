@@ -519,6 +519,7 @@
     // interim mounts stay wired (live contract tests drive them); they hide
     // on host-ready and return only if the app fails (P3-T16).
     appApi = mountAppFrame(appMount, host, {
+      window_id: ownWindowId,
       // Records the mode the app actually booted in (P3-T15 contract seam:
       // live suites assert `host` here). Ready also retires the interim
       // chrome (P3-T16); a failure keeps it visible with appError set.
@@ -551,6 +552,9 @@
       // is the one thing the host model does not carry yet. Rewrite only that
       // field; every tab, space and active id stays the model's own.
       transformEvent: (event) => {
+        // A per-window surface (peek cards) must never reach another window's
+        // app frame. The shell filters before the bridge sees it.
+        if (event?.data?.window_id && event.data.window_id !== ownWindowId) return null;
         if (!privateWindow || event?.type !== "items-changed" || !event.data) return event;
         return {
           ...event,
@@ -710,6 +714,13 @@
         Tabs: host.Tabs,
         Navigation: host.Navigation,
         Panes: host.Panes,
+        SplitView: host.SplitView,
+        Peek: host.Peek,
+        SpaceHistory: host.SpaceHistory,
+        SpaceExtensions: host.SpaceExtensions,
+        SpaceClone: host.SpaceClone,
+        TabGroups: host.TabGroups,
+        Settings: host.Settings,
         Windows: host.Windows,
         Metadata: host.Metadata,
         __spacesState: host.__spacesState,
@@ -915,6 +926,25 @@
         menuTimer = setTimeout(() => setMenuOpen(false), 30000);
       }
     }
+    // A page peek is drawn in the app frame, which normally sits under the
+    // page. While one is open the frame is raised and clipped to the card's
+    // own rectangle, so the page keeps its pointer everywhere else.
+    function setPeekOpen(open, rect = null) {
+      if (!open) {
+        frameRoot.dataset.astraPeekOpen = "false";
+        return;
+      }
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const top = clamp(Number(rect?.top) || 0, 0, win.innerHeight);
+      const right = clamp(Number(rect?.right) || 0, 0, win.innerWidth);
+      const bottom = clamp(Number(rect?.bottom) || 0, 0, win.innerHeight);
+      const left = clamp(Number(rect?.left) || 0, 0, win.innerWidth);
+      frameRoot.style.setProperty("--astra-peek-top", `${Math.round(top)}px`);
+      frameRoot.style.setProperty("--astra-peek-right", `${Math.round(right)}px`);
+      frameRoot.style.setProperty("--astra-peek-bottom", `${Math.round(bottom)}px`);
+      frameRoot.style.setProperty("--astra-peek-left", `${Math.round(left)}px`);
+      frameRoot.dataset.astraPeekOpen = "true";
+    }
     const tabIdOf = (browser) => {
       for (const [id, entry] of mounted?.browsers ?? []) {
         if (entry.browser === browser) return id;
@@ -969,6 +999,14 @@
       }
       if (data.kind === "menu-close") {
         setMenuOpen(false);
+        return;
+      }
+      if (data.kind === "peek-open") {
+        setPeekOpen(true, data.rect ?? null);
+        return;
+      }
+      if (data.kind === "peek-close") {
+        setPeekOpen(false);
         return;
       }
       // The app's page bar floats over a web page instead of taking a row: it
@@ -1554,6 +1592,22 @@
   }
   :global(.astra-frame[data-astra-menu-open="true"] .astra-app-frame) {
     clip-path: none;
+  }
+
+  /* A page peek keeps the frame raised only over its own card rectangle. The
+     app makes its ground transparent while one is open, so the page stays
+     visible around the card and keeps its pointer outside the clip. */
+  :global(.astra-frame[data-astra-peek-open="true"] .astra-app-mount) {
+    position: relative;
+    z-index: 4;
+    background: transparent;
+  }
+
+  :global(.astra-frame[data-astra-peek-open="true"] .astra-app-frame) {
+    clip-path: inset(
+      var(--astra-peek-top, 0px) var(--astra-peek-right, 0px)
+        var(--astra-peek-bottom, 0px) var(--astra-peek-left, 0px)
+    );
   }
   .astra-app-mount > :global(.astra-app-frame) {
     flex: 1 1 auto;

@@ -1,1 +1,0 @@
-import{pn as e}from"./chrome-shared-Vsn24tXl.js";e();

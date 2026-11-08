@@ -70,6 +70,31 @@ describe("authoritative sidebar model", () => {
     ]);
   });
 
+  it("renders one native group heading over its own rows", () => {
+    const grouped = {
+      ...tab("a"),
+      group: { id: "group-1", label: "Work", color: "blue", collapsed: false },
+    };
+    const also = {
+      ...tab("b"),
+      group: { id: "group-1", label: "Work", color: "blue", collapsed: false },
+    };
+    const tree = sidebarTree([tabNode("a"), tabNode("b"), tabNode("c")], [grouped, also, tab("c")]);
+    const units = sidebarDisplayUnits("today", tree.today, null, true);
+    expect(units.map((unit) => unit.kind)).toEqual(["group", "tab", "tab", "tab"]);
+    expect(units[0]?.kind === "group" ? units[0].group.label : "").toBe("Work");
+  });
+
+  it("leaves groups out when the setting is off", () => {
+    const grouped = {
+      ...tab("a"),
+      group: { id: "group-1", label: "Work", color: "blue", collapsed: false },
+    };
+    const tree = sidebarTree([tabNode("a")], [grouped]);
+    const units = sidebarDisplayUnits("today", tree.today, null, false);
+    expect(units.map((unit) => unit.kind)).toEqual(["tab"]);
+  });
+
   it("fails a cross-section or unknown split back to independent rows", () => {
     const tree = sidebarTree([tabNode("a", "pinned"), tabNode("b")], [tab("a"), tab("b")]);
     expect(

@@ -5,6 +5,7 @@ import type { ItemsState, SpaceLookInputV1, TabView } from "$shared/ipc/bindings
 import { settle } from "$domain/operations";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
+import { splitReplace } from "$shared/ipc/surfaces";
 import { TabProjectionModel } from "./tabs-model";
 
 const model = new TabProjectionModel();
@@ -125,7 +126,10 @@ const fire = (task: Promise<unknown> | undefined) => void task?.catch?.(() => {}
 
 export const open = () => fire(commands.tabsOpen());
 export const activate = (id: string) => fire(commands.tabsActivate(id));
-export const close = (id: string) => fire(commands.tabsClose(id));
+export const close = (id: string) => {
+  if (_replacePane === id) _replacePane = null;
+  fire(commands.tabsClose(id));
+};
 /** The window's one tab, with nothing open in it yet. Closing it would only
  *  put another empty tab in its place, so it offers no close. */
 export const loneNewTab = (id: string) => {
@@ -147,7 +151,25 @@ export const backActive = onActive((id) => fire(commands.tabsBack(id)));
 export const forwardActive = onActive((id) => fire(commands.tabsForward(id)));
 export const split = (other: string) => fire(commands.tabsSplit(other));
 export const unsplit = () => fire(commands.tabsUnsplit());
+export const leaveSplit = (id: string) => fire(commands.tabsLeaveSplit(id));
 export const inSplit = (id: string) => state.split_group?.members.includes(id) ?? false;
+/** Pane order for the native split, or null when there is no split. */
+export const splitMembers = () => state.split_group?.members ?? [];
+
+/** A pane waiting to be replaced by the next tab the person chooses. */
+let _replacePane = $state<string | null>(null);
+export const replacePane = () => _replacePane;
+export function beginReplace(pane: string): void {
+  _replacePane = pane;
+}
+export function cancelReplace(): void {
+  _replacePane = null;
+}
+/** Swap the waiting pane for another tab without closing the tab it showed. */
+export const replaceWith = (pane: string, other: string) => {
+  _replacePane = null;
+  fire(splitReplace(pane, other));
+};
 export const dragOver = (x: number, y: number) => fire(commands.tabDragOver(x, y));
 export const dropTab = (id: string, x: number, y: number) => fire(commands.tabDrop(id, x, y));
 /** Keeps one of onboarding's catalog sites in Essentials, named by its id;

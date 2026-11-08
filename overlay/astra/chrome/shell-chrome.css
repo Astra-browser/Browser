@@ -64,3 +64,29 @@
   border-radius: 0 !important;
   z-index: 10;
 }
+
+/* Native split view: the engine owns the panes, but it must not draw its own
+   footer badge or a Firefox-styled divider. The footer is redundant with the
+   Astra tab row; the splitter stays as an invisible resize target and takes
+   the product's accent only while focused or dragged. */
+split-view-footer {
+  display: none !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-splitter {
+  border: 0 !important;
+  border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent) !important;
+  background: transparent !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-splitter:hover,
+#tabbrowser-tabpanels[splitview] .split-view-splitter:focus-visible,
+#tabbrowser-tabpanels[splitview] .split-view-splitter[state="dragging"] {
+  border-inline-start-color: AccentColor !important;
+  outline: none !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-panel > .browserContainer {
+  border-radius: 12px;
+  overflow: clip;
+}

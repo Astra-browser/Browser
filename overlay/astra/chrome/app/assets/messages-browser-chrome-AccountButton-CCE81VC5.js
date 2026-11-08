@@ -1,1 +1,0 @@
-import{C as e}from"./chrome-shared-Vsn24tXl.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-bbkz7y02-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3639,n)??`Profile Settings`)),r=((n,r={})=>(r.locale??e(),t(3391,n)??`Switch to ${n?.name}`));export{n,r as t};

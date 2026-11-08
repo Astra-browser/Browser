@@ -103,6 +103,8 @@ function buildItems(menu, browser) {
   if (menu.onLink && menu.linkURL) {
     add(
       item("link.open", "Open Link in New Tab"),
+      item("link.openSplit", "Open Link in Split View"),
+      item("link.preview", "Preview Link"),
       item("link.openWindow", "Open Link in New Window"),
       item("link.openPrivate", "Open Link in New Private Window"),
       item("link.copy", "Copy Link Address"),
@@ -374,6 +376,30 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
       switch (id) {
       case "link.open":
         return newTab(menu.linkURL);
+      case "link.openSplit": {
+        const target = (() => {
+          try {
+            return win.Services.prefs.getStringPref("astra.settings.split.link-target", "split");
+          } catch {
+            return "split";
+          }
+        })();
+        if (target === "tab") return newTab(menu.linkURL);
+        const reply = await host.SplitView.openUrl({
+          url: menu.linkURL,
+          mode: "split",
+          placement: "right",
+        });
+        return { accepted: !reply?.error, split: reply?.split === true };
+      }
+      case "link.preview": {
+        const reply = await host.Peek.open({
+          url: menu.linkURL,
+          title: menu.linkTextStr,
+          source: "context-menu",
+        });
+        return { accepted: !reply?.error };
+      }
       case "link.openWindow":
         return openWindow({ url: menu.linkURL });
       case "link.openPrivate":

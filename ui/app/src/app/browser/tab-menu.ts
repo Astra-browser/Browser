@@ -1,5 +1,14 @@
 import { openAt } from "$features/menus";
 import { tabs } from "$domain/tabs";
+import {
+  cloneTabToSpace,
+  collapseTabGroup,
+  createTabGroup,
+  splitSaveArrangement,
+  ungroupTabs,
+} from "$shared/ipc/surfaces";
+import { peek } from "$domain/peek";
+import { preferences } from "$domain/preferences";
 import { clearRequest } from "$domain/site-data";
 import * as notices from "$session/notice.svelte";
 import * as m from "$shared/i18n/messages";
@@ -46,6 +55,7 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
     ...(page
       ? [
           { kind: "item" as const, id: "tab.reload", label: m.native_reload_tab() },
+          { kind: "item" as const, id: "tab.preview", label: "Preview" },
           { kind: "item" as const, id: "tab.copyLink", label: m.native_copy_link() },
         ]
       : []),
@@ -55,9 +65,29 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
       id: "tab.keep",
       label: kept ? m.native_remove_from_essentials() : m.native_add_to_essentials(),
     },
-    ...(tabs.canSplitWith(id)
+    ...(tabs.canSplitWith(id) && !tabs.inSplit(id)
       ? [{ kind: "item" as const, id: "tab.split", label: m.native_open_in_split_view() }]
       : []),
+    ...(tabs.inSplit(id)
+      ? [
+          { kind: "item" as const, id: "tab.replacePane", label: "Replace This Pane…" },
+          { kind: "item" as const, id: "tab.leaveSplit", label: "Remove from Split View" },
+          { kind: "item" as const, id: "tab.unsplit", label: "End Split View" },
+          { kind: "item" as const, id: "tab.saveSplit", label: "Save Split Arrangement…" },
+        ]
+      : []),
+    ...(tab.group
+      ? [
+          {
+            kind: "item" as const,
+            id: "tab.groupCollapse",
+            label: tab.group.collapsed ? "Expand Group" : "Collapse Group",
+          },
+          { kind: "item" as const, id: "tab.ungroup", label: "Remove from Group" },
+        ]
+      : tabs.canSplitWith(id)
+        ? [{ kind: "item" as const, id: "tab.group", label: "Group with This Tab" }]
+        : []),
     ...(tab.audio?.can_mute
       ? [
           {
@@ -74,6 +104,12 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
           ...others.map((space) => ({
             kind: "item" as const,
             id: `tab.move.${space.id}`,
+            label: space.name,
+          })),
+          { kind: "heading" as const, label: "Clone to space" },
+          ...others.map((space) => ({
+            kind: "item" as const,
+            id: `tab.clone.${space.id}`,
             label: space.name,
           })),
         ]
@@ -97,17 +133,47 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
   openAt({ x, y, items: rows }, (choice) => {
     if (choice === "tab.new") tabs.open();
     else if (choice === "tab.reload") tabs.reloadTab(id);
+    else if (choice === "tab.preview") void peek.open({ tab_id: id, source: "menu" });
     else if (choice === "tab.copyLink")
       void tabs.copyLinkFor(id).then((copied) => {
         if (copied) notices.show(m.notice_link_copied());
       });
     else if (choice === "tab.keep") void tabs.setKept(id, !kept);
     else if (choice === "tab.split") tabs.split(id);
+    else if (choice === "tab.replacePane") tabs.beginReplace(id);
+    else if (choice === "tab.group")
+      void createTabGroup(id).catch(() => notices.show("The tabs could not be grouped"));
+    else if (choice === "tab.ungroup" && tab.group)
+      void ungroupTabs(tab.group.id).catch(() => notices.show("The group could not be dissolved"));
+    else if (choice === "tab.groupCollapse" && tab.group)
+      void collapseTabGroup(tab.group.id, !tab.group.collapsed).catch(() => {});
+    else if (choice === "tab.leaveSplit") tabs.leaveSplit(id);
+    else if (choice === "tab.unsplit") tabs.unsplit();
+    else if (choice === "tab.saveSplit")
+      void splitSaveArrangement("").then(
+        () => notices.show("Split arrangement saved"),
+        () => notices.show("Could not save this split arrangement"),
+      );
     else if (choice === "tab.mute") void tabs.setMuted(id, !muted);
     else if (choice === "tab.clearData") clearRequest.ask(url);
     else if (choice === "tab.close") tabs.close(id);
     else if (choice.startsWith("tab.move."))
       void tabs.moveTabToSpace(id, choice.slice("tab.move.".length));
+    else if (choice.startsWith("tab.clone.")) {
+      const space = choice.slice("tab.clone.".length);
+      void cloneTabToSpace(
+        id,
+        space,
+        preferences.value("tabs.clone-history") === "true",
+        preferences.value("tabs.clone-background") === "true",
+      ).then(
+        () =>
+          notices.show(
+            `Cloned to ${tabs.profileSpaces().find((row) => row.id === space)?.name ?? "space"}`,
+          ),
+        () => notices.show("That tab could not be cloned"),
+      );
+    }
   });
 }
 
