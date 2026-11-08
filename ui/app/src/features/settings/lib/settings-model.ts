@@ -62,6 +62,13 @@ const allSections = [
     icon: Search01Icon,
   },
   {
+    id: "extensions",
+    group: "browser",
+    title: () => "Extensions",
+    description: () => "Installed extensions, per-space sets and site access.",
+    icon: Plug01Icon,
+  },
+  {
     id: "privacy",
     group: "browser",
     title: m.section_privacy,
