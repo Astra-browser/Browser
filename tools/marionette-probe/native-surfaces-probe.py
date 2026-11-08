@@ -237,6 +237,15 @@ const done = arguments[arguments.length - 1];
       return sv ? sv.tabs.length : 0;
     })();
     out.resizers = document.querySelectorAll(".astra-pane-resizer").length;
+    out.resizerHits = [...document.querySelectorAll(".astra-pane-resizer")].map((r) => {
+      const b = r.getBoundingClientRect();
+      const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return {
+        rect: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)],
+        tag: hit?.tagName ?? null,
+        cls: typeof hit?.className === "string" ? hit.className : null,
+      };
+    });
     out.paneDrag = (() => {
       const sv = gBrowser.selectedTab.splitview;
       const handles = document.querySelectorAll(".astra-pane-resizer");

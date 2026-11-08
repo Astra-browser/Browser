@@ -204,12 +204,12 @@ function selectedTab(binding) {
 
 /** Give every pane boundary its own draggable divider. */
 function syncResizers(binding, splitview) {
-  const container = binding?.gb?.tabpanels;
+  const tabbox = binding?.gb?.tabbox ?? binding?.gb?.tabpanels?.parentElement;
   const doc = binding?.win?.document;
-  if (!container || !doc) return;
-  for (const old of binding.resizers ?? []) {
+  if (!tabbox || !doc) return;
+  for (const entry of binding.resizers ?? []) {
     try {
-      old.remove();
+      entry.node.remove();
     } catch {
       // Already removed with the split.
     }
@@ -217,23 +217,46 @@ function syncResizers(binding, splitview) {
   binding.resizers = [];
   const panels = splitview?.panels ?? [];
   if (panels.length < 2) return;
-  for (const [index, panel] of panels.entries()) {
-    try {
-      panel.style.order = String(index * 2);
-    } catch {
-      // A detached panel.
-    }
-  }
   for (let index = 0; index < panels.length - 1; index += 1) {
-    const resizer = doc.createElementNS(XHTML_NS, "div");
+    // A chrome box in the tabbox, above the native panel deck. It is not a
+    // browser and owns no page; it only turns pointer travel into panel width.
+    const resizer = doc.createXULElement("box");
     resizer.className = "astra-pane-resizer";
     resizer.setAttribute("role", "separator");
     resizer.setAttribute("aria-orientation", "vertical");
     resizer.setAttribute("tabindex", "0");
-    resizer.style.order = String(index * 2 + 1);
-    panels[index].after(resizer);
-    binding.resizers.push(resizer);
+    resizer.style.position = "absolute";
+    resizer.style.zIndex = "10";
+    resizer.style.inlineSize = "10px";
+    resizer.style.cursor = "col-resize";
+    resizer.style.pointerEvents = "auto";
+    resizer.style.margin = "0";
+    tabbox.appendChild(resizer);
+    binding.resizers.push({ node: resizer, index });
     bindResizer(binding, resizer, index);
+  }
+  positionResizers(binding);
+}
+
+function positionResizers(binding) {
+  const splitview = selectedTab(binding)?.splitview ?? null;
+  const panels = splitview?.panels ?? [];
+  const tabbox = binding?.gb?.tabbox ?? binding?.gb?.tabpanels?.parentElement;
+  if (!tabbox || panels.length < 2) return;
+  const box = tabbox.getBoundingClientRect();
+  for (const entry of binding.resizers ?? []) {
+    const left = panels[entry.index];
+    const right = panels[entry.index + 1];
+    if (!left || !right) continue;
+    try {
+      const a = left.getBoundingClientRect();
+      const b = right.getBoundingClientRect();
+      entry.node.style.left = `${Math.round(Math.max(a.right, b.left) - box.left - 5)}px`;
+      entry.node.style.top = `${Math.round(Math.min(a.top, b.top) - box.top)}px`;
+      entry.node.style.blockSize = `${Math.round(Math.max(a.height, b.height))}px`;
+    } catch {
+      // A panel that left the deck.
+    }
   }
 }
 
@@ -250,8 +273,8 @@ function bindResizer(binding, resizer, index) {
     if (event.key === "ArrowRight") direction = 1;
     if (direction === 0) return;
     event.preventDefault();
-    const leftWidth = left.getBoundingClientRect().width + direction * step;
-    resizePair(left, right, leftWidth);
+    resizePair(left, right, left.getBoundingClientRect().width + direction * step);
+    positionResizers(binding);
   };
   const down = (event) => {
     if (event.button !== 0) return;
@@ -266,10 +289,11 @@ function bindResizer(binding, resizer, index) {
     try {
       resizer.setPointerCapture(event.pointerId);
     } catch {
-      // Capture is optional; the window listeners still finish the drag.
+      // Capture is optional; the element listeners still finish the drag.
     }
     const move = (moveEvent) => {
       resizePair(left, right, startLeft + (moveEvent.clientX - startX), startLeft, startRight);
+      positionResizers(binding);
     };
     const stop = () => {
       resizer.removeEventListener("pointermove", move);
@@ -302,6 +326,7 @@ function bindResizer(binding, resizer, index) {
         // Detached.
       }
     }
+    positionResizers(binding);
   });
 }
 
@@ -397,6 +422,13 @@ export function __bindSplitWindow({ window_id, win, tabOf, idOf: idMap }) {
       container.addEventListener(type, onChange);
       binding.listeners.push([container, type, onChange]);
     }
+  }
+  const onResize = () => positionResizers(binding);
+  try {
+    win.addEventListener("resize", onResize);
+    binding.listeners.push([win, "resize", onResize]);
+  } catch {
+    // A window with no resize event still keeps its last geometry.
   }
   try {
     const splitter = binding.gb?.tabpanels?.splitViewSplitter;

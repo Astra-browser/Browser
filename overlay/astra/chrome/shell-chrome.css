@@ -79,19 +79,16 @@ split-view-footer {
   display: none !important;
 }
 
-#tabbrowser-tabpanels[splitview] .astra-pane-resizer {
-  flex: 0 0 7px;
-  align-self: stretch;
+#tabbrowser-tabbox .astra-pane-resizer {
   border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   background: transparent;
-  cursor: col-resize;
   outline: none;
   -moz-window-dragging: no-drag;
 }
 
-#tabbrowser-tabpanels[splitview] .astra-pane-resizer:hover,
-#tabbrowser-tabpanels[splitview] .astra-pane-resizer:focus-visible,
-#tabbrowser-tabpanels[splitview] .astra-pane-resizer:active {
+#tabbrowser-tabbox .astra-pane-resizer:hover,
+#tabbrowser-tabbox .astra-pane-resizer:focus-visible,
+#tabbrowser-tabbox .astra-pane-resizer:active {
   border-inline-start-color: AccentColor;
   background: color-mix(in srgb, AccentColor 12%, transparent);
 }

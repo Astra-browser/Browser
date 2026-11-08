@@ -17,7 +17,6 @@
   let busy = $state<string | null>(null);
 
   const spaceId = () => tabs.activeSpaceId() ?? "";
-  const spaceName = () => tabs.activeSpace()?.name ?? "this space";
 
   async function load(): Promise<void> {
     loading = true;
@@ -70,10 +69,6 @@
 </script>
 
 <div class="space-extensions">
-  <p class="space-note">
-    Extensions stay installed once per profile. Turning one off here only changes
-    {spaceName()}; switching to another space applies that space's own set.
-  </p>
   {#if error}
     <p class="space-status" role="status">{error}</p>
   {/if}
@@ -125,14 +120,6 @@
   .space-extensions {
     display: flex;
     flex-direction: column;
-  }
-
-  .space-note {
-    margin: 0;
-    padding: 14px 18px 0;
-    color: var(--color-muted);
-    font-size: var(--text-label, 12px);
-    line-height: 1.5;
   }
 
   .space-status {
