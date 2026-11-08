@@ -353,6 +353,222 @@ export const fields = {
       { value: "7d", label: m.pref_tabs_archive_option_3 },
     ],
   },
+  // --- Native split view ---------------------------------------------------
+  "split.enabled": {
+    section: "tabs",
+    label: () => "Split view",
+    description: () => "Open more than one page beside each other in the same window.",
+    initial: true,
+  },
+  "split.max-panes": {
+    section: "tabs",
+    label: () => "Maximum panes",
+    description: () => "How many pages one split view may hold.",
+    initial: "4",
+    options: [
+      { value: "2", label: () => "2 panes" },
+      { value: "3", label: () => "3 panes" },
+      { value: "4", label: () => "4 panes" },
+    ],
+  },
+  "split.restore": {
+    section: "tabs",
+    label: () => "Restore split views",
+    description: () => "Bring back open split views after a restart (normal windows only).",
+    initial: true,
+  },
+  "split.remember-width": {
+    section: "tabs",
+    label: () => "Remember pane width",
+    description: () => "Keep the divider position for each split arrangement.",
+    initial: true,
+  },
+  "split.link-target": {
+    section: "tabs",
+    label: () => "Open links as",
+    description: () => "Where a link opened from a split pane lands.",
+    initial: "split",
+    options: [
+      { value: "split", label: () => "A new pane" },
+      { value: "tab", label: () => "A normal tab" },
+    ],
+  },
+  "split.drag-edge": {
+    section: "tabs",
+    label: () => "Drag a tab to the edge to split",
+    description: () => "Drop a tab on the page's left or right edge to open it as a pane.",
+    initial: true,
+  },
+  "split.double-click-reset": {
+    section: "tabs",
+    label: () => "Double-click resets the divider",
+    description: () => "Return the split to equal shares.",
+    initial: true,
+  },
+  "split.groups": {
+    section: "tabs",
+    label: () => "Show native groups",
+    description: () => "List Firefox tab groups in Astra's sidebar.",
+    initial: true,
+  },
+  "split.group-collapse": {
+    section: "tabs",
+    label: () => "Remember collapsed groups",
+    description: () => "A group that was folded stays folded.",
+    initial: true,
+  },
+
+  // --- Peeks ---------------------------------------------------------------
+  "peek.enabled": {
+    section: "tabs",
+    label: () => "Page previews",
+    description: () => "Show a floating preview of a page without switching to it.",
+    initial: true,
+  },
+  "peek.trigger": {
+    section: "tabs",
+    label: () => "Preview trigger",
+    description: () => "How a preview opens.",
+    initial: "hover-shift",
+    options: [
+      { value: "hover", label: () => "Hover" },
+      { value: "shift", label: () => "Shift-click" },
+      { value: "hover-shift", label: () => "Hover and shift-click" },
+      { value: "menu", label: () => "Menu only" },
+    ],
+  },
+  "peek.delay": {
+    section: "tabs",
+    label: () => "Hover delay",
+    description: () => "How long the pointer rests before a preview opens.",
+    initial: "420",
+    options: [
+      { value: "150", label: () => "Fast (150 ms)" },
+      { value: "420", label: () => "Normal (420 ms)" },
+      { value: "700", label: () => "Slow (700 ms)" },
+      { value: "1000", label: () => "Very slow (1 s)" },
+    ],
+  },
+  "peek.size": {
+    section: "tabs",
+    label: () => "Preview size",
+    description: () => "The card's width.",
+    initial: "medium",
+    options: [
+      { value: "small", label: () => "Small" },
+      { value: "medium", label: () => "Medium" },
+      { value: "large", label: () => "Large" },
+    ],
+  },
+  "peek.position": {
+    section: "tabs",
+    label: () => "Preview position",
+    description: () => "Where the card appears in the window.",
+    initial: "auto",
+    options: [
+      { value: "auto", label: () => "Automatic" },
+      { value: "bottom-right", label: () => "Bottom right" },
+      { value: "bottom-left", label: () => "Bottom left" },
+      { value: "top-right", label: () => "Top right" },
+      { value: "top-left", label: () => "Top left" },
+    ],
+  },
+  "peek.scale": {
+    section: "tabs",
+    label: () => "Preview scale",
+    description: () => "Scale the capture and card together.",
+    initial: "1",
+    options: [
+      { value: "0.85", label: () => "85%" },
+      { value: "1", label: () => "100%" },
+      { value: "1.15", label: () => "115%" },
+    ],
+  },
+  "peek.restore": {
+    section: "tabs",
+    label: () => "Restore previews",
+    description: () =>
+      "Reopen previews that were open before a restart. Never in a private window.",
+    initial: true,
+  },
+  "peek.close-leave": {
+    section: "tabs",
+    label: () => "Close when the pointer leaves",
+    description: () => "Dismiss a hover preview once the pointer moves away.",
+    initial: true,
+  },
+  "peek.show-url": {
+    section: "tabs",
+    label: () => "Show the address",
+    description: () => "Include the host under the capture.",
+    initial: true,
+  },
+  "peek.show-title": {
+    section: "tabs",
+    label: () => "Show the title",
+    description: () => "Include the page title in the card head.",
+    initial: true,
+  },
+  "peek.pinned": {
+    section: "tabs",
+    label: () => "Preview kept tabs on hover",
+    description: () => "Hovering a pinned site shows its page preview.",
+    initial: true,
+  },
+  "peek.bookmarks": {
+    section: "tabs",
+    label: () => "Preview bookmarks on hover",
+    description: () => "Hovering a bookmark shows its page preview.",
+    initial: true,
+  },
+
+  // --- Space isolation -----------------------------------------------------
+  "history.scope": {
+    section: "privacy",
+    label: () => "History scope",
+    description: () => "Which visits the History surface reads.",
+    initial: "space",
+    options: [
+      { value: "space", label: () => "This space only" },
+      { value: "profile", label: () => "All spaces in this profile" },
+    ],
+  },
+  "history.show-other": {
+    section: "privacy",
+    label: () => "Show other spaces' history",
+    description: () => "Include visits from sibling spaces (marked, never merged silently).",
+    initial: false,
+  },
+  "extensions.per-space": {
+    section: "extensions",
+    label: () => "Per-space extensions",
+    description: () => "Enable an extension set per space; the install stays at profile scope.",
+    initial: true,
+  },
+  "extensions.new-space": {
+    section: "extensions",
+    label: () => "New space starts with",
+    description: () => "Which extension set a new space receives.",
+    initial: "all",
+    options: [
+      { value: "all", label: () => "Every installed extension" },
+      { value: "none", label: () => "No extensions" },
+      { value: "current", label: () => "The current space's set" },
+    ],
+  },
+  "tabs.clone-history": {
+    section: "tabs",
+    label: () => "Clone tab history",
+    description: () => "Copy the tab's back/forward history where the engine allows it.",
+    initial: false,
+  },
+  "tabs.clone-background": {
+    section: "tabs",
+    label: () => "Clone in the background",
+    description: () => "Leave the current page in front after a clone.",
+    initial: true,
+  },
+
   "search.provider": {
     section: "search",
     label: m.pref_search_provider,

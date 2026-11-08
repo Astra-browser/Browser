@@ -26,6 +26,7 @@
     spaces: () => import("./sections/SpacesPage.svelte"),
     search: () => import("./sections/SearchPage.svelte"),
     privacy: () => import("./sections/PrivacyPage.svelte"),
+    extensions: () => import("./sections/ExtensionsPage.svelte"),
     shortcuts: () => import("./sections/KeyboardPage.svelte"),
     features: () => import("./sections/FeaturesPage.svelte"),
     focus: () => import("./sections/FocusPage.svelte"),

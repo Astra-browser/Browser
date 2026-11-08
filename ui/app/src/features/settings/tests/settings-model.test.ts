@@ -52,6 +52,7 @@ it("groups sections as Browser, Work and App with stable ids", async () => {
     "tabs",
     "newtab",
     "search",
+    "extensions",
     "privacy",
     "focus",
     "performance",

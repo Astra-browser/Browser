@@ -15,6 +15,7 @@
   import SiteExceptions from "../SiteExceptions.svelte";
   import PasskeysGroup from "../PasskeysGroup.svelte";
   import SiteSettings from "../SiteSettings.svelte";
+  import SpaceHistoryClear from "../SpaceHistoryClear.svelte";
 </script>
 
 <ProtectionControls />
@@ -45,6 +46,11 @@
   >
   <SiteExceptions />
 {/if}
+<SettingsGroup title="History by space">
+  <PreferenceSelect id="history.scope" preference="history.scope" />
+  <PreferenceSwitch id="history.show-other" preference="history.show-other" />
+  <SpaceHistoryClear />
+</SettingsGroup>
 <SettingsGroup title={m.settings_browsing_data()}>
   {#if showPreviews}<PreferenceSwitch id="privacy.cleanup" preference="privacy.cleanup" />{/if}
   <ClearBrowsingData />

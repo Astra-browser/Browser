@@ -75,6 +75,37 @@ const defaults = {
   "privacy.microphone": "Ask",
   "privacy.location": "Ask",
   "privacy.notifications": "Ask",
+  // Native split view (engine owns the panes; these are the product's rules).
+  "split.enabled": "true",
+  "split.max-panes": "4",
+  "split.restore": "true",
+  "split.remember-width": "true",
+  "split.link-target": "split",
+  "split.drag-edge": "true",
+  "split.double-click-reset": "true",
+  "split.groups": "true",
+  "split.group-collapse": "true",
+  // Peek cards.
+  "peek.enabled": "true",
+  "peek.trigger": "hover-shift",
+  "peek.delay": "420",
+  "peek.size": "medium",
+  "peek.position": "auto",
+  "peek.scale": "1",
+  "peek.restore": "true",
+  "peek.close-leave": "true",
+  "peek.show-url": "true",
+  "peek.show-title": "true",
+  "peek.pinned": "true",
+  "peek.bookmarks": "true",
+  // Space isolation.
+  "history.scope": "space",
+  "history.show-other": "false",
+  "extensions.per-space": "true",
+  "extensions.new-space": "all",
+  // Cross-space tab cloning.
+  "tabs.clone-history": "false",
+  "tabs.clone-background": "true",
 } as const;
 export type PreferenceKey = keyof typeof defaults;
 const values = $state<Record<PreferenceKey, string>>({ ...defaults });
