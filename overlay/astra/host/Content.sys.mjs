@@ -24,13 +24,17 @@ import {
   __forgetWindow,
   __startArchiveScheduler,
   __markPrivate,
+  __setTabGroup,
   __spaceUserContextId,
   __tabsState,
+  emitItemsChanged,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { Blocker } from "./Blocker.sys.mjs";
+import { __bindSplitWindow, __unbindSplitWindow } from "./SplitView.sys.mjs";
+import { __flushSpaceHistory, noteTabVisit } from "./SpaceHistory.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { releaseSpaceContext, userContextForSpace } from "./Containers.sys.mjs";
 import {
@@ -238,7 +242,13 @@ export function allowGlobalHistory(browser) {
 const ERROR_PAGE_FLAG =
   typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE : 0x2;
 
-export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTitle, onErrorPage } = {}) {
+export function makeProgressListener({
+  tabIdOf,
+  commit = __commitExternal,
+  setTitle,
+  onErrorPage,
+  onCommit,
+} = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
     onLocationChange(browser, progress, _request, location, flags) {
@@ -261,6 +271,9 @@ export function makeProgressListener({ tabIdOf, commit = __commitExternal, setTi
           // Tell the model whether the browser is still fetching, so the
           // stage's skeleton and the row's spinner survive an early commit.
           commit(id, url, { loading: stillLoading(browser) });
+          if (typeof onCommit === "function") {
+            onCommit(id, url, browser);
+          }
         }
       } catch {
         // Progress callbacks must never break page loads.
@@ -395,6 +408,14 @@ export const Content = {
     const bindTab = (id, tab) => {
       if (!id || !tab) return;
       tab.setAttribute("astra-tab-id", id);
+      // Peek/split read the space from the native tab; this is the one place
+      // that knows both the Astra model and the native element.
+      try {
+        const space = __tabsState().tabs.get(id)?.space_id ?? "";
+        if (space) tab.setAttribute("astra-space-id", space);
+      } catch {
+        // A tab adopted before the model row exists.
+      }
       // P5b: the organisation store must never keep a private tab. Content is
       // the only layer that knows the window, so it stamps the record here.
       __markPrivate(id, isPrivateWindow(win));
@@ -661,6 +682,7 @@ export const Content = {
         tab.removeAttribute("astra-tab-id");
       }
       detachMedia(id);
+      __setTabGroup(id, null);
       tabOf.delete(id);
       browsers.delete(id);
       pending.delete(id);
@@ -888,8 +910,42 @@ export const Content = {
       bindTab(id, tab);
       __announceAdopted(id, { selected: tab.selected === true });
     };
+    // Native tab groups feed the same projection the sidebar reads. A group
+    // is engine-owned; this only copies its identity/label/colour so Astra
+    // can draw the header the hidden tab strip would have drawn.
+    const projectGroups = () => {
+      let changed = false;
+      for (const tab of gb.tabs ?? []) {
+        const id = idOfTab(tab);
+        if (!id) continue;
+        const group = tab.group ?? null;
+        const next = group
+          ? {
+              id: String(group.id ?? ""),
+              label: group.label ?? "",
+              color: typeof group.color === "string" ? group.color : null,
+              collapsed: group.collapsed === true,
+            }
+          : null;
+        changed = __setTabGroup(id, next) || changed;
+      }
+      if (changed) emitItemsChanged();
+    };
+    const groupEvents = [
+      "TabGroupCreate",
+      "TabGroupRemoved",
+      "TabGroupUpdate",
+      "TabGrouped",
+      "TabUngrouped",
+      "TabGroupMoved",
+    ];
+    for (const type of groupEvents) win.addEventListener(type, projectGroups);
+
     const progress = makeProgressListener({
       tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
+      onCommit: (id, url) => {
+        if (!isPrivateWindow(win)) noteTabVisit(id, url);
+      },
       onErrorPage: ({ astra_tab_id, url, browser }) => {
         void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id });
       },
@@ -1021,6 +1077,14 @@ export const Content = {
         }
         return;
       }
+      if (event.type === "tab.space-changed" && id) {
+        try {
+          tabOf.get(id)?.setAttribute("astra-space-id", event.data.space_id ?? "");
+        } catch {
+          // A tab leaving with its window.
+        }
+        return;
+      }
       if (event.type === "tab.updated" && id) {
         if (event.data.selected) {
           activate(id);
@@ -1043,6 +1107,7 @@ export const Content = {
         pending.delete(id);
         loadIn(id, event.data.url, true);
         refreshIcon(id);
+        if (!isPrivateWindow(win)) noteTabVisit(id, event.data.url);
         return;
       }
       if (event.type === "nav.hard-reload" && id) {
@@ -1144,6 +1209,26 @@ export const Content = {
     const archiveWindow = window_id || DEFAULT_WINDOW_ID;
     __startArchiveScheduler({ window_id: archiveWindow });
 
+    // A restored session can carry split views. `split.restore` off means the
+    // pages come back as ordinary tabs, not as a split.
+    try {
+      const restore =
+        win.Services?.prefs?.getStringPref("astra.settings.split.restore", "true") !== "false";
+      if (!restore) {
+        for (const splitview of gb.splitViews ?? []) {
+          splitview.unsplitTabs("astra_setting");
+        }
+      }
+    } catch {
+      // No preference service: keep the engine's restore.
+    }
+
+    projectGroups();
+
+    // Hand the one native tab map to the split-view module. It projects the
+    // engine's TabSplitView membership and never keeps a second tab list.
+    __bindSplitWindow({ window_id: archiveWindow, win, tabOf, idOf });
+
     return {
       native: true,
       get browser() {
@@ -1152,6 +1237,8 @@ export const Content = {
       browsers,
       detach() {
         off();
+        __flushSpaceHistory();
+        __unbindSplitWindow(archiveWindow);
         __forgetWindow(archiveWindow);
         Media.__setEngine(null);
         for (const id of [...mediaStates.keys()]) detachMedia(id);
@@ -1159,6 +1246,9 @@ export const Content = {
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
         try { gb.tabContainer.removeEventListener("TabOpen", onOpen); } catch {}
         try { gb.tabContainer.removeEventListener("TabAttrModified", onAttr); } catch {}
+        for (const type of groupEvents) {
+          try { win.removeEventListener(type, projectGroups); } catch {}
+        }
         try { gb.removeTabsProgressListener(progress); } catch {}
         for (const id of [...tabOf.keys()]) forgetTab(id);
       },

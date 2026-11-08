@@ -34,6 +34,12 @@ import { Navigation, __commitExternal, __resetNavigationForTests } from "./Navig
 import { Windows, __bindCurrentWindow, __resetWindowsForTests } from "./Windows.sys.mjs";
 import { History, __resetHistoryForTests } from "./History.sys.mjs";
 import { Panes, __resetPanesForTests } from "./Panes.sys.mjs";
+import { SplitView, __resetSplitForTests, __setSplitStoreForTests } from "./SplitView.sys.mjs";
+import { Peek, __resetPeekForTests } from "./Peek.sys.mjs";
+import { SpaceHistory, __resetSpaceHistoryForTests } from "./SpaceHistory.sys.mjs";
+import { SpaceExtensions, __resetSpaceExtensionsForTests } from "./SpaceExtensions.sys.mjs";
+import { SpaceClone } from "./SpaceClone.sys.mjs";
+import { TabGroups } from "./TabGroups.sys.mjs";
 import { Containers, __resetContainersForTests } from "./Containers.sys.mjs";
 import { Dialogs, __resetDialogsForTests } from "./Dialogs.sys.mjs";
 import { ContentHide, __resetForTests as __resetContentHideForTests } from "./ContentHide.sys.mjs";
@@ -82,6 +88,13 @@ export {
   Tabs,
   Navigation,
   Panes,
+  SplitView,
+  Peek,
+  SpaceHistory,
+  SpaceExtensions,
+  SpaceClone,
+  TabGroups,
+  __setSplitStoreForTests,
   Containers,
   Dialogs,
   ContentHide,
@@ -137,6 +150,10 @@ export function __resetForTests() {
   __resetWindowsForTests();
   __resetHistoryForTests();
   __resetPanesForTests();
+  __resetSplitForTests();
+  __resetPeekForTests();
+  __resetSpaceHistoryForTests();
+  __resetSpaceExtensionsForTests();
   __resetContainersForTests();
   __resetDialogsForTests();
   __resetContentHideForTests();

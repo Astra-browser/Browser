@@ -197,6 +197,8 @@ function snapshot(id) {
     index: _order.indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
+    // Native group membership is part of the tab view the sidebar renders.
+    group: _groups.get(id) ?? null,
   };
 }
 
@@ -527,6 +529,55 @@ let _activeSpaceId = DEFAULT_SPACE_ID;
 let _activeProfileId = DEFAULT_PROFILE_ID;
 const _profileNames = new Map([[DEFAULT_PROFILE_ID, "Personal"]]);
 
+/**
+ * Native split-view projection. `Content.mountNative` owns the mapping from
+ * Astra tab ids to the engine's tabs, and is the only writer: the members are
+ * the live `TabSplitView.tabs` of the split view that owns the selected tab.
+ * Native geometry and divider ratios stay native; the app only needs the
+ * membership order so a split reads as one row in the sidebar.
+ */
+let _splitGroup = null;
+
+/** Native tab-group membership, keyed by Astra tab id. Content writes it. */
+const _groups = new Map();
+
+/** Replace one tab's native group (or clear it). Returns whether it changed. */
+export function __setTabGroup(id, group) {
+  if (!id) return false;
+  const before = _groups.get(id);
+  const beforeKey = before ? `${before.id}|${before.label}|${before.color}|${before.collapsed}` : "";
+  if (group === null || group === undefined) {
+    _groups.delete(id);
+    return beforeKey !== "";
+  }
+  const next = {
+    id: String(group.id ?? ""),
+    label: String(group.label ?? ""),
+    color: typeof group.color === "string" ? group.color : null,
+    collapsed: group.collapsed === true,
+  };
+  const afterKey = `${next.id}|${next.label}|${next.color}|${next.collapsed}`;
+  _groups.set(id, next);
+  return beforeKey !== afterKey;
+}
+
+/** Replace the split membership (normalised to Astra tab ids). */
+export function __setSplitGroup(members) {
+  const next =
+    Array.isArray(members) && members.length > 1
+      ? { members: members.filter((id) => typeof id === "string" && id !== "") }
+      : null;
+  const before = _splitGroup === null ? "" : _splitGroup.members.join("\u0000");
+  const after = next === null ? "" : next.members.join("\u0000");
+  _splitGroup = next;
+  return before !== after;
+}
+
+/** The split membership the projection currently carries. */
+export function __splitGroupState() {
+  return _splitGroup === null ? null : { members: [..._splitGroup.members] };
+}
+
 /** The active space without building a projection (and without bumping its
  *  revision); host modules use this to scope their own stores. */
 export function __activeSpaceId() {
@@ -658,6 +709,7 @@ function tabView(id) {
     // the model's own state, set by `Tabs.discard` and cleared by selecting
     // the tab or by the content binding when the engine refused.
     availability: tab.discarded === true ? { state: "sleeping" } : null,
+    group: _groups.get(id) ?? null,
   };
 }
 
@@ -706,7 +758,14 @@ export function __itemsSnapshot() {
     ],
     tabs,
     active,
-    split_group: null,
+    // Only a group whose members all still exist is a split; a close that the
+    // native side has not yet reported must not leave a ghost row.
+    split_group:
+      _splitGroup !== null &&
+      _splitGroup.members.length > 1 &&
+      _splitGroup.members.every((id) => _tabs.has(id))
+        ? { members: [..._splitGroup.members] }
+        : null,
   };
 }
 
@@ -1549,6 +1608,8 @@ export function __resetTabsForTests() {
   ];
   _activeSpaceId = DEFAULT_SPACE_ID;
   _activeProfileId = DEFAULT_PROFILE_ID;
+  _splitGroup = null;
+  _groups.clear();
   _profileNames.clear();
   _profileNames.set(DEFAULT_PROFILE_ID, "Personal");
   _nextSpaceId = 2;

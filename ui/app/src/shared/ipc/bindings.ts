@@ -3368,6 +3368,20 @@ export type TabView = {
 	zoom?: number | null,
 	/**  Present while the page plays sound, and for as long as it is muted. */
 	audio?: TabAudioView | null,
+	/**
+	 *  Native tab-group membership. The group identity, label and colour come
+	 *  from the engine's TabGroup; the sidebar renders the same group the tab
+	 *  strip would. Absent when the tab is not grouped.
+	 */
+	group?: TabGroupView | null,
+};
+
+/** One native tab group as the sidebar needs it (never a second model). */
+export type TabGroupView = {
+	id: string,
+	label: string,
+	color: string | null,
+	collapsed: boolean,
 };
 
 /**
