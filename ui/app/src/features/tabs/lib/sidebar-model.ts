@@ -2,6 +2,7 @@ import type {
   SidebarNodeView,
   SidebarSectionView,
   SplitGroupView,
+  TabGroupView,
   TabView,
 } from "$shared/ipc/bindings";
 
@@ -29,6 +30,12 @@ export type SidebarDisplayUnit =
       kind: "split";
       key: string;
       tabs: SidebarTabEntry[];
+      depth: number;
+    }
+  | {
+      kind: "group";
+      key: string;
+      group: TabGroupView;
       depth: number;
     };
 
@@ -141,38 +148,72 @@ export function sidebarDisplayUnits(
   section: SidebarSectionView,
   entries: readonly SidebarEntry[],
   splitGroup: SplitGroupView | null,
+  showGroups = true,
 ): SidebarDisplayUnit[] {
-  if (splitGroup === null || splitGroup.members.length < 2) return [...entries];
+  let units: SidebarDisplayUnit[] = [...entries];
 
-  const positions = new Map<string, { index: number; entry: SidebarTabEntry }>();
-  entries.forEach((entry, index) => {
-    if (entry.kind === "tab") positions.set(entry.tab.id, { index, entry });
-  });
+  if (splitGroup !== null && splitGroup.members.length >= 2) {
+    const positions = new Map<string, { index: number; entry: SidebarTabEntry }>();
+    entries.forEach((entry, index) => {
+      if (entry.kind === "tab") positions.set(entry.tab.id, { index, entry });
+    });
 
-  const ids = new Set<string>();
-  const members: SidebarTabEntry[] = [];
-  let insertionIndex = entries.length;
-  for (const id of splitGroup.members) {
-    const member = positions.get(id);
-    if (member === undefined || ids.has(id)) return [...entries];
-    ids.add(id);
-    members.push(member.entry);
-    insertionIndex = Math.min(insertionIndex, member.index);
+    const ids = new Set<string>();
+    const members: SidebarTabEntry[] = [];
+    let insertionIndex = entries.length;
+    let valid = true;
+    for (const id of splitGroup.members) {
+      const member = positions.get(id);
+      if (member === undefined || ids.has(id)) {
+        valid = false;
+        break;
+      }
+      ids.add(id);
+      members.push(member.entry);
+      insertionIndex = Math.min(insertionIndex, member.index);
+    }
+
+    if (valid) {
+      const output: SidebarDisplayUnit[] = [];
+      entries.forEach((entry, index) => {
+        if (index === insertionIndex) {
+          output.push({
+            kind: "split",
+            key: `split:${section}`,
+            tabs: members,
+            depth: Math.min(...members.map((member) => member.depth)),
+          });
+        }
+        if (entry.kind !== "tab" || !ids.has(entry.tab.id)) output.push(entry);
+      });
+      units = output;
+    }
   }
 
-  const output: SidebarDisplayUnit[] = [];
-  entries.forEach((entry, index) => {
-    if (index === insertionIndex) {
-      output.push({
-        kind: "split",
-        key: `split:${section}`,
-        tabs: members,
-        depth: Math.min(...members.map((member) => member.depth)),
+  if (!showGroups) return units;
+
+  // A native group reads as a heading over its own rows. Consecutive rows in
+  // the same group share one heading; a row outside a group clears the run.
+  const grouped: SidebarDisplayUnit[] = [];
+  let lastGroup = "";
+  for (const unit of units) {
+    const first =
+      unit.kind === "tab" ? unit.tab : unit.kind === "split" ? unit.tabs[0]?.tab : undefined;
+    const group = first?.group ?? null;
+    if (group && group.id !== lastGroup) {
+      grouped.push({
+        kind: "group",
+        key: `group:${group.id}`,
+        group,
+        depth: unit.depth,
       });
+      lastGroup = group.id;
+    } else if (!group) {
+      lastGroup = "";
     }
-    if (entry.kind !== "tab" || !ids.has(entry.tab.id)) output.push(entry);
-  });
-  return output;
+    grouped.push(unit);
+  }
+  return grouped;
 }
 
 /** Keep the real active tab visible even when its parent was folded. */

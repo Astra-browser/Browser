@@ -1,0 +1,1 @@
+import{$t as e,_n as t,cn as n,yn as r}from"./chrome-shared-JlM94X-M.js";var i=500;function a(a,o=i){let s=r(!1);return n(()=>{if(!a()){t(s,!1);return}let e=setTimeout(()=>t(s,!0),o);return()=>clearTimeout(e)}),{get current(){return e(s)}}}export{a as t};

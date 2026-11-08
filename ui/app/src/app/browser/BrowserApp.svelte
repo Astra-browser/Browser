@@ -3,6 +3,7 @@
   import "$styles/global.css";
   import { onMount, untrack } from "svelte";
   import { WebExtensionAccessPrompt, WebExtensionReview } from "$features/webext";
+  import { PeekLayer, peek } from "$features/peek";
   import { webext } from "$domain/webext";
   import { PagePermissionPrompt } from "$features/permissions";
   import { updateNotices } from "$features/updates";
@@ -157,6 +158,7 @@
     const runtimeReady = runtime.init();
     // Native offers the player with the same bootstrap that supplies tabs.
     void mediaPlayer.init();
+    void peek.init();
     void focus.init();
     void updates.init();
     void updateNotices.init();
@@ -227,6 +229,7 @@
       blocker.dispose();
       runtime.dispose();
       mediaPlayer.dispose();
+      peek.dispose();
       updates.dispose();
       updateNotices.dispose();
       focus.dispose();
@@ -250,6 +253,7 @@
 
 <div class="contents" inert={consentActive}>
   <Shell />
+  <PeekLayer />
   {#if !IS_MAC}
     <Dividers />
   {/if}

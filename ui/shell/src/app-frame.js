@@ -45,7 +45,7 @@ export const APP_BOOT_TIMEOUT_MS = 60000;
  *   the content browser
  * @param {{onReady?: (mode: string) => void, onFailure?: (message: string) => void}} hooks
  */
-export function mountAppFrame(container, host, { onReady, onFailure, onTheme, transformEvent, guardCall } = {}) {
+export function mountAppFrame(container, host, { window_id = "", onReady, onFailure, onTheme, transformEvent, guardCall } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView ?? null;
   if (!win) {
@@ -222,7 +222,12 @@ export function mountAppFrame(container, host, { onReady, onFailure, onTheme, tr
             message: `host has no ${String(data.module)}.${String(data.method)}`,
           };
         } else if (!refused) {
-          payload = await fn(data.args ?? {});
+          // The relay is the only party that knows which window the call came
+          // from. Stamp it here so a private/normal window can never be
+          // resolved by "most recently focused" inside a host module.
+          const args = { ...(data.args ?? {}) };
+          if (window_id && !args.window_id) args.window_id = window_id;
+          payload = await fn(args);
         }
       } catch (e) {
         error = { code: "host_error", message: String(e?.message ?? e) };
@@ -263,6 +268,7 @@ export function mountAppFrame(container, host, { onReady, onFailure, onTheme, tr
   const relayEvents = host?.addEventListener
     ? host.addEventListener((event) => {
         const seen = typeof transformEvent === "function" ? transformEvent(event) : event;
+        if (seen === null || seen === undefined) return;
         post({ kind: "evt", type: seen.type, data: seen.data, seq: seen.event_seq });
       })
     : null;

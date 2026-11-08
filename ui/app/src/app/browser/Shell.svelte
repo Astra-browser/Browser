@@ -222,6 +222,17 @@
     };
   });
   let splitting = $state(false);
+  onMount(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (tabs.replacePane() === null && !splitting) return;
+      event.preventDefault();
+      tabs.cancelReplace();
+      splitting = false;
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
   let inWork = $derived(browserPage.currentPage() === "work");
   // Settings stands beside the rail the way a tool panel does.
   let paneled = $derived(
@@ -588,6 +599,11 @@
     });
   });
   function selectTab(id: string) {
+    const pane = tabs.replacePane();
+    if (pane !== null) {
+      tabs.replaceWith(pane, id);
+      return;
+    }
     if (splitting) {
       tabs.split(id);
       splitting = false;
@@ -673,6 +689,12 @@
             <HidingBar />
             {#if splitting}<p class="shrink-0 px-3 pb-1 text-[12px] text-accent" aria-live="polite">
                 {m.choose_split()}
+              </p>{/if}
+            {#if tabs.replacePane() !== null}<p
+                class="shrink-0 px-3 pb-1 text-[12px] text-accent"
+                aria-live="polite"
+              >
+                Choose a tab to replace this pane. Press Escape to cancel.
               </p>{/if}
             <SidebarBody pinned={tree.pinned} today={tree.today} {splitting} onSelect={selectTab}>
               {#snippet extras()}<PinnedExtensions />{/snippet}

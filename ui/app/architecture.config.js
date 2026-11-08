@@ -75,6 +75,12 @@ export const architecture = {
               },
             },
           },
+          // Bookmark rows open the shared app menu (the menu is the one
+          // presenter, not a native popup).
+          {
+            from: { element: { type: "features", captured: { module: "bookmarks" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
           // Settings edits the sites focus shuts with the same control as Time.
           {
             from: { element: { type: "features", captured: { module: "settings" } } },
