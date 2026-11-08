@@ -245,7 +245,7 @@ light/dark measurements. Screenshots for both themes are written to
 
 | Date | Change | Evidence |
 |---|---|---|
-| 2026-11-08 | Native split-view port (2–3 panes, ratio, replace, leave, drag-edge, arrangement save/restore, background-tab load) | `native-surfaces-probe.py` 39/39; background pane commits its URL; 3 panes, 4th refused; arrangement restores 3 |
+| 2026-11-08 | Native split-view port (2–3 panes, ratio, replace, leave, drag-edge, arrangement save/restore, background-tab load) | `native-surfaces-probe.py` 40/40; background pane commits its URL; 3 panes, 4th refused; arrangement restores 3 |
 | 2026-11-08 | Peek (real capture, window popup with bookmark/open-tab/open-split, hover/shift/menu, restore, settings) | same probe: 31 kB PNG capture, `.peek-window` above the page with an inset clip; light/dark measured |
 | 2026-11-08 | Per-space history, per-space extension sets, cross-space clone | same probe: scoped visits, extension read, clone into `space-1`; `native_surfaces.mjs` 118 checks |
 | 2026-11-08 | Native tab groups projected and drawn | same probe: group created, 2 members projected, `.tab-group-head` drawn |

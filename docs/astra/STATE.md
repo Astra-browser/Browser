@@ -42,7 +42,7 @@ uninstalled. Group and split listeners are keyed to the window and removed in
 
 **Verification:** `native_surfaces.mjs` 120/120; typecheck, lint, stylelint,
 format, knip clean; 1238 unit tests; `settings-audit` 95/0; adblock benchmark
-PASS; `wire_coverage` PASS; live probe 39/39 on Wikipedia, MDN and IANA.
+PASS; `wire_coverage` PASS; live probe 40/40 on Wikipedia, MDN and IANA.
 Evidence in `/tmp/opencode/ns-out` for the run and reproducible with
 `tools/marionette-probe/native-surfaces-probe.py out/native-surfaces`.
 
