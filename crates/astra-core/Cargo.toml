@@ -7,6 +7,7 @@ license = "MPL-2.0"
 
 [dependencies]
 astra-host-trait = { path = "../astra-host-trait" }
+astra-extensions = { path = "../astra-extensions" }
 astra-proto = { path = "../astra-proto" }
 astra-store = { path = "../astra-store" }
 serde = { version = "1", features = ["derive"] }

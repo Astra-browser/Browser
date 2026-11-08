@@ -17,12 +17,16 @@
 //! - `session.load`   — `{name?}` → `{snapshot, updated_at}` or nulls.
 //! - `core.shutdown`  — reply, then exit 0. stdin EOF also exits 0, so a
 //!                      browser crash cannot leave a zombie holding the file.
+//! - `extensions.capabilities` — what the extension intake supports.
+//! - `extensions.inspect` — `{path, source}` → a package report. Read-only.
+//! - `extensions.stage` — `{path, source, dest}` → an adapted XPI and the
+//!   report it is bound to. The Host API performs the AddonManager install.
 //!
 //! Durability: every save is one SQLite transaction (WAL + synchronous
 //! default), so kill -9 after a `session.save` reply keeps the row.
 
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use astra_core::session::SessionSnapshot;
 use astra_proto::{
@@ -112,6 +116,18 @@ fn fail(env: &Envelope, code: &str, message: impl Into<String>) -> Envelope {
     }
 }
 
+fn extension_source(payload: &Value) -> astra_extensions::Source {
+    match payload
+        .get("source")
+        .and_then(Value::as_str)
+        .unwrap_or("chrome")
+    {
+        "firefox" => astra_extensions::Source::Firefox,
+        "file" => astra_extensions::Source::File,
+        _ => astra_extensions::Source::Chrome,
+    }
+}
+
 fn name_of(payload: &Value) -> &str {
     payload
         .get("name")
@@ -178,6 +194,33 @@ fn handle(store: &Store, env: &Envelope) -> Envelope {
             }
         }
         "core.shutdown" => ok(env, json!({"shutdown": true})),
+        "extensions.capabilities" => ok(env, astra_extensions::pipeline::engine_capabilities()),
+        "extensions.inspect" => {
+            let Some(path) = env.payload.get("path").and_then(Value::as_str) else {
+                return fail(env, "invalid_payload", "extensions.inspect needs a path");
+            };
+            let source = extension_source(&env.payload);
+            match astra_extensions::inspect(Path::new(path), source) {
+                Ok(report) => ok(env, json!({ "report": report })),
+                Err(error) => fail(env, "extensions_failed", error.to_string()),
+            }
+        }
+        "extensions.stage" => {
+            let path = env.payload.get("path").and_then(Value::as_str);
+            let dest = env.payload.get("dest").and_then(Value::as_str);
+            let (Some(path), Some(dest)) = (path, dest) else {
+                return fail(
+                    env,
+                    "invalid_payload",
+                    "extensions.stage needs path and dest",
+                );
+            };
+            let source = extension_source(&env.payload);
+            match astra_extensions::stage(Path::new(path), source, Path::new(dest)) {
+                Ok(staged) => ok(env, json!({ "staged": staged })),
+                Err(error) => fail(env, "extensions_failed", error.to_string()),
+            }
+        }
         other => fail(env, "unknown_command", format!("unknown command {other}")),
     }
 }
