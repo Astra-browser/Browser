@@ -32,6 +32,7 @@ import {
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { chooseMedia } from "./MediaSelection.sys.mjs";
 import { Blocker } from "./Blocker.sys.mjs";
 import { __bindSplitWindow, __unbindSplitWindow } from "./SplitView.sys.mjs";
 import { __flushSpaceHistory, noteTabVisit } from "./SpaceHistory.sys.mjs";
@@ -458,16 +459,33 @@ export const Content = {
     // browser; a private window projects nothing. Position/duration arrive
     // only when the page publishes them.
     const mediaStates = new Map(); // astra_tab_id -> state
+    const mediaSuppressed = new Map(); // astra_tab_id -> play generation at close
+    let mediaClock = 0;
     const mediaView = (id) => {
       const state = mediaStates.get(id);
       if (!state) return null;
       const controller = state.controller;
       let active = false;
+      let playing = false;
       try {
         active = controller.isActive === true;
+        playing = controller.isPlaying === true;
       } catch {
         active = false;
+        playing = false;
       }
+      if (active !== state.active) {
+        state.active = active;
+        if (active) state.activeSince = ++mediaClock;
+      }
+      if (playing !== state.playing) {
+        state.playing = playing;
+        state.playSince = playing ? ++mediaClock : 0;
+        // A closed player comes back the next time its tab starts playing,
+        // not on the next position tick from the same playback.
+        if (playing && mediaSuppressed.has(id)) mediaSuppressed.delete(id);
+      }
+      if (mediaSuppressed.has(id)) return null;
       if (!active) return null;
       let metadata = null;
       try {
@@ -476,13 +494,25 @@ export const Content = {
         metadata = null;
       }
       const tab = tabOf.get(id);
-      const title = String(metadata?.title || tab?.label || state.browser.contentTitle || "").trim();
+      let contentTitle = "";
+      try {
+        contentTitle = state.browser?.contentTitle ?? "";
+      } catch {
+        contentTitle = "";
+      }
+      const title = String(metadata?.title || tab?.label || contentTitle || "").trim();
       if (title === "") return null;
       let site = "";
       try {
         site = state.browser.currentURI?.host ?? "";
       } catch {
         site = "";
+      }
+      let muted = false;
+      try {
+        muted = state.browser.audioMuted === true;
+      } catch {
+        muted = false;
       }
       return {
         tab_id: id,
@@ -492,22 +522,47 @@ export const Content = {
         duration: state.duration ?? null,
         position: state.position ?? null,
         rate: state.rate ?? null,
-        playing: controller.isPlaying === true,
-        waiting: controller.isPlaying !== true && controller.isActive === true,
+        playing,
+        waiting: !playing && active,
         // The engine's PiP launcher can toggle any playing video in this
         // browser; expose the control when there is something to launch.
-        can_pip: controller.isPlaying === true,
+        can_pip: playing,
         in_pip: state.in_pip === true,
-        muted: state.browser.audioMuted === true,
+        muted,
         can_mute: true,
       };
     };
-    const projectMedia = (id) => {
+    const clearMedia = () => {
+      const showing = Media.view()?.tab_id;
+      if (showing) Media.__projectMedia(showing, null);
+    };
+    const projectCurrentMedia = () => {
       if (isPrivateWindow(win)) {
-        Media.__projectMedia(id, null);
+        clearMedia();
         return;
       }
-      Media.__projectMedia(id, mediaView(id));
+      const views = new Map();
+      const candidates = [];
+      for (const id of mediaStates.keys()) {
+        const state = mediaStates.get(id);
+        const view = mediaView(id);
+        views.set(id, view);
+        candidates.push({
+          id,
+          live: view !== null,
+          playing: state?.playing === true,
+          playSince: state?.playSince ?? 0,
+          activeSince: state?.activeSince ?? 0,
+        });
+      }
+      const currentId = Media.view()?.tab_id ?? "";
+      const currentLive = candidates.some((entry) => entry.id === currentId && entry.live);
+      const next = chooseMedia({ currentId, currentLive, candidates });
+      if (next === null) {
+        clearMedia();
+        return;
+      }
+      Media.__projectMedia(next, views.get(next) ?? mediaView(next));
     };
     const detachMedia = (id) => {
       const state = mediaStates.get(id);
@@ -521,7 +576,8 @@ export const Content = {
         }
         mediaStates.delete(id);
       }
-      Media.__projectMedia(id, null);
+      mediaSuppressed.delete(id);
+      projectCurrentMedia();
     };
     const attachMedia = (id, browser) => {
       detachMedia(id);
@@ -541,6 +597,10 @@ export const Content = {
         rate: null,
         in_pip: false,
         audible: null,
+        active: false,
+        playing: false,
+        playSince: 0,
+        activeSince: 0,
         listeners: [],
       };
       // Keep the tab projection's audio flag in step with the engine. The
@@ -548,7 +608,9 @@ export const Content = {
       const projectAudible = () => {
         let audible = false;
         try {
-          audible = browser.audioPlaybackActive === true;
+          const nativeTab = tabOf.get(id);
+          audible =
+            nativeTab?.soundPlaying === true || state.controller.isAudible === true;
         } catch {
           audible = false;
         }
@@ -560,7 +622,7 @@ export const Content = {
       };
       const refresh = () => {
         projectAudible();
-        projectMedia(id);
+        projectCurrentMedia();
       };
       for (const type of [
         "activated",
@@ -605,7 +667,7 @@ export const Content = {
             } catch {
               return false;
             }
-            projectMedia(id);
+            projectCurrentMedia();
             return true;
           case "pause":
             if (!controller) return false;
@@ -614,7 +676,7 @@ export const Content = {
             } catch {
               return false;
             }
-            projectMedia(id);
+            projectCurrentMedia();
             return true;
           case "seek":
             if (!controller || !Number.isFinite(action.seconds)) return false;
@@ -623,7 +685,7 @@ export const Content = {
             } catch {
               return false;
             }
-            projectMedia(id);
+            projectCurrentMedia();
             return true;
           case "picture_in_picture": {
             // The engine's own launcher actor finds the playing video in
@@ -645,14 +707,15 @@ export const Content = {
               return false;
             }
             state.in_pip = state.in_pip !== true;
-            projectMedia(id);
+            projectCurrentMedia();
             return true;
           }
           case "show":
             void Tabs.select({ request_id: `media-show-${id}`, astra_tab_id: id });
             return true;
           case "close":
-            Media.__projectMedia(id, null);
+            if (state) mediaSuppressed.set(id, state.playSince ?? 0);
+            projectCurrentMedia();
             return true;
           default:
             return false;
@@ -895,7 +958,7 @@ export const Content = {
         if (selected) activate(selected);
       }
       // The player follows the tab behind the page in front.
-      for (const id of [...mediaStates.keys()]) projectMedia(id);
+      projectCurrentMedia();
     };
     const onClose = (event) => {
       if (applying) return;
@@ -1112,7 +1175,7 @@ export const Content = {
           } catch {
             // A tab torn down mid-toggle.
           }
-          projectMedia(id);
+          projectCurrentMedia();
         }
         return;
       }

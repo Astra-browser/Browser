@@ -1,0 +1,105 @@
+Patch-Id: ASTRA-0013
+Title: Float the media picture-in-picture window and dress it as Astra
+Tier: P2
+Upstream-Files: toolkit/components/pictureinpicture/PictureInPicture.sys.mjs, toolkit/components/pictureinpicture/content/player.xhtml
+Intent: a media PiP window is opened as a dependent dialog from the opener on Linux, so tiling Wayland compositors (Hyprland) treat it as a floater instead of giving it a tile; the native player keeps its always-on-top, aspect-locked, resizable behavior. The player document links Astra's stylesheet from `resource://astra/` (a `chrome://astra` stylesheet inside a `chrome://global` document loads with zero rules, measured) and allows `resource:` for styles in its CSP. After load the engine hands the window to Astra's `resource://astra/pip/PipPlayer.sys.mjs`, which copies the interface's light/dark theme for the window's lifetime and shows the site title in a slim head strip. The video, scrubber and transport controls remain Gecko's own; every observer and listener is released on the player's unload.
+Risk: low (Linux-only feature string and open path; macOS/Windows keep the existing window-watcher path, and the Astra dressing is additive and never changes playback)
+Test: forge lint; `build --faster --jobs 2`; `pip-player-probe.py` on Hyprland: the player is `floating: true` at 640×360, the Astra sheet reports 24 rules, the window follows dark→light→dark and paints the Astra ground, the head is present, and closing returns to the browser; the native player still closes and returns to its tab. The launcher gesture path is the same; this changes only how the window is created once the request reaches the parent.
+Verified-On: 153.6.0
+Removal-Plan: drop the `dependent`/`window.open` part when upstream uses xdg-dialog-v1 for media PiP (bug 1958013); keep or fold the Astra stylesheet into the upstream player skin if upstream ever reads app-supplied theme tokens
+---
+diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+index e1cc8e0c1d..fccca4a0f9 100644
+--- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
++++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+@@ -27,7 +27,34 @@ const PLAYER_URI = "chrome://global/content/pictureinpicture/player.xhtml";
+ // Currently, we need titlebar="yes" on macOS in order for the player window
+ // to be resizable. See bug 1824171.
+ const TITLEBAR = AppConstants.platform == "macosx" ? "yes" : "no";
+-const PLAYER_FEATURES = `chrome,alwaysontop,lockaspectratio,resizable,dialog,titlebar=${TITLEBAR}`;
++// On Linux a media PiP window is a dependent dialog. `dependent` makes the
++// window transient for its opener, which is the only hint a tiling Wayland
++// compositor gets to float it instead of giving it a tile. The `titlebar`
++// feature must stay present so the chrome mask still marks this as a media
++// PiP window; the GTK widget is undecorated for that type anyway.
++const PLAYER_FEATURES =
++  AppConstants.platform == "linux"
++    ? "chrome,alwaysontop,lockaspectratio,resizable,dialog,dependent,titlebar=yes"
++    : `chrome,alwaysontop,lockaspectratio,resizable,dialog,titlebar=${TITLEBAR}`;
++
++let astraPip = null;
++
++function dressPlayerWindow(playerWin, parentWin) {
++  if (!astraPip) {
++    try {
++      astraPip =
++        ChromeUtils.importESModule("resource://astra/pip/PipPlayer.sys.mjs")
++          .PipPlayer ?? false;
++    } catch {
++      astraPip = false;
++    }
++  }
++  try {
++    astraPip?.dress?.(playerWin, parentWin);
++  } catch {
++    // The player is Gecko's; Astra's face is best-effort.
++  }
++}
+ 
+ const WINDOW_TYPE = "Toolkit:PictureInPicture";
+ const TOGGLE_ENABLED_PREF =
+@@ -1141,13 +1168,24 @@ export var PictureInPicture = {
+       features += ",private";
+     }
+ 
+-    let pipWindow = Services.ww.openWindow(
+-      parentWin,
+-      PLAYER_URI,
+-      null,
+-      features,
+-      null
+-    );
++    let pipWindow;
++    if (AppConstants.platform == "linux") {
++      // A dependent dialog floats under tiling Wayland compositors. The
++      // window watcher path does not mark the opener for chrome windows, so
++      // the opener's own `open` is the one that makes the window transient.
++      pipWindow = parentWin.open(PLAYER_URI, "_blank", features);
++    } else {
++      pipWindow = Services.ww.openWindow(
++        parentWin,
++        PLAYER_URI,
++        null,
++        features,
++        null
++      );
++    }
++    if (!pipWindow) {
++      throw new Error("PiP player window was not created");
++    }
+ 
+     pipWindow._openDurationTimerId =
+       Glean.pictureinpicture.windowOpenDuration.start();
+@@ -1164,6 +1202,7 @@ export var PictureInPicture = {
+       pipWindow.addEventListener(
+         "load",
+         () => {
++          dressPlayerWindow(pipWindow, parentWin);
+           resolve(pipWindow);
+         },
+         { once: true }
+diff --git a/toolkit/components/pictureinpicture/content/player.xhtml b/toolkit/components/pictureinpicture/content/player.xhtml
+index 09c9c5000d..9dab91d332 100644
+--- a/toolkit/components/pictureinpicture/content/player.xhtml
++++ b/toolkit/components/pictureinpicture/content/player.xhtml
+@@ -12,8 +12,9 @@
+       >
+   <head>
+     <meta charset="utf-8"/>
+-    <meta http-equiv="Content-Security-Policy" content="default-src chrome:"/>
++    <meta http-equiv="Content-Security-Policy" content="default-src chrome:; style-src chrome: resource:"/>
+     <link rel="stylesheet" href="chrome://global/skin/pictureinpicture/player.css"/>
++    <link rel="stylesheet" href="resource://astra/pip/player.css"/>
+     <link rel="localization" href="toolkit/pictureinpicture/pictureinpicture.ftl"/>
+     <link rel="localization" href="browser/browserSets.ftl"/>
+     <script src="chrome://global/content/pictureinpicture/player.js"></script>
