@@ -151,7 +151,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 - **Previews:** the peek stores only `{ tabId, url, title, spaceId, capturedAt }`
   and a bounded data URL kept only while the card is mounted. No page DOM, no
   cookies, no form state, no full-page scrolling script injection.
-- **Split:** a split view never spans containers. Cross-space “open in split”
+- **Split:** a split view never spans containers and never clones a tab: every pane is the same native `<browser>` the tab already owns, so memory is shared. The cap is three panes per split view; each window (and each space/profile in it) opens its own split independently. Cross-space “open in split”
   switches to the target space first or refuses; it does not mix partitions in
   one split view.
 - **Extensions:** disabling an add-on for a space never uninstalls it; the
