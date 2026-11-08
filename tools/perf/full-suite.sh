@@ -33,7 +33,7 @@ CONTRACTS=(
   permissions_prompt operations_ledger metadata_restore page_source_model
   media_model webext_view wire_coverage containers_isolation settings_native
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
-  protected_content
+  protected_content native_surfaces
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -87,6 +87,7 @@ PROBES=(
   "bar:tools/marionette-probe/bar-probe.py"
   "search_theme:tools/marionette-probe/search-theme-probe.py"
   "window_radius:tools/marionette-probe/window-radius-probe.py"
+  "native_surfaces:tools/marionette-probe/native-surfaces-probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"
