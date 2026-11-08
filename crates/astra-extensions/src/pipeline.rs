@@ -115,15 +115,22 @@ fn identity_for(crx_id: Option<&str>, manifest: &Value, source: Source, path: &P
             kind: IdentityKind::ChromeKey,
         };
     }
-    if let Some(gecko_id) = manifest_gecko_id(manifest) {
-        let chrome_id = manifest_key(manifest)
-            .and_then(|key| crx::decode_base64(&key))
-            .map(|key| chrome_id_from_key(&key));
-        return Identity {
-            install_id: gecko_id,
-            chrome_id,
-            kind: IdentityKind::GeckoId,
-        };
+    // A Chrome package may ship a Firefox-shaped `browser_specific_settings`
+    // (Privacy Badger, Wappalyzer, NordPass and others do). The Chrome build
+    // is not that Firefox add-on; keep the Chrome-derived id so the two can
+    // coexist and the record matches the manifest Astra writes. Only an
+    // explicit Firefox source keeps the author's id.
+    if source != Source::Chrome {
+        if let Some(gecko_id) = manifest_gecko_id(manifest) {
+            let chrome_id = manifest_key(manifest)
+                .and_then(|key| crx::decode_base64(&key))
+                .map(|key| chrome_id_from_key(&key));
+            return Identity {
+                install_id: gecko_id,
+                chrome_id,
+                kind: IdentityKind::GeckoId,
+            };
+        }
     }
     if let Some(key) = manifest_key(manifest).and_then(|key| crx::decode_base64(&key)) {
         let chrome_id = chrome_id_from_key(&key);
@@ -568,7 +575,7 @@ fn analyze(path: &Path, source: Source) -> Result<Analysis, ExtensionsError> {
     };
 
     let manifest_bytes = scan.manifest.clone();
-    let parsed = manifest::parse(&manifest_bytes, source != Source::Firefox)?;
+    let parsed = manifest::parse(&manifest_bytes, source)?;
     let identity = identity_for(
         crx_info.as_ref().map(|(id, _)| id.as_str()),
         &parsed.value,
@@ -611,7 +618,7 @@ fn analyze(path: &Path, source: Source) -> Result<Analysis, ExtensionsError> {
         // Re-summarize the adapted manifest so the review reflects what the
         // engine will actually see.
         let text = serde_json::to_vec(&adapted).expect("manifest serializes");
-        manifest::parse(&text, true)
+        manifest::parse(&text, source)
             .map(|parsed| parsed.summary)
             .unwrap_or_else(|_| parsed.summary.clone())
     };

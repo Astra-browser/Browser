@@ -25,7 +25,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::types::{Identity, ManifestSummary};
+use crate::types::{Identity, ManifestSummary, Source};
 
 pub const ENGINE_VERSION: &str = "153.6.0esr";
 
@@ -126,7 +126,7 @@ pub enum ManifestError {
     Missing(&'static str),
 }
 
-pub fn parse(bytes: &[u8], chrome_source: bool) -> Result<ParsedManifest, ManifestError> {
+pub fn parse(bytes: &[u8], source: Source) -> Result<ParsedManifest, ManifestError> {
     let value: Value =
         serde_json::from_slice(bytes).map_err(|e| ManifestError::Json(e.to_string()))?;
     let object = value.as_object().ok_or(ManifestError::NotObject)?;
@@ -150,9 +150,17 @@ pub fn parse(bytes: &[u8], chrome_source: bool) -> Result<ParsedManifest, Manife
     if name.is_empty() || version.is_empty() {
         return Err(ManifestError::Missing("name or version"));
     }
+    // A Chrome-sourced package stays a Chrome package even when it ships a
+    // Firefox-shaped `browser_specific_settings` (several do). Otherwise the
+    // id the Host API looks for and the id written into the XPI diverge.
     let firefox_shape =
         object.contains_key("browser_specific_settings") || object.contains_key("applications");
-    let kind = if chrome_source && !firefox_shape {
+    let chrome = match source {
+        Source::Chrome => true,
+        Source::Firefox => false,
+        Source::File => !firefox_shape,
+    };
+    let kind = if chrome {
         if manifest_version == 3 {
             ManifestKind::ChromeMv3
         } else {
@@ -281,16 +289,28 @@ pub fn adapt(
             .entry("gecko")
             .or_insert_with(|| Value::Object(Map::new()));
         if let Some(id) = id.as_object_mut() {
-            if !id.contains_key("id") {
+            let current = id.get("id").and_then(Value::as_str).map(str::to_string);
+            let force = parsed.kind.is_chrome();
+            if (force || current.is_none())
+                && current.as_deref() != Some(identity.install_id.as_str())
+            {
+                let had_id = current.is_some();
                 id.insert("id".into(), Value::String(identity.install_id.clone()));
                 adaptations.push(Adaptation {
                     kind: "identity".into(),
-                    detail: format!(
-                        "installed under the stable id {} derived from the package",
-                        identity.install_id
-                    ),
-                    limitation: false,
-                });
+                    detail: if force && had_id {
+                            format!(
+                                "installed under the Chrome-derived id {} (the package's Firefox id is not used for the Chrome build)",
+                                identity.install_id
+                            )
+                        } else {
+                            format!(
+                                "installed under the stable id {} derived from the package",
+                                identity.install_id
+                            )
+                        },
+                        limitation: false,
+                    });
             }
             if !id.contains_key("strict_min_version") {
                 id.insert("strict_min_version".into(), Value::String("115.0".into()));
@@ -415,6 +435,10 @@ pub fn adapt(
         }
     }
 
+    // Chrome accepts extension-root paths with a leading slash; the engine's
+    // ExtensionURL validation and ZIP lookups expect a relative path.
+    normalize_manifest_paths(object);
+
     // Chrome provenance keys. `key` is used for identity before this point;
     // the engine installs by add-on id, not by the Chrome key.
     object.remove("key");
@@ -432,6 +456,224 @@ pub fn adapt(
     }
 
     (value, adaptations)
+}
+
+fn strip_root(path: &str) -> String {
+    path.trim_start_matches('/').to_string()
+}
+
+fn normalize_value(value: &mut Value) {
+    if let Some(path) = value.as_str() {
+        let stripped = strip_root(path);
+        if stripped != path {
+            *value = Value::String(stripped);
+        }
+    }
+}
+
+fn normalize_array(list: &mut Value) {
+    if let Some(items) = list.as_array_mut() {
+        for item in items {
+            normalize_value(item);
+        }
+    }
+}
+
+fn normalize_object_paths(value: &mut Value) {
+    if let Some(map) = value.as_object_mut() {
+        for item in map.values_mut() {
+            normalize_value(item);
+        }
+    }
+}
+
+fn normalize_action(object: &mut Map<String, Value>, key: &str) {
+    let Some(action) = object.get_mut(key).and_then(Value::as_object_mut) else {
+        return;
+    };
+    if let Some(value) = action.get_mut("default_popup") {
+        normalize_value(value);
+    }
+    if let Some(icon) = action.get_mut("default_icon") {
+        if icon.is_object() {
+            normalize_object_paths(icon);
+        } else {
+            normalize_value(icon);
+        }
+    }
+}
+
+/// Chrome lets a WAR entry expose resources to another extension with
+/// `matches: ["chrome-extension://<id>/*"]`. Gecko's MatchPattern has no
+/// `chrome-extension` scheme and rejects the manifest; the equivalent Gecko
+/// shape is `extension_ids: ["<id>"]`.
+fn adapt_war_matches(map: &mut Map<String, Value>) {
+    if let Some(ids) = map.get_mut("extension_ids").and_then(Value::as_array_mut) {
+        for value in ids.iter_mut() {
+            if let Some(id) = value.as_str() {
+                *value = Value::String(gecko_extension_id(id));
+            }
+        }
+    }
+    let Some(matches) = map.get_mut("matches").and_then(Value::as_array_mut) else {
+        return;
+    };
+    let mut kept = Vec::new();
+    let mut extension_ids = Vec::new();
+    for value in matches.drain(..) {
+        let Some(pattern) = value.as_str() else {
+            continue;
+        };
+        if let Some(rest) = pattern.strip_prefix("chrome-extension://") {
+            let id = rest.split('/').next().unwrap_or("");
+            if !id.is_empty() {
+                extension_ids.push(Value::String(id.to_string()));
+            }
+            continue;
+        }
+        if pattern == "<all_urls>"
+            || pattern.starts_with("http://")
+            || pattern.starts_with("https://")
+            || pattern.starts_with("ws://")
+            || pattern.starts_with("wss://")
+            || pattern.starts_with("ftp://")
+            || pattern.starts_with("file://")
+        {
+            kept.push(Value::String(pattern.to_string()));
+        }
+    }
+    *matches = kept;
+    if extension_ids.is_empty() {
+        return;
+    }
+    let list = map
+        .entry("extension_ids")
+        .or_insert_with(|| Value::Array(Vec::new()));
+    if let Some(list) = list.as_array_mut() {
+        for id in extension_ids {
+            let id = match id {
+                Value::String(id) => Value::String(gecko_extension_id(&id)),
+                other => other,
+            };
+            if !list.contains(&id) {
+                list.push(id);
+            }
+        }
+    }
+}
+
+/// A Chrome extension id is not a Gecko add-on id. Astra installs a Chrome
+/// package under `<chrome-id>@chrome.astra`, so a WAR reference to another
+/// Chrome extension must use that same shape.
+fn gecko_extension_id(id: &str) -> String {
+    if id == "*" || id.starts_with('{') || id.contains('@') {
+        id.to_string()
+    } else {
+        format!("{id}@chrome.astra")
+    }
+}
+
+fn normalize_manifest_paths(object: &mut Map<String, Value>) {
+    for key in ["options_page", "devtools_page"] {
+        if let Some(value) = object.get_mut(key) {
+            normalize_value(value);
+        }
+    }
+    if let Some(options) = object.get_mut("options_ui").and_then(Value::as_object_mut) {
+        if let Some(page) = options.get_mut("page") {
+            normalize_value(page);
+        }
+    }
+    if let Some(background) = object.get_mut("background").and_then(Value::as_object_mut) {
+        if let Some(page) = background.get_mut("page") {
+            normalize_value(page);
+        }
+        if let Some(scripts) = background.get_mut("scripts") {
+            normalize_array(scripts);
+        }
+    }
+    if let Some(groups) = object
+        .get_mut("content_scripts")
+        .and_then(Value::as_array_mut)
+    {
+        for group in groups {
+            if let Some(group) = group.as_object_mut() {
+                for field in ["js", "css"] {
+                    if let Some(list) = group.get_mut(field) {
+                        normalize_array(list);
+                    }
+                }
+            }
+        }
+    }
+    for key in ["action", "browser_action", "page_action"] {
+        normalize_action(object, key);
+    }
+    if let Some(sidebar) = object
+        .get_mut("sidebar_action")
+        .and_then(Value::as_object_mut)
+    {
+        if let Some(panel) = sidebar.get_mut("default_panel") {
+            normalize_value(panel);
+        }
+        if let Some(icon) = sidebar.get_mut("default_icon") {
+            if icon.is_object() {
+                normalize_object_paths(icon);
+            } else {
+                normalize_value(icon);
+            }
+        }
+    }
+    if let Some(overrides) = object
+        .get_mut("chrome_url_overrides")
+        .and_then(Value::as_object_mut)
+    {
+        for value in overrides.values_mut() {
+            normalize_value(value);
+        }
+    }
+    if let Some(icons) = object.get_mut("icons").and_then(Value::as_object_mut) {
+        for value in icons.values_mut() {
+            normalize_value(value);
+        }
+    }
+    if let Some(resources) = object.get_mut("web_accessible_resources") {
+        match resources {
+            Value::Array(items) => {
+                for item in items {
+                    if item.is_array() {
+                        normalize_array(item);
+                    } else if item.is_string() {
+                        normalize_value(item);
+                    } else if let Some(map) = item.as_object_mut() {
+                        if let Some(list) = map.get_mut("resources") {
+                            normalize_array(list);
+                        }
+                        adapt_war_matches(map);
+                    }
+                }
+            }
+            Value::Object(map) => {
+                if let Some(list) = map.get_mut("resources") {
+                    normalize_array(list);
+                }
+                adapt_war_matches(map);
+            }
+            _ => {}
+        }
+    }
+    if let Some(dnr) = object
+        .get_mut("declarative_net_request")
+        .and_then(Value::as_object_mut)
+    {
+        if let Some(rules) = dnr.get_mut("rule_resources").and_then(Value::as_array_mut) {
+            for rule in rules {
+                if let Some(path) = rule.get_mut("path") {
+                    normalize_value(path);
+                }
+            }
+        }
+    }
 }
 
 /// Files the adapter needs to write, relative to the package root.
@@ -504,7 +746,7 @@ mod tests {
             "background": { "service_worker": "sw.js", "type": "module" },
             "permissions": ["storage"],
         });
-        let parsed = parse(value.to_string().as_bytes(), true).expect("parses");
+        let parsed = parse(value.to_string().as_bytes(), Source::Chrome).expect("parses");
         let (adapted, notes) = adapt(&parsed, &identity(), false);
         let background = &adapted["background"];
         assert_eq!(background["scripts"][0], "sw.js");
@@ -526,7 +768,7 @@ mod tests {
             "side_panel": { "default_path": "panel.html", "default_title": "Panel" },
             "permissions": ["sidePanel", "storage"],
         });
-        let parsed = parse(value.to_string().as_bytes(), true).expect("parses");
+        let parsed = parse(value.to_string().as_bytes(), Source::Chrome).expect("parses");
         let (adapted, notes) = adapt(&parsed, &identity(), true);
         assert!(adapted.get("side_panel").is_none());
         assert_eq!(adapted["sidebar_action"]["default_panel"], "panel.html");
@@ -554,6 +796,47 @@ mod tests {
     }
 
     #[test]
+    fn a_chrome_package_with_a_firefox_id_keeps_the_chrome_id() {
+        let value = serde_json::json!({
+            "manifest_version": 3,
+            "name": "Sibling",
+            "version": "1.0",
+            "browser_specific_settings": { "gecko": { "id": "jid1-sibling@jetpack" } },
+        });
+        let parsed = parse(value.to_string().as_bytes(), Source::Chrome).expect("parses");
+        assert_eq!(parsed.kind, ManifestKind::ChromeMv3);
+        let (adapted, notes) = adapt(&parsed, &identity(), false);
+        assert_eq!(
+            adapted["browser_specific_settings"]["gecko"]["id"],
+            "abcdefghijklmnopabcdefghijklmnop@chrome.astra"
+        );
+        assert!(notes
+            .iter()
+            .any(|note| note.kind == "identity" && note.detail.contains("Firefox id")));
+    }
+
+    #[test]
+    fn chrome_extension_war_matches_become_gecko_extension_ids() {
+        let value = serde_json::json!({
+            "manifest_version": 3,
+            "name": "WAR",
+            "version": "1.0",
+            "web_accessible_resources": [{
+                "matches": ["<all_urls>", "chrome-extension://ocpdpnakdghopjcifldjidbdmfobmmoi/*"],
+                "resources": ["images/*.svg"],
+            }],
+        });
+        let parsed = parse(value.to_string().as_bytes(), Source::Chrome).expect("parses");
+        let (adapted, _) = adapt(&parsed, &identity(), false);
+        let war = &adapted["web_accessible_resources"][0];
+        assert_eq!(war["matches"], serde_json::json!(["<all_urls>"]));
+        assert_eq!(
+            war["extension_ids"],
+            serde_json::json!(["ocpdpnakdghopjcifldjidbdmfobmmoi@chrome.astra"])
+        );
+    }
+
+    #[test]
     fn a_firefox_manifest_is_not_rewritten() {
         let value = serde_json::json!({
             "manifest_version": 2,
@@ -561,7 +844,7 @@ mod tests {
             "version": "1.0",
             "browser_specific_settings": { "gecko": { "id": "ff@example.com" } },
         });
-        let parsed = parse(value.to_string().as_bytes(), true).expect("parses");
+        let parsed = parse(value.to_string().as_bytes(), Source::Firefox).expect("parses");
         assert_eq!(parsed.kind, ManifestKind::Firefox);
         let (adapted, notes) = adapt(&parsed, &identity(), false);
         assert_eq!(

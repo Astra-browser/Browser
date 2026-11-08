@@ -19,7 +19,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 use crate::types::PackageSummary;
 
 pub const MAX_ENTRIES: usize = 20_000;
-pub const MAX_UNCOMPRESSED: u64 = 256 * 1024 * 1024;
+pub const MAX_UNCOMPRESSED: u64 = 512 * 1024 * 1024;
 pub const MAX_ENTRY: u64 = 64 * 1024 * 1024;
 pub const MAX_MANIFEST: u64 = 2 * 1024 * 1024;
 /// Files whose text the analyzers read (JS/HTML). The rest is only extracted.
@@ -301,17 +301,17 @@ pub fn write_xpi(dir: &Path, dest: &Path) -> Result<(), PackageError> {
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .last_modified_time(zip::DateTime::default());
-    let mut buffer = Vec::new();
     for relative in files {
         let name = relative
             .to_str()
             .ok_or_else(|| PackageError::UnsafePath(relative.display().to_string()))?;
         safe_name(name)?;
         let mut input = fs::File::open(dir.join(&relative))?;
-        buffer.clear();
-        input.read_to_end(&mut buffer)?;
         writer.start_file(name, options)?;
-        writer.write_all(&buffer)?;
+        // Stream entry by entry: a legitimate blocker can carry 300 MiB of
+        // rule data across 363 files, and holding each one in memory buys
+        // nothing.
+        std::io::copy(&mut input, &mut writer)?;
     }
     writer.finish()?;
     Ok(())

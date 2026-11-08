@@ -111,7 +111,7 @@ fn stage_writes_a_deterministic_xpi_with_the_prelude() {
     let bytes = std::fs::read(&staged.xpi_path).expect("read xpi");
     let scan = crate::package::scan_zip(&bytes).expect("xpi is a zip");
     assert!(scan.scan.contains_key(crate::manifest::COMPAT_SCRIPT));
-    let manifest = crate::manifest::parse(&scan.manifest, true).expect("manifest");
+    let manifest = crate::manifest::parse(&scan.manifest, Source::Chrome).expect("manifest");
     assert!(manifest.value.get("side_panel").is_none());
     assert_eq!(
         manifest.value["sidebar_action"]["default_panel"],
@@ -210,7 +210,7 @@ fn arbitrary_bytes_never_panic_the_parsers() {
             buffer[8..12].copy_from_slice(&header.to_le_bytes());
         }
         let _ = Crx::parse(&buffer);
-        let _ = crate::manifest::parse(&buffer, true);
+        let _ = crate::manifest::parse(&buffer, Source::Chrome);
         let _ = crate::package::scan_zip(&buffer);
     }
 }
