@@ -115,6 +115,11 @@ button {
    same ground steps aside while a context menu is open, because the shell
    raises the whole frame to draw it over the page. */
 :root[data-astra-peek="true"],
+:root[data-astra-page-peek="true"],
+:root[data-astra-page-peek="true"] body,
+:root[data-astra-page-peek="true"] #root,
+:root[data-astra-page-peek="true"] .shell,
+:root[data-astra-page-peek="true"] .shell[data-caption],
 :root[data-astra-peek="true"] body,
 :root[data-astra-peek="true"] #root,
 :root[data-astra-peek="true"] .shell,
