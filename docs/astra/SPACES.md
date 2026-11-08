@@ -104,9 +104,10 @@ ever lists the profile in front.
 
 ## Known limits
 
-- Preferences, extensions and the Places history database remain shared by the
-  one running profile directory (D-41). History is not scoped per space; the
-  Settings copy says so. A future engine-side visit annotation is the path to
-  per-space history.
+- Preferences, extensions and the Places history database remain shared on
+  disk by the one running profile directory (D-41). Astra now scopes the
+  History surface through a per-space visit index, and applies a per-space
+  extension enable/disable set on switch (D-45); the Places file and the
+  add-on installation are still profile-scope. The Settings copy says so.
 - A profile switch is an in-window space transition, not a new process or
   profile directory (D-41).

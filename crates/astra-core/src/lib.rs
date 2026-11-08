@@ -23,6 +23,7 @@ pub mod settings;
 pub mod settings_ext;
 pub mod sleeping;
 pub mod spaces;
+pub mod surfaces;
 pub mod tabs;
 
 pub use diagnostics::{check_db_integrity, collect as collect_diagnostics, log_tail};
@@ -52,6 +53,11 @@ pub use settings_ext::{apply_defaults, defaults as settings_defaults, migrate, v
 pub use settings_ext::{MigrationReport, SettingsExtError};
 pub use spaces::{container_name_for_space, profile_dir_name, valid_container_ref};
 pub use spaces::{Space, SpaceError, SpaceStore};
+pub use surfaces::{
+    clamp_ratio, clone_admitted, history_key, is_web_url, require_public, trim_peek_count,
+    validate_arrangement, Arrangement, Pane, SurfaceError, CAPTURE_HEIGHT, CAPTURE_WIDTH,
+    MAX_HISTORY_ENTRIES, MAX_PANES, MAX_PEEKS,
+};
 pub use tabs::{TabEntry, TabStrip, TabStripError};
 
 use astra_host_trait::{Admission, BrowserHost};
