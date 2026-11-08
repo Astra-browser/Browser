@@ -228,7 +228,7 @@ function syncResizers(binding, splitview) {
     const resizer = doc.createElementNS(XHTML_NS, "div");
     resizer.className = "astra-pane-resizer";
     resizer.setAttribute("role", "separator");
-    resizer.setAttribute("aria-orientation", "horizontal");
+    resizer.setAttribute("aria-orientation", "vertical");
     resizer.setAttribute("tabindex", "0");
     resizer.style.order = String(index * 2 + 1);
     panels[index].after(resizer);
@@ -269,7 +269,7 @@ function bindResizer(binding, resizer, index) {
       // Capture is optional; the window listeners still finish the drag.
     }
     const move = (moveEvent) => {
-      resizePair(left, right, startLeft + (moveEvent.clientX - startX), startRight);
+      resizePair(left, right, startLeft + (moveEvent.clientX - startX), startLeft, startRight);
     };
     const stop = () => {
       resizer.removeEventListener("pointermove", move);
@@ -306,9 +306,11 @@ function bindResizer(binding, resizer, index) {
 }
 
 /** Resize one adjacent pair, keeping the rest of the split untouched. */
-function resizePair(left, right, nextLeft, startRight = 0) {
+function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0) {
   if (!left || !right) return;
-  const total = startRight || left.getBoundingClientRect().width + right.getBoundingClientRect().width;
+  const leftWidth = startLeft || left.getBoundingClientRect().width;
+  const rightWidth = startRight || right.getBoundingClientRect().width;
+  const total = leftWidth + rightWidth;
   const min = 140;
   const clamped = Math.min(total - min, Math.max(min, nextLeft));
   for (const panel of [left, right]) {
