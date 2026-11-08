@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tabs } from "$domain/tabs";
+  import { surface as browserPage } from "$domain/surface";
   import {
     copySpaceExtensions,
     setSpaceExtension,
@@ -85,6 +86,9 @@
         <strong>No extensions installed</strong>
         <span>Install one from the extensions gallery, then it appears here for every space.</span>
       </span>
+      <Button size="compact" variant="ghost" onclick={() => void browserPage.open("extensions")}
+        >Manage extensions</Button
+      >
     </div>
   {:else}
     {#each items as entry (entry.id)}
@@ -141,6 +145,7 @@
 
   .space-empty {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     padding: 14px 18px;
@@ -169,6 +174,13 @@
   }
 
   .space-copy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     padding: 10px 18px 14px;
+  }
+
+  .space-empty :global(button) {
+    margin-inline-start: auto;
   }
 </style>
