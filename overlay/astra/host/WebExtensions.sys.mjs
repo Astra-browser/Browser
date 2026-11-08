@@ -12,6 +12,12 @@
 // Nothing here fabricates an extension or a state.
 
 import { __tabsState } from "./Tabs.sys.mjs";
+import {
+  ChromeExtensions,
+  __resetChromeExtensionsForTests,
+  isChromePackagePath,
+  storeIdFromUrl,
+} from "./ChromeExtensions.sys.mjs";
 
 const REVIEWS = new Map();
 let _nextReview = 0;
@@ -138,7 +144,7 @@ export const WebExtensions = {
     try {
       const addons = await manager.getAddonsByTypes(["extension"]);
       const pinned = pinnedIds();
-      return addons
+      const views = addons
         .filter(
           (addon) =>
             addon &&
@@ -150,6 +156,9 @@ export const WebExtensions = {
         .map((addon) => viewForAddon(addon, { pinned: pinned.has(addon.id) }))
         .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name));
+      // Chrome provenance (source, verdict, security, how the package
+      // survives a restart) comes from Astra's record, not AddonManager.
+      return await ChromeExtensions.decorate(views);
     } catch {
       return [];
     }
@@ -161,6 +170,7 @@ export const WebExtensions = {
     try {
       if (enabled === true) await addon.enable();
       else await addon.disable();
+      await ChromeExtensions.setEnabled({ id, enabled }).catch(() => {});
       return null;
     } catch {
       throw fail("the engine refused the change");
@@ -207,12 +217,16 @@ export const WebExtensions = {
       throw fail("the engine refused to uninstall");
     }
     await removed;
+    await ChromeExtensions.forget({ id }).catch(() => {});
     return null;
   },
 
   /** Review an extension package on disk without installing it yet. */
   async prepareFile({ path = "" } = {}) {
     if (typeof path !== "string" || path === "") throw fail("no package selected");
+    if (isChromePackagePath(path)) {
+      return ChromeExtensions.prepareFile({ path, source: "chrome" });
+    }
     const manager = await addonManager();
     const FileUtils = await fileUtils();
     if (!manager || !FileUtils) throw fail("the engine cannot install extensions");
@@ -232,7 +246,11 @@ export const WebExtensions = {
 
   /** Install the package the review named. */
   async confirm({ id = "", review_id = "", reviewId = "" } = {}) {
-    const entry = REVIEWS.get(review_id || reviewId);
+    const key = review_id || reviewId;
+    if (String(key).startsWith("chrome-review-")) {
+      return ChromeExtensions.confirm({ review_id: key });
+    }
+    const entry = REVIEWS.get(key);
     if (!entry) throw fail("this review is no longer available");
     if (id !== "" && entry.review.id !== "" && id !== entry.review.id) {
       throw fail("the package does not match the review");
@@ -248,7 +266,11 @@ export const WebExtensions = {
 
   /** Drop a review without installing. */
   async cancel({ review_id = "", reviewId = "" } = {}) {
-    const entry = REVIEWS.get(review_id || reviewId);
+    const key = review_id || reviewId;
+    if (String(key).startsWith("chrome-review-")) {
+      return ChromeExtensions.cancel({ review_id: key });
+    }
+    const entry = REVIEWS.get(key);
     if (!entry) return undefined;
     REVIEWS.delete(review_id || reviewId);
     try {
@@ -272,8 +294,16 @@ export const WebExtensions = {
 
   /** Reload a failed extension, which re-runs its startup. */
   async retry({ install_id = "", installId = "", id = "" } = {}) {
-    const addon = await findAddon(install_id || installId || id);
-    if (!addon) throw fail("no such extension");
+    const key = install_id || installId || id;
+    const addon = await findAddon(key);
+    if (!addon) {
+      const record = await ChromeExtensions.record({ id: key }).catch(() => null);
+      if (record) {
+        await ChromeExtensions.restore();
+        return null;
+      }
+      throw fail("no such extension");
+    }
     try {
       await addon.reload();
       return null;
@@ -349,6 +379,9 @@ export const WebExtensions = {
     if (!parsed || parsed.protocol !== "https:") throw fail("this page is not an extension listing");
     const manager = await addonManager();
     if (!manager) throw fail("the engine cannot install extensions");
+    if (storeIdFromUrl(url)) {
+      return ChromeExtensions.prepareStore({ url });
+    }
     let xpi = "";
     if (
       parsed.hostname === "addons.mozilla.org" ||
@@ -357,11 +390,6 @@ export const WebExtensions = {
       const slug = /^\/(?:[^/]+\/)?(?:firefox\/)?addon\/([^/]+)/.exec(parsed.pathname)?.[1] ?? "";
       if (slug === "") throw fail("this page is not an extension listing");
       xpi = `${parsed.origin}/firefox/downloads/latest/${slug}/latest.xpi`;
-    } else if (
-      parsed.hostname === "chromewebstore.google.com" ||
-      parsed.hostname === "chrome.google.com"
-    ) {
-      throw fail("Chrome Web Store packages cannot be installed in this browser");
     } else {
       throw fail("this page is not an extension listing");
     }
@@ -411,7 +439,7 @@ export const WebExtensions = {
         folder ? "Choose extension folder" : "Choose extension package",
         folder ? Ci.nsIFilePicker.modeGetFolder : Ci.nsIFilePicker.modeOpen
       );
-      if (!folder) picker.appendFilter("Extensions", "*.xpi");
+      if (!folder) picker.appendFilter("Extensions", "*.xpi;*.crx;*.zip");
       const result = await new Promise((resolve) => picker.open(resolve));
       if (result !== Ci.nsIFilePicker.returnOK) return null;
       if (folder === true) {
@@ -448,4 +476,6 @@ export const WebExtensions = {
 
 // Test-only reset: the module holds no state, but the HostAPI reset protocol
 // calls this.
-export function __resetWebExtensionsForTests() {}
+export function __resetWebExtensionsForTests() {
+  __resetChromeExtensionsForTests();
+}

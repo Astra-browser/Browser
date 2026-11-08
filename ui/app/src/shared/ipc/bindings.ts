@@ -3625,6 +3625,23 @@ export type WebExtensionAccessRequestView = {
 
 export type WebExtensionAccessRequested = WebExtensionAccessRequestView;
 
+export type WebExtensionSecurityFinding = {
+	id: string,
+	category: string,
+	level: string,
+	file: string | null,
+	line: number | null,
+	evidence: string,
+	explanation: string,
+};
+
+export type WebExtensionSecurity = {
+	level: string,
+	summary: string,
+	blocked: boolean,
+	findings: WebExtensionSecurityFinding[],
+};
+
 export type WebExtensionReview = {
 	/**  Identifies the package/profile shown by this particular review. */
 	review_id: string,
@@ -3639,6 +3656,18 @@ export type WebExtensionReview = {
 	update: boolean,
 	/**  Installed from a file, so not checked against the Web Store. */
 	from_file: boolean,
+	/**  `firefox`, `chrome` or `file`. */
+	source?: string,
+	/**  `verified`, `not_present`, `invalid` or `unsupported`. */
+	signature?: string,
+	/**  `full`, `limited`, `adapted`, `unsupported` or `blocked`. */
+	compatibility?: string,
+	security?: WebExtensionSecurity,
+	/**  `profile` (survives restart) or `session` (restored by Astra). */
+	persistence?: string,
+	manifest_version?: number,
+	permissions?: string[],
+	host_permissions?: string[],
 };
 
 export type WebExtensionStoreButtonState = "add" | "adding" | "remove";
@@ -3677,6 +3706,12 @@ export type WebExtensionView = {
 	held_update: string | null,
 	sideloaded: boolean,
 	pinned: boolean,
+	/**  `firefox` or `chrome`, when Astra has a package record. */
+	source?: string,
+	compatibility?: string,
+	security_level?: string,
+	persistence?: string,
+	store_url?: string | null,
 };
 
 /**

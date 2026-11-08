@@ -14,6 +14,61 @@
   let failure = $derived(webext.error());
   let detailed = $state(false);
   let limited = $state(false);
+  let evidence = $state(false);
+  let sourceLabel = $derived(
+    review.source === "chrome"
+      ? m.webext_source_chrome()
+      : review.source === "firefox"
+        ? m.webext_source_firefox()
+        : review.source === "file"
+          ? m.webext_source_file()
+          : null,
+  );
+  let signatureLabel = $derived(
+    review.signature === "verified"
+      ? m.webext_signature_verified()
+      : review.signature === "invalid" || review.signature === "unsupported"
+        ? m.webext_signature_invalid()
+        : review.signature === "not_present"
+          ? m.webext_signature_unsigned()
+          : null,
+  );
+  let compatibilityLabel = $derived(
+    review.compatibility === "limited"
+      ? m.webext_compat_limited()
+      : review.compatibility === "adapted"
+        ? m.webext_compat_adapted()
+        : review.compatibility === "unsupported"
+          ? m.webext_compat_unsupported()
+          : review.compatibility === "blocked"
+            ? m.webext_compat_blocked()
+            : null,
+  );
+  let securityMessage = $derived(
+    review.security?.blocked
+      ? m.webext_security_blocked()
+      : review.security?.level === "high" || review.security?.level === "critical"
+        ? m.webext_security_critical()
+        : review.security?.level === "medium"
+          ? m.webext_security_warning()
+          : review.security?.level === "low" || review.security?.level === "info"
+            ? m.webext_security_notice()
+            : null,
+  );
+  let securityTone = $derived(
+    review.security?.blocked || review.security?.level === "critical"
+      ? "danger"
+      : review.security?.level === "high" || review.security?.level === "medium"
+        ? "warning"
+        : "notice",
+  );
+  let persistenceLabel = $derived(
+    review.persistence === "session"
+      ? m.webext_persistence_session()
+      : review.persistence === "profile"
+        ? m.webext_persistence_profile()
+        : null,
+  );
   // The broadest access leads; the rest waits behind "more", which is where
   // a list of every permission belongs in a sheet this narrow.
   let lead = $derived(review.warnings[0] ?? null);
@@ -45,6 +100,14 @@
       <p>{m.webext_review_version({ version: review.version })}</p>
     </div>
   </div>
+
+  {#if sourceLabel !== null || signatureLabel !== null}
+    <p class="meta">
+      {#if sourceLabel !== null}<span>{sourceLabel}</span>{/if}
+      {#if sourceLabel !== null && signatureLabel !== null}<span aria-hidden="true">·</span>{/if}
+      {#if signatureLabel !== null}<span>{signatureLabel}</span>{/if}
+    </p>
+  {/if}
 
   <div id="web-extension-review-access" class="access">
     {#if lead === null}
@@ -80,7 +143,41 @@
         </ul>
       {/if}
     {/if}
+    {#if compatibilityLabel !== null}
+      <p class="compat" data-tone={review.compatibility === "limited" ? "warning" : "muted"}>
+        {compatibilityLabel}
+      </p>
+    {/if}
+    {#if securityMessage !== null}
+      <p class="security" data-tone={securityTone} role="status">{securityMessage}</p>
+      {#if review.security && review.security.findings.length > 0}
+        <button
+          type="button"
+          class="more"
+          aria-expanded={evidence}
+          onclick={() => (evidence = !evidence)}
+        >
+          {evidence ? m.webext_security_hide() : m.webext_security_show()}
+          <span class="chevron" aria-hidden="true"><Icon icon={ArrowDown01Icon} size={12} /></span>
+        </button>
+        {#if evidence}
+          <ul class="evidence">
+            {#each review.security.findings as finding (`${finding.id}:${finding.file ?? ""}:${finding.line ?? 0}`)}
+              <li>
+                <strong>{finding.category}</strong>
+                {#if finding.file}<span class="where"
+                    >{finding.file}{#if finding.line}:{finding.line}{/if}</span
+                  >{/if}
+                <span class="why">{finding.evidence}</span>
+                <span class="why">{finding.explanation}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+    {/if}
     {#if review.from_file}<p class="warning">{m.webext_from_file()}</p>{/if}
+    {#if persistenceLabel !== null}<p class="persistence">{persistenceLabel}</p>{/if}
   </div>
 
   {#if failure !== null}<p role="alert" class="failure">{failure}</p>{/if}
@@ -203,6 +300,70 @@
   .warning {
     margin-block-start: 8px !important;
     color: var(--color-warning);
+  }
+
+  .meta {
+    display: flex;
+    gap: 6px;
+    margin-block-start: 10px;
+    font-size: var(--text-caption);
+    color: var(--color-muted);
+  }
+
+  .compat,
+  .security {
+    margin-block-start: 8px;
+    font-size: var(--text-caption);
+  }
+
+  .compat {
+    color: var(--color-muted);
+  }
+
+  .compat[data-tone="warning"] {
+    color: var(--color-warning);
+  }
+
+  .security[data-tone="notice"] {
+    color: var(--color-muted);
+  }
+
+  .security[data-tone="warning"] {
+    color: var(--color-warning);
+  }
+
+  .security[data-tone="danger"] {
+    color: var(--color-danger);
+  }
+
+  .evidence {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0 0;
+    padding-inline-start: 16px;
+    font-size: var(--text-caption);
+    color: var(--color-muted);
+  }
+
+  .evidence li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .where {
+    font-family: var(--font-mono, monospace);
+  }
+
+  .why {
+    color: var(--color-faint);
+  }
+
+  .persistence {
+    margin-block-start: 8px !important;
+    font-size: var(--text-caption);
+    color: var(--color-faint);
   }
 
   .failure {

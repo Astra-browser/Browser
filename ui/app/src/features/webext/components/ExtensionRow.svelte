@@ -13,6 +13,21 @@
   let { extension }: { extension: WebExtensionView } = $props();
   let removing = $state(false);
   let editingSites = $state(false);
+  let sourceLabel = $derived(
+    extension.source === "chrome"
+      ? m.webext_source_chrome()
+      : extension.source === "firefox"
+        ? m.webext_source_firefox()
+        : null,
+  );
+  let securityNotice = $derived(
+    extension.security_level === "medium" ||
+      extension.security_level === "high" ||
+      extension.security_level === "critical" ||
+      extension.security_level === "blocked"
+      ? m.webext_security_notice()
+      : null,
+  );
 
   let access = $derived(
     extension.access === "click"
@@ -102,12 +117,15 @@
         <span class="status">{m.webext_state_off()}</span>
       {:else}
         <span class="status"
-          >{m.webext_state_version({ version: extension.version })}{#if extension.sideloaded}
+          >{m.webext_state_version({ version: extension.version })}{#if sourceLabel}
+            · {sourceLabel}{/if}{#if extension.sideloaded}
             · {m.webext_state_file()}{/if}{#if extension.limitations.length > 0}
             ·
             <span class="limits" title={extension.limitations.join("\n")}
               >{m.webext_limits_short()}</span
-            >{/if}</span
+            >{/if}{#if securityNotice}
+            ·
+            <span class="limits" title={securityNotice}>{m.webext_security_mark()}</span>{/if}</span
         >
       {/if}
     </span>

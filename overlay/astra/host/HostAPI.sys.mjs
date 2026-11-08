@@ -47,6 +47,7 @@ import { Settings, __resetSettingsForTests } from "./Settings.sys.mjs";
 import { Accounts } from "./Accounts.sys.mjs";
 import { Sidebar, __resetSidebarForTests } from "./Sidebar.sys.mjs";
 import { WebExtensions, __resetWebExtensionsForTests } from "./WebExtensions.sys.mjs";
+import { ChromeExtensions } from "./ChromeExtensions.sys.mjs";
 import { Commands } from "./Commands.sys.mjs";
 import { Zoom, __resetZoomForTests } from "./Zoom.sys.mjs";
 import { Keymap } from "./Keymap.sys.mjs";
@@ -102,6 +103,7 @@ export {
   Accounts,
   Sidebar,
   WebExtensions,
+  ChromeExtensions,
   Commands,
   Zoom,
   Keymap,
