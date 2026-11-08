@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { IconSvgElement } from "@hugeicons/svelte";
+  import { ZzzIcon } from "@hugeicons/core-free-icons";
   import Icon from "../Icon/Icon.svelte";
 
   type Props = {
@@ -16,6 +17,8 @@
     fallback?: IconSvgElement;
     /** Cuts the corner a sound badge sits in. */
     notched?: boolean;
+    /** A page native has put to sleep: the mark steps back behind a zzz. */
+    sleeping?: boolean;
   };
 
   let {
@@ -26,6 +29,7 @@
     lit = false,
     fallback,
     notched = false,
+    sleeping = false,
   }: Props = $props();
   let canvas: HTMLCanvasElement | undefined = $state();
 
@@ -51,6 +55,7 @@
   data-favicon
   data-loading={loading}
   data-notched={notched || undefined}
+  data-sleeping={sleeping || undefined}
   style:width={`${size}px`}
   style:height={`${size}px`}
   aria-hidden="true"
@@ -70,5 +75,10 @@
     <span class="favicon-fallback"><Icon icon={fallback} size={Math.round(size * 0.85)} /></span>
   {:else}
     <span class="favicon-blank"></span>
+  {/if}
+  {#if sleeping}
+    <span class="favicon-sleep"
+      ><Icon icon={ZzzIcon} size={Math.max(7, Math.round(size * 0.58))} strokeWidth={2.2} /></span
+    >
   {/if}
 </span>

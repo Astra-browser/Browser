@@ -33,6 +33,14 @@ const native = vi.hoisted(() => ({
   run: vi.fn(async () => ({ accepted: true, operation_id: null })),
   showPlayer: vi.fn(),
   player: null as null | Record<string, unknown>,
+  extensions: [] as unknown[],
+  openPage: vi.fn(async (_page: string) => {}),
+  setTheme: vi.fn(async (_key: string, _value: string) => {}),
+  appearance: "light",
+  openUrl: vi.fn(async (_url: string, _newTab: boolean) => ({
+    accepted: true,
+    operation_id: null,
+  })),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
@@ -42,8 +50,42 @@ vi.mock("$shared/ipc/bindings", async () => {
     tabsActivate: native.activate,
     spacesSwitch: native.switchSpace,
     runCommand: native.run,
+    browserOpenUrl: native.openUrl,
   });
 });
+
+vi.mock("$domain/webext", () => ({
+  webext: {
+    list: () => native.extensions,
+    error: () => null,
+    isAvailable: () => true,
+    refresh: vi.fn(async () => {}),
+    setEnabled: vi.fn(async () => {}),
+    setPinned: vi.fn(async () => {}),
+    pinnedCount: () => 0,
+    MAX_PINNED: 3,
+    openOptions: vi.fn(async () => {}),
+    uninstall: vi.fn(async () => {}),
+    chooseFile: vi.fn(async () => {}),
+  },
+}));
+
+vi.mock("$domain/extensions", () => ({
+  extensions: {
+    activeActions: () => [],
+    isInvoking: () => false,
+    invoke: vi.fn(async () => {}),
+  },
+}));
+
+vi.mock("$domain/preferences", () => ({
+  preferences: {
+    value: (key: string) => (key === "appearance" ? native.appearance : ""),
+    set: native.setTheme,
+  },
+}));
+
+vi.mock("$domain/surface", () => ({ surface: { open: native.openPage } }));
 
 afterEach(() => {
   tabs.dispose();
@@ -55,6 +97,11 @@ afterEach(() => {
   native.run.mockClear();
   native.showPlayer.mockClear();
   native.player = null;
+  native.extensions = [];
+  native.setTheme.mockClear();
+  native.openPage.mockClear();
+  native.openUrl.mockClear();
+  native.appearance = "light";
 });
 
 let projection = 100;
@@ -118,9 +165,21 @@ test("at rail width the bar becomes the two-column tool grid", async () => {
   expect(getComputedStyle(row.querySelector<HTMLElement>(".rail-row-title")!).display).toBe("none");
 });
 
+test("the bar reflows as a grid when the column is dragged narrow", async () => {
+  await tabs.init();
+  project();
+  const screen = await render(UtilityBar, { ontoggle: () => {} });
+  const host = screen.container;
+  host.style.inlineSize = "190px";
+  host.style.containerType = "inline-size";
+  const element = host.querySelector<HTMLElement>(".utility-bar")!;
+  await expect.poll(() => getComputedStyle(element).display).toBe("grid");
+  expect(getComputedStyle(host.querySelector<HTMLElement>(".bar-rule")!).display).toBe("none");
+});
+
 test("every utility entry is named, and each opens its own surface", async () => {
   const screen = await bar();
-  for (const name of ["Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs"]) {
+  for (const name of ["Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs", "Extensions"]) {
     await expect.element(screen.getByRole("button", { name, exact: true })).toBeVisible();
   }
 
@@ -203,6 +262,53 @@ test("the spaces entry switches the window's space", async () => {
     .toHaveAttribute("aria-current", "true");
   await screen.getByRole("menuitem", { name: "Studio", exact: true }).click();
   expect(native.switchSpace).toHaveBeenCalledWith("studio");
+});
+
+test("the extensions entry opens the hub for every installed extension", async () => {
+  native.extensions = [
+    {
+      profile_id: "p1",
+      install_id: "install-a",
+      id: "ext-a",
+      name: "Bitwarden",
+      version: "1",
+      description: "",
+      enabled: true,
+      icon: null,
+      state: "running",
+      error: null,
+      warnings: [],
+      limitations: [],
+      access: "all",
+      sites: [],
+      site_scoped: false,
+      has_options: false,
+      held_update: null,
+      sideloaded: false,
+      pinned: false,
+    },
+  ];
+  const screen = await bar();
+  await screen.getByRole("button", { name: "Extensions", exact: true }).click();
+  await expect.element(screen.getByText("Bitwarden", { exact: true })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Manage extensions" })).toBeVisible();
+});
+
+test("the appearance switch turns the window dark from a light window", async () => {
+  const screen = await bar();
+  const dark = screen.getByRole("button", { name: "Use dark appearance", exact: true });
+  await expect.element(dark).toBeVisible();
+  await dark.click();
+  expect(native.setTheme).toHaveBeenCalledWith("appearance", "dark");
+});
+
+test("a dark window offers the way back to light", async () => {
+  native.appearance = "dark";
+  const screen = await bar();
+  const light = screen.getByRole("button", { name: "Use light appearance", exact: true });
+  await expect.element(light).toBeVisible();
+  await light.click();
+  expect(native.setTheme).toHaveBeenCalledWith("appearance", "light");
 });
 
 test("the keyboard reaches a tool entry", async () => {

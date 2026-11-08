@@ -88,6 +88,7 @@
       lit
       fallback={Globe02Icon}
       notched={!!tab.audio}
+      sleeping={!open}
     />
     <span data-astra-tab-label class="sr-only">{tab.title}</span>
   </button>

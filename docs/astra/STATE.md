@@ -11,6 +11,34 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: top bar utilities — extensions, appearance, sleeping (2026-11-09)
+
+**What changed:** the column head now carries every utility in one row: media,
+downloads, notes, spaces, sleeping pages, extensions and a quick appearance
+switch. Sleeping pages use one `zzz` mark everywhere (rail entry, tab rows,
+essential tiles, sleeping badge) instead of the moon, which now means light and
+dark. The extension door opens a real hub: every installed extension with its
+live action for the page in front, an enable switch, options, pin/unpin and
+removal with confirmation, plus install-from-file, store and manage entries.
+The hub loads on first open, not with the column's startup. The bar reflows to
+a grid at the column's narrow widths and its 24px plate step below 196px.
+
+| Surface | What works | Wiring / files | Verification |
+|---|---|---|---|
+| Top bar | Extensions and appearance entries beside the existing five; the row follows the column's width with container queries | `features/rail/components/UtilityBar.svelte`, `SidebarHeader.svelte`, `Sidebar.svelte`, `favicon.css`, `shared/ui/FavIcon` | `UtilityBar.component.test.ts` 16 tests; narrow reflow case |
+| Appearance switch | One click writes `appearance` (light ↔ dark) through the preferences store; System resolves to what the window shows | `preferences.set("appearance", …)`, same push path as Settings → Appearance | two component tests; icon/name follows the resolved mode |
+| Sleeping mark | `zzz` on the rail entry, tab rows, rail rows, essentials and the sleeping badge; site mark steps back rather than disappears | `FavIcon` `sleeping` prop, `favicon.css`, `TabRow`, `TabRail`, `EssentialTile`, `TabsSleepingBadge` | `FavIcon.component.test.ts` 2 tests; sleeping badge suite |
+| Extension hub | Live actions, switch, options, pin, remove-confirm, install file, store, manage; empty state has both ways to add | `features/extensions/components/ExtensionHub.svelte`, `loadExtensionHub()`, existing `webExtension*` routes and `surface.open("extensions")` | `ExtensionHub.component.test.ts` 5 tests; `UtilityBar` extension-entry test |
+
+**Verification:** typecheck 0; full unit suite 1241 passed / 2 skipped; targeted
+component 28 passed; stylelint and eslint clean on the touched files.
+
+**Limit:** live Marionette verification is deferred. On this branch's base
+commit (`e58be029`) `bun run --filter @astra/frame build` already fails at
+`browser startup requests exceed the native asset budget: 39 (limit 24)`;
+the same failure reproduces with this work stashed. The feature adds no startup
+chunk (the hub is a lazy destination). No live claim is made for this surface.
+
 ## Owner report: extension platform — Chrome CRX3 + Firefox XPI (2026-11-08, latest)
 
 **What changed:** Chrome packages are a real extension source next to signed

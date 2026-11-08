@@ -179,6 +179,7 @@
                 size={16}
                 fallback={tabFallbackIcon(tab.content)}
                 notched={!!tab.audio}
+                sleeping={tab.availability?.state === "sleeping"}
               />
               <span data-astra-tab-label class="sr-only">{tab.title}</span>
             </button>

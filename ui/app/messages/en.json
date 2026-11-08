@@ -2881,6 +2881,8 @@
   "webext_install_folder": "Unpacked folder…",
   "webext_open_store": "Chrome Web Store",
   "webext_installed": "Installed",
+  "webext_ready_page": "Ready on this page",
+  "webext_no_action_page": "No action on this page",
   "webext_empty_title": "Add your first extension",
   "webext_empty_help": "Open an extension in the Chrome Web Store and choose Add to Astra, or pick one below.",
   "webext_recommended": "Works well in Astra",
