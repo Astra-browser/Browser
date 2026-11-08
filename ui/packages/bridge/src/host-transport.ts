@@ -21,6 +21,12 @@ export interface HostModules {
   Tabs: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Navigation: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Panes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  SplitView: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Peek: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  SpaceHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  SpaceExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  SpaceClone: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  TabGroups: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Boot: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Sidebar: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   WebExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -77,6 +83,47 @@ const ROUTES: Record<string, Route> = {
   // are the explicit verbs for a surface or a live probe to use the same path.
   tabs_discard: ["Tabs", "discard", TAB_ARG],
   tabs_wakeup: ["Tabs", "wakeup", TAB_ARG],
+  // Native split view: the engine's gBrowser owns the panes and their
+  // geometry; these routes only ask it to create/move/end the split.
+  tabs_split: ["SplitView", "open"],
+  tab_drag_over: ["SplitView", "dragOver"],
+  tab_drop: ["SplitView", "drop"],
+  tabs_unsplit: ["SplitView", "unsplit"],
+  tabs_leave_split: ["SplitView", "leave"],
+  split_open_url: ["SplitView", "openUrl"],
+  split_replace: ["SplitView", "replace"],
+  split_focus: ["SplitView", "focus"],
+  split_ratio: ["SplitView", "ratio"],
+  split_drop: ["SplitView", "drop"],
+  split_state: ["SplitView", "state"],
+  split_bookmark_save: ["SplitView", "bookmarkSave"],
+  split_bookmark_list: ["SplitView", "bookmarkList"],
+  split_bookmark_restore: ["SplitView", "bookmarkRestore"],
+  split_bookmark_delete: ["SplitView", "bookmarkDelete"],
+  // Bounded page previews (never a hidden live browser per card).
+  peek_open: ["Peek", "open"],
+  peek_close: ["Peek", "close"],
+  peek_close_all: ["Peek", "closeAll"],
+  peek_capture: ["Peek", "capture"],
+  peek_list: ["Peek", "list"],
+  peek_open_tab: ["Peek", "openTab"],
+  peek_open_split: ["Peek", "openSplit"],
+  peek_restore: ["Peek", "restore"],
+  peek_configure: ["Peek", "configure"],
+  // Per-space history, extension sets and cloning.
+  space_history_note: ["SpaceHistory", "note"],
+  space_history_list: ["SpaceHistory", "list"],
+  space_history_clear: ["SpaceHistory", "clear"],
+  space_history_status: ["SpaceHistory", "status"],
+  space_extensions_list: ["SpaceExtensions", "list"],
+  space_extensions_assign: ["SpaceExtensions", "assign"],
+  space_extensions_copy: ["SpaceExtensions", "copy"],
+  space_extensions_apply: ["SpaceExtensions", "apply"],
+  tabs_clone_to_space: ["SpaceClone", "clone", { id: "tab" }],
+  tab_group_create: ["TabGroups", "create"],
+  tab_group_list: ["TabGroups", "list"],
+  tab_group_collapse: ["TabGroups", "collapse"],
+  tab_group_ungroup: ["TabGroups", "ungroup"],
   tabs_activate: ["Tabs", "select", TAB_ARG],
   tabs_answer_sign_in: ["DialogPrompts", "answerAuth", TAB_ARG],
   tabs_answer_page_request: ["Tabs", "answerPageRequest", TAB_ARG],
@@ -135,7 +182,9 @@ const ROUTES: Record<string, Route> = {
   bookmark_call: ["Bookmarks", "call"],
   time_call: ["Time", "call"],
   focus_control: ["Time", "focus"],
-  history_call: ["HistoryCall", "call"],
+  // History is read through the space index; `SpaceHistory.call` delegates
+  // closed-tab/forget kinds to the Places-backed HistoryCall module.
+  history_call: ["SpaceHistory", "call"],
   about_info: ["System", "aboutInfo"],
   system_clock_24h: ["System", "systemClock24h"],
   update_status: ["System", "updateStatus"],

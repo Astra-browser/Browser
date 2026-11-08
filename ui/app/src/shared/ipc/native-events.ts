@@ -99,6 +99,7 @@ export const nativeEventNames = {
   voiceLevels: "astra:voice-levels",
   swipeScroll: "astra:swipe",
   profilesChanged: "astra:profiles",
+  peekChanged: "astra:peek",
 } as const;
 
 export const events = {
@@ -162,4 +163,20 @@ export const events = {
   voiceLevels: scopedEvent<VoiceLevels>(nativeEventNames.voiceLevels),
   swipeScroll: scopedEvent<SwipeScroll>(nativeEventNames.swipeScroll),
   profilesChanged: scopedEvent<ProfilesView>(nativeEventNames.profilesChanged),
+  peekChanged: scopedEvent<{
+    peeks: Array<{
+      id: string;
+      tab_id: string;
+      url: string;
+      title: string;
+      space_id: string;
+      source: string;
+      private: boolean;
+      captured_at: number;
+      image: string | null;
+      thumbnail: string | null;
+    }>;
+    config: Record<string, unknown>;
+    private?: boolean;
+  }>(nativeEventNames.peekChanged),
 };
