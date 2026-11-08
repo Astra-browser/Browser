@@ -130,16 +130,20 @@ export function applyBrowserActivation(browser, isActive) {
   }
 }
 
-/** Activate exactly `activeId`'s browser and park every other entry. */
-export function applyTabActivation(browsers, activeId) {
+/** Activate every browser in `active` and park every other entry. */
+export function applyTabActivation(browsers, active) {
   if (!browsers) return 0;
+  const activeIds =
+    active instanceof Set
+      ? active
+      : new Set(Array.isArray(active) ? active : [active]);
   const entries =
     browsers instanceof Map ? browsers.entries() : Object.entries(browsers);
   let applied = 0;
   for (const [id, entry] of entries) {
     const browser =
       entry && typeof entry === "object" && "browser" in entry ? entry.browser : entry;
-    if (applyBrowserActivation(browser, id === activeId)) applied += 1;
+    if (applyBrowserActivation(browser, activeIds.has(id))) applied += 1;
   }
   return applied;
 }
@@ -802,8 +806,13 @@ export const Content = {
       }
       // The tabbox is only the visual deck. The page itself has to be told it
       // is hidden, or a background video never fires VideoTabHidden and the
-      // automatic picture-in-picture window cannot open.
-      applyTabActivation(browsers, id);
+      // automatic picture-in-picture window cannot open. Every pane of a
+      // native split stays active; parking the siblings made them go dark.
+      const split = tab.splitview;
+      const active = split
+        ? split.tabs.map((member) => idOfTab(member)).filter(Boolean)
+        : [id];
+      applyTabActivation(browsers, active);
     };
     const activate = (id) => {
       const url = pending.get(id);
@@ -873,7 +882,11 @@ export const Content = {
       if (applying) return;
       const id = idOfTab(gb.selectedTab);
       if (id) {
-        applyTabActivation(browsers, id);
+        const split = gb.selectedTab?.splitview;
+        const active = split
+          ? split.tabs.map((member) => idOfTab(member)).filter(Boolean)
+          : [id];
+        applyTabActivation(browsers, active);
         void Tabs.select({ astra_tab_id: id });
       } else {
         // An engine-created tab is in front. P4.3 adopts it; until then put

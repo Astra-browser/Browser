@@ -109,6 +109,22 @@ const done = arguments[arguments.length - 1];
       const f = document.querySelector("iframe[data-astra-app-frame]");
       return f?.contentDocument?.querySelectorAll(".split-group").length ?? 0;
     })();
+    out.uiSplitSection = (() => {
+      const d = document.querySelector("iframe[data-astra-app-frame]")?.contentDocument;
+      return {
+        head: d?.querySelectorAll(".split-group-head").length ?? 0,
+        members: d?.querySelectorAll(".split-group-members .browse-tab").length ?? 0,
+      };
+    })();
+    // Selecting a pane in the sidebar must keep every split browser active.
+    await host.Tabs.select({ request_id: "probe-pane-select", astra_tab_id: secondId });
+    await sleep(500);
+    out.splitActive = (() => {
+      const sv = gBrowser.selectedTab.splitview;
+      return sv ? sv.tabs.map((t) => t.linkedBrowser.docShellIsActive === true) : [];
+    })();
+    await host.Tabs.select({ request_id: "probe-pane-back", astra_tab_id: first.astra_tab_id });
+    await sleep(300);
     out.native = (() => {
       const sv = gBrowser.selectedTab.splitview;
       if (!sv) return null;
@@ -219,6 +235,28 @@ const done = arguments[arguments.length - 1];
     out.threeNative = (() => {
       const sv = gBrowser.selectedTab.splitview;
       return sv ? sv.tabs.length : 0;
+    })();
+    out.resizers = document.querySelectorAll(".astra-pane-resizer").length;
+    out.paneDrag = (() => {
+      const sv = gBrowser.selectedTab.splitview;
+      const handles = document.querySelectorAll(".astra-pane-resizer");
+      if (!sv || handles.length < 2) return null;
+      const panels = sv.panels;
+      const before = panels.map((p) => Math.round(p.getBoundingClientRect().width));
+      const handle = handles[1];
+      const box = handle.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      handle.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true, pointerId: 1, button: 0, clientX: x, clientY: box.top + 20,
+      }));
+      handle.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, pointerId: 1, button: 0, clientX: x + 70, clientY: box.top + 20,
+      }));
+      handle.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true, pointerId: 1, button: 0, clientX: x + 70, clientY: box.top + 20,
+      }));
+      const after = panels.map((p) => Math.round(p.getBoundingClientRect().width));
+      return { before, after };
     })();
     out.savedThree = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe three" });
     for (let attempt = 0; attempt < 10 && out.savedThree?.error; attempt += 1) {
@@ -419,6 +457,13 @@ def main():
         checks.append(check(results, "peek is listed", len((results.get("peekList") or {}).get("peeks", [])) >= 1))
         checks.append(check(results, "Astra draws the split group", (results.get("uiSplit") or 0) >= 1,
                             str(results.get("uiSplit"))))
+        section = results.get("uiSplitSection") or {}
+        checks.append(check(results, "the split is a section with individual tabs",
+                            section.get("head") == 1 and (section.get("members") or 0) >= 2,
+                            json.dumps(section)))
+        checks.append(check(results, "all split panes stay active",
+                            (results.get("splitActive") or []) == [True, True],
+                            json.dumps(results.get("splitActive"))))
         checks.append(check(results, "Astra draws the peek window", (results.get("uiPeek") or 0) >= 1,
                             str(results.get("uiPeek"))))
         checks.append(check(results, "closing the peek frees it",
@@ -471,6 +516,14 @@ def main():
                             and results.get("threeNative") == 3,
                             json.dumps(results.get("three"))[:300]))
         fourth = results.get("fourthPane") or {}
+        drag = results.get("paneDrag") or {}
+        checks.append(check(results, "every pane boundary has its own resizer",
+                            results.get("resizers") == 2,
+                            str(results.get("resizers"))))
+        checks.append(check(results, "the second divider resizes its own pair",
+                            len(drag.get("after") or []) == 3
+                            and (drag.get("after") or [])[1:] != (drag.get("before") or [])[1:],
+                            json.dumps(drag)[:300]))
         checks.append(check(results, "a fourth pane is refused",
                             fourth.get("split") is False
                             or fourth.get("error", {}).get("code") == "pane_limit",

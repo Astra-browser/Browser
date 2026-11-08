@@ -33,6 +33,7 @@ export const MAX_RATIO = 0.95;
 export const ARRANGEMENTS_PREF = "astra.split.arrangements.v1";
 export const MAX_ARRANGEMENTS = 200;
 const STORE_VERSION = 1;
+const XHTML_NS = "http://www.w3.org/1999/xhtml";
 
 const _bindings = new Map(); // window_id -> binding
 
@@ -201,10 +202,137 @@ function selectedTab(binding) {
   return binding?.gb?.selectedTab ?? null;
 }
 
+/** Give every pane boundary its own draggable divider. */
+function syncResizers(binding, splitview) {
+  const container = binding?.gb?.tabpanels;
+  const doc = binding?.win?.document;
+  if (!container || !doc) return;
+  for (const old of binding.resizers ?? []) {
+    try {
+      old.remove();
+    } catch {
+      // Already removed with the split.
+    }
+  }
+  binding.resizers = [];
+  const panels = splitview?.panels ?? [];
+  if (panels.length < 2) return;
+  for (const [index, panel] of panels.entries()) {
+    try {
+      panel.style.order = String(index * 2);
+    } catch {
+      // A detached panel.
+    }
+  }
+  for (let index = 0; index < panels.length - 1; index += 1) {
+    const resizer = doc.createElementNS(XHTML_NS, "div");
+    resizer.className = "astra-pane-resizer";
+    resizer.setAttribute("role", "separator");
+    resizer.setAttribute("aria-orientation", "horizontal");
+    resizer.setAttribute("tabindex", "0");
+    resizer.style.order = String(index * 2 + 1);
+    panels[index].after(resizer);
+    binding.resizers.push(resizer);
+    bindResizer(binding, resizer, index);
+  }
+}
+
+function bindResizer(binding, resizer, index) {
+  const panels = () => selectedTab(binding)?.splitview?.panels ?? [];
+  const nudge = (event) => {
+    const all = panels();
+    const left = all[index];
+    const right = all[index + 1];
+    if (!left || !right) return;
+    const step = event.shiftKey ? 36 : 12;
+    let direction = 0;
+    if (event.key === "ArrowLeft") direction = -1;
+    if (event.key === "ArrowRight") direction = 1;
+    if (direction === 0) return;
+    event.preventDefault();
+    const leftWidth = left.getBoundingClientRect().width + direction * step;
+    resizePair(left, right, leftWidth);
+  };
+  const down = (event) => {
+    if (event.button !== 0) return;
+    const all = panels();
+    const left = all[index];
+    const right = all[index + 1];
+    if (!left || !right) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startLeft = left.getBoundingClientRect().width;
+    const startRight = right.getBoundingClientRect().width;
+    try {
+      resizer.setPointerCapture(event.pointerId);
+    } catch {
+      // Capture is optional; the window listeners still finish the drag.
+    }
+    const move = (moveEvent) => {
+      resizePair(left, right, startLeft + (moveEvent.clientX - startX), startRight);
+    };
+    const stop = () => {
+      resizer.removeEventListener("pointermove", move);
+      resizer.removeEventListener("pointerup", stop);
+      resizer.removeEventListener("pointercancel", stop);
+      resizer.removeEventListener("lostpointercapture", stop);
+      try {
+        if (resizer.hasPointerCapture?.(event.pointerId)) {
+          resizer.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // Capture was never taken or is already gone.
+      }
+    };
+    resizer.addEventListener("pointermove", move);
+    resizer.addEventListener("pointerup", stop);
+    resizer.addEventListener("pointercancel", stop);
+    resizer.addEventListener("lostpointercapture", stop);
+  };
+  resizer.addEventListener("pointerdown", down);
+  resizer.addEventListener("keydown", nudge);
+  resizer.addEventListener("dblclick", () => {
+    if (!settingBool("astra.settings.split.double-click-reset", true)) return;
+    for (const panel of panels()) {
+      try {
+        panel.style.removeProperty("width");
+        panel.style.removeProperty("flex");
+        panel.removeAttribute("width");
+      } catch {
+        // Detached.
+      }
+    }
+  });
+}
+
+/** Resize one adjacent pair, keeping the rest of the split untouched. */
+function resizePair(left, right, nextLeft, startRight = 0) {
+  if (!left || !right) return;
+  const total = startRight || left.getBoundingClientRect().width + right.getBoundingClientRect().width;
+  const min = 140;
+  const clamped = Math.min(total - min, Math.max(min, nextLeft));
+  for (const panel of [left, right]) {
+    try {
+      panel.style.flex = "0 0 auto";
+    } catch {
+      // Detached.
+    }
+  }
+  try {
+    left.style.width = `${Math.round(clamped)}px`;
+    left.setAttribute("width", String(Math.round(clamped)));
+    right.style.width = `${Math.round(total - clamped)}px`;
+    right.setAttribute("width", String(Math.round(total - clamped)));
+  } catch {
+    // Detached.
+  }
+}
+
 function refresh(binding) {
   try {
     const tab = selectedTab(binding);
     const splitview = tab?.splitview ?? null;
+    syncResizers(binding, splitview);
     const members = splitview ? splitview.tabs.map((t) => idOf(binding, t)).filter(Boolean) : [];
     const changed = __setSplitGroup(members);
     if (changed) {
@@ -247,6 +375,7 @@ export function __bindSplitWindow({ window_id, win, tabOf, idOf: idMap }) {
     scheduled: false,
     disposed: false,
     listeners: [],
+    resizers: [],
   };
   const container = binding.gb?.tabContainer;
   const onChange = () => scheduleRefresh(binding);
@@ -299,6 +428,14 @@ export function __unbindSplitWindow(window_id) {
     }
   }
   binding.listeners.length = 0;
+  for (const resizer of binding.resizers ?? []) {
+    try {
+      resizer.remove();
+    } catch {
+      // Already gone with the tabpanels.
+    }
+  }
+  binding.resizers = [];
   _bindings.delete(window_id);
   return true;
 }

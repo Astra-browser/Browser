@@ -25,7 +25,7 @@ contract and the full inventory live in `docs/astra/NATIVE_SURFACES.md`.
 
 | Surface | What works | Wiring / files | Live evidence |
 |---|---|---|---|
-| Split view | 1–3 native panes (a fourth is refused), divider ratio, replace/leave, drag-to-edge, save/restore, background tabs load when split | `overlay/astra/host/SplitView.sys.mjs`, route table (`tabs_split`/`tabs_unsplit`/`tabs_leave_split`/`split_*`), `Content.sys.mjs` binds the native map, `Tabs.__setSplitGroup` projection, `ui/app/src/features/split`, tab menu, `tab-menu.ts` | `native-surfaces-probe.py`: 2 panes on Wikipedia + MDN, widths 244/421 after ratio, 3 panes live, arrangement restores 3, drop accepted, replace keeps 2 |
+| Split view | 1–3 native panes (a fourth is refused), one resizer per boundary, all panes active, replace/leave, drag-to-edge, save/restore, background tabs load when split | `overlay/astra/host/SplitView.sys.mjs`, route table (`tabs_split`/`tabs_unsplit`/`tabs_leave_split`/`split_*`), `Content.sys.mjs` binds the native map, `Tabs.__setSplitGroup` projection, `ui/app/src/features/split`, tab menu, `tab-menu.ts` | `native-surfaces-probe.py`: 2 panes on Wikipedia + MDN, widths 244/421 after ratio, 3 panes live, arrangement restores 3, drop accepted, replace keeps 2 |
 | Native groups | Handles, collapse, ungroup and sidebar headings for engine tab groups | `TabGroups.sys.mjs`, `tabs.group_*` routes, `TabView.group`, `sidebar-model.ts` group units, `TabList` headings | probe: group created, both members projected, `.tab-group-head` drawn |
 | Peek | Window-like popup: real capture, close, bookmark, open as tab/split, hover/shift/menu, independent cards, restore, settings | `Peek.sys.mjs`, `peek_*` routes, `$domain/peek`, `PeekLayer.svelte`, `peek-changed` channel, Tabs/Bookmarks hover timers | probe: 31 kB PNG capture of Wikipedia, `.peek-window` drawn above the page with an inset clip, bookmark/open-tab/open-split actions; closing frees the capture |
 | Per-space history | History page and panel read only the space in front; private writes are refused; Clear removes only that space's rows | `SpaceHistory.sys.mjs`, `history_call` routes through it, `Content` notes commits, Privacy settings | probe: space 1 sees Wikipedia/MDN and not the space-2 visit; space 2 sees its IANA visit and not Wikipedia |
@@ -42,7 +42,7 @@ uninstalled. Group and split listeners are keyed to the window and removed in
 
 **Verification:** `native_surfaces.mjs` 120/120; typecheck, lint, stylelint,
 format, knip clean; 1238 unit tests; `settings-audit` 95/0; adblock benchmark
-PASS; `wire_coverage` PASS; live probe 40/40 on Wikipedia, MDN and IANA.
+PASS; `wire_coverage` PASS; live probe 44/44 on Wikipedia, MDN and IANA.
 Evidence in `/tmp/opencode/ns-out` for the run and reproducible with
 `tools/marionette-probe/native-surfaces-probe.py out/native-surfaces`.
 

@@ -69,17 +69,23 @@
 </script>
 
 <div class="space-extensions">
-  {#if error}
-    <p class="space-note" role="status">{error}</p>
-  {/if}
   <p class="space-note">
     Extensions stay installed once per profile. Turning one off here only changes
     {spaceName()}; switching to another space applies that space's own set.
   </p>
+  {#if error}
+    <p class="space-status" role="status">{error}</p>
+  {/if}
   {#if loading}
-    <p class="space-note">Reading installed extensions…</p>
+    <p class="space-status">Reading installed extensions…</p>
   {:else if items.length === 0}
-    <p class="space-note">No extensions are installed in this profile yet.</p>
+    <div class="space-empty">
+      <span class="space-empty-mark" aria-hidden="true"></span>
+      <span>
+        <strong>No extensions installed</strong>
+        <span>Install one from the extensions gallery, then it appears here for every space.</span>
+      </span>
+    </div>
   {:else}
     {#each items as entry (entry.id)}
       <SettingsRow
@@ -118,13 +124,51 @@
   }
 
   .space-note {
-    margin: 4px 0 10px;
+    margin: 0;
+    padding: 14px 18px 0;
     color: var(--color-muted);
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: var(--text-label, 12px);
+    line-height: 1.5;
+  }
+
+  .space-status {
+    margin: 0;
+    padding: 10px 18px;
+    border-block-start: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: var(--text-label, 12px);
+  }
+
+  .space-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-block-start: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: var(--text-label, 12px);
+    line-height: 1.5;
+  }
+
+  .space-empty-mark {
+    flex: none;
+    inline-size: 18px;
+    block-size: 18px;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-control);
+  }
+
+  .space-empty strong {
+    display: block;
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .space-empty span span {
+    display: block;
   }
 
   .space-copy {
-    padding: 8px 0 4px;
+    padding: 10px 18px 14px;
   }
 </style>
