@@ -112,7 +112,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 | S6 | Link split | Page context menu has “Open Link in Split View” | done |
 | S7 | Pane replacement | “Replace this pane” chooses another tab/bookmark and swaps it in place | done |
 | S8 | Arrangement bookmarking | Save/restore a named split arrangement (tabs + order + ratio + space) | done |
-| S9 | Group integration | Native tab groups are projected and rendered in Astra's sidebar; a split reads as a section whose head opens the split and whose rows open individual panes | done |
+| S9 | Group integration | Native tab groups are projected and rendered in Astra's sidebar; split cards sit at the head of the section behind a separator, the head opens the split, and each pane is a row below it | done |
 | S10 | Restoration | Arrangements restore after a real quit/relaunch, reconciled against live tab ids; no duplicate tabs | done |
 
 ### 3.2 Peek (floating preview)
@@ -130,6 +130,7 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 | P9 | Session restoration | Open peeks restore after relaunch (opt-in, private never) | done |
 | P10 | Peek configuration | Category with delay, size, position, capture scale, auto-hover, restore, close-on-leave | done |
 | P11 | Peek bookmark | The preview’s star adds the page to the active space’s bookmarks; closing frees the capture | done |
+| P12 | Preview from page context menu | Right-clicking a page offers “Preview This Page” and “Open Page in Split View”; link rows keep their own preview/open-split actions | done |
 
 ### 3.3 Space isolation
 
@@ -245,7 +246,7 @@ light/dark measurements. Screenshots for both themes are written to
 
 | Date | Change | Evidence |
 |---|---|---|
-| 2026-11-08 | Native split-view port (2–3 panes, per-boundary resize, active panes, replace/leave, drag-edge, arrangement restore, background-tab load) | `native-surfaces-probe.py` 44/44; a synthetic drag on the second divider changes pane 2/3 only; all three browsers stay active after selecting a pane; 4th pane refused |
+| 2026-11-08 | Native split-view port (2–3 panes, per-boundary resize, active panes, split section + separator, replace/leave, drag-edge, arrangement restore, background-tab load) | `native-surfaces-probe.py` 44/44; divider hit test returns `box.astra-pane-resizer`; second-divider drag changes panes 2/3; all three browsers active; split section head + separator + member rows rendered; 4th pane refused |
 | 2026-11-08 | Peek (real capture, window popup with bookmark/open-tab/open-split, hover/shift/menu, restore, settings) | same probe: 31 kB PNG capture, `.peek-window` above the page with an inset clip; closing empties `peek_list`; light/dark measured |
 | 2026-11-08 | Per-space history, per-space extension sets, cross-space clone | same probe: scoped visits, extension read, clone into `space-1`; `native_surfaces.mjs` 118 checks |
 | 2026-11-08 | Native tab groups projected and drawn | same probe: group created, 2 members projected, `.tab-group-head` drawn |

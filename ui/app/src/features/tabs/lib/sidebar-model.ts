@@ -37,6 +37,11 @@ export type SidebarDisplayUnit =
       key: string;
       group: TabGroupView;
       depth: number;
+    }
+  | {
+      kind: "separator";
+      key: string;
+      depth: number;
     };
 
 export type SidebarTree = Record<SidebarSectionView, SidebarEntry[]>;
@@ -153,14 +158,13 @@ export function sidebarDisplayUnits(
   let units: SidebarDisplayUnit[] = [...entries];
 
   if (splitGroup !== null && splitGroup.members.length >= 2) {
-    const positions = new Map<string, { index: number; entry: SidebarTabEntry }>();
-    entries.forEach((entry, index) => {
-      if (entry.kind === "tab") positions.set(entry.tab.id, { index, entry });
-    });
+    const positions = new Map<string, SidebarTabEntry>();
+    for (const entry of entries) {
+      if (entry.kind === "tab") positions.set(entry.tab.id, entry);
+    }
 
     const ids = new Set<string>();
     const members: SidebarTabEntry[] = [];
-    let insertionIndex = entries.length;
     let valid = true;
     for (const id of splitGroup.members) {
       const member = positions.get(id);
@@ -169,24 +173,23 @@ export function sidebarDisplayUnits(
         break;
       }
       ids.add(id);
-      members.push(member.entry);
-      insertionIndex = Math.min(insertionIndex, member.index);
+      members.push(member);
     }
 
     if (valid) {
-      const output: SidebarDisplayUnit[] = [];
-      entries.forEach((entry, index) => {
-        if (index === insertionIndex) {
-          output.push({
-            kind: "split",
-            key: `split:${section}`,
-            tabs: members,
-            depth: Math.min(...members.map((member) => member.depth)),
-          });
-        }
-        if (entry.kind !== "tab" || !ids.has(entry.tab.id)) output.push(entry);
-      });
-      units = output;
+      // Split views sit at the head of the section, one card per split. A
+      // hairline separates them from every ordinary tab below.
+      const rest = entries.filter((entry) => entry.kind !== "tab" || !ids.has(entry.tab.id));
+      units = [
+        {
+          kind: "split",
+          key: `split:${section}`,
+          tabs: members,
+          depth: Math.min(...members.map((member) => member.depth)),
+        },
+        { kind: "separator", key: `split-separator:${section}`, depth: 0 },
+        ...rest,
+      ];
     }
   }
 

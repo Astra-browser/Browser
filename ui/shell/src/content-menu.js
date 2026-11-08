@@ -126,6 +126,12 @@ function buildItems(menu, browser) {
     gap();
   }
 
+  add(
+    item("page.preview", "Preview This Page"),
+    item("page.split", "Open Page in Split View"),
+  );
+  gap();
+
   if (menu.isContentSelected && menu.selectedText) {
     add(item("page.copy", "Copy"));
     add(item("page.search", "Search Google for “…”", { hint: "Google" }));
@@ -430,6 +436,23 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
         return mediaCommand(menu, "fullscreen");
       case "media.pip":
         return mediaCommand(menu, "pictureinpicture");
+      case "page.preview": {
+        const id = tabIdOf(browser);
+        if (!id) return { accepted: false };
+        const reply = await host.Peek.open({ tab_id: id, source: "context-menu" });
+        return { accepted: !reply?.error };
+      }
+      case "page.split": {
+        const id = tabIdOf(browser);
+        if (!id) return { accepted: false };
+        const list = await host.Tabs.list({ request_id: "ctx-split" });
+        const other = (list.tabs ?? []).find(
+          (tab) => tab.astra_tab_id !== id && /^https?:/u.test(tab.url ?? ""),
+        );
+        if (!other) return { accepted: false };
+        const reply = await host.SplitView.open({ source: id, other: other.astra_tab_id });
+        return { accepted: !reply?.error, split: reply?.split === true };
+      }
       case "page.copy":
         win.goDoCommand?.("cmd_copy");
         return NOTHING;

@@ -114,6 +114,7 @@ const done = arguments[arguments.length - 1];
       return {
         head: d?.querySelectorAll(".split-group-head").length ?? 0,
         members: d?.querySelectorAll(".split-group-members .browse-tab").length ?? 0,
+        separator: d?.querySelectorAll(".tab-list-separator").length ?? 0,
       };
     })();
     // Selecting a pane in the sidebar must keep every split browser active.
@@ -467,8 +468,10 @@ def main():
         checks.append(check(results, "Astra draws the split group", (results.get("uiSplit") or 0) >= 1,
                             str(results.get("uiSplit"))))
         section = results.get("uiSplitSection") or {}
-        checks.append(check(results, "the split is a section with individual tabs",
-                            section.get("head") == 1 and (section.get("members") or 0) >= 2,
+        checks.append(check(results, "the split is a section with a separator",
+                            section.get("head") == 1
+                            and (section.get("members") or 0) >= 2
+                            and section.get("separator") == 1,
                             json.dumps(section)))
         checks.append(check(results, "all split panes stay active",
                             (results.get("splitActive") or []) == [True, True],

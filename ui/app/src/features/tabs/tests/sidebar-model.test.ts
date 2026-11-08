@@ -62,7 +62,7 @@ describe("authoritative sidebar model", () => {
     const split: SplitGroupView = { members: ["b", "a"] };
     const units = sidebarDisplayUnits("today", tree.today, split);
 
-    expect(units.map((unit) => unit.kind)).toEqual(["split", "tab"]);
+    expect(units.map((unit) => unit.kind)).toEqual(["split", "separator", "tab"]);
     const group = units[0];
     expect(group?.kind === "split" ? group.tabs.map((entry) => entry.tab.id) : []).toEqual([
       "b",

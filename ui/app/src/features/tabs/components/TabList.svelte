@@ -232,6 +232,8 @@
             {#if unit.group.collapsed}<span class="tab-group-state">collapsed</span>{/if}
           </button>
         </li>
+      {:else if unit.kind === "separator"}
+        <li class="tab-list-separator" aria-hidden="true"></li>
       {:else if unit.kind === "split"}
         <SplitGroupRow
           motionKey={unit.key}
@@ -352,6 +354,15 @@
   /* A native tab-group heading: small, coloured and quiet, so the group is
      legible without becoming a second tab strip. */
   .tab-group-row {
+    list-style: none;
+  }
+
+  /* The split cards are their own section; this line is the boundary before
+     the ordinary single-tab rows. */
+  .tab-list-separator {
+    block-size: 1px;
+    margin: 7px 6px 6px;
+    background: var(--color-border);
     list-style: none;
   }
 
