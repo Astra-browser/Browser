@@ -369,7 +369,14 @@ export const WebExtensions = {
   async prepare({ tab_id = "", tabId = "" } = {}) {
     const { tabs } = __tabsState();
     const tab = tabs.get(String(tab_id || tabId));
-    const url = tab?.url ?? "";
+    // A tab created a moment ago can be selected while the model has not
+    // recorded its URL yet. The listing is the tab, not the selection; give
+    // the commit a short grace period instead of failing on an empty string.
+    let url = tab?.url ?? "";
+    for (let attempt = 0; attempt < 12 && url === ""; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      url = tab?.url ?? "";
+    }
     let parsed = null;
     try {
       parsed = new URL(url);

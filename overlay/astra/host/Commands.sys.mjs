@@ -101,6 +101,7 @@ const SHELL_ACTIONS = new Set([
 
 /** Commands the app's own surfaces answer from `ui-command`. */
 const APP_ACTIONS = new Set([
+  "extensions.manage",
   "find.next",
   "find.previous",
   "find.show",

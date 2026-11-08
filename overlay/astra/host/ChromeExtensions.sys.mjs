@@ -217,6 +217,9 @@ async function coreCall(name, payload) {
     request_id: `ext-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     name,
     payload,
+    // A legitimate blocker can carry ~300 MiB of rules across hundreds of
+    // files; inspect and stage are disk-bound, not request-bound.
+    timeout: 180000,
   });
   if (reply?.error) {
     throw fail("core_error", String(reply.error.message ?? "the extension analyzer refused the package"));
@@ -481,7 +484,13 @@ async function installStaged(staged, report) {
     try {
       await manager.installTemporaryAddon(file);
     } catch (error) {
-      throw fail("install_failed", `the engine refused the package: ${String(error?.message ?? error)}`);
+      const details = Array.isArray(error?.additionalErrors)
+        ? `: ${error.additionalErrors.join("; ")}`
+        : "";
+      throw fail(
+        "install_failed",
+        `the engine refused the package: ${String(error?.message ?? error)}${details}`,
+      );
     }
   } else {
     let install = null;
@@ -494,7 +503,13 @@ async function installStaged(staged, report) {
     try {
       await install.install();
     } catch (error) {
-      throw fail("install_failed", `the engine refused the install: ${String(error?.message ?? error)}`);
+      const details = Array.isArray(error?.additionalErrors)
+        ? `: ${error.additionalErrors.join("; ")}`
+        : "";
+      throw fail(
+        "install_failed",
+        `the engine refused the install: ${String(error?.message ?? error)}${details}`,
+      );
     }
   }
 

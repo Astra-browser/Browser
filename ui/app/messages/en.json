@@ -3979,5 +3979,9 @@
   "webext_security_hide": "Hide evidence",
   "webext_persistence_session": "Restored by Astra at each start",
   "webext_persistence_profile": "Installed in your profile",
-  "webext_security_mark": "Security notice"
+  "webext_security_mark": "Security notice",
+  "webext_store_chrome_hint": "Chrome Web Store asks you to switch to Chrome. Astra installs the same package itself — use Add to Astra.",
+  "webext_store_callout_title": "Chrome Web Store",
+  "webext_store_callout_body": "This store asks for Chrome. Astra installs the same package itself.",
+  "webext_store_callout_installed": "Installed in Astra"
 }

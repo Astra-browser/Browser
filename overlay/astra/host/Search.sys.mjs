@@ -63,7 +63,10 @@ const ENGINES = {
   wikipedia: { name: "Wikipedia", url: "https://en.wikipedia.org/w/index.php?search=%s" },
 };
 
-const DEFAULT_ENGINE = "google";
+// Google serves an image CAPTCHA to fresh/automated profiles; Astra does not
+// bypass a CAPTCHA. A privacy-first engine is the default, and Google stays a
+// selectable engine when the person chooses it.
+const DEFAULT_ENGINE = "duckduckgo";
 
 /** Leading `!` shortcuts, parsed before URL detection. */
 const BANGS = {

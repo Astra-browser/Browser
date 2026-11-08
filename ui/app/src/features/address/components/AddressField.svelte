@@ -610,6 +610,7 @@
       >
     {/if}
   {:else if !compact && listedId !== null}
+    <p class="store-hint" role="note">{m.webext_store_chrome_hint()}</p>
     <Button
       variant="primary"
       size="compact"
@@ -618,8 +619,10 @@
       data-extension-store-install
       title="Install this extension in Astra"
       onclick={() => {
-        const id = tabs.activeId();
-        if (id !== null) void webext.prepare(id);
+        // The listing is the tab whose URL produced this button. Asking the
+        // selection again can be a frame behind it during a tab switch.
+        const id = tabs.activeTab()?.id;
+        if (id !== undefined) void webext.prepare(id);
       }}
     >
       {webext.isPreparing()
@@ -645,6 +648,13 @@
 </form>
 
 <style>
+  .store-hint {
+    margin: 8px 0 0;
+    font-size: var(--text-caption);
+    line-height: 1.4;
+    color: var(--color-muted);
+  }
+
   .store-remove {
     display: flex;
     align-items: center;

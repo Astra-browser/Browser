@@ -66,8 +66,10 @@
     disabled={busy}
     data-extension-store-install
     onclick={() => {
-      const id = tabs.activeId();
-      if (id !== null) void webext.prepare(id);
+      // The listing is the tab whose URL produced this button. Asking the
+      // selection again can be a frame behind it during a tab switch.
+      const id = tabs.activeTab()?.id;
+      if (id !== undefined) void webext.prepare(id);
     }}
   >
     {#if busy}

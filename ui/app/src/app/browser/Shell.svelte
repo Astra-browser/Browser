@@ -29,7 +29,7 @@
   import { UpdateNotice } from "$features/updates";
   import { EssentialsRail } from "$features/essentials";
   import { ExtensionsSection, PinnedExtensions } from "$features/extensions";
-  import { loadWebExtensionManager, StoreInstallRail } from "$features/webext";
+  import { loadWebExtensionManager, StoreInstallBanner, StoreInstallRail } from "$features/webext";
   import { sidebarTree } from "$features/tabs";
   import { SidebarBody } from "$features/tabs";
   import { TabList } from "$features/tabs";
@@ -661,6 +661,7 @@
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
   <Sidebar
     >{#snippet browserBody(compact)}
+      {#if !compact && !inWork}<StoreInstallBanner />{/if}
       {#if compact && (inWork || paneled)}
         {#if !inWork}<StoreInstallRail />{/if}
         {#if paneled}<div class="rail-search"><SidebarSearch /></div>{/if}

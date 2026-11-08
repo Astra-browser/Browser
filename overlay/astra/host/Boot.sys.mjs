@@ -288,17 +288,18 @@ export const Boot = {
    * or a `core_unavailable` error when no core is running; callers must treat
    * a missing core as "unavailable", never as success.
    */
-  async coreCall({ request_id = "", name = "", payload = {} } = {}) {
+  async coreCall({ request_id = "", name = "", payload = {}, timeout = 8000 } = {}) {
     const core = currentCore();
     if (!core?.alive) {
       return { request_id, error: { code: "core_unavailable", message: "the core is not running" } };
     }
     let timer = 0;
+    const timeoutMs = Number.isFinite(timeout) && timeout > 0 ? timeout : 8000;
     try {
       return await Promise.race([
         core.call(name, payload),
         new Promise((_resolve, reject) => {
-          timer = setTimeout(() => reject(new Error("core request timed out")), 8000);
+          timer = setTimeout(() => reject(new Error(`core request timed out after ${timeoutMs}ms`)), timeoutMs);
         }),
       ]);
     } catch (e) {
