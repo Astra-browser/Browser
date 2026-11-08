@@ -77,6 +77,9 @@ class M:
     def js(self, script, args=None):
         return self.cmd("WebDriver:ExecuteScript", {"script": script, "args": args or []})["value"]
 
+    def js_async(self, script, args=None):
+        return self.cmd("WebDriver:ExecuteAsyncScript", {"script": script, "args": args or []})["value"]
+
 
 def launch(profile, port):
     with open(os.path.join(profile, "prefs.js"), "w") as f:
@@ -151,11 +154,23 @@ def main():
             })()"""
         )
         started = time.time()
+
+        def current_url():
+            return m.js_async(
+                """const done = arguments[arguments.length - 1];
+                (async () => {
+                  try {
+                    const r = await Services.astraHost.Tabs.list({ request_id: 's' });
+                    const tab = (r.tabs || []).find((item) => item.astra_tab_id === r.selected_tab_id);
+                    done((tab && tab.url) || '');
+                  } catch (e) { done(''); }
+                })()"""
+            )
+
         opened = wait(
-            lambda: m.js(
-                "return Services.astraHost.Tabs.list({request_id:'s'})"
-                ".then(r=>r.tabs.find(t=>t.astra_tab_id===r.selected_tab_id)?.url||'');"
-            ).startswith("https://www.google.com/search"),
+            lambda: (lambda url: url.startswith("https://") and ("probe%20search" in url or "probe+search" in url))(
+                current_url()
+            ),
             3.0,
             0.02,
         )

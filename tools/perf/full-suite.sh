@@ -91,6 +91,7 @@ PROBES=(
   "chrome_ext:tools/perf/stress/chrome_ext_probe.py"
   "real_extensions:tools/perf/stress/real_extensions_probe.py"
   "extension_bench:tools/perf/stress/extension_bench.py"
+  "corpus:tools/perf/stress/extension_corpus_probe.py"
 )
 for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"

@@ -152,6 +152,12 @@ for (const name of ["list", "prepare", "prepareFile", "confirm", "cancel", "unin
 }
 check("the Chrome module is reachable from the Host API", typeof mod.ChromeExtensions.restore === "function");
 
+// The app opens its Extensions page from this command; it must be admitted by
+// the host command table, not only handled by the app after the fact.
+const { Commands } = await import(path.join(HOST, "Commands.sys.mjs"));
+const manage = await Commands.run({ id: "extensions.manage" });
+check("extensions.manage is admitted", manage?.accepted === true, manage);
+
 mod.__resetChromeExtensionsForTests();
 mod.__setCoreCallForTests(null);
 
