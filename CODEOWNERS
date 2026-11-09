@@ -1,23 +1,23 @@
 # CODEOWNERS (P0-T10) — orchestrator merges everything; lanes bound review scope
 # Lane A — Forge/Engine
-/forge/ @orchestrator
-/patches/ @orchestrator
-/overlay/ @orchestrator
-/config/ @orchestrator
-/branding/ @orchestrator
-/upstream.toml @orchestrator
+/forge/ @kyosike
+/patches/ @kyosike
+/overlay/ @kyosike
+/config/ @kyosike
+/branding/ @kyosike
+/upstream.toml @kyosike
 # Lane B — Core (Rust)
-/crates/ @orchestrator
+/crates/ @kyosike
 # Lane C — UI
-/ui/ @orchestrator
+/ui/ @kyosike
 # Lane D — Quality/CI
-/tests/ @orchestrator
-/tools/ @orchestrator
-/.github/ @orchestrator
+/tests/ @kyosike
+/tools/ @kyosike
+/.github/ @kyosike
 # Lane E — Cloud
-/servers/ @orchestrator
+/servers/ @kyosike
 # Tracking docs are orchestrator-only edits (plan §1.5)
-/docs/astra/STATE.md @orchestrator
-/docs/astra/DECISIONS.md @orchestrator
-/plan.md @orchestrator
-* @orchestrator
+/docs/astra/STATE.md @kyosike
+/docs/astra/DECISIONS.md @kyosike
+/plan.md @kyosike
+* @kyosike
