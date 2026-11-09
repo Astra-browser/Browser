@@ -2,14 +2,14 @@ Patch-Id: ASTRA-0013
 Title: Float the media picture-in-picture window and dress it as Astra
 Tier: P2
 Upstream-Files: toolkit/components/pictureinpicture/PictureInPicture.sys.mjs, toolkit/components/pictureinpicture/content/player.js, toolkit/components/pictureinpicture/content/player.xhtml, toolkit/actors/PictureInPictureChild.sys.mjs
-Intent: a media PiP window is opened as a dependent dialog from the opener on Linux, so tiling Wayland compositors (Hyprland) treat it as a floater instead of giving it a tile; the native player keeps its always-on-top, aspect-locked, resizable behavior. The player document links Astra's stylesheet from `resource://astra/` (a `chrome://astra` stylesheet inside a `chrome://global` document loads with zero rules, measured) and allows `resource:` for styles in its CSP. After load the engine hands the window to Astra's `resource://astra/pip/PipPlayer.sys.mjs`, which copies the interface's light/dark theme for the window's lifetime and shows the site title in a slim head strip. The video, scrubber and transport controls remain Gecko's own; every observer and listener is released on the player's unload. An automatic request that reaches the parent after the person has already returned to the tab is dropped instead of opening a player over the page, including when the return lands while the window is still being created; a duplicate hidden edge cannot open a second player for the same browser. Astra's card request travels as its own message so an active-tab player still opens.
+Intent: a media PiP window is opened as a dependent dialog from the opener on Linux, so tiling Wayland compositors (Hyprland) treat it as a floater instead of giving it a tile; the native player keeps its always-on-top, aspect-locked, resizable behavior. The player document links Astra's stylesheet from `resource://astra/` (a `chrome://astra` stylesheet inside a `chrome://global` document loads with zero rules, measured) and allows `resource:` for styles in its CSP. After load the engine hands the window to Astra's `resource://astra/pip/PipPlayer.sys.mjs`, which copies the interface's light/dark theme for the window's lifetime and shows the site title in a slim head strip. The video, scrubber and transport controls remain Gecko's own; every observer and listener is released on the player's unload. An automatic request that reaches the parent after the person has already returned to the tab is dropped instead of opening a player over the page, including when the return lands while the window is still being created; a duplicate hidden edge cannot open a second player for the same browser. Astra's card request travels as its own message so an active-tab player still opens. The request is an open, never a toggle: a video that already has a clone is left alone, and a browser that already has a request opening or a player open is not given a second one, so a double click (or a hidden edge racing the card) cannot stop the clone the first request made or open two windows.
 Risk: low (Linux-only feature string and open path; macOS/Windows keep the existing window-watcher path, and the Astra dressing is additive and never changes playback)
-Test: forge lint; `build --faster --jobs 2`; `pip-player-probe.py` on Hyprland: the player is `floating: true` at 640×360, the Astra sheet reports 24 rules, the window follows dark→light→dark and paints the Astra ground, the head is present, and closing returns to the browser; `pip-minimize-probe.py`: the source stays active through a tab switch and a model update, Shift+close/minimize keeps the media playing without auto-PiP reopening the window, and the card can open it again; `pip-foreground-probe.py`: a card player closes when its tab comes back, an automatic player closes the same way, and a request that loses the return race does not open. The launcher gesture path is the same; this changes only how the window is created once the request reaches the parent.
+Test: forge lint; `build --faster --jobs 2`; `pip-player-probe.py` on Hyprland: the player is `floating: true` at 640×360, the Astra sheet reports 24 rules, the window follows dark→light→dark and paints the Astra ground, the head is present, and closing returns to the browser; `pip-minimize-probe.py`: the source stays active through a tab switch and a model update, Shift+close/minimize keeps the media playing without auto-PiP reopening the window, and the card can open it again; `pip-foreground-probe.py`: a card player closes when its tab comes back, an automatic player closes the same way, and a request that loses the return race does not open. `youtube-autopip-probe.py`: leaving a playing YouTube tab opens one mapped player each round and the card control opens one; `pip-rapid-probe.py`: one request opens one player and two requests 0/40/120/300 ms apart each leave exactly one window and one tab marker (before the change: 0 ms left two windows, and the live YouTube pair left none). The launcher gesture path is the same; this changes only how the window is created once the request reaches the parent.
 Verified-On: 153.6.0
 Removal-Plan: drop the `dependent`/`window.open` part when upstream uses xdg-dialog-v1 for media PiP (bug 1958013); keep or fold the Astra stylesheet into the upstream player skin if upstream ever reads app-supplied theme tokens
 ---
 diff --git a/toolkit/actors/PictureInPictureChild.sys.mjs b/toolkit/actors/PictureInPictureChild.sys.mjs
-index eb31b10af9..664d5db8a9 100644
+index eb31b10af9..dadb26e1b9 100644
 --- a/toolkit/actors/PictureInPictureChild.sys.mjs
 +++ b/toolkit/actors/PictureInPictureChild.sys.mjs
 @@ -190,6 +190,12 @@ export class PictureInPictureLauncherChild extends JSWindowActorChild {
@@ -42,7 +42,7 @@ index eb31b10af9..664d5db8a9 100644
      });
  
      // Some tests don't bother setting a reason.
-@@ -336,7 +343,7 @@ export class PictureInPictureLauncherChild extends JSWindowActorChild {
+@@ -336,16 +343,27 @@ export class PictureInPictureLauncherChild extends JSWindowActorChild {
     * Automatically toggle Picture-in-Picture if a video tab has been
     * backgrounded.
     */
@@ -51,7 +51,15 @@ index eb31b10af9..664d5db8a9 100644
      let doc = this.document;
      if (doc) {
        let video = this.findVideoToPiP(doc);
-@@ -345,7 +352,11 @@ export class PictureInPictureLauncherChild extends JSWindowActorChild {
++      // An auto or Astra request opens a player; it never closes one. The
++      // toggle path below stops the clone, so a second request for a video
++      // that already has one (a re-park, a second click while the window is
++      // still opening) erased the player the first request opened.
++      if (video?.isCloningElementVisually) {
++        return;
++      }
+       if (
+         video &&
          PictureInPictureChild.videoIsPlaying(video) &&
          PictureInPictureChild.videoIsPiPEligible(video)
        ) {
@@ -65,7 +73,7 @@ index eb31b10af9..664d5db8a9 100644
      }
    }
 diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
-index e1cc8e0c1d..3deb600b5b 100644
+index e1cc8e0c1d..2b62d8488b 100644
 --- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
 +++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
 @@ -27,7 +27,34 @@ const PLAYER_URI = "chrome://global/content/pictureinpicture/player.xhtml";
@@ -116,7 +124,7 @@ index e1cc8e0c1d..3deb600b5b 100644
          let actor = browsingContext.currentWindowGlobal.getActor(
            "PictureInPictureLauncher"
          );
-@@ -255,6 +287,42 @@ export var PictureInPicture = {
+@@ -255,6 +287,44 @@ export var PictureInPicture = {
    // Maps auto pip browser to PictureInPictureParent actor
    weakAutoPipBrowserToParent: new WeakMap(),
  
@@ -125,8 +133,10 @@ index e1cc8e0c1d..3deb600b5b 100644
 +  // originating tab clears the suppression.
 +  autoPipSuppressed: new WeakSet(),
 +
-+  // Browsers with an automatic player request that has not finished opening.
-+  autoRequestInFlight: new WeakSet(),
++  // Browsers whose player request has not finished opening (auto or Astra's
++  // card): one player per browser, never two windows or a toggle of the clone
++  // the first request just made.
++  requestInFlight: new WeakSet(),
 +
 +  hasPipPlayerFor(browser) {
 +    for (let win of Services.wm.getEnumerator(WINDOW_TYPE)) {
@@ -159,7 +169,7 @@ index e1cc8e0c1d..3deb600b5b 100644
    /**
     * Returns the player window if one exists and if it hasn't yet been closed.
     *
-@@ -309,6 +377,7 @@ export var PictureInPicture = {
+@@ -309,6 +379,7 @@ export var PictureInPicture = {
          break;
        }
        case "TabSelect": {
@@ -167,7 +177,7 @@ index e1cc8e0c1d..3deb600b5b 100644
          this.unpipAutoPipBrowser(event);
          this.updatePlayingDurationHistograms();
          break;
-@@ -888,13 +957,17 @@ export var PictureInPicture = {
+@@ -888,13 +959,17 @@ export var PictureInPicture = {
     *   The reason for closing this PiP window
     */
    async closeSinglePipWindow(closeData) {
@@ -188,7 +198,7 @@ index e1cc8e0c1d..3deb600b5b 100644
  
      Glean.pictureinpicture["closedMethod" + reason].record();
      await this.closePipWindow(win);
-@@ -974,6 +1047,26 @@ export var PictureInPicture = {
+@@ -974,6 +1049,24 @@ export var PictureInPicture = {
     */
    async handlePictureInPictureRequest(wgp, videoData) {
      const isApiRequest = !!videoData.isPipApiRequest;
@@ -201,16 +211,14 @@ index e1cc8e0c1d..3deb600b5b 100644
 +    if (videoData.autoRequest && browser?.docShellIsActive) {
 +      return;
 +    }
-+    if (videoData.autoRequest) {
-+      // A second hidden edge while the first request is still opening must
-+      // not create a second player; the auto map holds one actor.
-+      if (
-+        this.autoRequestInFlight.has(browser) ||
-+        this.hasPipPlayerFor(browser)
-+      ) {
++    if (!isApiRequest) {
++      // One player per browser. A second hidden edge while the first request
++      // is still opening, or an Astra card click inside that latency, must not
++      // create a second window or toggle the clone the first request made.
++      if (this.requestInFlight.has(browser) || this.hasPipPlayerFor(browser)) {
 +        return;
 +      }
-+      this.autoRequestInFlight.add(browser);
++      this.requestInFlight.add(browser);
 +    }
  
      if (isApiRequest) {
@@ -227,7 +235,7 @@ index e1cc8e0c1d..3deb600b5b 100644
 +    try {
 +      win = await this.openPipWindow(parentWin, videoData);
 +    } finally {
-+      this.autoRequestInFlight.delete(browser);
++      this.requestInFlight.delete(browser);
 +    }
      win.setIsPlayingState(videoData.playing);
      win.setIsMutedState(videoData.isMuted);
