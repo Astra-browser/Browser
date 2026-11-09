@@ -65,9 +65,44 @@ try:
       step('the astra ground is painted',
         bg===(root.getAttribute('data-astra-theme')==='light'?'rgb(241, 241, 243)':'rgb(26, 26, 29)'), bg);
       step('the head names the window', (head?.textContent||'').includes('Astra'));
+      // The face follows the theme: a flat themed bar, not a white/black
+      // gradient wash over the video, and text/glyphs that take the theme's
+      // own text tone (dark on the light bar, light on the dark one).
+      const lum=(s)=>{const m=String(s).match(/[\d.]+/g);if(!m)return null;
+        const [r,g,b]=m.slice(0,3).map(Number);return 0.2126*r+0.7152*g+0.0722*b};
+      const tone=(doc)=>{
+        const g=(s)=>getComputedStyle(doc.querySelector(s));
+        return {
+          theme: root.getAttribute('data-astra-theme'),
+          headImage: g('.astra-pip-head').backgroundImage,
+          bottomImage: getComputedStyle(doc.getElementById('controls-bottom-gradient')).backgroundImage,
+          headColor: g('.astra-pip-head').color,
+          titleColor: g('.astra-pip-title').color,
+          closeFill: getComputedStyle(doc.getElementById('close')).fill,
+          closeBg: getComputedStyle(doc.getElementById('close')).backgroundColor,
+          minColor: g('.astra-pip-min').color,
+        };
+      };
+      const themed=(t)=>{
+        const light=t.theme==='light';
+        const head=lum(t.headColor), title=lum(t.titleColor), glyph=lum(t.closeFill);
+        return {light, head, title, glyph,
+          ok: t.headImage==='none' && t.bottomImage==='none' &&
+              (light ? head<90 && title<110 && glyph<90
+                     : head>180 && title>150 && glyph>180)};
+      };
+      const first=themed(tone(doc));
+      out.diag.face=first;
+      step('the head is a themed bar, not a gradient', tone(doc).headImage==='none');
+      step('the controls plate is flat, not a gradient', tone(doc).bottomImage==='none');
+      step('title and glyphs take the theme tone', first.ok, first);
+      step('the close glyph is the theme text colour',
+        getComputedStyle(doc.getElementById('close')).fill===getComputedStyle(head).color);
       frame?.setAttribute('data-astra-theme', before==='light'?'dark':'light');
       await wait(400);
       step('a theme change follows live', root.getAttribute('data-astra-theme')===(before==='light'?'dark':'light'));
+      const flipped=themed(tone(doc));
+      step('the face re-themes with the window', flipped.ok, flipped);
       frame?.setAttribute('data-astra-theme', before);
       step('the minimize control is present', !!min && /Minimize player/.test(min.getAttribute('aria-label')||''), min?.getAttribute('aria-label')??null);
       done(JSON.stringify(out));

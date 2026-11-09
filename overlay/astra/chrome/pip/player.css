@@ -15,6 +15,10 @@
   --astra-border: rgb(255 255 255 / 0.1);
   --astra-accent: #ededf0;
   --astra-radius: 12px;
+  /* One recipe for every surface that floats over the video, so the title,
+     the glyphs and the buttons all resolve against the same theme tone. */
+  --astra-bar: color-mix(in srgb, var(--astra-canvas) 66%, transparent);
+  --astra-chip: color-mix(in srgb, var(--astra-canvas) 78%, transparent);
   --astra-font:
     "InterVariable", "Inter", system-ui, "Segoe UI Variable Text", "Segoe UI",
     "Noto Sans", "Cantarell", sans-serif;
@@ -22,7 +26,7 @@
   --player-bg-color: var(--astra-canvas);
   --player-control-icon-fill: var(--astra-text);
   --player-control-item-height: clamp(20px, 8vmax, 30px);
-  --close-btn-fill-color: var(--astra-canvas);
+  --close-btn-fill-color: var(--astra-text);
   --border-radius-small: 8px;
   --border-radius-medium: 999px;
   --border-radius-large: 999px;
@@ -39,7 +43,6 @@
   --astra-muted: rgb(28 28 31 / 0.62);
   --astra-border: rgb(0 0 0 / 0.11);
   --astra-accent: #1c1c1f;
-  --close-btn-fill-color: #f4f4f6;
 
   color-scheme: light;
 }
@@ -53,7 +56,9 @@ body {
 }
 
 /* A slim head that names the window and gives the pointer somewhere to drag
-   it. It never covers the video's own controls. */
+   it. It is a flat themed bar, not a gradient wash over the video, so the
+   title and the glyphs resolve against the same tone the rest of Astra uses;
+   the inline paddings clear the two native chips that share this row. */
 .astra-pip-head {
   position: absolute;
   inset: 0 0 auto;
@@ -61,10 +66,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 12px;
-  padding-inline-end: 82px;
-  background: linear-gradient(180deg, rgb(0 0 0 / 0.5), transparent);
+  height: 44px;
+  padding-block: 0;
+  padding-inline: 52px 92px;
+  background: var(--astra-bar);
+  box-shadow: inset 0 -1px 0 var(--astra-border);
   color: var(--astra-text);
   font: 600 10px/1 var(--astra-font);
   letter-spacing: 0.12em;
@@ -72,10 +78,6 @@ body {
   pointer-events: none;
   -moz-window-dragging: drag;
   user-select: none;
-}
-
-:root[data-astra-theme="light"] .astra-pip-head {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.72), transparent);
 }
 
 .astra-pip-word {
@@ -126,11 +128,12 @@ body {
   padding: 0;
   border: 0;
   border-radius: var(--astra-radius);
-  background: color-mix(in srgb, var(--astra-text) 18%, transparent);
+  background: var(--astra-chip);
+  box-shadow: inset 0 0 0 1px var(--astra-border);
   color: var(--astra-text);
   cursor: pointer;
   -moz-window-dragging: no-drag;
-  opacity: 0.7;
+  opacity: 0.8;
   transition:
     opacity var(--motion-fast, 120ms) ease-out,
     background-color var(--motion-fast, 120ms) ease-out;
@@ -145,7 +148,7 @@ body {
 }
 
 .astra-pip-min:is(:hover, :focus-visible) {
-  background: color-mix(in srgb, var(--astra-text) 28%, transparent);
+  background: var(--astra-float);
   opacity: 1;
 }
 
@@ -168,27 +171,28 @@ body {
 }
 
 .control-button:hover:enabled {
-  background-color: color-mix(in srgb, var(--astra-text) 18%, transparent);
+  background-color: color-mix(in srgb, var(--astra-text) 14%, transparent);
 }
 
 #close,
 #unpip {
   border-radius: var(--astra-radius);
-  background-color: color-mix(in srgb, var(--astra-text) 88%, transparent);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 0.28);
+  background-color: var(--astra-chip);
+  box-shadow: inset 0 0 0 1px var(--astra-border);
+  -moz-context-properties: fill, fill-opacity;
 }
 
 #close:is(:hover, :focus-visible),
 #unpip:is(:hover, :focus-visible) {
-  background-color: var(--astra-accent);
+  background-color: var(--astra-float);
 }
 
+/* The controls sit on a flat themed plate instead of a white (light theme) or
+   black (dark theme) wash over the video, so the scrubber, the times and the
+   glyphs keep the interface's tone and never read as a gradient glare. */
 #controls-bottom-gradient {
-  background: linear-gradient(
-    0deg,
-    color-mix(in srgb, var(--astra-canvas) 88%, transparent) -13.24%,
-    transparent 90.44%
-  );
+  background: var(--astra-bar);
+  box-shadow: inset 0 1px 0 var(--astra-border);
 }
 
 #scrubber {
