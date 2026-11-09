@@ -64,6 +64,12 @@ without it.
 **Never run the engine build without `--jobs 2`**: the gkrust LTO link has
 OOM-killed this machine and taken the editor with it (BUILD_TIMES.md).
 
+After `build:chrome` or the shell build, stage before refreshing the dist:
+`cargo run -q -- overlay` copies `overlay/astra/` into `engine/astra/`, then
+`cargo run -q -- build --faster` links those files into `dist/bin`. Running
+`build --faster` before `overlay` leaves the dist symlinks on the previous
+hashed bundle and the app boots to "app frame timed out".
+
 ## Drive the running browser (Marionette)
 
 Playwright cannot attach to this build (it needs `-juggler-pipe`; our ESR
