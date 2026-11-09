@@ -66,7 +66,7 @@ if [ "$SKIP_UI" = 0 ]; then
   if command -v bun >/dev/null 2>&1; then
     step "building the chrome UI bundle"
     ( cd "$ROOT/ui" && bun install --frozen-lockfile )
-    ( cd "$ROOT" && bun run --filter @astra/frame build:chrome )
+    ( cd "$ROOT/ui" && bun run --filter @astra/frame build:chrome )
   else
     echo "bootstrap: bun not found — keeping the committed chrome bundle" >&2
     echo "bootstrap: install Bun (https://bun.sh) to rebuild the UI" >&2

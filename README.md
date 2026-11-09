@@ -75,7 +75,7 @@ FORGE=forge/astra-forge/target/release/astra-forge
 $FORGE fetch                 # download + verify + extract engine/
 $FORGE config --os linux --branding astra
 ( cd ui && bun install --frozen-lockfile )
-bun run --filter @astra/frame build:chrome
+( cd ui && bun run --filter @astra/frame build:chrome )
 $FORGE overlay               # copy overlay/astra + apply patches/*.patch
 $FORGE build --jobs 2        # engine + astra-core sidecar
 ```
@@ -102,7 +102,7 @@ The archive is the full product with the Work flag off (Beta 1 rule). See
 python3 tools/state-check.py        # task-lock registry consistency
 ./tools/brand-lint.sh               # branding gate
 $FORGE lint                         # patch-series health
-bun run --filter @astra/frame check # UI types, lint and unit tests
+( cd ui && bun run --filter @astra/frame check ) # UI types, lint and unit tests
 tools/perf/full-suite.sh --skip-build   # contracts + live probes + benches
 ```
 
