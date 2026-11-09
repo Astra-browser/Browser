@@ -120,7 +120,14 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
                 &tarball.to_string_lossy(),
             ],
             root,
-        )?;
+        )
+        .map_err(|e| {
+            format!(
+                "{e}\n  hint: import Mozilla's release key, then retry:\n  \
+                 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys \
+                 14F26682D0916CDD81E37B6D61B7B526D98F0353"
+            )
+        })?;
         println!("fetch: signature OK");
     }
     // Extract (idempotent marker).
