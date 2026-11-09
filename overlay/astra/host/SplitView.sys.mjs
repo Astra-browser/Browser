@@ -38,6 +38,12 @@ const XHTML_NS = "http://www.w3.org/1999/xhtml";
 
 const _bindings = new Map(); // window_id -> binding
 
+/** The narrowest a pane may become, matching the engine's own split CSS. */
+export const MIN_PANE_PX = 140;
+/** Pane shares keyed by the engine's split view, so a tab switch or a stage
+ *  resize re-applies the same proportions instead of stale pixel widths. */
+let _paneRatios = new WeakMap();
+
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
 }
@@ -203,22 +209,223 @@ function selectedTab(binding) {
   return binding?.gb?.selectedTab ?? null;
 }
 
-/** Give every pane boundary its own draggable divider. */
+/** The selected tab's split panels in tab order (the engine's flex order). */
+function activePanels(binding) {
+  return selectedTab(binding)?.splitview?.panels ?? [];
+}
+
+/** The stage width panes share, or 0 while the stage has no geometry. */
+function stageWidth(binding) {
+  const width = Number(binding?.gb?.tabpanels?.clientWidth) || 0;
+  return width > 0 ? width : 0;
+}
+
+/** The shares for one split view, seeded from the panels' current widths. */
+function ratiosOf(splitview) {
+  const panels = splitview?.panels ?? [];
+  if (panels.length < 2) return null;
+  let ratios = _paneRatios.get(splitview) ?? null;
+  if (Array.isArray(ratios) && ratios.length !== panels.length) ratios = null;
+  if (!ratios) {
+    const widths = panels.map((panel) => {
+      try {
+        return panel.getBoundingClientRect().width;
+      } catch {
+        return 0;
+      }
+    });
+    const sum = widths.reduce((total, width) => total + width, 0);
+    ratios =
+      sum > 0 ? widths.map((width) => width / sum) : panels.map(() => 1 / panels.length);
+    _paneRatios.set(splitview, ratios);
+  }
+  return ratios;
+}
+
+/** Pixel widths for every pane but the last, which stays flexible.
+ *
+ * Pure, exported for tests. `total` is the stage width the panes share; the
+ * engine's 4px margins are left out so the flex row cannot overflow. */
+export function paneWidths(total, shares, min = MIN_PANE_PX) {
+  const count = shares?.length ?? 0;
+  if (!(total > 0) || !Number.isFinite(total) || count < 2) return null;
+  const budget = Math.max(total - 8 * count, min * count);
+  const widths = [];
+  let used = 0;
+  for (let index = 0; index < count - 1; index += 1) {
+    const remaining = count - index - 1;
+    const room = budget - used - min * remaining;
+    const want = Math.round(budget * shares[index]);
+    const width = Math.max(min, Math.min(want, Math.max(min, room)));
+    widths.push(width);
+    used += width;
+  }
+  widths.push(null);
+  return widths;
+}
+
+function setPanelWidth(panel, width) {
+  try {
+    panel.style.flex = "0 0 auto";
+    panel.style.width = `${Math.round(width)}px`;
+    panel.setAttribute("width", String(Math.round(width)));
+  } catch {
+    // Detached.
+  }
+}
+
+function clearPanelWidth(panel) {
+  try {
+    panel.removeAttribute("width");
+    panel.style.removeProperty("width");
+    panel.style.removeProperty("flex");
+  } catch {
+    // Detached.
+  }
+}
+
+/** Apply the remembered shares to the current stage width.
+ *
+ * The engine stores pane sizes as pixel `width` attributes. Those go stale
+ * when the stage changes width (the sidebar hides or shows) or when a split is
+ * suspended and re-activated by a tab switch. Every pane but the last is set
+ * from its share; the last stays flexible so rounding and the engine's 4px
+ * margins never overflow the stage. */
+function applyPaneWidths(binding) {
+  // A drag has just written live pixel widths that have not been read back
+  // into shares yet. Re-applying the old shares now would snap the panes back
+  // to their pre-drag split; the pending capture applies the new shares.
+  if (binding.capturing) return;
+  const splitview = selectedTab(binding)?.splitview ?? null;
+  const panels = splitview?.panels ?? [];
+  if (!splitview || panels.length < 2) return;
+  const total = stageWidth(binding);
+  if (total <= 0) {
+    positionResizers(binding);
+    return;
+  }
+  const ratios = ratiosOf(splitview);
+  if (!ratios) return;
+  const widths = paneWidths(total, ratios);
+  if (!widths) return;
+  for (let index = 0; index < panels.length - 1; index += 1)
+    setPanelWidth(panels[index], widths[index]);
+  clearPanelWidth(panels[panels.length - 1]);
+  // Reading the panel rects in the same turn as the width change can still
+  // see the previous flex layout. Place the handles on the next frame so a
+  // sidebar change never leaves them on the old boundary.
+  scheduleResizerPosition(binding);
+}
+
+function scheduleResizerPosition(binding) {
+  if (binding.disposed) return;
+  // The sidebar slides over ~400ms, and every frame moves and resizes the
+  // stage; the final frame's rects are not known until the transition ends.
+  // Keep placing the handles for a short settle window instead of trusting a
+  // single post-width measurement (which can land mid-transition).
+  binding.positionUntil = Date.now() + 800;
+  if (binding.positioning) return;
+  binding.positioning = true;
+  const tick = () => {
+    if (binding.disposed) {
+      binding.positioning = false;
+      return;
+    }
+    positionResizers(binding);
+    if (Date.now() < binding.positionUntil) {
+      try {
+        binding.win.requestAnimationFrame(tick);
+        return;
+      } catch {
+        // Fall through to the final placement.
+      }
+    }
+    binding.positioning = false;
+    positionResizers(binding);
+  };
+  try {
+    binding.win.requestAnimationFrame(tick);
+  } catch {
+    binding.positioning = false;
+    positionResizers(binding);
+  }
+}
+
+/** Capture the settled widths after a drag frame.
+ *
+ * `getBoundingClientRect()` in the same turn as an inline width change can
+ * still report the previous flex layout. Waiting one flushed frame keeps the
+ * ratio readback honest, and then re-applies it so the last pane becomes
+ * flexible again. */
+function scheduleRatioCapture(binding) {
+  if (binding.capturing || binding.disposed) return;
+  binding.capturing = true;
+  const run = () => {
+    binding.capturing = false;
+    if (binding.disposed) return;
+    rememberPaneRatios(binding);
+    applyPaneWidths(binding);
+  };
+  try {
+    binding.win.requestAnimationFrame(() => {
+      try {
+        const flushed = binding.win.promiseDocumentFlushed?.(() => {});
+        if (flushed && typeof flushed.then === "function") flushed.then(run, run);
+        else run();
+      } catch {
+        run();
+      }
+    });
+  } catch {
+    run();
+  }
+}
+
+/** Read the pane widths a drag just produced back into the share table. */
+function rememberPaneRatios(binding) {
+  const splitview = selectedTab(binding)?.splitview ?? null;
+  const panels = splitview?.panels ?? [];
+  if (!splitview || panels.length < 2) return;
+  const widths = panels.map((panel) => {
+    // The engine animates a pane's width over 50ms, so a rect read one frame
+    // after a drag can still be the old size. The inline width is the size the
+    // drag asked for; use it, and measure only the flexible last pane.
+    const inline = Number.parseFloat(panel.style?.width ?? "");
+    if (Number.isFinite(inline) && inline > 0) return inline;
+    const attr = Number(panel.getAttribute?.("width"));
+    if (Number.isFinite(attr) && attr > 0) return attr;
+    try {
+      return panel.getBoundingClientRect().width;
+    } catch {
+      return 0;
+    }
+  });
+  const sum = widths.reduce((total, width) => total + width, 0);
+  if (!(sum > 0)) return;
+  const ratios = widths.map((width) => width / sum);
+  _paneRatios.set(splitview, ratios);
+  binding.ratio = clampRatio(ratios[0]) ?? binding.ratio;
+}
+
+/** Give every pane boundary its own draggable divider, reusing existing nodes
+ *  so a tab switch never drops pointer capture mid-drag. */
 function syncResizers(binding, splitview) {
   const tabbox = binding?.gb?.tabbox ?? binding?.gb?.tabpanels?.parentElement;
   const doc = binding?.win?.document;
   if (!tabbox || !doc) return;
-  for (const entry of binding.resizers ?? []) {
+  const panels = splitview?.panels ?? [];
+  const wanted = panels.length >= 2 ? panels.length - 1 : 0;
+  const resizers = binding.resizers ?? [];
+  while (resizers.length > wanted) {
+    const entry = resizers.pop();
     try {
       entry.node.remove();
     } catch {
       // Already removed with the split.
     }
   }
-  binding.resizers = [];
-  const panels = splitview?.panels ?? [];
-  if (panels.length < 2) return;
-  for (let index = 0; index < panels.length - 1; index += 1) {
+  for (const [index, entry] of resizers.entries()) entry.index = index;
+  for (let index = resizers.length; index < wanted; index += 1) {
     // A chrome box in the tabbox, above the native panel deck. It is not a
     // browser and owns no page; it only turns pointer travel into panel width.
     const resizer = doc.createXULElement("box");
@@ -233,15 +440,15 @@ function syncResizers(binding, splitview) {
     resizer.style.pointerEvents = "auto";
     resizer.style.margin = "0";
     tabbox.appendChild(resizer);
-    binding.resizers.push({ node: resizer, index });
+    resizers.push({ node: resizer, index });
     bindResizer(binding, resizer, index);
   }
-  positionResizers(binding);
+  binding.resizers = resizers;
+  applyPaneWidths(binding);
 }
 
 function positionResizers(binding) {
-  const splitview = selectedTab(binding)?.splitview ?? null;
-  const panels = splitview?.panels ?? [];
+  const panels = activePanels(binding);
   const tabbox = binding?.gb?.tabbox ?? binding?.gb?.tabpanels?.parentElement;
   if (!tabbox || panels.length < 2) return;
   const box = tabbox.getBoundingClientRect();
@@ -262,9 +469,8 @@ function positionResizers(binding) {
 }
 
 function bindResizer(binding, resizer, index) {
-  const panels = () => selectedTab(binding)?.splitview?.panels ?? [];
   const nudge = (event) => {
-    const all = panels();
+    const all = activePanels(binding);
     const left = all[index];
     const right = all[index + 1];
     if (!left || !right) return;
@@ -275,15 +481,16 @@ function bindResizer(binding, resizer, index) {
     if (direction === 0) return;
     event.preventDefault();
     resizePair(left, right, left.getBoundingClientRect().width + direction * step);
-    positionResizers(binding);
+    scheduleRatioCapture(binding);
   };
   const down = (event) => {
     if (event.button !== 0) return;
-    const all = panels();
+    const all = activePanels(binding);
     const left = all[index];
     const right = all[index + 1];
     if (!left || !right) return;
     event.preventDefault();
+    binding.dragging = true;
     const startX = event.clientX;
     const startLeft = left.getBoundingClientRect().width;
     const startRight = right.getBoundingClientRect().width;
@@ -295,8 +502,12 @@ function bindResizer(binding, resizer, index) {
     const move = (moveEvent) => {
       resizePair(left, right, startLeft + (moveEvent.clientX - startX), startLeft, startRight);
       positionResizers(binding);
+      scheduleResizerPosition(binding);
+      scheduleRatioCapture(binding);
     };
     const stop = () => {
+      binding.dragging = false;
+      scheduleRatioCapture(binding);
       resizer.removeEventListener("pointermove", move);
       resizer.removeEventListener("pointerup", stop);
       resizer.removeEventListener("pointercancel", stop);
@@ -318,16 +529,13 @@ function bindResizer(binding, resizer, index) {
   resizer.addEventListener("keydown", nudge);
   resizer.addEventListener("dblclick", () => {
     if (!settingBool("astra.settings.split.double-click-reset", true)) return;
-    for (const panel of panels()) {
-      try {
-        panel.style.removeProperty("width");
-        panel.style.removeProperty("flex");
-        panel.removeAttribute("width");
-      } catch {
-        // Detached.
-      }
+    const splitview = selectedTab(binding)?.splitview ?? null;
+    const all = splitview?.panels ?? [];
+    if (splitview && all.length >= 2) {
+      _paneRatios.set(splitview, all.map(() => 1 / all.length));
+      binding.ratio = 0.5;
     }
-    positionResizers(binding);
+    applyPaneWidths(binding);
   });
 }
 
@@ -356,11 +564,39 @@ function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0) {
   }
 }
 
+/** Re-apply shares after the engine has flushed the new split's layout.
+ *  Panel rects and the re-activated split deck settle one frame after a tab
+ *  switch; measuring before that leaves the handles on the old boundary. */
+function scheduleReflow(binding) {
+  if (binding.reflowing || binding.disposed) return;
+  binding.reflowing = true;
+  const run = () => {
+    binding.reflowing = false;
+    if (binding.disposed) return;
+    if (!binding.dragging) applyPaneWidths(binding);
+    else positionResizers(binding);
+  };
+  try {
+    binding.win.requestAnimationFrame(() => {
+      try {
+        const flushed = binding.win.promiseDocumentFlushed?.(() => {});
+        if (flushed && typeof flushed.then === "function") flushed.then(run, run);
+        else run();
+      } catch {
+        run();
+      }
+    });
+  } catch {
+    run();
+  }
+}
+
 function refresh(binding) {
   try {
     const tab = selectedTab(binding);
     const splitview = tab?.splitview ?? null;
     syncResizers(binding, splitview);
+    scheduleReflow(binding);
     const members = splitview ? splitview.tabs.map((t) => idOf(binding, t)).filter(Boolean) : [];
     const allGroups = splitViewsIn(binding)
       .map((sv) => ({
@@ -407,9 +643,15 @@ export function __bindSplitWindow({ window_id, win, tabOf, idOf: idMap }) {
     idOf: idMap,
     ratio: 0.5,
     scheduled: false,
+    reflowing: false,
+    positioning: false,
+    positionUntil: 0,
+    capturing: false,
+    dragging: false,
     disposed: false,
     listeners: [],
     resizers: [],
+    panelObserver: null,
   };
   const container = binding.gb?.tabContainer;
   const onChange = () => scheduleRefresh(binding);
@@ -430,12 +672,35 @@ export function __bindSplitWindow({ window_id, win, tabOf, idOf: idMap }) {
       binding.listeners.push([container, type, onChange]);
     }
   }
-  const onResize = () => positionResizers(binding);
+  const onResize = () => {
+    if (binding.dragging) positionResizers(binding);
+    else applyPaneWidths(binding);
+    scheduleReflow(binding);
+  };
   try {
     win.addEventListener("resize", onResize);
     binding.listeners.push([win, "resize", onResize]);
   } catch {
     // A window with no resize event still keeps its last geometry.
+  }
+  // The stage changes width without a window resize when the person hides or
+  // shows the sidebar (and the bar's flow/overlay shape). Observe the panel
+  // deck itself so the pane shares follow that width and the dividers stay on
+  // the boundaries.
+  try {
+    const Resize = win.ResizeObserver;
+    const deck = binding.gb?.tabpanels;
+    if (Resize && deck) {
+      const observer = new Resize(() => {
+        if (binding.disposed) return;
+        if (binding.dragging) positionResizers(binding);
+        else applyPaneWidths(binding);
+      });
+      observer.observe(deck);
+      binding.panelObserver = observer;
+    }
+  } catch {
+    // A window without ResizeObserver keeps the window-resize path.
   }
   try {
     const splitter = binding.gb?.tabpanels?.splitViewSplitter;
@@ -469,9 +734,15 @@ export function __unbindSplitWindow(window_id) {
     }
   }
   binding.listeners.length = 0;
+  try {
+    binding.panelObserver?.disconnect();
+  } catch {
+    // Already gone with the window.
+  }
+  binding.panelObserver = null;
   for (const resizer of binding.resizers ?? []) {
     try {
-      resizer.remove();
+      resizer.node?.remove();
     } catch {
       // Already gone with the tabpanels.
     }
@@ -488,6 +759,7 @@ export function __nativeBinding(window_id = "") {
 
 export function __resetSplitForTests() {
   for (const id of [..._bindings.keys()]) __unbindSplitWindow(id);
+  _paneRatios = new WeakMap();
   _store = null;
 }
 
@@ -684,30 +956,23 @@ function applyRatio(binding, value) {
   const splitview = selectedTab(binding)?.splitview ?? null;
   if (!splitview || splitview.tabs.length < 2) return ratio;
   const panels = splitview.panels;
-  const first = panels[0];
-  if (!first) return ratio;
-  const width = Math.max(1, Math.round((binding.gb.tabpanels.clientWidth || 0) * ratio));
-  try {
-    first.setAttribute("width", String(width));
-    first.style.width = `${width}px`;
-  } catch {
-    // A panel that has not been laid out yet keeps equal shares.
-  }
+  if (!panels[0]) return ratio;
+  // The first divider's share; a third pane splits the remainder evenly.
+  const rest = (1 - ratio) / (panels.length - 1);
+  _paneRatios.set(splitview, [ratio, ...panels.slice(1).map(() => rest)]);
+  applyPaneWidths(binding);
   return ratio;
 }
 
 function resetRatio(binding) {
   binding.ratio = 0.5;
   for (const splitview of splitViewsIn(binding)) {
-    for (const panel of splitview.panels ?? []) {
-      try {
-        panel.removeAttribute("width");
-        panel.style.removeProperty("width");
-      } catch {
-        // A panel that has already left the deck.
-      }
-    }
+    const panels = splitview.panels ?? [];
+    if (panels.length >= 2) _paneRatios.set(splitview, panels.map(() => 1 / panels.length));
+    for (const panel of panels) clearPanelWidth(panel);
   }
+  applyPaneWidths(binding);
+  positionResizers(binding);
 }
 
 function paneSnapshot(binding, tabs) {

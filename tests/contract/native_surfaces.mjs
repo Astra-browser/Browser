@@ -73,6 +73,23 @@ check("restore never reuses one tab twice", (() => {
   );
   return matched.filter((row) => row.reuse).length === 1;
 })());
+check("pane widths follow the stage width", (() => {
+  const wide = SplitView.paneWidths(900, [0.5, 0.5]);
+  const narrow = SplitView.paneWidths(600, [0.5, 0.5]);
+  return wide?.[0] > narrow?.[0] && wide[0] <= 900 && narrow[0] <= 600;
+})());
+check("pane widths keep a flexible last pane", (() => {
+  const widths = SplitView.paneWidths(900, [0.3, 0.3, 0.4]);
+  return widths?.length === 3 && widths.at(-1) === null
+    && widths[0] >= SplitView.MIN_PANE_PX && widths[1] >= SplitView.MIN_PANE_PX
+    && widths[0] + widths[1] < 900;
+})());
+check("pane widths clamp a tiny share to the floor", (() => {
+  const widths = SplitView.paneWidths(900, [0.01, 0.99]);
+  return widths?.[0] === SplitView.MIN_PANE_PX && widths.at(-1) === null;
+})());
+check("pane widths refuse a stage with no geometry", SplitView.paneWidths(0, [0.5, 0.5]) === null);
+check("pane shares are a helper on the module", typeof SplitView.paneWidths === "function");
 
 // --- host method surface ---------------------------------------------------
 for (const method of [

@@ -11,6 +11,38 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: split panes keep their layout and every boundary resizes (2026-11-09)
+
+**What changed:** Three-pane split views were laid out in the wrong visual
+order. The engine's split CSS only gives columns 0 and 1 an `order`, so a third
+pane (column 2) fell back to `order: 0` and rendered before column 1. Astra's
+per-boundary handles use tab order, so the handle between panes 1 and 2 resized
+the tab that was visually third instead. The shell now pins columns 1 and 2 to
+their tab order.
+
+Pane widths were also stored only as pixel `width` attributes. Switching to a
+non-split tab and back, or hiding/showing the sidebar, left those pixels stale
+(or zeroed while the deck had no geometry), which is the broken layout in the
+report. The host now keeps each split view's pane shares and re-applies them to
+the current stage width whenever the panel deck resizes, and repositions every
+resizer through the 400 ms sidebar slide rather than once at the start.
+
+| Surface | Wiring / files | Live evidence |
+|---|---|---|
+| Pane order | `overlay/astra/chrome/shell-chrome.css` (`[column="1"]`/`[column="2"]` order) | 3-pane probe: panels left-to-right are columns 0,1,2 |
+| Resize every boundary | `overlay/astra/host/SplitView.sys.mjs` (`resizePair`, resizer reconciliation, `scheduleResizerPosition`) | two handles, both hit-test as `.astra-pane-resizer`; first pair changes while the third pane stays put |
+| Stable layout | same file (`_paneRatios`, `paneWidths`, `applyPaneWidths`, tabpanels `ResizeObserver`) | switching away/back keeps widths 346/140/177 (no 0-px pane); sidebar hide reflows to 473/189/241; resizers stay on both boundaries |
+| Missing geometry | `paneWidths` refuses a 0-width stage instead of writing 0-px panes | contract test |
+
+**Verification:** `node tests/contract/native_surfaces.mjs` 125/125;
+`tools/marionette-probe/native-surfaces-probe.py` 44/44 on the packaged dev
+build; targeted three-pane live probe measured every state above. `state-check`
+and `brand-lint` clean.
+
+**Limit:** the 140 px pane floor is the engine's own split minimum; an
+arrangement still stores one divider share, so restoring three panes splits the
+remainder evenly.
+
 ## Owner report: floating bar hit box + Back/Forward (2026-11-09)
 
 **What changed:** The floating bar stays down for as long as the pointer is
