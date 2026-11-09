@@ -410,6 +410,52 @@ let tA, tB, tC;
   check("adopted tab has nothing behind it", adoptedTab.tab.canGoBack === false);
 }
 
+// === Back/Forward traverse the engine's history, not a fresh URL load ===
+// Owner-reported: Back/Forward could stop part-way because each step loaded
+// the URL again, so a redirect or a duplicate native entry truncated the
+// pages ahead. The model steps once; the Content binding calls the browser's
+// own history, and the landing URL folds back into that same entry.
+{
+  const hist = (id) => TabsMod.__historyFor(id);
+  const tabId = (await Tabs.create({ request_id: "bh-0", url: "https://a.example/", background: true })).astra_tab_id;
+  await Navigation.loadURL({ request_id: "bh-1", astra_tab_id: tabId, url: "https://b.example/" });
+  await Navigation.loadURL({ request_id: "bh-2", astra_tab_id: tabId, url: "https://c.example/" });
+  const count = hist(tabId).entries.length;
+  const back = await Navigation.goBack({ request_id: "bh-3", astra_tab_id: tabId });
+  check("Back steps the model once", back.went_back === true && back.url === "https://b.example/");
+  // The engine may land on a redirect target instead of the stored URL; it
+  // rewrites the current entry and keeps the forward branch intact.
+  __commitExternal(tabId, "https://b.example/?redirected", { history: "back", loading: false });
+  check("Back keeps the forward branch", hist(tabId).entries.length === count);
+  check("Back rewrites the entry it landed on",
+    hist(tabId).entries[hist(tabId).index] === "https://b.example/?redirected");
+  check("Back does not leak its direction into a commit",
+    seen.some((e) => e.type === "nav.committed"
+      && e.data.external === true
+      && e.data.url === "https://b.example/?redirected"
+      && e.data.history === undefined));
+  const fwd = await Navigation.goForward({ request_id: "bh-4", astra_tab_id: tabId });
+  check("Forward returns to the last page", fwd.went_forward === true && fwd.url === "https://c.example/");
+  __commitExternal(tabId, "https://c.example/", { history: "forward", loading: false });
+  check("Forward ends at the last entry", hist(tabId).index === count - 1);
+  const atEnd = await Tabs.get({ request_id: "bh-5", astra_tab_id: tabId });
+  check("Forward button disabled at the end",
+    atEnd.tab.canGoForward === false && atEnd.tab.canGoBack === true);
+
+  // A native history that skips an entry the model recorded lands on an
+  // older URL; the model follows that URL instead of inventing a duplicate.
+  const skip = (await Tabs.create({ request_id: "bh-6", url: "https://skip-a.example/", background: true })).astra_tab_id;
+  await Navigation.loadURL({ request_id: "bh-7", astra_tab_id: skip, url: "https://skip-b.example/" });
+  await Navigation.loadURL({ request_id: "bh-8", astra_tab_id: skip, url: "https://skip-c.example/" });
+  const skipCount = hist(skip).entries.length;
+  await Navigation.goBack({ request_id: "bh-9", astra_tab_id: skip });
+  __commitExternal(skip, "https://skip-a.example/", { history: "back", loading: false });
+  check("Back follows a skipped native entry", hist(skip).index === 0 && hist(skip).entries.length === skipCount);
+  const skipped = await Tabs.get({ request_id: "bh-10", astra_tab_id: skip });
+  check("Skipped back still leaves Forward available",
+    skipped.tab.canGoBack === false && skipped.tab.canGoForward === true);
+}
+
 // === Panes v1 ===
 {
   const s = await Panes.show({ request_id: "p-1", pane_id: "assistant" });
@@ -469,7 +515,6 @@ let tA, tB, tC;
 
   const clr = await Sidebar.setWidth({ request_id: "s-4", width: null, animate: false, revision: null });
   check("null width clears override", clr.width === null && clr.animate === false);
-
   checkErr("sidebar.setWidth bad width",
     await Sidebar.setWidth({ request_id: "s-5", width: "wide" }), "s-5", "invalid_width");
   checkErr("sidebar.setWidth bad animate",

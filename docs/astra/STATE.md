@@ -11,6 +11,32 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: Back/Forward go all the way to either end (2026-11-09)
+
+**What changed:** Back and Forward stepped the model and then loaded the
+target URL again in the page. That made a new native history entry for every
+step, so the browser's own stack and the bar's stack diverged; a redirect or a
+duplicate native entry could truncate the pages ahead and the bar could not
+walk the whole history. The buttons now drive the engine's own session history
+(`browser.goBack(false)` / `goForward(false)`), which keeps bfcache, POST
+results, scroll position and form state.
+
+The model still steps once so the buttons update immediately. Commits produced
+by the traversal fold the address the engine really landed on back into that
+same entry (or follow a skipped native entry), so a redirect no longer creates
+a new entry or drops the Forward branch.
+
+| Surface | Wiring / files | Live evidence |
+|---|---|---|
+| Back / Forward | `overlay/astra/host/Navigation.sys.mjs` (`history: "back"`/`"forward"` on the commit), `overlay/astra/host/Content.sys.mjs` (native history move + commit-direction wrapper) | 4-page probe: Back reaches the first page (button disabled), Forward reaches the last (button disabled) |
+| Native stack stays aligned | same files (`__commitExternal` history branch) | `bar-nav-probe.py` native history after Back + Forward: index 2, count 3 (was index 4, count 5); external-link and meta-refresh redirect probes add no entries |
+| Redirect / skipped entry | `__commitExternal` folds the landed URL into the current entry or follows it in the direction of travel | `hostapi_v1` checks: forward branch survives, redirect rewrites its entry, skipped back leaves Forward available |
+
+**Verification:** `hostapi_v1` 336/336, `native_surfaces` 125/125,
+`content_slot` 33/33, `slots_model` 39/39; live `bar-nav-probe.py`,
+multi-step Back/Forward probe and external/redirect probe on the packaged dev
+build. `state-check` and `brand-lint` clean.
+
 ## Owner report: split panes keep their layout and every boundary resizes (2026-11-09)
 
 **What changed:** Three-pane split views were laid out in the wrong visual

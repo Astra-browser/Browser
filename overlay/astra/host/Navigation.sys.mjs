@@ -158,7 +158,7 @@ export const Navigation = {
       return ok(request_id, { astra_tab_id: id, went_back: false, url: tab.url });
     }
     h.index -= 1;
-    commit(id, h.entries[h.index], { loading: true });
+    commit(id, h.entries[h.index], { loading: true, history: "back" });
     return ok(request_id, { astra_tab_id: id, went_back: true, url: tab.url });
   },
 
@@ -172,7 +172,7 @@ export const Navigation = {
       return ok(request_id, { astra_tab_id: id, went_forward: false, url: tab.url });
     }
     h.index += 1;
-    commit(id, h.entries[h.index], { loading: true });
+    commit(id, h.entries[h.index], { loading: true, history: "forward" });
     return ok(request_id, { astra_tab_id: id, went_forward: true, url: tab.url });
   },
 
@@ -350,6 +350,46 @@ export function __commitExternal(id, url, extra = {}) {
   const tab = tabs.get(id);
   if (!tab || typeof url !== "string" || url === "") {
     return null;
+  }
+  // A Back/Forward move is traversing the engine's own session history. The
+  // model already stepped to its target entry; the engine may land on a
+  // redirect or a duplicate entry, so record the address it really showed in
+  // that entry instead of pushing a new one (which would truncate Forward).
+  const history = extra.history === "back" || extra.history === "forward" ? extra.history : null;
+  if (history) {
+    const h = __historyFor(id);
+    if (h && h.index >= 0 && h.entries[h.index] !== url) {
+      // The engine may skip entries it does not consider user-visible, or
+      // land on a redirect. If it landed on an entry the model already has,
+      // move the index there; otherwise fold the landing URL into the entry
+      // the model stepped to, keeping the pages ahead.
+      let found = -1;
+      if (history === "back") {
+        for (let i = h.index - 1; i >= 0; i -= 1) {
+          if (h.entries[i] === url) {
+            found = i;
+            break;
+          }
+        }
+      } else {
+        for (let i = h.index + 1; i < h.entries.length; i += 1) {
+          if (h.entries[i] === url) {
+            found = i;
+            break;
+          }
+        }
+      }
+      if (found >= 0) h.index = found;
+      else h.entries[h.index] = url;
+    }
+    if (typeof extra.title === "string") {
+      tab.title = extra.title;
+    }
+    const rest = { ...extra };
+    delete rest.history;
+    commit(id, url, { ...rest, external: true, reloaded: true });
+    emit("content.location-changed", { astra_tab_id: id, url });
+    return tab.url;
   }
   const h = __historyFor(id);
   const head = h && h.index >= 0 ? h.entries[h.index] : null;

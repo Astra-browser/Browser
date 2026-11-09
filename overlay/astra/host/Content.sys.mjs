@@ -403,6 +403,7 @@ export const Content = {
     const idOf = new WeakMap(); // native tab -> astra_tab_id
     const browsers = new Map(); // astra_tab_id -> { browser, tab }
     const pending = new Map(); // astra_tab_id -> URL to load on first activation
+    const historyMoves = new Map(); // astra_tab_id -> "back" | "forward" still settling
     __setFaviconEventSink((view) => emit("favicons-changed", view));
     let applying = false;
 
@@ -753,6 +754,7 @@ export const Content = {
       tabOf.delete(id);
       browsers.delete(id);
       pending.delete(id);
+      historyMoves.delete(id);
     };
     const contextFor = (id) => {
       try {
@@ -1019,6 +1021,20 @@ export const Content = {
 
     const progress = makeProgressListener({
       tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
+      // A Back/Forward move traverses the engine's own session history. Keep
+      // that direction on the commits the traversal produces so the model
+      // rewrites the entry it is on instead of pushing a new one and
+      // truncating the pages ahead.
+      commit: (id, url, extra = {}) => {
+        const direction = historyMoves.get(id) ?? null;
+        const result = __commitExternal(
+          id,
+          url,
+          direction ? { ...extra, history: direction } : extra,
+        );
+        if (direction && extra.loading !== true) historyMoves.delete(id);
+        return result;
+      },
       onCommit: (id, url) => {
         if (!isPrivateWindow(win)) noteTabVisit(id, url);
       },
@@ -1176,6 +1192,37 @@ export const Content = {
             // A tab torn down mid-toggle.
           }
           projectCurrentMedia();
+        }
+        return;
+      }
+      if (event.type === "nav.committed" && id && event.data.history) {
+        // Back/Forward uses the browser's own session history, so bfcache,
+        // redirects, POST results, scroll position and form state survive.
+        // The model already stepped to its target; the progress listener
+        // folds the address the engine really landed on back into that entry.
+        const tab = tabOf.get(id);
+        const browser = tab?.linkedBrowser;
+        const direction = event.data.history === "forward" ? "forward" : "back";
+        let moved = false;
+        if (browser) {
+          historyMoves.set(id, direction);
+          try {
+            const can =
+              direction === "back"
+                ? browser.canGoBackIgnoringUserInteraction === true
+                : browser.canGoForward === true;
+            if (can) {
+              if (direction === "back") browser.goBack(false);
+              else browser.goForward(false);
+              moved = true;
+            }
+          } catch {
+            moved = false;
+          }
+        }
+        if (!moved) {
+          historyMoves.delete(id);
+          loadIn(id, event.data.url, true);
         }
         return;
       }
