@@ -1510,7 +1510,10 @@
     position: absolute;
     z-index: 5;
     inset-block-start: 0;
-    inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 16px);
+    /* The app's shell keeps an 8px gutter; the bar starts there, not at the
+       sidebar column's edge. Matching it means the whole bar width is a
+       reveal target instead of losing its first 8px. */
+    inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 8px);
     inset-inline-end: 0;
     block-size: 8px;
     /* stylelint-disable-next-line property-no-unknown -- Gecko chrome property. */

@@ -11,6 +11,29 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: floating bar hit box + Back/Forward (2026-11-09)
+
+**What changed:** The floating bar stays down for as long as the pointer is
+anywhere on it. The shell's top-edge strip and the app's bar sit in two
+documents, so crossing from one to the other reports leave/enter in an order
+neither side controls; the strip's leave used to schedule the hide even after
+the pointer had reached the bar, so the bar retracted on its own and Back /
+Forward could not be clicked reliably. The trail timer now decides on the
+pointer's current homes (strip or bar), not on which handler ran last. The
+strip also starts at the bar's left edge instead of 8px inside it, so the whole
+bar width reveals. Back and Forward were already wired; they now stay
+reachable and were re-verified with a real pointer and external page history.
+
+| Surface | Wiring / files | Live evidence |
+|---|---|---|
+| Bar stays under the pointer | `ui/app/src/app/browser/Shell.svelte` (`barRevealHover`, `barPointerInside`, `barEnter`/`barLeave`, `revealEnter`/`revealLeave`, source-aware `releaseBar`) | `bar-probe.py` PASS including the new strip→bar crossing case; real-pointer `/tmp/opencode/bar-hover-probe.py`: hover → bar shown, move onto address/back → still shown, leave page → hidden |
+| Reveal spans the bar | `ui/shell/src/Shell.svelte` (`.astra-bar-reveal` inline start = sidebar + 8px, matching the app's shell gutter) | `bar-probe.py`: reveal strip and bar left edges now align |
+| Back/Forward | `ui/app/src/features/toolbar/components/ContentBar.svelte` (unchanged; real callers `tabs.backActive` / `tabs.forwardActive`) | `/tmp/opencode/bar-nav-probe.py`: page link /a→/b enables Back; click Back → /a with Forward enabled; click Forward → /b |
+
+**Verification:** `bun run typecheck` 0/0; `eslint` clean; `prettier --check`
+clean; new `BarHover.component.test.ts` 2/2 (both event orders); packaged dev
+build boots (`data-app-booted=true`) and `bar-probe.py` passes.
+
 ## Owner report: browser pages are tabs (2026-11-09)
 
 **What changed:** Settings and the Extensions manager now wear their own row in

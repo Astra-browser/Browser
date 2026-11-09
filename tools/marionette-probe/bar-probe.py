@@ -138,9 +138,28 @@ def main():
         b = json.loads(bar_state)
         if b["hidden"] != "false": failures.append("the revealed bar still reports itself hidden")
 
-        leave = m.js("""return (()=>{
-          const r=document.querySelector('.astra-bar-reveal'); if(!r) return 'no shell reveal';
+        # Crossing from the shell's strip onto the bar moves between documents:
+        # the bar's enter and the strip's leave can be handled in either order.
+        # The bar must stay down under the pointer instead of retracting from
+        # under the controls (Back/Forward became unreachable when it did).
+        crossed = m.js("""return (()=>{
+          const f=document.querySelector('iframe[data-astra-app-frame]'); const d=f&&f.contentDocument;
+          const b=d?.querySelector('.stage-bar'); const r=document.querySelector('.astra-bar-reveal');
+          if(!b||!r) return 'missing';
+          b.dispatchEvent(new PointerEvent('pointerenter',{bubbles:false}));
           r.dispatchEvent(new PointerEvent('pointerleave',{bubbles:true}));
+          return 'sent';
+        })()""")
+        time.sleep(0.6)
+        kept = m.js("return document.querySelector('.astra-frame')?.getAttribute('data-astra-bar-shown') === 'true';")
+        print("crossed onto the bar", crossed, "still shown", kept)
+        if crossed != "sent": failures.append("could not cross from the reveal strip onto the bar")
+        if not kept: failures.append("the bar hid while the pointer was on it")
+
+        leave = m.js("""return (()=>{
+          const f=document.querySelector('iframe[data-astra-app-frame]'); const d=f&&f.contentDocument;
+          const b=d?.querySelector('.stage-bar'); if(!b) return 'no bar';
+          b.dispatchEvent(new PointerEvent('pointerleave',{bubbles:false}));
           return 'sent';
         })()""")
         print("leave", leave)

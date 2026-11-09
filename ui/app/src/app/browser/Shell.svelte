@@ -413,8 +413,8 @@
     const onShellMessage = (event: MessageEvent) => {
       const data = event.data as { ns?: string; kind?: string; hover?: boolean } | null;
       if (data?.ns !== "astra-shell" || data.kind !== "bar-hover") return;
-      if (data.hover === true) holdBar();
-      else releaseBar();
+      if (data.hover === true) revealEnter();
+      else revealLeave();
     };
     window.addEventListener("message", onShellMessage);
     return () => {
@@ -495,6 +495,15 @@
   let barFocused = $state(false);
   let barHideTimer: ReturnType<typeof setTimeout> | null = null;
   let barElement = $state<HTMLElement | null>(null);
+  // A floating bar has two pointer homes, in two documents: the shell's
+  // top-edge strip above it and the bar's own surface below it. Moving from
+  // one to the other fires a leave and an enter across the iframe boundary in
+  // an order neither side controls, so the trail timer decides on where the
+  // pointer is now (a source is still held) rather than on which handler ran
+  // last. Without this the leave from the strip hid the bar while the pointer
+  // sat on its controls, which is why Back and Forward felt unreachable.
+  let barRevealHover = false;
+  let barPointerInside = false;
   function clearBarHide() {
     if (barHideTimer !== null) {
       clearTimeout(barHideTimer);
@@ -509,8 +518,25 @@
     clearBarHide();
     barHideTimer = setTimeout(() => {
       barHideTimer = null;
+      if (barRevealHover || barPointerInside || barFocused) return;
       barHover = false;
     }, 260);
+  }
+  function revealEnter() {
+    barRevealHover = true;
+    holdBar();
+  }
+  function revealLeave() {
+    barRevealHover = false;
+    releaseBar();
+  }
+  function barEnter() {
+    barPointerInside = true;
+    holdBar();
+  }
+  function barLeave() {
+    barPointerInside = false;
+    releaseBar();
   }
   $effect(() => () => clearBarHide());
   let pageShown = $derived.by(() => {
@@ -524,6 +550,13 @@
   // The bar floats whenever it is not pinned to a row: over a web page in
   // `auto`, and everywhere in `hidden`.
   let barOverPage = $derived(barMode === "hidden" || (barMode === "auto" && pageShown));
+  // A missed pointerleave (a surface torn down under the pointer, a window
+  // blur) must not leave a source latched on and pin the bar down forever.
+  $effect(() => {
+    if (barVisible) return;
+    barRevealHover = false;
+    barPointerInside = false;
+  });
   let barPosted = "";
   $effect(() => {
     // The shell only has to raise and clip for a floating bar when a native
@@ -835,8 +868,8 @@
       data-hidden={!barVisible}
       data-mode={barMode}
       bind:this={barElement}
-      onpointerenter={holdBar}
-      onpointerleave={releaseBar}
+      onpointerenter={barEnter}
+      onpointerleave={barLeave}
       onfocusin={() => (barFocused = true)}
       onfocusout={(event) => {
         const next = event.relatedTarget;
@@ -882,8 +915,8 @@
         data-active={!barVisible}
         aria-label={m.ui_show_bar()}
         title={m.ui_show_bar()}
-        onpointerenter={holdBar}
-        onpointerleave={releaseBar}
+        onpointerenter={revealEnter}
+        onpointerleave={revealLeave}
         onfocus={() => (barFocused = true)}
         onblur={() => (barFocused = false)}
       ></button>
