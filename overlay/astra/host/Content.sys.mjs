@@ -762,6 +762,25 @@ export const Content = {
       }
       return null;
     };
+    // A player is a detour, not a second home: selecting the tab it was
+    // cloned from brings the video back into the page. The engine closes its
+    // own auto-PiP on the tab's TabSelect; a player opened from the Now
+    // playing card is not in that map, so the foreground close runs here
+    // through the player's own path (which unpips without pausing).
+    const closeForegroundPip = (browser) => {
+      const pipWin = findPipWindow(browser);
+      if (!pipWin) return false;
+      try {
+        if (typeof pipWin.closeFromForeground === "function") {
+          pipWin.closeFromForeground();
+        } else {
+          pipWin.close();
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
     Media.__setEngine({
       dispatch: (id, action) => {
         const state = mediaStates.get(id);
@@ -830,7 +849,7 @@ export const Content = {
             }
             if (!actor || typeof actor.sendAsyncMessage !== "function") return false;
             try {
-              actor.sendAsyncMessage("PictureInPicture:AutoToggle");
+              actor.sendAsyncMessage("PictureInPicture:AstraToggle");
             } catch {
               return false;
             }
@@ -986,7 +1005,8 @@ export const Content = {
     const selectTab = (id) => {
       const tab = tabOf.get(id);
       if (!tab) return;
-      if (gb.selectedTab !== tab) {
+      const wasSelected = gb.selectedTab === tab;
+      if (!wasSelected) {
         applying = true;
         try {
           gb.selectedTab = tab;
@@ -1003,6 +1023,15 @@ export const Content = {
         ? split.tabs.map((member) => idOfTab(member)).filter(Boolean)
         : [id];
       applyTabActivation(browsers, active);
+      // Only a real return to the tab brings the video back. A redundant
+      // re-activation (the model re-asserting the tab already in front, which
+      // happens while playback and the player update) must leave the player
+      // alone. Every pane of a split counts: its page is in front again.
+      if (!wasSelected) {
+        for (const memberId of active) {
+          closeForegroundPip(tabOf.get(memberId)?.linkedBrowser);
+        }
+      }
     };
     const activate = (id) => {
       const url = pending.get(id);
@@ -1083,6 +1112,9 @@ export const Content = {
           ? split.tabs.map((member) => idOfTab(member)).filter(Boolean)
           : [id];
         applyTabActivation(browsers, active);
+        for (const memberId of active) {
+          closeForegroundPip(tabOf.get(memberId)?.linkedBrowser);
+        }
         void Tabs.select({ astra_tab_id: id });
       } else {
         // An engine-created tab is in front. P4.3 adopts it; until then put

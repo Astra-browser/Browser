@@ -132,6 +132,58 @@ Work with `VITE_ASTRA_WORK=true` (the Vitest projects set it). Verification:
 `browser.work` leaves the surface on Browse, Settings groups are
 Browser/AI/App and Features offers only AI, Notes, Tasks and Time.
 
+## Owner report: PiP returns to its tab (2026-11-10, latest)
+
+**What changed:** A media PiP player is a detour from the page, not a second
+home. Selecting the tab it was cloned from now closes the player and the video
+keeps playing inline. The engine already did this for the player it opens by
+itself when a playing tab is left (`TabSelect` → `unpipAutoPipBrowser`); a
+player opened from the Now playing card was not in that map, so it stayed over
+the page after the tab came back. The host now runs the same foreground close
+through the player's own `closeFromForeground` path (no Pause is sent) whenever
+a real selection change brings a PiP source tab (or any pane of a selected
+split) back. A redundant model re-assertion of the tab that is already in front
+does not close it: that re-selection happens while playback and the card update,
+and treating it as a return closed the player the moment it opened.
+
+The automatic request had a second failure: it can reach the parent after the
+person already returned (or finish opening while the return lands), so no tab
+selection was left to close it and it opened as an unmarked manual player. The
+request now carries its origin: an automatic request is dropped when its tab is
+already selected or already active, and a player that finishes opening after the
+return closes itself through the same foreground path. A duplicate hidden edge
+cannot open a second player for the same browser (the auto actor map holds one).
+Astra's card request is a separate message, so a player asked for while the tab
+is in front still opens.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Card player return | opening the player from the Now playing card, leaving the tab, then selecting the tab closes the popup | `overlay/astra/host/Content.sys.mjs` (`closeForegroundPip`, `selectTab`, `onSelect`) | `pip-foreground-probe.py` PASS: 1 window while away, 0 after the return |
+| Auto-PiP return | the engine's own auto-PiP closes on the same return; the host path is a no-op when the engine already closed it | same file; engine `unpipAutoPipBrowser` | same probe: window open on leave, closed on return |
+| Late auto request | a request that loses the return race, or finishes after it, leaves no player over the tab; a duplicate hidden edge opens only one | `patches/ASTRA-0013-float-astra-pip.patch` (`autoRequest`, `AstraToggle`, `autoRequestInFlight`, `hasPipPlayerFor`) | same probe: 3 consecutive PASS, no window after the race |
+| Playback continuity | the page keeps playing after the player closes, the native tab marker clears and the card drops `in_pip` | player `closeFromForeground` → `closeSinglePipWindow` (`Foregrounded`, no Pause) | same probe: `controller.isPlaying` true, marker gone, card `in_pip:false` |
+| Redundant selection | re-selecting the tab already in front (model re-assert) leaves the player alone | `selectTab` (`wasSelected`) | same probe: player still open after a redundant `Tabs.select` |
+
+**Verification:** `node tests/contract/tab_lifecycle.mjs` 17/17,
+`media_model.mjs` 58/58, `media_selection.mjs` 10/10, `hostapi_v1.mjs` 336
+checks, `wire_coverage.mjs` 50/50; live `pip-foreground-probe.py` PASS on
+Hyprland (card, automatic, late-request paths; three consecutive runs);
+`pip-minimize-probe.py`, `now-playing-probe.py` and `pip-player-probe.py` still
+PASS; `forge lint` 13/13, `state-check` and `brand-lint` clean; overlay staged
+and `build --faster` clean.
+
+**Limit:** the player is closed only on a real foreground transition, matching
+the engine's own auto-PiP rule. Clicking the tab row that is already selected
+while its player is open re-asserts the same selection and keeps the player;
+the player's own close/minimize control (or the card's PiP control) remains the
+way to dismiss it in that state.
+
+**Limit:** the player is closed only on a real foreground transition, matching
+the engine's own auto-PiP rule. Clicking the tab row that is already selected
+while its player is open re-asserts the same selection and keeps the player;
+the player's own close/minimize control (or the card's PiP control) remains the
+way to dismiss it in that state.
+
 ## Owner report: PiP minimize — popup away, playback stays (2026-11-10, latest)
 
 **What changed:** Astra's PiP player has a minimize control beside the native

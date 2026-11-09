@@ -73,6 +73,7 @@ PROBES=(
   "media:tools/perf/stress/media_player_probe.py"
   "now_playing:tools/marionette-probe/now-playing-probe.py"
   "pip_player:tools/marionette-probe/pip-player-probe.py"
+  "pip_foreground:tools/marionette-probe/pip-foreground-probe.py"
   "webext:tools/perf/stress/webext_probe.py"
   "devtools:tools/perf/stress/devtools_probe.py"
   "first_load:tools/perf/stress/first_load_probe.py"
