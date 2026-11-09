@@ -12,7 +12,7 @@ This is the only supported build target today.
 
 | Need | Why |
 |---|---|
-| 8 GB RAM minimum, 16 GB+ recommended | the gkrust LTO link peaks near 10 GB |
+| 16 GB RAM minimum, 31 GB recommended | the gkrust LTO link peaks near 10 GB |
 | ~30 GB free disk | engine source ~6 GB, objdir ~16 GB, Rust targets/caches ~8 GB |
 | `git`, `curl`, `tar`, `gpg`, `patch`, `python3` | fetch, verify and assemble the source tree |
 | Rust toolchain (`cargo`, 1.90+) | `astra-forge` and the `astra-core` sidecar |
