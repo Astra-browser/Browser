@@ -712,13 +712,29 @@ export const Content = {
       // through the tabbrowser helper, so no TabAttrModified arrives. Watch
       // the one attribute on the one tab; it is released with the media state.
       let pipObserver = null;
+      const nativeTab = tabOf.get(id);
       try {
-        const nativeTab = tabOf.get(id);
         if (nativeTab) {
           pipObserver = new win.MutationObserver(() => {
             const inPip = nativeTab.hasAttribute("pictureinpicture");
             if (state.in_pip === inPip) return;
             state.in_pip = inPip;
+            // Automatic PiP opens after the tab has already been hidden, so
+            // the source may have been parked before the engine set this
+            // marker. A parked source stops feeding frames and transport
+            // state to the clone, leaving the player on its last frame while
+            // audio plays. Keep the source live with the marker, and let the
+            // selection in front decide again once the player closes.
+            let selected = false;
+            try {
+              const split = gb.selectedTab?.splitview;
+              selected =
+                gb.selectedTab === nativeTab ||
+                (split ? split.tabs.includes(nativeTab) : false);
+            } catch {
+              selected = false;
+            }
+            applyBrowserActivation(browser, inPip || selected);
             projectCurrentMedia();
           });
           pipObserver.observe(nativeTab, {
@@ -730,6 +746,8 @@ export const Content = {
         pipObserver = null;
       }
       state.pipObserver = pipObserver;
+      // A tab bound while its player is already open is a PiP source too.
+      if (inPip) applyBrowserActivation(browser, true);
       // The controller only forwards a few event types while inactive
       // (`audiblechange` among them). The native tab attributes are the
       // fallback for a tab whose sound or mute state changes without one.

@@ -11,6 +11,39 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: the older space's floating player stays live (2026-11-10, latest)
+
+**Symptom:** after adding a space while a video played in the older space, that
+space's floating PiP player kept the last frame, title and transport state. Its
+clock and play/pause stopped following the site (reported on YouTube).
+
+**Root cause:** adding the space hides the old tab, and automatic PiP opens
+afterwards. The clone could attach while the source was still parked, so it
+stopped receiving frames and state. The engine also sets the
+`pictureinpicture` tab marker directly, which only refreshed the sidebar
+projection; it did not wake a parked source. The head strip read the player's
+own browser title ("Picture-in-Picture"), never the cloned tab's title.
+
+**Fix:** the per-tab marker observer in `Content.sys.mjs` now activates the
+source when the marker appears, and lets the tab in front decide again when the
+player closes. `PipPlayer.sys.mjs` resolves the cloned tab through
+`PictureInPicture.weakWinToBrowser`, reads its title, follows the tab's label
+while the player is open, and retries as the engine links the window and
+source.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Older-space player | the auto-opened player keeps advancing and following the hidden site | `overlay/astra/host/Content.sys.mjs` (`pipObserver` activation), `overlay/astra/pip/PipPlayer.sys.mjs` (`sourceBrowser`, `syncTitle`) | `pip-space-state-probe.py`: clock 0:04→0:07, title Track 2→Track 3, pause/play both followed |
+| Parked source | a player requested for an already-hidden source wakes it before the clone is set up | `Content.sys.mjs` (`pipObserver`, `attachMedia`) | same probe: source parked, card PiP admitted, marker set, `docShellIsActive` true |
+| Title strip | the head names the cloned tab and follows its label | `PipPlayer.sys.mjs` (`TabAttrModified`, retries) | same probe: head Track 2→Track 3; falls back to empty when the source has no title |
+
+**Verification:** `pip-space-state-probe.py` PASS on the packaged dev build
+(added to `tools/perf/full-suite.sh`); a real YouTube watch page in the same
+build after adding a space: head titled "Rick Astley - Never Gonna Give You Up
+(Official Video) (4K Remaster) - YouTube", timestamp 0:04→0:07, player
+playing; `pip-minimize-probe.py` and `now-playing-probe.py` still PASS;
+`forge lint` 13/13; `state-check` and `brand-lint` clean.
+
 ## Owner report: Back/Forward go all the way to either end (2026-11-09)
 
 **What changed:** Back and Forward stepped the model and then loaded the

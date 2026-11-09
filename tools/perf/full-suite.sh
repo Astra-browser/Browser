@@ -74,6 +74,7 @@ PROBES=(
   "now_playing:tools/marionette-probe/now-playing-probe.py"
   "pip_player:tools/marionette-probe/pip-player-probe.py"
   "pip_foreground:tools/marionette-probe/pip-foreground-probe.py"
+  "pip_space_state:tools/marionette-probe/pip-space-state-probe.py"
   "webext:tools/perf/stress/webext_probe.py"
   "devtools:tools/perf/stress/devtools_probe.py"
   "first_load:tools/perf/stress/first_load_probe.py"
