@@ -26,10 +26,18 @@ beforeEach(async () => {
   await page.viewport(1100, 800);
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   surface.dispose();
   tabs.dispose();
 });
 test("Settings stands beside the tab rail and returns to the same web tab", async () => {
+  // The app owns the surface state; it names the page in front to the shell,
+  // which is the only signal that can report a park (the host never sees one).
+  const posted: Array<Record<string, unknown>> = [];
+  vi.spyOn(window.parent, "postMessage").mockImplementation((message: unknown) => {
+    posted.push(message as Record<string, unknown>);
+  });
+  const surfacePosts = () => posted.filter((entry) => entry?.kind === "surface");
   await surface.init();
   await tabs.init();
   const tab = tabFixture();
@@ -47,6 +55,7 @@ test("Settings stands beside the tab rail and returns to the same web tab", asyn
   const screen = await render(Shell);
   emitNativeEvent("uiCommand", "browser.settings");
   expect(screen.container.querySelector('[data-astra-surface="settings"]')).not.toBeNull();
+  await expect.poll(() => surfacePosts().at(-1)?.internal).toBe(true);
   // The settings rail is deliberately a lazy chunk; wait for it instead of
   // asserting that it is already in the first synchronous paint.
   await expect
@@ -61,11 +70,13 @@ test("Settings stands beside the tab rail and returns to the same web tab", asyn
   ).not.toBeNull();
   screen.container.querySelector<HTMLElement>(`[data-astra-tab-id="${tab.id}"] button`)!.click();
   await expect.poll(() => surface.currentPage()).toBeNull();
+  await expect.poll(() => surfacePosts().at(-1)?.internal).toBe(false);
   expect(surface.hasPage()).toBe(true);
   screen.container
     .querySelector<HTMLElement>('[data-astra-tab-id="astra-page:settings"] button')!
     .click();
   await expect.poll(() => surface.currentPage()).toBe("settings");
+  await expect.poll(() => surfacePosts().at(-1)?.internal).toBe(true);
   emitNativeEvent("browserReturn", { ...items, projection_revision: revision(11) });
   expect(screen.container.querySelector('[data-astra-surface="browse"]')).not.toBeNull();
   const rows = screen.container.querySelectorAll(`[data-astra-tab-id="${tab.id}"]`);

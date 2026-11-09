@@ -44,6 +44,41 @@ build after adding a space: head titled "Rick Astley - Never Gonna Give You Up
 playing; `pip-minimize-probe.py` and `now-playing-probe.py` still PASS;
 `forge lint` 13/13; `state-check` and `brand-lint` clean.
 
+## Owner report: a parked page left the real page hidden (2026-11-10)
+
+**Symptom:** opening Settings and then choosing a web tab left the page area
+dark. Every page opened after that stayed dark too, until Settings was closed
+through its own Back control. The window still showed the sidebar and the tabs.
+
+**Root cause:** the native page surface is a sibling layer under the app frame.
+The shell takes that layer out of front while one of the app's own pages owns
+the window, and it did so from `data-internal` on the content slot: set by any
+`ui-command browser.*` and cleared only by `browser.return`. Browser pages are
+tabs now (2026-11-09): choosing a web tab **parks** the page in the app
+(`surface.park()`), which never reaches the host, so no command cleared the
+flag. The content slot stayed `display:none`, the stage stayed `app`, and every
+later page was painted behind the hidden slot.
+
+**Fix:** the app is the authority on which surface is in front. It posts
+`{ ns: "astra-shell", kind: "surface", internal }` whenever the page in front
+changes — a page open, a page parked, a web tab in front — and the shell adopts
+or clears `data-internal` from that message. The `ui-command` mapping stays as
+the first word before the app frame has booted.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Return from a page | choosing a web tab parks Settings and the real page comes back in front | `ui/app/src/app/browser/Shell.svelte` (`surfacePosted` effect), `ui/shell/src/Shell.svelte` (`kind === "surface"` handler) | `surface-park-probe.py`: stage `page`, `data-internal` cleared, content `display:flex` (before: `app` / `true` / `none`) |
+| Later pages | a page opened after the round trip paints normally | same files | same probe: second tab loads and the stage stays `page` |
+| App page in front | Settings still covers the window; the native page stays alive but unpainted | same files (`data-internal` set from `internal: true`) | same probe: stage `app`, content `display:none` while Settings is in front |
+
+**Verification:** `bun run typecheck` 0/0; `eslint` clean; `prettier --check`
+clean; 1246 unit tests pass (2 environment skips); `Shell.component.test`
+3/3 (asserts the posted `internal` values); `node --test ui/shell/src` 74/74;
+`shell_assembly.mjs` PASS; `wire_coverage.mjs` 50/50; `content_slot.mjs` 33/33;
+`state-check` and `brand-lint` clean; new live
+`tools/marionette-probe/surface-park-probe.py` PASS on the packaged dev build
+(added to `tools/perf/full-suite.sh`).
+
 ## Owner report: Back/Forward go all the way to either end (2026-11-09)
 
 **What changed:** Back and Forward stepped the model and then loaded the

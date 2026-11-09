@@ -792,8 +792,10 @@
         frameRoot.dataset.astraSidebarAnimate = event.data?.animate === true ? "true" : "false";
       } else if (event.type === "ui-command") {
         // Work, Settings, Tasks, Notes and Time are the app's own pages: the
-        // real page surface must get out of their way, and come back on
-        // `browser.return` (the app's own surface event does the rest).
+        // real page surface must get out of their way. This command is only
+        // the first word — the app's `surface` message above is the
+        // authority, because choosing a web tab parks the page without
+        // emitting a host command at all.
         const command = typeof event.data === "string" ? event.data : "";
         if (SHELL_COMMANDS.has(command)) {
           void runChromeAction(win, host, command, { browser: mounted?.browser ?? null });
@@ -999,6 +1001,14 @@
       }
       if (data.kind === "menu-close") {
         setMenuOpen(false);
+        return;
+      }
+      // The app names the surface that is actually in front. This is the
+      // authority for `data-internal`: a page can still be open while a web
+      // tab is the one shown (parking), and no host command says so.
+      if (data.kind === "surface") {
+        if (data.internal === true) slot.dataset.internal = "true";
+        else delete slot.dataset.internal;
         return;
       }
       if (data.kind === "peek-open") {

@@ -300,6 +300,13 @@ check("shell applies its own fullscreen event",
   && shell.includes("data-astra-fullscreen"));
 check("shell fullscreen toolbar action dispatches toggle-fullscreen",
   shell.includes("toggle-fullscreen"));
+// The app is the authority on which surface is in front. A browser page that
+// is parked still exists, so only the app can say the real page surface
+// belongs to the window again; a host command cannot report a park.
+check("shell lets the app name the surface in front",
+  shell.includes('data.kind === "surface"')
+  && shell.includes("slot.dataset.internal = \"true\"")
+  && shell.includes("delete slot.dataset.internal"));
 
 // --- B. Behavioral: assemble exactly like Shell.svelte ---------------------
 const doc = fakeDoc();

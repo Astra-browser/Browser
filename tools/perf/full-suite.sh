@@ -92,6 +92,7 @@ PROBES=(
   "search_theme:tools/marionette-probe/search-theme-probe.py"
   "window_radius:tools/marionette-probe/window-radius-probe.py"
   "native_surfaces:tools/marionette-probe/native-surfaces-probe.py"
+  "surface_park:tools/marionette-probe/surface-park-probe.py"
   "chrome_ext:tools/perf/stress/chrome_ext_probe.py"
   "real_extensions:tools/perf/stress/real_extensions_probe.py"
   "extension_bench:tools/perf/stress/extension_bench.py"

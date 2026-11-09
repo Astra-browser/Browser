@@ -363,6 +363,24 @@
       // No shell: the panel is drawn in this document.
     }
   });
+  // The real page surface is a sibling layer under this frame, so it paints
+  // over the window whenever a web page is in front. An app page of ours
+  // (Settings, History, …) owns the window instead and the shell has to put
+  // that surface away. A parked page is still open but no longer in front,
+  // which is why this follows the page that is *shown*, not the page that
+  // merely exists — a host command cannot report a park, because parking
+  // never reaches the host.
+  let surfacePosted: boolean | null = null;
+  $effect(() => {
+    const internal = browserPage.currentPage() !== null;
+    if (surfacePosted === internal) return;
+    surfacePosted = internal;
+    try {
+      window.parent.postMessage({ ns: "astra-shell", kind: "surface", internal }, "*");
+    } catch {
+      // No shell: the stage is drawn in this document.
+    }
+  });
   // Pop-ups this app draws are the elements that claim to be one. A mutation
   // observer catches conditionally rendered menus and panels; a timeout
   // (rather than rAF) keeps it working under a hidden display.
