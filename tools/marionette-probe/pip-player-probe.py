@@ -52,10 +52,11 @@ try:
       const doc=win.document;
       const root=doc.documentElement;
       const head=doc.querySelector('.astra-pip-head');
+      const min=doc.querySelector('.astra-pip-min');
       const css=doc.querySelector('link[href*="/pip/player.css"]');
       const bg=getComputedStyle(doc.body).backgroundColor;
       out.diag={theme:root.getAttribute('data-astra-theme'),astra:root.getAttribute('data-astra-pip'),
-        head:head?.textContent, css:css?.getAttribute('href'), bg,
+        head:head?.textContent, min:min?.getAttribute('aria-label'), css:css?.getAttribute('href'), bg,
         size:[win.outerWidth,win.outerHeight], uri:win.location.href};
       step('the player opens', !!win && win.location.href.includes('player.xhtml'));
       step('astra marks the player', root.getAttribute('data-astra-pip')==='');
@@ -68,6 +69,7 @@ try:
       await wait(400);
       step('a theme change follows live', root.getAttribute('data-astra-theme')===(before==='light'?'dark':'light'));
       frame?.setAttribute('data-astra-theme', before);
+      step('the minimize control is present', !!min && /Minimize player/.test(min.getAttribute('aria-label')||''), min?.getAttribute('aria-label')??null);
       done(JSON.stringify(out));
       } catch (e) { out.error=String(e?.message??e)+" | "+String(e?.stack??''); done(JSON.stringify(out)); }
     })()

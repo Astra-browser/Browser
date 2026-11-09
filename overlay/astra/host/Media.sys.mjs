@@ -10,8 +10,8 @@
 // Contract (bindings.ts `MediaPlayerView`):
 // - one view or `null`, emitted as `media-player-changed` only on change
 // - transport actions answer the admission `settle()` expects
-// - PiP/waiting are not exposed by this engine controller, so they are always
-//   false; position/duration are null unless the page publishes them.
+// - position/duration are null unless the page publishes them; `can_pip`
+//   follows playback and `in_pip` follows the engine's tab marker.
 //
 // Pure logic, no Firefox internals: the shell/Content supply the engine.
 

@@ -188,9 +188,9 @@
               {#if player.can_pip}<button
                   type="button"
                   class="media-control media-small"
-                  aria-label={m.media_pip()}
-                  aria-pressed={player.in_pip}
-                  title={m.media_pip()}
+                  data-in-pip={player.in_pip || undefined}
+                  aria-label={player.in_pip ? m.media_show_player() : m.media_pip()}
+                  title={player.in_pip ? m.media_show_player() : m.media_pip()}
                   onclick={() => mediaPlayer.pictureInPicture()}
                 >
                   <Icon icon={PictureInPictureOnIcon} size={14} />
@@ -345,6 +345,7 @@
   }
 
   .media-control[data-muted],
+  .media-control[data-in-pip],
   .media-control[aria-pressed="true"]:not(.media-toggle) {
     color: var(--color-accent);
   }

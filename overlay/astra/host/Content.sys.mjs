@@ -89,14 +89,13 @@ export function loadWatchStep({
  * back. It is a no-op on a non-remote browser, and every Astra page browser is
  * remote.
  *
- * Media is intentionally not an input. ESR 153 suspends a hidden page's media
- * only when the top browsing context opts in through
- * `suspendMediaWhenInactive` (`HTMLMediaElement::ShouldBeSuspendedByInactiveDocShell`);
- * the field defaults to false and `applyActivation` keeps it false, so a
- * parked tab keeps playing audio/video. If that ever stops holding, the narrow
- * exception is to keep the docshell active while
- * `browsingContext.mediaController.isPlaying === true` and re-park the tab on
- * the browser's `DOMAudioPlaybackStopped` event.
+ * Media is not an input by itself. ESR 153 suspends a hidden page's media only
+ * when the top browsing context opts in through `suspendMediaWhenInactive`
+ * (`HTMLMediaElement::ShouldBeSuspendedByInactiveDocShell`); the field
+ * defaults to false and `applyActivation` keeps it false, so a parked tab keeps
+ * playing audio/video. The exception is the source of a media PiP player:
+ * `applyTabActivation` keeps that browser active so the player's clone keeps
+ * receiving frames, and re-parks it when the engine clears the tab marker.
  */
 export function docshellState(isActive) {
   const active = isActive === true;
@@ -131,6 +130,26 @@ export function applyBrowserActivation(browser, isActive) {
   }
 }
 
+/**
+ * True when the browser is the source of a media Picture-in-Picture player.
+ * Gecko sets the native tab's `pictureinpicture` attribute when a clone opens
+ * and clears it when the player closes; while it is set the engine keeps the
+ * source docshell active so the clone receives frames. Parking it would stop
+ * that clone and make the page fire `VideoTabHidden` again, which auto-PiP
+ * reads as a second toggle and closes the player.
+ */
+export function isPictureInPictureSource(entry) {
+  const tab = entry && typeof entry === "object" ? entry.tab : null;
+  try {
+    return (
+      tab?.pictureinpicture === true ||
+      tab?.hasAttribute?.("pictureinpicture") === true
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Activate every browser in `active` and park every other entry. */
 export function applyTabActivation(browsers, active) {
   if (!browsers) return 0;
@@ -144,7 +163,8 @@ export function applyTabActivation(browsers, active) {
   for (const [id, entry] of entries) {
     const browser =
       entry && typeof entry === "object" && "browser" in entry ? entry.browser : entry;
-    if (applyBrowserActivation(browser, activeIds.has(id))) applied += 1;
+    const keep = activeIds.has(id) || isPictureInPictureSource(entry);
+    if (applyBrowserActivation(browser, keep)) applied += 1;
   }
   return applied;
 }
@@ -466,8 +486,10 @@ export const Content = {
       const state = mediaStates.get(id);
       if (!state) return null;
       const controller = state.controller;
+      const tab = tabOf.get(id);
       let active = false;
       let playing = false;
+      let pip = false;
       try {
         active = controller.isActive === true;
         playing = controller.isPlaying === true;
@@ -475,6 +497,16 @@ export const Content = {
         active = false;
         playing = false;
       }
+      try {
+        pip =
+          tab?.pictureinpicture === true ||
+          tab?.hasAttribute?.("pictureinpicture") === true;
+      } catch {
+        pip = false;
+      }
+      // One source of truth for the dispatch path too: the observer may have
+      // missed an attribute edge, but the card always reads the tab live.
+      state.in_pip = pip;
       if (active !== state.active) {
         state.active = active;
         if (active) state.activeSince = ++mediaClock;
@@ -487,28 +519,39 @@ export const Content = {
         if (playing && mediaSuppressed.has(id)) mediaSuppressed.delete(id);
       }
       if (mediaSuppressed.has(id)) return null;
-      if (!active) return null;
+      // An inactive controller is not the same as "nothing playing": Gecko
+      // deactivates one when playback pauses, and a tab can still be audible
+      // (or be the source of a PiP clone) while the controller is idle. Only
+      // drop the card when the tab offers no live signal at all.
+      let audible = false;
+      try {
+        audible = tab?.soundPlaying === true || controller.isAudible === true;
+      } catch {
+        audible = false;
+      }
+      if (!active && !playing && !audible && !pip) return null;
       let metadata = null;
       try {
         metadata = controller.getMetadata?.() ?? null;
       } catch {
         metadata = null;
       }
-      const tab = tabOf.get(id);
       let contentTitle = "";
       try {
         contentTitle = state.browser?.contentTitle ?? "";
       } catch {
         contentTitle = "";
       }
-      const title = String(metadata?.title || tab?.label || contentTitle || "").trim();
-      if (title === "") return null;
       let site = "";
       try {
         site = state.browser.currentURI?.host ?? "";
       } catch {
         site = "";
       }
+      const title = String(
+        metadata?.title || tab?.label || contentTitle || site,
+      ).trim();
+      if (title === "") return null;
       let muted = false;
       try {
         muted = state.browser.audioMuted === true;
@@ -526,9 +569,10 @@ export const Content = {
         playing,
         waiting: !playing && active,
         // The engine's PiP launcher can toggle any playing video in this
-        // browser; expose the control when there is something to launch.
-        can_pip: playing,
-        in_pip: state.in_pip === true,
+        // browser; while a player is open the same control restores it, so it
+        // stays available even when playback is paused.
+        can_pip: playing || pip,
+        in_pip: pip,
         muted,
         can_mute: true,
       };
@@ -568,6 +612,11 @@ export const Content = {
     const detachMedia = (id) => {
       const state = mediaStates.get(id);
       if (state) {
+        try {
+          state.pipObserver?.disconnect();
+        } catch {
+          // Already detached.
+        }
         for (const [type, fn] of state.listeners) {
           try {
             state.controller.removeEventListener(type, fn);
@@ -590,13 +639,19 @@ export const Content = {
         controller = null;
       }
       if (!controller || typeof controller.addEventListener !== "function") return;
+      let inPip = false;
+      try {
+        inPip = tabOf.get(id)?.hasAttribute?.("pictureinpicture") === true;
+      } catch {
+        inPip = false;
+      }
       const state = {
         browser,
         controller,
         position: null,
         duration: null,
         rate: null,
-        in_pip: false,
+        in_pip: inPip,
         audible: null,
         active: false,
         playing: false,
@@ -653,8 +708,59 @@ export const Content = {
       } catch {
         // No position state on this engine.
       }
+      // The PiP code sets `pictureinpicture` on the native tab directly, not
+      // through the tabbrowser helper, so no TabAttrModified arrives. Watch
+      // the one attribute on the one tab; it is released with the media state.
+      let pipObserver = null;
+      try {
+        const nativeTab = tabOf.get(id);
+        if (nativeTab) {
+          pipObserver = new win.MutationObserver(() => {
+            const inPip = nativeTab.hasAttribute("pictureinpicture");
+            if (state.in_pip === inPip) return;
+            state.in_pip = inPip;
+            projectCurrentMedia();
+          });
+          pipObserver.observe(nativeTab, {
+            attributes: true,
+            attributeFilter: ["pictureinpicture"],
+          });
+        }
+      } catch {
+        pipObserver = null;
+      }
+      state.pipObserver = pipObserver;
+      // The controller only forwards a few event types while inactive
+      // (`audiblechange` among them). The native tab attributes are the
+      // fallback for a tab whose sound or mute state changes without one.
+      state.refresh = refresh;
       mediaStates.set(id, state);
       refresh();
+    };
+    // The engine owns the player window. The card's PiP control asks it to
+    // come back when one is already open; the weak map is the engine's own
+    // player -> originating browser link, so no second guess is stored here.
+    const findPipWindow = (browser) => {
+      if (!browser) return null;
+      try {
+        const services = win.Services;
+        const CU = win.ChromeUtils ?? globalThis.ChromeUtils;
+        if (!services?.wm || typeof CU?.importESModule !== "function") return null;
+        const { PictureInPicture } = CU.importESModule(
+          "resource://gre/modules/PictureInPicture.sys.mjs",
+        );
+        for (const pipWin of services.wm.getEnumerator("Toolkit:PictureInPicture")) {
+          if (
+            !pipWin.closed &&
+            PictureInPicture.weakWinToBrowser?.get(pipWin) === browser
+          ) {
+            return pipWin;
+          }
+        }
+      } catch {
+        // No PiP module or no player window in this engine.
+      }
+      return null;
     };
     Media.__setEngine({
       dispatch: (id, action) => {
@@ -689,6 +795,27 @@ export const Content = {
             projectCurrentMedia();
             return true;
           case "picture_in_picture": {
+            // A player window that is already open may be behind the browser
+            // window; the card brings it forward instead of opening a second
+            // one. `in_pip` comes from the engine's own tab attribute, so a
+            // player the person minimized (closed) no longer answers here.
+            if (state?.in_pip) {
+              const pipWin = findPipWindow(state.browser);
+              if (pipWin) {
+                try {
+                  pipWin.restore();
+                } catch {
+                  // Already restored or the window manager refused.
+                }
+                try {
+                  pipWin.focus();
+                } catch {
+                  // The window may be closing; the tab still plays.
+                }
+                projectCurrentMedia();
+                return true;
+              }
+            }
             // The engine's own launcher actor finds the playing video in
             // this browser and toggles it. This is the same entry point the
             // automatic tab-switch path uses, so it works for the video a
@@ -707,8 +834,6 @@ export const Content = {
             } catch {
               return false;
             }
-            state.in_pip = state.in_pip !== true;
-            projectCurrentMedia();
             return true;
           }
           case "show":
@@ -940,6 +1065,12 @@ export const Content = {
         if (typeof title === "string" && title !== "") {
           void Tabs.setTitle({ astra_tab_id: id, title });
         }
+      }
+      // Sound and mute are native tab attributes; they are the fallback when
+      // a controller event is dropped while it is inactive. PiP state is
+      // watched per tab in `attachMedia`, where the tab is known.
+      if (changed.includes("soundplaying") || changed.includes("muted")) {
+        mediaStates.get(id)?.refresh?.();
       }
     };
     gb.tabContainer.addEventListener("TabAttrModified", onAttr);

@@ -88,6 +88,16 @@ test("the rest opens under the pointer: progress, times, picture in picture and 
   expect(native.player).toHaveBeenLastCalledWith("tab-1", { kind: "close" });
 });
 
+test("a player already in picture in picture offers to bring it back", async () => {
+  const screen = await render(MediaPlayer);
+  emitNativeEvent("mediaPlayerChanged", view({ in_pip: true }));
+  await screen.getByRole("region", { name: "Now playing" }).hover();
+  const show = screen.getByRole("button", { name: "Show player" });
+  await expect.element(show).toHaveAttribute("data-in-pip", "true");
+  await show.click();
+  expect(native.player).toHaveBeenLastCalledWith("tab-1", { kind: "picture_in_picture" });
+});
+
 test("seeking asks native and holds its place until the page answers", async () => {
   const screen = await render(MediaPlayer);
   emitNativeEvent("mediaPlayerChanged", view({ playing: false }));

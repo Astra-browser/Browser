@@ -1,0 +1,1 @@
+export{t as default}from"./AskCard-WIP5isiO.js";

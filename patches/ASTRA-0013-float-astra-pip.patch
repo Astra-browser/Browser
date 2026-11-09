@@ -1,15 +1,15 @@
 Patch-Id: ASTRA-0013
 Title: Float the media picture-in-picture window and dress it as Astra
 Tier: P2
-Upstream-Files: toolkit/components/pictureinpicture/PictureInPicture.sys.mjs, toolkit/components/pictureinpicture/content/player.xhtml
+Upstream-Files: toolkit/components/pictureinpicture/PictureInPicture.sys.mjs, toolkit/components/pictureinpicture/content/player.js, toolkit/components/pictureinpicture/content/player.xhtml
 Intent: a media PiP window is opened as a dependent dialog from the opener on Linux, so tiling Wayland compositors (Hyprland) treat it as a floater instead of giving it a tile; the native player keeps its always-on-top, aspect-locked, resizable behavior. The player document links Astra's stylesheet from `resource://astra/` (a `chrome://astra` stylesheet inside a `chrome://global` document loads with zero rules, measured) and allows `resource:` for styles in its CSP. After load the engine hands the window to Astra's `resource://astra/pip/PipPlayer.sys.mjs`, which copies the interface's light/dark theme for the window's lifetime and shows the site title in a slim head strip. The video, scrubber and transport controls remain Gecko's own; every observer and listener is released on the player's unload.
 Risk: low (Linux-only feature string and open path; macOS/Windows keep the existing window-watcher path, and the Astra dressing is additive and never changes playback)
-Test: forge lint; `build --faster --jobs 2`; `pip-player-probe.py` on Hyprland: the player is `floating: true` at 640×360, the Astra sheet reports 24 rules, the window follows dark→light→dark and paints the Astra ground, the head is present, and closing returns to the browser; the native player still closes and returns to its tab. The launcher gesture path is the same; this changes only how the window is created once the request reaches the parent.
+Test: forge lint; `build --faster --jobs 2`; `pip-player-probe.py` on Hyprland: the player is `floating: true` at 640×360, the Astra sheet reports 24 rules, the window follows dark→light→dark and paints the Astra ground, the head is present, and closing returns to the browser; `pip-minimize-probe.py`: the source stays active through a tab switch and a model update, Shift+close/minimize keeps the media playing without auto-PiP reopening the window, and the card can open it again. The launcher gesture path is the same; this changes only how the window is created once the request reaches the parent.
 Verified-On: 153.6.0
 Removal-Plan: drop the `dependent`/`window.open` part when upstream uses xdg-dialog-v1 for media PiP (bug 1958013); keep or fold the Astra stylesheet into the upstream player skin if upstream ever reads app-supplied theme tokens
 ---
 diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
-index e1cc8e0c1d..fccca4a0f9 100644
+index e1cc8e0c1d..4580cc5359 100644
 --- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
 +++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
 @@ -27,7 +27,34 @@ const PLAYER_URI = "chrome://global/content/pictureinpicture/player.xhtml";
@@ -19,9 +19,9 @@ index e1cc8e0c1d..fccca4a0f9 100644
 -const PLAYER_FEATURES = `chrome,alwaysontop,lockaspectratio,resizable,dialog,titlebar=${TITLEBAR}`;
 +// On Linux a media PiP window is a dependent dialog. `dependent` makes the
 +// window transient for its opener, which is the only hint a tiling Wayland
-+// compositor gets to float it instead of giving it a tile. The `titlebar`
-+// feature must stay present so the chrome mask still marks this as a media
-+// PiP window; the GTK widget is undecorated for that type anyway.
++// compositor gets to float it instead of giving it a tile. `titlebar=yes` is
++// deliberate: CHROME_TITLEBAR keeps the window out of the MediaPiP class, and
++// Hyprland tiles a MediaPiP window (measured); the dependent dialog floats.
 +const PLAYER_FEATURES =
 +  AppConstants.platform == "linux"
 +    ? "chrome,alwaysontop,lockaspectratio,resizable,dialog,dependent,titlebar=yes"
@@ -48,7 +48,79 @@ index e1cc8e0c1d..fccca4a0f9 100644
  
  const WINDOW_TYPE = "Toolkit:PictureInPicture";
  const TOGGLE_ENABLED_PREF =
-@@ -1141,13 +1168,24 @@ export var PictureInPicture = {
+@@ -125,6 +152,11 @@ export class PictureInPictureToggleParent extends JSWindowActorParent {
+         if (browser.documentGlobal.gBrowser.selectedBrowser == browser) {
+           break;
+         }
++        // A minimized player was closed while the tab stays hidden; do not
++        // open a new one for the same playback.
++        if (PictureInPicture.isAutoPipSuppressed(browser)) {
++          break;
++        }
+         let actor = browsingContext.currentWindowGlobal.getActor(
+           "PictureInPictureLauncher"
+         );
+@@ -255,6 +287,30 @@ export var PictureInPicture = {
+   // Maps auto pip browser to PictureInPictureParent actor
+   weakAutoPipBrowserToParent: new WeakMap(),
+ 
++  // Browsers whose player was closed without pausing (minimize). Auto-PiP
++  // must not reopen a window the person deliberately put away; selecting the
++  // originating tab clears the suppression.
++  autoPipSuppressed: new WeakSet(),
++
++  suppressAutoPip(browser) {
++    if (!browser) {
++      return;
++    }
++    this.autoPipSuppressed.add(browser);
++    // The window's own TabSelect listener is removed with the last player, so
++    // clear the suppression from the tab the person has to return to.
++    let tab = browser.getTabBrowser()?.getTabForBrowser(browser);
++    tab?.addEventListener(
++      "TabSelect",
++      () => this.autoPipSuppressed.delete(browser),
++      { once: true }
++    );
++  },
++
++  isAutoPipSuppressed(browser) {
++    return !!browser && this.autoPipSuppressed.has(browser);
++  },
++
+   /**
+    * Returns the player window if one exists and if it hasn't yet been closed.
+    *
+@@ -309,6 +365,7 @@ export var PictureInPicture = {
+         break;
+       }
+       case "TabSelect": {
++        this.autoPipSuppressed.delete(event.target.linkedBrowser);
+         this.unpipAutoPipBrowser(event);
+         this.updatePlayingDurationHistograms();
+         break;
+@@ -888,13 +945,17 @@ export var PictureInPicture = {
+    *   The reason for closing this PiP window
+    */
+   async closeSinglePipWindow(closeData) {
+-    const { reason, actorRef } = closeData;
++    const { reason, actorRef, withoutPause } = closeData;
+     const win = this.getWeakPipPlayer(actorRef);
+     if (!win) {
+       return;
+     }
+-    this.removePiPBrowserFromWeakMap(this.weakWinToBrowser.get(win));
+-    this.weakAutoPipBrowserToParent.delete(this.weakWinToBrowser.get(win));
++    const browser = this.weakWinToBrowser.get(win);
++    if (withoutPause) {
++      this.suppressAutoPip(browser);
++    }
++    this.removePiPBrowserFromWeakMap(browser);
++    this.weakAutoPipBrowserToParent.delete(browser);
+ 
+     Glean.pictureinpicture["closedMethod" + reason].record();
+     await this.closePipWindow(win);
+@@ -1141,13 +1202,24 @@ export var PictureInPicture = {
        features += ",private";
      }
  
@@ -80,7 +152,7 @@ index e1cc8e0c1d..fccca4a0f9 100644
  
      pipWindow._openDurationTimerId =
        Glean.pictureinpicture.windowOpenDuration.start();
-@@ -1164,6 +1202,7 @@ export var PictureInPicture = {
+@@ -1164,6 +1236,7 @@ export var PictureInPicture = {
        pipWindow.addEventListener(
          "load",
          () => {
@@ -88,6 +160,34 @@ index e1cc8e0c1d..fccca4a0f9 100644
            resolve(pipWindow);
          },
          { once: true }
+diff --git a/toolkit/components/pictureinpicture/content/player.js b/toolkit/components/pictureinpicture/content/player.js
+index 282a718093..54ac15ac8c 100644
+--- a/toolkit/components/pictureinpicture/content/player.js
++++ b/toolkit/components/pictureinpicture/content/player.js
+@@ -703,8 +703,12 @@ let Player = {
+         break;
+       }
+     }
+-    const { reason } = closeData;
+-    PictureInPicture.closeSinglePipWindow({ reason, actorRef: this.actor });
++    const { reason, withoutPause } = closeData;
++    PictureInPicture.closeSinglePipWindow({
++      reason,
++      actorRef: this.actor,
++      withoutPause,
++    });
+   },
+ 
+   onDblClick(event) {
+@@ -838,7 +842,7 @@ let Player = {
+       });
+     }
+ 
+-    this.closePipWindow({ reason: "CloseButton" });
++    this.closePipWindow({ reason: "CloseButton", withoutPause: bypassPause });
+   },
+ 
+   closeFromForeground() {
 diff --git a/toolkit/components/pictureinpicture/content/player.xhtml b/toolkit/components/pictureinpicture/content/player.xhtml
 index 09c9c5000d..9dab91d332 100644
 --- a/toolkit/components/pictureinpicture/content/player.xhtml

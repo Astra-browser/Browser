@@ -46,6 +46,34 @@ function dress(playerWin, parentWin) {
   head.append(word, title);
   doc.body.prepend(head);
 
+  // A tiling Wayland compositor ignores minimize() for an always-on-top
+  // dependent dialog, and a browser window cannot hide itself without
+  // closing. The player's own close path has the right primitive: Shift+close
+  // unpips without pausing, so the player window goes away while the page
+  // behind it keeps the song or video playing. Astra's button runs that same
+  // path instead of inventing a second one.
+  const minimize = doc.createElement("button");
+  minimize.type = "button";
+  minimize.className = "astra-pip-min";
+  minimize.setAttribute("aria-label", "Minimize player (audio keeps playing)");
+  minimize.title = "Minimize player — audio keeps playing";
+  const minimizePlayer = () => {
+    try {
+      const close = doc.getElementById("close");
+      close?.dispatchEvent(
+        new playerWin.MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          shiftKey: true,
+        }),
+      );
+    } catch {
+      // The native close path is the only owner of the player's teardown.
+    }
+  };
+  minimize.addEventListener("click", minimizePlayer);
+  doc.body.append(minimize);
+
   const syncTitle = () => {
     title.textContent = String(browser?.contentTitle || "").trim();
   };
@@ -68,6 +96,8 @@ function dress(playerWin, parentWin) {
       // Already detached.
     }
     observer = null;
+    minimize.removeEventListener("click", minimizePlayer);
+    minimize.remove();
     head.remove();
     playerWin.removeEventListener("unload", release);
   };

@@ -132,7 +132,52 @@ Work with `VITE_ASTRA_WORK=true` (the Vitest projects set it). Verification:
 `browser.work` leaves the surface on Browse, Settings groups are
 Browser/AI/App and Features offers only AI, Notes, Tasks and Time.
 
-## Owner report: Now playing + Astra picture-in-picture (2026-11-09, latest)
+## Owner report: PiP minimize — popup away, playback stays (2026-11-10, latest)
+
+**What changed:** Astra's PiP player has a minimize control beside the native
+close. It runs the engine's own unpip-without-pause close path (the same path
+Shift+close takes), so the popup closes and the originating tab keeps playing.
+A native `window.minimize()` was tried first and is not the answer: Hyprland
+ignores it for the always-on-top dependent dialog (measured `windowState` stayed
+`1`, never `STATE_MINIMIZED`), and the player cannot hide itself without
+closing. Closing the player is the safe path. The engine records the
+unpip-without-pause close and suppresses auto-PiP for that browser until its tab
+is selected again, so the hidden source cannot reopen the window immediately.
+The source docshell stays active while the clone is open; parking it fires
+`VideoTabHidden` and freezes the clone. The sidebar's
+`in_pip` state comes from the engine's own tab marker through a per-tab
+`MutationObserver` (the PiP code sets the attribute directly, so no
+`TabAttrModified` arrives); the card's PiP control raises an already-open
+player rather than opening a second one. The card itself no longer drops just
+because the controller deactivated or its title had not arrived: an audible or
+playing tab keeps the card, and the native `soundplaying`/`muted` attributes
+refresh the projection when the controller drops an event.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Minimize | closes the popup, leaves the tab unpiped and the media playing; no Pause is sent | `overlay/astra/pip/PipPlayer.sys.mjs` (`astra-pip-min` → `#close` with `shiftKey`), `overlay/astra/chrome/pip/player.css` | `pip-minimize-probe.py` PASS: player closed, tab marker gone, `controller.isPlaying` still true |
+| Restore | the card's PiP control reopens the player after minimize, or raises an open one | `overlay/astra/host/Content.sys.mjs` (`findPipWindow`, `picture_in_picture`), `MediaPlayer.svelte` (`Show player`) | same probe: second window opened from the card; `pip-player-probe.py` PASS |
+| State | `in_pip` follows the native `pictureinpicture` tab attribute open/close; the player's window map is the only source | `Content.sys.mjs` (`pipObserver`, `attachMedia`, `detachMedia`) | same probe: `in_pip=true` while open, `false` after minimize |
+| Tab switch | a PiP source stays active while its player is open, so a tab switch and the model update that follows it do not close or re-park the player | `Content.sys.mjs` (`isPictureInPictureSource`, `applyTabActivation`), engine auto-PiP (`docShellIsActive`) | same probe: switching to a silent tab keeps one window, the card stays on the source and `docShellIsActive` stays true |
+| Now playing | a playing or audible tab keeps the card when the controller is inactive or the title is still empty; `soundplaying`/`muted` attribute changes refresh it | `Content.sys.mjs` (`mediaView`, `attachMedia` `state.refresh`, `onAttr`) | `now-playing-probe.py` PASS: card named, silent switch kept it, newer playback took it, close stuck, pause kept it |
+
+**Verification:** `node tests/contract/tab_lifecycle.mjs` 17/17,
+`media_model.mjs` 58/58, `media_selection.mjs` 10/10, `hostapi_v1.mjs` 336
+checks, `wire_coverage.mjs` 50/50; `bun run typecheck` 0 errors/warnings;
+media component tests 9/9; `forge lint` 13/13, `state-check` and `brand-lint`
+clean; live `pip-minimize-probe.py` PASS, `now-playing-probe.py` PASS and
+`pip-player-probe.py` PASS on Hyprland.
+
+**Limit:** the live clip is generated VP8/Opus and the proof is the media
+controller's `isPlaying` across the close, not a speaker measurement. Minimize
+is an unpip (the player window closes), not an OS-iconified window; the card's
+PiP control is the restore path inside Astra, and the site's own PiP control
+also returns. The source docshell stays active while the player is open;
+closing it re-parks the source, and the engine suppresses auto-PiP for that
+browser until its tab is selected again. The cost is the hidden tab's layer
+while the player is open; after minimize the hidden page parks as usual.
+
+## Owner report: Now playing + Astra picture-in-picture (2026-11-09)
 
 **What changed:** the sidebar's Now playing card was one shared projection, so
 every tab's media event overwrote it and a silent tab's `null` view could clear

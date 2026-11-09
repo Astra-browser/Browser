@@ -16,8 +16,8 @@
   --astra-accent: #ededf0;
   --astra-radius: 12px;
   --astra-font:
-    "InterVariable", "Inter", system-ui, "Segoe UI Variable Text", "Segoe UI", "Noto Sans",
-    "Cantarell", sans-serif;
+    "InterVariable", "Inter", system-ui, "Segoe UI Variable Text", "Segoe UI",
+    "Noto Sans", "Cantarell", sans-serif;
 
   --player-bg-color: var(--astra-canvas);
   --player-control-icon-fill: var(--astra-text);
@@ -63,6 +63,7 @@ body {
   gap: 8px;
   height: 34px;
   padding: 0 12px;
+  padding-inline-end: 82px;
   background: linear-gradient(180deg, rgb(0 0 0 / 0.5), transparent);
   color: var(--astra-text);
   font: 600 10px/1 var(--astra-font);
@@ -107,6 +108,54 @@ body {
 
 .astra-pip-title:empty {
   display: none;
+}
+
+/* Sits beside the native close button and stays visible while the video is
+   playing: the person can put the window away without stopping the sound.
+   It is a sibling of the head strip so the native controls never paint over
+   it, but keeps the same top row. */
+.astra-pip-min {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 48px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--astra-radius);
+  background: color-mix(in srgb, var(--astra-text) 18%, transparent);
+  color: var(--astra-text);
+  cursor: pointer;
+  -moz-window-dragging: no-drag;
+  opacity: 0.7;
+  transition:
+    opacity var(--motion-fast, 120ms) ease-out,
+    background-color var(--motion-fast, 120ms) ease-out;
+}
+
+.astra-pip-min::before {
+  content: "";
+  inline-size: 11px;
+  block-size: 2px;
+  border-radius: 1px;
+  background: currentcolor;
+}
+
+.astra-pip-min:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--astra-text) 28%, transparent);
+  opacity: 1;
+}
+
+.astra-pip-min:focus-visible {
+  outline: 2px solid var(--astra-accent);
+  outline-offset: 1px;
+}
+
+.astra-pip-min:active {
+  scale: 0.9;
 }
 
 /* The transport row reads as theatre, not as a browser toolbar: a soft plate
@@ -206,7 +255,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .control-button,
-  .control-item {
+  .control-item,
+  .astra-pip-min {
     transition: none;
   }
 }
@@ -215,5 +265,11 @@ body {
   .astra-pip-head,
   #controls-bottom-gradient {
     background: none;
+  }
+
+  .astra-pip-min {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
   }
 }

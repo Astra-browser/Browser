@@ -3212,6 +3212,7 @@
   "media_position_text": "{position} of {duration}",
   "media_live": "Live",
   "media_pip": "Picture in picture",
+  "media_show_player": "Show player",
   "media_close": "Close player",
   "media_show_tab": "Go to the tab playing {title}",
   "page_permission_applying": "Saving…",

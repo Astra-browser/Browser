@@ -13,9 +13,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { docshellState, applyBrowserActivation, applyTabActivation } = await import(
-  path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")
-);
+const { docshellState, applyBrowserActivation, applyTabActivation, isPictureInPictureSource } =
+  await import(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs"));
 
 let passed = 0;
 function check(name, actual, expected) {
@@ -86,6 +85,37 @@ check(
   [
     ["tab-a", false],
     ["tab-b", true],
+  ],
+);
+
+// A media Picture-in-Picture source must keep its docshell active. The engine
+// writes that to feed the player's clone; parking it freezes the clone and
+// makes the page fire VideoTabHidden again, which auto-PiP reads as a second
+// toggle and closes the window the person just opened.
+function fakeTab({ pip = false } = {}) {
+  return {
+    pictureinpicture: pip,
+    hasAttribute(name) {
+      return name === "pictureinpicture" ? this.pictureinpicture : false;
+    },
+  };
+}
+
+check("a PiP source is recognised", isPictureInPictureSource({ tab: fakeTab({ pip: true }) }), true);
+check("an ordinary tab is not a PiP source", isPictureInPictureSource({ tab: fakeTab() }), false);
+check("an entry without a native tab is not a PiP source", isPictureInPictureSource({ browser: fakeBrowser() }), false);
+
+const pipBrowsers = new Map([
+  ["tab-pip", { browser: fakeBrowser(), tab: fakeTab({ pip: true }) }],
+  ["tab-front", { browser: fakeBrowser(), tab: fakeTab() }],
+]);
+check("a PiP source is not parked by a tab switch", applyTabActivation(pipBrowsers, "tab-front"), 2);
+check(
+  "the PiP source and the tab in front are both active",
+  [...pipBrowsers.entries()].map(([id, entry]) => [id, entry.browser.docShellIsActive]),
+  [
+    ["tab-pip", true],
+    ["tab-front", true],
   ],
 );
 
