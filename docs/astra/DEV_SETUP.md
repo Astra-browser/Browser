@@ -51,6 +51,24 @@ VITE_ASTRA_WORK=true bun run --filter @astra/frame dev
 The flag is read at build time, so changing it needs a rebuild. Beta 1 ships
 without it.
 
+## Installable release build
+
+```sh
+# frame already built with Work off (the default); builds overlay + engine:
+./tools/package-release.sh --with-build
+
+# or package the current dist/ without rebuilding:
+./tools/package-release.sh
+```
+
+Output: `out/release/Astra-<ver>-linux-x86_64.tar.xz` plus its `.sha256`.
+The archive is a portable browser folder with `astra-core`, an `install.sh`
+(per-user or `--system`), launcher, icons and desktop entry. It contains the
+full product with the Work flag off. `mach package` needs three Astra entries
+in the packaging manifest (`chrome/astra*`, `mozilla.cfg`, the autoconfig pref,
+`distribution/*`, the sidecar) and an `astra/defs.mk`; the script applies both
+fixes to the ignored `engine/` tree idempotently.
+
 ## Rebuild loop
 
 | Changed | Command | Time |
