@@ -192,7 +192,7 @@ const done = arguments[arguments.length - 1];
     const pd = principalOf(originD);
     step("dismiss writes no policy", perm(pd, "camera") === Services.perms.UNKNOWN_ACTION, perm(pd, "camera"));
     step("the page observes NotAllowedError", (await waitTitle(d.browser, "GUM-NotAllowedError")) === "GUM-NotAllowedError", d.browser?.contentTitle);
-    const d2 = await open(originD, "d2");
+    const d2 = await open(originD + "?again=1", "d2");
     step("dismiss does not block the next request", !!(await waitPrompt()));
     const next = host.Permissions.current().prompt;
     await host.Permissions.respond({
