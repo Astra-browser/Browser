@@ -17,6 +17,10 @@
   import { keymap } from "$domain/keymap";
   import { acceleratorKeys } from "$shared/lib/accelerator";
   import { IS_MAC } from "$shared/platform";
+  import { openAt } from "$features/menus";
+
+  /** The shape `openAt` accepts, so the rows are checked against the renderer. */
+  type MenuItems = Parameters<typeof openAt>[0]["items"];
 
   let { compact = false }: { compact?: boolean } = $props();
   onMount(() => {
@@ -52,12 +56,54 @@
   }
   const named = (label: string, keys: string | null) => (keys ? `${label}  ${keys}` : label);
   const run = (id: string) => void commands.runCommand(id).catch(() => {});
-  // The full native menu stays one gesture away, where a Mac user reaches for
-  // everything else a control can do.
-  function nativeMenu(event: MouseEvent) {
+  /**
+   * The same rows the stack shows, opened at the pointer. `tools_menu_popup`
+   * had no host route in this build, so a right-click asked for a native menu
+   * that never opened; every row here has a real caller in this window.
+   */
+  function openMenu(event: MouseEvent) {
     event.preventDefault();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    void commands.toolsMenuPopup(rect.left, rect.top);
+    const rows: MenuItems = [
+      {
+        kind: "item",
+        id: "shelf.profile",
+        label: `${name} — ${m.browse_profile_settings()}`,
+      },
+      ...others.map((profile) => ({
+        kind: "item" as const,
+        id: `shelf.switch.${profile.id}`,
+        label: profile.name,
+      })),
+      ...(!privately ? [{ kind: "item" as const, id: "shelf.private", label: privateLabel }] : []),
+    ];
+    // One group per rule in the stack; an empty group takes its rule with it.
+    for (const group of groups) {
+      rows.push({ kind: "separator" });
+      for (const kind of group) {
+        rows.push({
+          kind: "item",
+          id: `shelf.tool.${kind}`,
+          label: toolPresentation(kind).label(),
+          hint: keysFor(`tool.${kind}`) ?? undefined,
+        });
+      }
+    }
+    rows.push({ kind: "separator" });
+    rows.push({
+      kind: "item",
+      id: "shelf.settings",
+      label: m.command_browser_settings(),
+      hint: keysFor("browser.settings") ?? undefined,
+    });
+    openAt({ x: event.clientX, y: event.clientY, items: rows }, (choice) => {
+      if (choice === "shelf.profile") run("settings.profiles");
+      else if (choice === "shelf.private") run("window.newPrivate");
+      else if (choice === "shelf.settings") run("browser.settings");
+      else if (choice.startsWith("shelf.switch."))
+        void profiles.switchTo(choice.slice("shelf.switch.".length));
+      else if (choice.startsWith("shelf.tool."))
+        pick(choice.slice("shelf.tool.".length) as ToolKind);
+    });
   }
 </script>
 
@@ -105,7 +151,7 @@
   data-compact={compact}
   data-morph="profile"
   role="presentation"
-  oncontextmenu={nativeMenu}
+  oncontextmenu={openMenu}
 >
   <Disclosure
     label={name ? `${m.dock_tools()} — ${name}` : m.dock_tools()}
