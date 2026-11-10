@@ -9,7 +9,11 @@
      than cutting across its corner. */
   --menu-radius: var(--radius-row);
 
-  z-index: 50;
+  /* A menu portals to <body>, so it is a sibling of an open dialog rather
+     than a child. It must sit above the dialog scrim (80) and panel (81) or a
+     Select inside a dialog (the clear-data time range) renders behind the
+     scrim and cannot be clicked. */
+  z-index: 90;
   box-sizing: border-box;
   padding: var(--menu-pad);
   border-radius: var(--menu-radius);
