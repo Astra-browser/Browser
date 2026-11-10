@@ -1,1 +1,0 @@
-function e(e){return e?.closest(`[data-menu-material]`)?.getAttribute(`data-menu-material`)===`opaque`?`opaque`:void 0}export{e as t};

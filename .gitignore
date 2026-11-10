@@ -53,6 +53,8 @@ UI_IDEA
 
 ui_inspiration/
 
+/test_repo/
+
 # Local working docs (intentionally not published)
 /docs/release/release.md
 /docs/notes/bugs.txt

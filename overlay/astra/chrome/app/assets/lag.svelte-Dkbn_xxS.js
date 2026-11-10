@@ -1,1 +1,0 @@
-import{Cn as e,fn as t,rn as n,xn as r}from"./chrome-shared-BCUmjBxz.js";var i=500;function a(a,o=i){let s=e(!1);return t(()=>{if(!a()){r(s,!1);return}let e=setTimeout(()=>r(s,!0),o);return()=>clearTimeout(e)}),{get current(){return n(s)}}}export{a as t};

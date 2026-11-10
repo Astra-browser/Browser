@@ -1,1 +1,0 @@
-function e(e){if(e.columns[0]?.kind!==`entity`||e.rows.length<2||e.rows.length>5)return!1;let t=e.columns.filter((t,n)=>n>0&&e.rows.some(e=>(e.cells[n]??``).trim()));return t.length>=2&&t.length<=10}export{e as t};

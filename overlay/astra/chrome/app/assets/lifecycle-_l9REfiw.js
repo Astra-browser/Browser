@@ -1,1 +1,0 @@
-function e(){let e=0,t=!1;return{begin(){return t=!0,++e},isCurrent(n){return t&&e===n},end(){t=!1,e++}}}async function t(e){let t=await Promise.allSettled(e),n=[],r;for(let e of t)e.status===`fulfilled`?n.push(e.value):r??=e;if(r){for(let e of n)try{e()}catch{}throw r.reason}return n}export{t as n,e as t};
