@@ -225,6 +225,15 @@ for _ in range(40):
         break
     time.sleep(0.25)
 check("Astra's sheet receives the PIN prompt", (prompt or {}).get("prompt", {}).get("type") == "pin-required", json.dumps(prompt))
+raised = m.script("""
+const app = document.querySelector("iframe.astra-app-frame")?.contentDocument;
+return {
+  app: app?.documentElement?.dataset?.astraRaised === "true",
+  frame: document.querySelector(".astra-frame")?.dataset?.astraMenuOpen === "true",
+  sheet: !!app?.querySelector(".sheet"),
+};
+""")
+check("the sheet raises the app frame over the page", raised.get("app") is True and raised.get("frame") is True and raised.get("sheet") is True, json.dumps(raised))
 time.sleep(0.6)
 shot = m.cmd("WebDriver:TakeScreenshot", {"full": False}).get("value")
 if shot:
@@ -259,6 +268,15 @@ for _ in range(60):
 check("a passkey is created", created is not None and created.get("id"), json.dumps(created))
 check("it reports the platform attachment", (created or {}).get("attachment") == "platform", json.dumps(created))
 check("it advertises the internal transport", "internal" in ((created or {}).get("transports") or []), json.dumps(created))
+m.chrome()
+lowered = m.script("""
+const app = document.querySelector("iframe.astra-app-frame")?.contentDocument;
+return {
+  app: app?.documentElement?.dataset?.astraRaised === "true",
+  frame: document.querySelector(".astra-frame")?.dataset?.astraMenuOpen === "true",
+};
+""")
+check("the frame goes back under the page when the prompt closes", lowered.get("app") is False and lowered.get("frame") is False, json.dumps(lowered))
 
 # --- sign in ----------------------------------------------------------------
 focus_page(m)

@@ -25,10 +25,8 @@ describe("passkey copy", () => {
   });
 
   it("keeps private-window and PIN prompts distinct", () => {
-    expect(passkeyPromptMessage({ type: "private-blocked" }, "example.com")).toMatch(/private/i);
-    expect(passkeyPromptMessage({ type: "pin-required" }, "example.com")).toMatch(/example\.com/);
-    expect(passkeyPromptMessage({ type: "pin-invalid", retries: 3 }, "example.com")).toMatch(
-      /incorrect/i,
-    );
+    expect(passkeyPromptMessage({ type: "private-blocked" })).toMatch(/private/i);
+    expect(passkeyPromptMessage({ type: "pin-required" })).toMatch(/PIN to continue/i);
+    expect(passkeyPromptMessage({ type: "pin-invalid", retries: 3 })).toMatch(/incorrect/i);
   });
 });

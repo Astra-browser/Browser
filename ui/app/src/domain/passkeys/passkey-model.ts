@@ -22,7 +22,7 @@ export function passkeyErrorMessage(code: string | null | undefined): string {
 }
 
 /** Closed copy for a prompt the engine raised. */
-export function passkeyPromptMessage(prompt: PasskeyPrompt, origin: string): string {
+export function passkeyPromptMessage(prompt: PasskeyPrompt): string {
   switch (prompt.type) {
     case "private-blocked":
       return m.passkey_prompt_private();
@@ -39,7 +39,7 @@ export function passkeyPromptMessage(prompt: PasskeyPrompt, origin: string): str
     case "select-device":
       return m.passkey_prompt_blocked();
     default:
-      return m.passkey_prompt_pin({ origin });
+      return m.passkey_prompt_pin();
   }
 }
 

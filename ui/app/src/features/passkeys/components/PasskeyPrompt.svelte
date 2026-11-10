@@ -119,7 +119,7 @@
         <Button variant="primary" onclick={proceed}>{m.passkey_prompt_continue()}</Button>
       </div>
     {:else}
-      <p class="copy">{passkeyPromptMessage(prompt, origin)}</p>
+      <p class="copy">{passkeyPromptMessage(prompt)}</p>
       <div class="actions">
         <Button variant="secondary" onclick={() => void passkeys.answer("cancel")}
           >{m.passkey_prompt_cancel()}</Button
@@ -134,7 +134,7 @@
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: color-mix(in srgb, var(--ground-deep) 46%, transparent);
+    background: var(--overlay-scrim);
     backdrop-filter: blur(2px);
   }
 

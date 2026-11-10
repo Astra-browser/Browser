@@ -25,7 +25,7 @@ the staged plan.
 | Surface | What works | Wiring / files | Live evidence |
 |---|---|---|---|
 | Create + sign in | a resident-key request creates an ES256 credential and returns `platform` / `internal`; an empty-allow-list sign-in resolves it | `engine/dom/webauthn/authrs_bridge/src/platform.rs`, `toolkit/components/astra_passkeys` (from `passkeys/engine`), `patches/ASTRA-0014` | probe: created, attachment `platform`, transports `internal`, signed-in id matches, signature present |
-| Astra prompt | the native doorhanger is suppressed and Astra's sheet asks for the PIN; the answer goes back through `nsIWebAuthnService` | `toolkit/modules/WebAuthnPromptHelper.sys.mjs`, `overlay/astra/host/Passkeys.sys.mjs`, `ui/app/src/features/passkeys/**` | probe: sheet rendered, PIN field + Continue, prompt type `pin-required` |
+| Astra prompt | the native doorhanger is suppressed and Astra's sheet asks for the PIN; while it is open the shell raises the app frame over the page (a sheet is a pop-up like a menu), so it is visible with the bar hidden too | `toolkit/modules/WebAuthnPromptHelper.sys.mjs`, `overlay/astra/host/Passkeys.sys.mjs`, `ui/app/src/features/passkeys/**` | probe: sheet rendered, PIN field + Continue, prompt type `pin-required`, frame raised over the page and lowered again after the answer |
 | Settings | browser-wide on/off, create the vault, set/change the PIN, system authentication, unlock/lock, list and remove | `ui/app/src/features/settings/components/PasskeysGroup.svelte`, `domain/passkeys/**`, `passkey_call` route | probe: switch off → UVPAA false; wrong PIN refused, retries drop, right PIN unlocks; one credential listed |
 | At rest | AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC, NSS), vault key wrapped with PBKDF2-HMAC-SHA256-600k over the CTAP2 PIN hash; 0600 file, 0700 dir | `passkeys/engine/src/{seal,vault,pin,pbkdf2}.rs` | probe: file 0600, no PIN and no RP id in clear, sealed `ct`/`tag` present; 16 crate tests |
 | Private windows | a prompt in a private context is cancelled before the token can create or use a credential | `Passkeys.sys.mjs` (`isPrivateContext`) | contract: private prompt cancelled + not shown (live private-window probe deferred) |
@@ -36,7 +36,7 @@ the staged plan.
 `bun run typecheck` 0/0 and the passkey model unit tests 3/3; `forge lint`
 14/14; `state-check` and `brand-lint` clean; `build:chrome` staged 783 files
 with a clean CSP audit; engine `build --jobs 2` succeeded;
-`tools/marionette-probe/passkeys-probe.py` **24/24** on the packaged dev build.
+`tools/marionette-probe/passkeys-probe.py` **26/26** on the packaged dev build.
 The engine build needed the documented low-memory recipe (thin LTO on the final
 `gkrust` invocation) because fat LTO peaked at 18.3 GB and was OOM-killed while
 the editor held the desktop; zswap is already enabled on this machine.

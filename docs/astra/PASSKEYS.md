@@ -148,7 +148,7 @@ device-key wrap; without it every operation asks for the PIN.
   prompt answers and the private-context refusal.
 - `tests/contract/wire_coverage.mjs` — both new routes and the new channel.
 - `crates/astra-proto/check-drift.sh` — registries, fixtures, TS.
-- Live probe: `tools/marionette-probe/passkeys-probe.py` 24/24 on the packaged
+- Live probe: `tools/marionette-probe/passkeys-probe.py` 26/26 on the packaged
   dev build (create, sign in, wrong PIN + retries, browser-wide toggle, vault
   file at rest, list). The full lockout timer and a real private window are
   covered by unit/contract tests, not the live probe.
