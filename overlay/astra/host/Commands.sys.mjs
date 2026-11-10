@@ -24,7 +24,7 @@
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
-import { Tabs, __itemsSnapshot, __tabsState } from "./Tabs.sys.mjs";
+import { Tabs, __itemsSnapshot, __tabsState, __selectedInWindow } from "./Tabs.sys.mjs";
 import { Navigation } from "./Navigation.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
 import { Zoom } from "./Zoom.sys.mjs";
@@ -122,21 +122,21 @@ function admission(accepted) {
   return { operation_id: null, accepted };
 }
 
-function selectedId() {
-  return __tabsState().selectedId;
+function selectedId(window_id = "") {
+  return window_id ? __selectedInWindow(window_id) : __tabsState().selectedId;
 }
 
-async function tabIndexInSpace() {
-  const list = await Tabs.list({});
+async function tabIndexInSpace(window_id = "") {
+  const list = await Tabs.list({ window_id });
   const tabs = list.tabs ?? [];
-  const current = tabs.find((tab) => tab.astra_tab_id === selectedId());
+  const current = tabs.find((tab) => tab.astra_tab_id === selectedId(window_id));
   if (!current) return null;
   const order = tabs.filter((tab) => tab.space_id === current.space_id);
-  return { order, at: order.findIndex((tab) => tab.astra_tab_id === selectedId()) };
+  return { order, at: order.findIndex((tab) => tab.astra_tab_id === selectedId(window_id)) };
 }
 
-async function stepTab(direction) {
-  const pos = await tabIndexInSpace();
+async function stepTab(direction, window_id = "") {
+  const pos = await tabIndexInSpace(window_id);
   if (!pos || pos.at < 0) return admission(false);
   const next = pos.order[(pos.at + direction + pos.order.length) % pos.order.length];
   if (!next) return admission(false);
@@ -144,8 +144,8 @@ async function stepTab(direction) {
   return admission(true);
 }
 
-async function selectTabAt(index) {
-  const pos = await tabIndexInSpace();
+async function selectTabAt(index, window_id = "") {
+  const pos = await tabIndexInSpace(window_id);
   if (!pos) return admission(false);
   const target = index === -1 ? pos.order[pos.order.length - 1] : pos.order[index];
   if (!target) return admission(false);
@@ -158,15 +158,15 @@ async function stepSpace(direction) {
   return admission(result.accepted === true);
 }
 
-async function tabNavigation(method) {
-  const id = selectedId();
+async function tabNavigation(method, window_id = "") {
+  const id = selectedId(window_id);
   if (!id) return admission(false);
   const result = await Navigation[method]({ astra_tab_id: id });
   return admission(!result?.error);
 }
 
-async function zoomBy(delta) {
-  const id = selectedId();
+async function zoomBy(delta, window_id = "") {
+  const id = selectedId(window_id);
   if (!id) return admission(false);
   const current = await Navigation.getZoom({ astra_tab_id: id });
   const from = typeof current.zoom === "number" ? current.zoom : 1;
@@ -221,8 +221,8 @@ function homeUrl() {
   return first === undefined || first === "" ? "about:blank" : first;
 }
 
-async function goHome() {
-  const id = selectedId();
+async function goHome(window_id = "") {
+  const id = selectedId(window_id);
   if (!id) return admission(false);
   const result = await Navigation.loadURL({ astra_tab_id: id, url: homeUrl() });
   return admission(!result?.error);
@@ -234,7 +234,7 @@ export const Commands = {
    * surface event is emitted before the admission returns, so the app can
    * never paint a page native did not agree to.
    */
-  async run({ id = "" } = {}) {
+  async run({ id = "", window_id = "" } = {}) {
     if (typeof id !== "string" || id === "") {
       return admission(false);
     }
@@ -294,39 +294,39 @@ export const Commands = {
         await Tabs.create({ url: "about:blank" });
         return admission(true);
       case "tab.close": {
-        const current = selectedId();
+        const current = selectedId(window_id);
         if (!current) return admission(false);
         const out = await Tabs.close({ astra_tab_id: current });
         return admission(out.closed !== false);
       }
       case "tab.next":
-        return stepTab(1);
+        return stepTab(1, window_id);
       case "tab.previous":
-        return stepTab(-1);
+        return stepTab(-1, window_id);
       case "tab.above":
-        return stepTab(-1);
+        return stepTab(-1, window_id);
       case "tab.below":
-        return stepTab(1);
+        return stepTab(1, window_id);
       case "tab.select.last":
-        return selectTabAt(-1);
+        return selectTabAt(-1, window_id);
       case "nav.back":
-        return tabNavigation("goBack");
+        return tabNavigation("goBack", window_id);
       case "nav.forward":
-        return tabNavigation("goForward");
+        return tabNavigation("goForward", window_id);
       case "nav.reload":
-        return tabNavigation("reload");
+        return tabNavigation("reload", window_id);
       case "nav.hardReload":
-        return tabNavigation("hardReload");
+        return tabNavigation("hardReload", window_id);
       case "nav.home":
-        return goHome();
+        return goHome(window_id);
       case "nav.stop":
-        return tabNavigation("stop");
+        return tabNavigation("stop", window_id);
       case "zoom.in":
-        return zoomBy(0.1);
+        return zoomBy(0.1, window_id);
       case "zoom.out":
-        return zoomBy(-0.1);
+        return zoomBy(-0.1, window_id);
       case "zoom.reset":
-        return zoomBy(0);
+        return zoomBy(0, window_id);
       case "space.next":
         return stepSpace(1);
       case "space.previous":
@@ -335,7 +335,7 @@ export const Commands = {
         break;
     }
     const tabMatch = /^tab\.select\.(\d+)$/u.exec(id);
-    if (tabMatch) return selectTabAt(Number(tabMatch[1]) - 1);
+    if (tabMatch) return selectTabAt(Number(tabMatch[1]) - 1, window_id);
     const spaceMatch = /^space\.select\.(\d+)$/u.exec(id);
     if (spaceMatch) {
       const space = __itemsSnapshot().spaces[Number(spaceMatch[1]) - 1];

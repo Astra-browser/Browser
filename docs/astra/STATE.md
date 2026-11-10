@@ -45,6 +45,53 @@ the end — it runs every file sequentially in a real browser, and files this
 merge never touched (e.g. `SpacesLook`, `OnboardingApp`, `PageRequestCard`)
 time out at ~15 s under load.
 
+## Hardening run: window identity, private isolation, downloads, tab order (2026-11-10)
+
+Work branches (each merged with `--no-ff` into
+`integration/hardening-20261110`, then `main`):
+`fix/window-identity`, `fix/private-metadata`, `fix/private-bookmarks`,
+`fix/page-source-window`, `fix/private-split-storage`, `fix/media-window-scope`,
+`fix/private-durable-writes`, `fix/metadata-secondary-window`,
+`fix/downloads-lifecycle`, `fix/tab-order-and-history`,
+`fix/favicon-double-fetch`, `fix/favicon-cache-bound`,
+`fix/search-contract-default`, `fix/edge-matrix-native`, and the probe-timing
+fixes `fix/webrtc-dismiss-probe`, `fix/webext-action-probe`,
+`fix/native-surfaces-divider-probe`.
+
+| Surface | What changed | Verified |
+|---|---|---|
+| Window identity | `__bindCurrentWindow` allocates `win-N` per native window; the model keeps a per-window selection, window-relative indexes, and one window-scoped `items-changed` snapshot per window. Content reads its own selection. | contract `window_scope` 17/17; live `multi-window-isolation-probe.py` 11/11 |
+| Private windows | private prepare/init/flush/dispose never touch the organisation store; the chrome bookmark shortcut, Notes, media import, Migration start/export are refused; the Source driver is per window; split layout uses in-memory storage; Media engine/view is per window. | `metadata_restore` 74/74, `page_source_model` 20/20, `media_model` 63/63, shell unit 76/76; live isolation probe |
+| Second normal window | Metadata refuses a non-owner's dispose/release and does not reload the snapshot over the owner's. | `metadata_restore` secondary-window checks |
+| Downloads | pause = cancel, resume = start (with one retry for the canceled attempt), keep = unblock, discard = confirmBlock/remove. | `downloads_model` 126/126; live `downloads-lifecycle-probe.py` 15/15 (pause, paused, resume, full-size file, cancel, discard) |
+| Tabs | a moved row now reorders `gBrowser`; a restored tab seeds the model from SessionStore history; native close restores the closing tab without polluting MRU. | `window_scope` 17/17; live `tab-order-probe.py` 6/6; `sessionstore_probe.py` PASS with `canGoBack` |
+| Favicons | one read per origin (coalesced and cached, including "no icon", bounded at 256 origins), so an iconless page is not downloaded twice per commit. | `favicons_model` 39/39; edge matrix doc-request counts |
+| Edge matrix | reads the native stage, waits for the bar inset, counts document requests, treats Work as off (D-48), closes a second window rather than the last. | live 21/21 |
+
+**Limits still open:** multi-window spaces/pins are merged into one store
+(P5b-3); a second normal window still shares the active space; private
+windows can still open browser pages (their durable writes are refused); the
+`AsyncTabSwitcher` assertion seen while closing a private window under the
+hidden Weston compositor is engine-side and did not reproduce outside it.
+
+**Installed verification (0.1.744).** The tarball was installed over the
+previous `~/.local/opt/astra` with the bundled `install.sh`. `version-probe.py`
+reports `astra.version` 0.1.744 and About `Version 0.1.744`; the installed
+binary passes the edge matrix (21), multi-window isolation (11), downloads
+lifecycle (15), tab order (6), tabs churn (20) and native surfaces (44/44).
+A copy of the existing `~/.mozilla/astra` profile boots on the installed build
+with `Metadata.status().available === true`, `restored === true`, three spaces
+and its tab. The old process was still running while the folder was replaced,
+so a restart is required to pick up the new binary.
+
+**Perf (0.1.744, installed binary, `run_all.py --runs 1`):** startup 0.302 s
+cold / 0.301 s warm; 1-tab baseline 674 MiB, 10 tabs 929 MiB, 50 tabs 947 MiB,
+50 sleeping 1 177 MiB; tab switch 21.5 ms median (p95 87.5); scroll step
+16.7 ms median; blocker 131 724 rules, p95 2 616 ns. The memory numbers are
+higher than the 2026-11-02 table because that table predates the native tab
+stage and the current UI; the stock-ESR column is still TODO, so no budget
+verdict is claimed. `perf-0.1.744` holds the JSON.
+
 ## Dev/alpha version 0.1.742 (2026-11-10)
 
 The first build handed to dev/alpha testers carries Astra's **own** product

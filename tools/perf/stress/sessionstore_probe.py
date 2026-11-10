@@ -123,6 +123,7 @@ def main():
     before = out.get("before", {}).get("tabs") or []
     after = out.get("after", {}).get("tabs") or []
     native_after = out.get("native_after") if isinstance(out.get("native_after"), list) else []
+    restored_back = any((t.get("can_go_back") is True or t.get("canGoBack") is True) for t in after)
     ok = (
         len(before) == 2
         and len(after) == 2
@@ -130,7 +131,9 @@ def main():
         and any((t.get("url") or "").endswith("/two.html") for t in after)
         and len(native_after) == 2
         and all(t.get("id") for t in native_after)
+        and restored_back
     )
+    out["restored_can_go_back"] = restored_back
     return 0 if ok else 1
 
 

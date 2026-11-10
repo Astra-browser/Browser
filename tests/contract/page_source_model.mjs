@@ -60,6 +60,35 @@ check("a non-function driver is ignored", PageSource.setDriver != null && (await
 
 setDriver(async (tabId) => ({ url: "u", text: tabId }));
 check("the module exposes the same function", (await PageSource.pageSource({ tab_id: "z" })).text === "z");
+
+// === One driver per window ================================================
+setDriver(async (tabId) => ({ url: "normal", text: tabId }), "win-1");
+setDriver(async (tabId) => ({ url: "private", text: tabId }), "win-2");
+check(
+  "each window's driver answers its own tab",
+  (await pageSource({ tab_id: "a", window_id: "win-1" })).url === "normal" &&
+    (await pageSource({ tab_id: "a", window_id: "win-2" })).url === "private",
+);
+check(
+  "a window with no driver is not served by another window's driver",
+  (await pageSource({ tab_id: "a", window_id: "win-3" })) === null,
+);
+check(
+  "a window call does not fall back to the standalone driver",
+  (await pageSource({ tab_id: "a", window_id: "win-9" })) === null,
+);
+setDriver(null, "win-2");
+check(
+  "clearing one window leaves the other's driver installed",
+  (await pageSource({ tab_id: "a", window_id: "win-2" })) === null &&
+    (await pageSource({ tab_id: "a", window_id: "win-1" })).url === "normal",
+);
+setDriver(null);
+check(
+  "a direct caller with one live window is served that window",
+  (await pageSource({ tab_id: "a" })).url === "normal",
+);
+
 __resetPageSourceForTests();
 check("reset clears the driver", (await pageSource({ tab_id: "z" })) === null);
 

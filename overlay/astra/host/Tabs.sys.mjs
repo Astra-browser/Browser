@@ -118,14 +118,14 @@ function insertionIndexFor({ index, window_id, space_id }) {
   if (Number.isInteger(index) && index >= 0 && index <= _order.length) {
     return index;
   }
-  if (newTabPosition() !== "after-current" || !_selectedId) {
+  if (newTabPosition() !== "after-current" || !selectedForWindow(window_id)) {
     return _order.length;
   }
-  const selected = _tabs.get(_selectedId);
+  const selected = _tabs.get(selectedForWindow(window_id));
   if (!selected || selected.window_id !== window_id || selected.space_id !== space_id) {
     return _order.length;
   }
-  return _order.indexOf(_selectedId) + 1;
+  return _order.indexOf(selected.astra_tab_id) + 1;
 }
 
 // Schemes a tab may carry. The content binding loads under the system
@@ -161,6 +161,22 @@ let _nextId = 1;
 let _selectedId = "";
 /** The tab last looked at in each space, so a switch back returns to it. */
 const _selectedBySpace = new Map();
+/** The tab each window has in front. A selection in one window must not
+ *  repaint (or re-assert) the tab in front of another. */
+const _selectedByWindow = new Map();
+
+/** The tab in front of one window, or the process-wide last selection. */
+function selectedForWindow(window_id = "") {
+  if (window_id) return _selectedByWindow.get(window_id) ?? "";
+  return _selectedId;
+}
+
+/** The ids one window shows, in model order, for the active space. */
+function orderForWindow(window_id = "") {
+  return activeOrder().filter(
+    (id) => !window_id || _tabs.get(id)?.window_id === window_id,
+  );
+}
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -194,7 +210,10 @@ function snapshot(id) {
     page_request: tab.page_request ?? null,
     failure: tab.failure ?? null,
     certificate_exception: tab.certificate_exception === true,
-    index: _order.indexOf(id),
+    // Drag/drop indices are per window, which is also what gb.addTab takes.
+    index: _order
+      .filter((entry) => _tabs.get(entry)?.window_id === tab.window_id)
+      .indexOf(id),
     canGoBack: h.index > 0,
     canGoForward: h.index >= 0 && h.index < h.entries.length - 1,
     // Native group membership is part of the tab view the sidebar renders.
@@ -203,16 +222,21 @@ function snapshot(id) {
 }
 
 function selectInternal(id) {
+  const target = _tabs.get(id);
   for (const tab of _tabs.values()) {
-    tab.selected = tab.astra_tab_id === id;
+    // Each window owns its selection flag; selecting in one window must not
+    // clear the tab in front of every other window.
+    if (!target || tab.window_id === target.window_id) {
+      tab.selected = tab.astra_tab_id === id;
+    }
   }
   _selectedId = id;
-  const tab = _tabs.get(id);
-  if (tab) {
-    _selectedBySpace.set(tab.space_id, id);
+  if (target) {
+    _selectedByWindow.set(target.window_id, id);
+    _selectedBySpace.set(target.space_id, id);
     // One clock feeds the archive age, one feeds the sleep policy.
-    tab.last_active_at = clockNow();
-    tab.last_active_ms = Date.now();
+    target.last_active_at = clockNow();
+    target.last_active_ms = Date.now();
     touchMru(id);
   }
   const snap = snapshot(id);
@@ -222,6 +246,11 @@ function selectInternal(id) {
 
 export function __tabsState() {
   return { tabs: _tabs, history: _history, get selectedId() { return _selectedId; } };
+}
+
+/** The tab in front of one window; used by that window's Content mount. */
+export function __selectedInWindow(window_id = "") {
+  return selectedForWindow(window_id);
 }
 
 /**
@@ -382,11 +411,12 @@ export function __closeTabsInWindow(window_id) {
     }
     emit("tab.closed", { astra_tab_id: id, window_id });
   }
+  _selectedByWindow.delete(window_id);
   if (_selectedId && !_tabs.has(_selectedId)) {
     _selectedId = "";
-    // Never fall back to a tab from another space: the page in front would
-    // belong to a space the person is not looking at.
-    const first = activeOrder()[0];
+    // Never fall back to a tab from another space or window: the page in
+    // front would belong to a surface the person is not looking at.
+    const first = orderForWindow(window_id)[0] ?? activeOrder()[0];
     if (first !== undefined) {
       selectInternal(first);
     }
@@ -473,7 +503,7 @@ export function __applyExternalUpdate(id, patch = {}) {
   }
   // A page still doing something in front counts as activity: its progress
   // events must not let the idle clock run down on the tab the person is on.
-  if (tab.selected === true || id === _selectedId) {
+  if (tab.selected === true || id === selectedForWindow(tab.window_id)) {
     tab.last_active_ms = Date.now();
   }
   const snap = snapshot(id);
@@ -496,6 +526,42 @@ export function __pushHistory(id, url) {
 
 export function __historyFor(id) {
   return _history.get(id) ?? null;
+}
+
+/** Fill a model history from the engine's restored session history. A tab
+ *  restored by SessionStore already has its real entries; without this the
+ *  model said "one entry" and Back/Forward were dead on every restored tab. */
+export function __syncHistory(id, history) {
+  const entries = Array.isArray(history?.entries)
+    ? history.entries
+        .map((entry) => (typeof entry === "string" ? entry : entry?.url))
+        .filter((url) => typeof url === "string" && url !== "")
+    : [];
+  if (entries.length === 0) return false;
+  const index =
+    Number.isInteger(history?.index) && history.index >= 0 && history.index < entries.length
+      ? history.index
+      : entries.length - 1;
+  _history.set(id, { entries, index });
+  return true;
+}
+
+/** Put a tab back in front without touching the MRU stack or activity clock.
+ *  The engine selects the successor before it reports TabClose; restoring the
+ *  closing tab this way lets `tabs.after-close=recent` step from the tab the
+ *  person was really on instead of the engine's neighbour. */
+export function __restoreSelection(id) {
+  const target = _tabs.get(id);
+  if (!target) return false;
+  for (const tab of _tabs.values()) {
+    if (tab.window_id === target.window_id) {
+      tab.selected = tab.astra_tab_id === id;
+    }
+  }
+  _selectedId = id;
+  _selectedByWindow.set(target.window_id, id);
+  _selectedBySpace.set(target.space_id, id);
+  return true;
 }
 
 // --- Projection for the product UI (P3-T20) -------------------------------
@@ -662,11 +728,12 @@ function placeInRun(astra_tab_id, before) {
  *  holds no tab has nothing to put on the stage, and every caller downstream
  *  (address bar, navigation, content) resolves a selected tab first. A space
  *  keeps its own New Tab, created on demand, in its own display order. */
-async function ensureTabInActiveSpace(request_id = "") {
-  if (activeOrder().length > 0) {
+async function ensureTabInActiveSpace(request_id = "", window_id = "") {
+  const order = window_id ? orderForWindow(window_id) : activeOrder();
+  if (order.length > 0) {
     return false;
   }
-  await Tabs.create({ request_id, url: "about:blank" });
+  await Tabs.create({ request_id, url: "about:blank", window_id: window_id || DEFAULT_WINDOW_ID });
   return true;
 }
 
@@ -738,16 +805,22 @@ function tabView(id) {
 }
 
 /** Build the ItemsState the product UI renders (bindings.ts: ItemsState). */
-export function __itemsSnapshot() {
-  const order = activeOrder();
+export function __itemsSnapshot(window_id = "") {
+  const shown = (id) =>
+    _tabs.has(id) && (!window_id || _tabs.get(id)?.window_id === window_id);
+  const order = activeOrder().filter(shown);
   // Kept sites are the section above Today, and their run comes first: the
   // sidebar, the rail and the dock all read the order from these nodes.
   const kept = order.filter((id) => _tabs.get(id)?.pinned === true);
   const open = order.filter((id) => _tabs.get(id)?.pinned !== true);
   const tabs = [...kept, ...open].map(tabView).filter(Boolean);
-  const active = _selectedId && order.includes(_selectedId) ? _selectedId : (order[0] ?? null);
+  const selected = selectedForWindow(window_id);
+  const active = selected && order.includes(selected) ? selected : (order[0] ?? null);
   return {
     projection_revision: nextRevision(),
+    // Window-scoped so a shell can drop another window's projection. The app
+    // reads its own snapshot through the frame; no tab crosses the boundary.
+    window_id: window_id || _tabs.get(active)?.window_id || DEFAULT_WINDOW_ID,
     // `id` stays the build's stable scope ("default") for command routing;
     // `name` follows the profile whose spaces are in front.
     profile: {
@@ -757,11 +830,13 @@ export function __itemsSnapshot() {
     },
     spaces: _spaces.map((space) => ({
       ...space,
-      tabs: _order.filter((id) => _tabs.get(id)?.space_id === space.id).length,
+      tabs: _order.filter(
+        (id) => shown(id) && _tabs.get(id)?.space_id === space.id,
+      ).length,
       // The switcher stacks the mark of the space's first tabs beside its
       // name. A tab with no icon yet is null, which the app draws as a globe.
       previews: _order
-        .filter((id) => _tabs.get(id)?.space_id === space.id)
+        .filter((id) => shown(id) && _tabs.get(id)?.space_id === space.id)
         .slice(0, 3)
         .map((id) => _tabs.get(id)?.icon ?? null),
     })),
@@ -782,28 +857,42 @@ export function __itemsSnapshot() {
     ],
     tabs,
     active,
-    // Only a group whose members all still exist is a split; a close that the
-    // native side has not yet reported must not leave a ghost row.
+    // Only a group whose members all still exist and are in this window is a
+    // split; a close that the native side has not yet reported must not leave
+    // a ghost row.
     split_group:
       _splitGroup !== null &&
       _splitGroup.members.length > 1 &&
-      _splitGroup.members.every((id) => _tabs.has(id))
+      _splitGroup.members.every((id) => order.includes(id))
         ? { members: [..._splitGroup.members] }
         : null,
     split_groups:
       _splitGroups
         .filter(
           (group) =>
-            group.members.length > 1 && group.members.every((id) => _tabs.has(id)),
+            group.members.length > 1 &&
+            group.members.every((id) => order.includes(id)),
         )
         .map((group) => ({ members: [...group.members] }))
         .filter((group) => group.members.length > 1) || null,
   };
 }
 
-/** Announce the full projection; the app replaces its tree with it. */
+/** Announce the full projection; the app replaces its tree with it.
+ *  One event per window: the snapshot carries that window's own tabs, and the
+ *  shell drops anything whose `window_id` is not its own. */
 export function emitItemsChanged() {
-  emit("items-changed", __itemsSnapshot());
+  const ids = new Set();
+  for (const tab of _tabs.values()) {
+    if (typeof tab.window_id === "string" && tab.window_id !== "") {
+      ids.add(tab.window_id);
+    }
+  }
+  for (const id of _mruByWindow.keys()) ids.add(id);
+  if (ids.size === 0) ids.add(DEFAULT_WINDOW_ID);
+  for (const id of ids) {
+    emit("items-changed", __itemsSnapshot(id));
+  }
 }
 
 export const Tabs = {
@@ -830,6 +919,7 @@ export const Tabs = {
       // first page returns here instead of stopping at the first search.
       __pushHistory(astra_tab_id, "about:blank");
       _selectedId = astra_tab_id;
+      _selectedByWindow.set(DEFAULT_WINDOW_ID, astra_tab_id);
       touchMru(astra_tab_id);
     }
     emitItemsChanged();
@@ -857,7 +947,7 @@ export const Tabs = {
             tab.url === url,
         );
       if (existing) {
-        if (!background || _selectedId === "") selectInternal(existing.astra_tab_id);
+        if (!background || selectedForWindow(window_id) === "") selectInternal(existing.astra_tab_id);
         emitItemsChanged();
         return admitted(request_id, {
           astra_tab_id: existing.astra_tab_id,
@@ -896,7 +986,7 @@ export const Tabs = {
       // order and the engine's tab strip must be the same list.
       index: windowIndexOf(astra_tab_id),
     });
-    if (!background || _selectedId === "") {
+    if (!background || selectedForWindow(window_id) === "") {
       selectInternal(astra_tab_id);
     }
     emitItemsChanged();
@@ -927,8 +1017,9 @@ export const Tabs = {
 
   async close({ request_id = "", astra_tab_id = "" } = {}) {
     const tab = _tabs.get(astra_tab_id);
+    const windowId = tab?.window_id ?? DEFAULT_WINDOW_ID;
     // Where it sat in the space that is on screen, before it leaves the order.
-    const closedAt = activeOrder().indexOf(astra_tab_id);
+    const closedAt = orderForWindow(windowId).indexOf(astra_tab_id);
     const strategy = Settings.current("tabs.after-close") ?? "next";
     forgetMru(astra_tab_id, tab?.window_id);
     const existed = _tabs.delete(astra_tab_id);
@@ -940,12 +1031,16 @@ export const Tabs = {
     if (existed) {
       emit("tab.closed", { astra_tab_id, window_id: tab.window_id });
       // The closed tab is no longer anyone's remembered selection.
+      const wasSelected = selectedForWindow(windowId) === astra_tab_id;
       for (const [space, id] of _selectedBySpace) {
         if (id === astra_tab_id) _selectedBySpace.delete(space);
       }
-      if (_selectedId === astra_tab_id) {
-        _selectedId = "";
-        const after = activeOrder();
+      for (const [window_id, id] of _selectedByWindow) {
+        if (id === astra_tab_id) _selectedByWindow.delete(window_id);
+      }
+      if (wasSelected || _selectedId === astra_tab_id) {
+        if (_selectedId === astra_tab_id) _selectedId = "";
+        const after = orderForWindow(windowId);
         let next;
         if (strategy === "recent") {
           // The tab last looked at, not the tab whose owner opened this one:
@@ -967,7 +1062,7 @@ export const Tabs = {
         if (next !== undefined && next !== null) {
           selectInternal(next);
         } else {
-          await ensureTabInActiveSpace(request_id);
+          await ensureTabInActiveSpace(request_id, windowId);
         }
       }
     }
@@ -1063,11 +1158,12 @@ export const Tabs = {
     }
     // Its tabs close with it: a tab cannot outlive the space that held it.
     for (const id of [..._order].filter((id) => _tabs.get(id)?.space_id === space)) {
+      const closedWindowId = _tabs.get(id)?.window_id ?? DEFAULT_WINDOW_ID;
       _tabs.delete(id);
       _history.delete(id);
       const i = _order.indexOf(id);
       if (i >= 0) _order.splice(i, 1);
-      emit("tab.closed", { astra_tab_id: id, window_id: _tabs.get(id)?.window_id ?? DEFAULT_WINDOW_ID });
+      emit("tab.closed", { astra_tab_id: id, window_id: closedWindowId });
     }
     _spaces.splice(at, 1);
     emit("space.deleted", { space });
@@ -1200,7 +1296,7 @@ export const Tabs = {
       : [..._order];
     return ok(request_id, {
       tabs: ids.map((id) => snapshot(id)),
-      selected_tab_id: _selectedId,
+      selected_tab_id: selectedForWindow(window_id),
     });
   },
 
@@ -1497,8 +1593,11 @@ export function __adoptNative({
     at = _order.indexOf(before);
   }
   if (at < 0) {
-    if (resolveExternalPosition() === "after-current" && _selectedId && _tabs.has(_selectedId)) {
-      at = _order.indexOf(_selectedId) + 1;
+    if (resolveExternalPosition() === "after-current" && selectedForWindow(window_id)) {
+      const current = _tabs.get(selectedForWindow(window_id));
+      if (current && current.window_id === window_id) {
+        at = _order.indexOf(current.astra_tab_id) + 1;
+      }
     } else {
       at = _order.length;
     }
@@ -1508,6 +1607,7 @@ export function __adoptNative({
   __pushHistory(astra_tab_id, safeTabUrl(url));
   if (selected) {
     _selectedId = astra_tab_id;
+    _selectedByWindow.set(window_id, astra_tab_id);
   }
   return astra_tab_id;
 }
@@ -1637,7 +1737,7 @@ export function __sleepState() {
       url: tab.url ?? "",
       title: tab.title ?? "",
       last_active_ms: Number.isFinite(tab.last_active_ms) ? tab.last_active_ms : now,
-      active: tab.selected === true || id === _selectedId,
+      active: tab.selected === true || id === selectedForWindow(tab.window_id),
       pinned: tab.pinned === true,
       discarded: tab.discarded === true,
       private: tab.private === true,
@@ -1659,6 +1759,7 @@ export function __resetTabsForTests() {
   _nextId = 1;
   _selectedId = "";
   _selectedBySpace.clear();
+  _selectedByWindow.clear();
   // Spaces are part of the same model: leaving them behind made a suite's
   // spaces visible to the next one in the same process.
   _spaces = [

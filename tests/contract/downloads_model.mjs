@@ -285,17 +285,21 @@ for (const kind of ["entries", "teleport", ""]) {
       store = store.filter((entry) => entry.state === "receiving");
       return true;
     },
-    async pause() {
-      return false;
+    async pause(id) {
+      calls.push(["pause", id]);
+      return store.some((entry) => entry.id === id && entry.state === "receiving");
     },
-    async resume() {
-      return false;
+    async resume(id) {
+      calls.push(["resume", id]);
+      return store.some((entry) => entry.id === id && entry.state === "paused");
     },
-    async keep() {
-      return false;
+    async keep(id) {
+      calls.push(["keep", id]);
+      return store.some((entry) => entry.id === id && entry.state === "held");
     },
-    async discard() {
-      return false;
+    async discard(id) {
+      calls.push(["discard", id]);
+      return store.some((entry) => entry.id === id && entry.state === "held");
     },
   };
 
@@ -350,7 +354,18 @@ for (const kind of ["entries", "teleport", ""]) {
   const unknown = await call(P, { kind: "cancel", id: "00000000000000ff-0" });
   check("an unknown transfer is unavailable, not applied", unknown.kind === "error" && unknown.error === "unavailable");
   const paused = await call(P, { kind: "pause", id: "0000000000000002-0" });
-  check("pause is unavailable where the engine has no pause", paused.kind === "error" && paused.error === "unavailable");
+  check("pause reaches the native transfer", paused.kind === "applied");
+  const pausedAgain = await call(P, { kind: "pause", id: "0000000000000001-0" });
+  check("pause refuses a finished transfer", pausedAgain.kind === "error" && pausedAgain.error === "unavailable");
+  const resumed = await call(P, { kind: "resume", id: "0000000000000002-0" });
+  check("resume is refused for a transfer that is not paused", resumed.kind === "error" && resumed.error === "unavailable");
+  const pausedEntry = await call(P, { kind: "pause", id: "0000000000000002-0" });
+  check("pause is accepted for a receiving transfer", pausedEntry.kind === "applied");
+  check("pause named the native transfer", calls.some((call_) => call_[0] === "pause" && call_[1] === "0000000000000002-0"));
+  const kept = await call(P, { kind: "keep", id: "0000000000000003-0" });
+  check("keep is unavailable for data the engine did not hold", kept.kind === "error" && kept.error === "unavailable");
+  const discarded = await call(P, { kind: "discard", id: "0000000000000003-0" });
+  check("discard is unavailable for data the engine did not hold", discarded.kind === "error" && discarded.error === "unavailable");
 
   const removedBefore = await call(P, { kind: "list", before: null, limit: 50 });
   check("the snapshot saw three transfers", removedBefore.entries.length === 3);
@@ -374,6 +389,59 @@ for (const kind of ["entries", "teleport", ""]) {
   });
   const refused = await call(P, { kind: "set_ask_destination", enabled: false });
   check("a refused native write is unavailable", refused.kind === "error" && refused.error === "unavailable");
+
+  reset();
+
+  // A held (reputation-blocked) entry is the one case keep/discard accept.
+  __setDownloadsNative({
+    async list() {
+      return [view("0000000000000004-0", "held", { error: "protection" })];
+    },
+    async preferences() {
+      return { ...preferences };
+    },
+    async pause() {
+      return false;
+    },
+    async resume() {
+      return false;
+    },
+    async keep(id) {
+      calls.push(["keep", id]);
+      return id === "0000000000000004-0";
+    },
+    async discard(id) {
+      calls.push(["discard", id]);
+      return id === "0000000000000004-0";
+    },
+    async cancel() {
+      return false;
+    },
+    async open() {
+      return false;
+    },
+    async reveal() {
+      return false;
+    },
+    async forget() {
+      return false;
+    },
+    async clear() {
+      return true;
+    },
+    async setAskDestination() {
+      return true;
+    },
+    async chooseDirectory() {
+      return { cancelled: true };
+    },
+  });
+  const keptHeld = await call(P, { kind: "keep", id: "0000000000000004-0" });
+  check("keep reaches a held transfer", keptHeld.kind === "applied");
+  const droppedHeld = await call(P, { kind: "discard", id: "0000000000000004-0" });
+  check("discard reaches a held transfer", droppedHeld.kind === "applied");
+  const heldElsewhere = await call(P, { kind: "keep", id: "0000000000000005-0" });
+  check("keep of an unknown held transfer is unavailable", heldElsewhere.kind === "error" && heldElsewhere.error === "unavailable");
 
   reset();
 }

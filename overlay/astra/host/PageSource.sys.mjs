@@ -19,10 +19,22 @@
 export const MAX_SOURCE_CHARS = 2_000_000;
 
 let _driver = null;
+/** One engine read per chrome window. A second window must not overwrite (or
+ *  clear) the first window's driver, and a private window's tab can never be
+ *  read through the normal window's chrome document. */
+const _drivers = new Map();
 
-/** Install (or clear) the engine read. The shell owns the lifetime. */
-export function setDriver(driver) {
-  _driver = typeof driver === "function" ? driver : null;
+/** Install (or clear) one window's engine read. The shell owns the lifetime.
+ *  No window id is the standalone/single-window driver. */
+export function setDriver(driver, window_id = "") {
+  const key = typeof window_id === "string" ? window_id : "";
+  if (typeof driver === "function") {
+    _drivers.set(key, driver);
+    if (key === "") _driver = driver;
+    return;
+  }
+  _drivers.delete(key);
+  if (key === "") _driver = null;
 }
 
 /**
@@ -32,12 +44,20 @@ export function setDriver(driver) {
  * tab id, or the engine could not read the document. Never throws into the
  * bridge.
  */
-export async function pageSource({ tab_id = "" } = {}) {
-  if (!_driver) return null;
+export async function pageSource({ tab_id = "", window_id = "" } = {}) {
+  const key = typeof window_id === "string" ? window_id : "";
+  let driver = key === "" ? _driver : (_drivers.get(key) ?? null);
+  // A direct (non-relayed) caller has no window id. With one live window its
+  // driver is unambiguous; more than one stays an honest null rather than
+  // reading another window's page.
+  if (!driver && key === "" && _drivers.size === 1) {
+    driver = [..._drivers.values()][0];
+  }
+  if (!driver) return null;
   if (typeof tab_id !== "string" || tab_id === "") return null;
   let result = null;
   try {
-    result = await _driver(tab_id);
+    result = await driver(tab_id);
   } catch {
     return null;
   }
@@ -56,4 +76,5 @@ export const PageSource = { pageSource, setDriver };
 /** Test-only: drop the injected driver. */
 export function __resetPageSourceForTests() {
   _driver = null;
+  _drivers.clear();
 }

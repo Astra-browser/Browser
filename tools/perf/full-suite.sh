@@ -28,13 +28,13 @@ fi
 
 echo "== contracts"
 CONTRACTS=(
-  hostapi_v1 shell_assembly frame_model tab_lifecycle stage_rect tabs_admission
+  hostapi_v1 shell_assembly frame_model tab_lifecycle stage_rect tabs_admission window_scope
   dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert diagnostics_model
   permissions_prompt operations_ledger metadata_restore page_source_model tab_history
   media_model media_selection webext_view wire_coverage containers_isolation settings_native
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker
-  menu_layer telemetry_blocklist migration_model
+  menu_layer telemetry_blocklist migration_model search_model commands_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -58,6 +58,11 @@ PROBES=(
   "tabs:tools/perf/stress/gbrowser_tabs_probe.py"
   "p43:tools/perf/stress/gbrowser_p43_probe.py"
   "multiwindow:tools/perf/stress/gbrowser_multiwindow_probe.py"
+  "multi_window_isolation:tools/marionette-probe/multi-window-isolation-probe.py"
+  "downloads_lifecycle:tools/marionette-probe/downloads-lifecycle-probe.py"
+  "tab_order:tools/marionette-probe/tab-order-probe.py"
+  "tabs_churn:tools/marionette-probe/tabs-churn-probe.py"
+  "edge_matrix:tools/marionette-probe/edge-matrix.py"
   "sessionstore:tools/perf/stress/sessionstore_probe.py"
   "containers_space:tools/perf/stress/containers_space_probe.py"
   "containers_private:tools/perf/stress/containers_private_move_probe.py"

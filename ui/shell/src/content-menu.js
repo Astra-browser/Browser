@@ -77,6 +77,27 @@ function hostOf(url) {
   }
 }
 
+/** True for a private chrome window. Bookmarks are durable, so a chrome
+ *  shortcut/menu path must check this before it reaches Places: the app's own
+ *  bookmark surface is gated in the shell relay, the chrome menu was not. */
+function isPrivateWindow(win) {
+  try {
+    if (win?.PrivateBrowsingUtils?.isWindowPrivate?.(win) === true) {
+      return true;
+    }
+  } catch {
+    // Fall through to the module.
+  }
+  try {
+    const { PrivateBrowsingUtils } = win.ChromeUtils.importESModule(
+      "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+    );
+    return PrivateBrowsingUtils.isWindowPrivate(win) === true;
+  } catch {
+    return false;
+  }
+}
+
 /** The play/pause label asks the tab's own media controller, not a guess. */
 function isPlaying(browser) {
   try {
@@ -298,6 +319,8 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
 
   async function bookmark({ url, title }) {
     if (typeof url !== "string" || !/^https?:/i.test(url)) return NOTHING;
+    // A private window records nothing, and a bookmark is durable.
+    if (isPrivateWindow(win)) return NOTHING;
     // Go through the host module so the bookmark lands in the active space's
     // folder, not the global unfiled root.
     const saved = await host.Bookmarks.call({
@@ -637,6 +660,7 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
       return { accepted: true };
     case "bookmark.current":
     case "bookmark.add": {
+      if (isPrivateWindow(win)) return { accepted: false };
       try {
         const list = await host.Tabs.list({ request_id: `menu-${Date.now()}` });
         const tabs = list.tabs ?? [];

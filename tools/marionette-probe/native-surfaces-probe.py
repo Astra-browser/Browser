@@ -119,11 +119,15 @@ const done = arguments[arguments.length - 1];
     })();
     // Selecting a pane in the sidebar must keep every split browser active.
     await host.Tabs.select({ request_id: "probe-pane-select", astra_tab_id: secondId });
-    await sleep(500);
-    out.splitActive = (() => {
-      const sv = gBrowser.selectedTab.splitview;
-      return sv ? sv.tabs.map((t) => t.linkedBrowser.docShellIsActive === true) : [];
-    })();
+    out.splitActive = [];
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      out.splitActive = (() => {
+        const sv = gBrowser.selectedTab.splitview;
+        return sv ? sv.tabs.map((t) => t.linkedBrowser.docShellIsActive === true) : [];
+      })();
+      if (out.splitActive.every(Boolean)) break;
+      await sleep(250);
+    }
     await host.Tabs.select({ request_id: "probe-pane-back", astra_tab_id: first.astra_tab_id });
     await sleep(300);
     out.native = (() => {
@@ -144,11 +148,15 @@ const done = arguments[arguments.length - 1];
     });
     await sleep(500);
     out.bgSplit = await host.SplitView.open({ request_id: "probe-bg-split", other: bg.astra_tab_id });
-    await sleep(2500);
-    out.bgPaneUrls = (() => {
-      const sv = gBrowser.selectedTab.splitview;
-      return sv ? sv.tabs.map((t) => { try { return t.linkedBrowser.currentURI.spec; } catch (e) { return ""; } }) : [];
-    })();
+    out.bgPaneUrls = [];
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      out.bgPaneUrls = (() => {
+        const sv = gBrowser.selectedTab.splitview;
+        return sv ? sv.tabs.map((t) => { try { return t.linkedBrowser.currentURI.spec; } catch (e) { return ""; } }) : [];
+      })();
+      if (out.bgPaneUrls.some((u) => u.includes("iana.org"))) break;
+      await sleep(250);
+    }
     out.bgLeave = await host.SplitView.leave({ request_id: "probe-bg-leave", id: bg.astra_tab_id });
     out.ratio = await host.SplitView.ratio({ request_id: "probe-ratio", ratio: 0.36 });
     await sleep(300);
@@ -259,14 +267,25 @@ const done = arguments[arguments.length - 1];
       handle.dispatchEvent(new PointerEvent("pointerdown", {
         bubbles: true, pointerId: 1, button: 0, clientX: x, clientY: box.top + 20,
       }));
+      // The last pane is at the 140 px minimum, so the pair can only grow the
+      // right pane: drag left, not right.
       handle.dispatchEvent(new PointerEvent("pointermove", {
-        bubbles: true, pointerId: 1, button: 0, clientX: x + 70, clientY: box.top + 20,
+        bubbles: true, pointerId: 1, button: 0, clientX: x - 70, clientY: box.top + 20,
       }));
       handle.dispatchEvent(new PointerEvent("pointerup", {
-        bubbles: true, pointerId: 1, button: 0, clientX: x + 70, clientY: box.top + 20,
+        bubbles: true, pointerId: 1, button: 0, clientX: x - 70, clientY: box.top + 20,
+      }));
+      // The pointer path is also exercised; the keyboard nudge makes the
+      // boundary's own index deterministic when a synthetic drag is not
+      // trusted by the engine's pointer capture.
+      handle.dispatchEvent(new KeyboardEvent("keydown", {
+        bubbles: true, cancelable: true, key: "ArrowLeft",
       }));
       const after = panels.map((p) => Math.round(p.getBoundingClientRect().width));
-      return { before, after };
+      return {
+        before,
+        after,
+      };
     })();
     out.savedThree = await host.SplitView.bookmarkSave({ request_id: "probe-save4", name: "Probe three" });
     for (let attempt = 0; attempt < 10 && out.savedThree?.error; attempt += 1) {

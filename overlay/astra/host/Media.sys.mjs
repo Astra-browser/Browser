@@ -26,8 +26,14 @@ const ACTIONS = new Set([
   "close",
 ]);
 
-let _engine = null;
-let _view = null;
+/** One engine and one projection per chrome window: a private window's media
+ *  must never replace or clear the card the normal window is showing. */
+const _engines = new Map();
+const _views = new Map();
+
+function windowKey(window_id) {
+  return typeof window_id === "string" ? window_id : "";
+}
 
 function sameView(a, b) {
   if (a === b) return true;
@@ -48,52 +54,74 @@ function sameView(a, b) {
   );
 }
 
-function silent(tabId) {
-  return { operation_id: null, accepted: false, tab_id: tabId, view: _view };
+function silent(tabId, view = null) {
+  return { operation_id: null, accepted: false, tab_id: tabId, view };
 }
 
 export const Media = {
-  player({ id = "", action = null } = {}) {
-    if (typeof id !== "string" || id === "") return silent(id);
+  player({ id = "", action = null, window_id = "" } = {}) {
+    const key = windowKey(window_id);
+    const view = _views.get(key) ?? null;
+    if (typeof id !== "string" || id === "") return silent(id, view);
     if (!action || typeof action !== "object" || !ACTIONS.has(action.kind)) {
-      return silent(id);
+      return silent(id, view);
     }
     if (action.kind === "seek") {
       if (action.seconds !== null && !Number.isFinite(action.seconds)) {
-        return silent(id);
+        return silent(id, view);
       }
     }
-    if (!_engine) return silent(id);
+    const engine = _engines.get(key) ?? null;
+    if (!engine) return silent(id, view);
     try {
-      const accepted = _engine.dispatch(id, action) === true;
-      return { operation_id: null, accepted, tab_id: id, view: _view };
+      const accepted = engine.dispatch(id, action) === true;
+      return {
+        operation_id: null,
+        accepted,
+        tab_id: id,
+        view: _views.get(key) ?? null,
+      };
     } catch {
-      return silent(id);
+      return silent(id, view);
     }
   },
 
-  /** The projection the app should be showing. */
-  view() {
-    return _view;
+  /** The projection one window should be showing. */
+  view(window_id = "") {
+    return _views.get(windowKey(window_id)) ?? null;
   },
 
-  /** Content installs the engine (dispatch + teardown). */
-  __setEngine(engine) {
-    _engine = engine && typeof engine.dispatch === "function" ? engine : null;
+  /** Content installs the engine (dispatch + teardown) for its window. */
+  __setEngine(engine, window_id = "") {
+    const key = windowKey(window_id);
+    if (engine && typeof engine.dispatch === "function") {
+      _engines.set(key, engine);
+    } else {
+      _engines.delete(key);
+      // The window is going away; its card must not outlive the engine.
+      _views.delete(key);
+    }
   },
 
-  /** Replace the projection; emits once per real change. */
-  __projectMedia(tabId, view) {
+  /** Replace one window's projection; emits once per real change. */
+  __projectMedia(tabId, view, window_id = "") {
+    const key = windowKey(window_id);
     if (view !== null && (typeof view !== "object" || view.tab_id !== tabId)) return false;
-    if (sameView(_view, view)) return false;
-    _view = view;
-    emit("media-player-changed", _view);
+    const current = _views.get(key) ?? null;
+    if (sameView(current, view)) return false;
+    if (view === null) {
+      _views.delete(key);
+    } else {
+      _views.set(key, view);
+    }
+    // The shell drops another window's event; the app never reads this field.
+    emit("media-player-changed", view === null ? null : { ...view, window_id: key });
     return true;
   },
 
   __resetForTests() {
-    _engine = null;
-    _view = null;
+    _engines.clear();
+    _views.clear();
   },
 };
 

@@ -383,6 +383,9 @@ function scheduleRatioCapture(binding) {
 
 /** Read the pane widths a drag just produced back into the share table. */
 function rememberPaneRatios(binding) {
+  // A pair just wrote its exact shares; a late rect read must not replace
+  // them with the animation's still-old geometry.
+  if (Date.now() < (binding.captureHoldUntil ?? 0)) return;
   const splitview = selectedTab(binding)?.splitview ?? null;
   const panels = splitview?.panels ?? [];
   if (!splitview || panels.length < 2) return;
@@ -440,8 +443,9 @@ function syncResizers(binding, splitview) {
     resizer.style.pointerEvents = "auto";
     resizer.style.margin = "0";
     tabbox.appendChild(resizer);
-    resizers.push({ node: resizer, index });
-    bindResizer(binding, resizer, index);
+    const entry = { node: resizer, index };
+    resizers.push(entry);
+    bindResizer(binding, entry);
   }
   binding.resizers = resizers;
   applyPaneWidths(binding);
@@ -468,8 +472,12 @@ function positionResizers(binding) {
   }
 }
 
-function bindResizer(binding, resizer, index) {
+function bindResizer(binding, entry) {
+  const resizer = entry.node;
   const nudge = (event) => {
+    // The node is reused when the deck's pane count changes; its boundary is
+    // whatever the current split says, not the index it was created with.
+    const index = entry.index;
     const all = activePanels(binding);
     const left = all[index];
     const right = all[index + 1];
@@ -480,11 +488,19 @@ function bindResizer(binding, resizer, index) {
     if (event.key === "ArrowRight") direction = 1;
     if (direction === 0) return;
     event.preventDefault();
-    resizePair(left, right, left.getBoundingClientRect().width + direction * step);
+    resizePair(
+      left,
+      right,
+      left.getBoundingClientRect().width + direction * step,
+      0,
+      0,
+      binding,
+    );
     scheduleRatioCapture(binding);
   };
   const down = (event) => {
     if (event.button !== 0) return;
+    const index = entry.index;
     const all = activePanels(binding);
     const left = all[index];
     const right = all[index + 1];
@@ -500,7 +516,14 @@ function bindResizer(binding, resizer, index) {
       // Capture is optional; the element listeners still finish the drag.
     }
     const move = (moveEvent) => {
-      resizePair(left, right, startLeft + (moveEvent.clientX - startX), startLeft, startRight);
+      resizePair(
+        left,
+        right,
+        startLeft + (moveEvent.clientX - startX),
+        startLeft,
+        startRight,
+        binding,
+      );
       positionResizers(binding);
       scheduleResizerPosition(binding);
       scheduleRatioCapture(binding);
@@ -540,7 +563,28 @@ function bindResizer(binding, resizer, index) {
 }
 
 /** Resize one adjacent pair, keeping the rest of the split untouched. */
-function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0) {
+function rememberPairRatios(binding, left, right, leftWidth, rightWidth) {
+  if (!binding) return;
+  const splitview = selectedTab(binding)?.splitview ?? null;
+  const panels = splitview?.panels ?? [];
+  const at = panels.indexOf(left);
+  if (at < 0 || panels[at + 1] !== right) return;
+  const widths = panels.map((panel) => {
+    try {
+      return Math.max(0, panel.getBoundingClientRect().width);
+    } catch {
+      return 0;
+    }
+  });
+  widths[at] = Math.max(0, leftWidth);
+  widths[at + 1] = Math.max(0, rightWidth);
+  const total = widths.reduce((sum, width) => sum + width, 0);
+  if (total <= 0) return;
+  _paneRatios.set(splitview, widths.map((width) => width / total));
+  binding.captureHoldUntil = Date.now() + 800;
+}
+
+function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0, binding = null) {
   if (!left || !right) return;
   const leftWidth = startLeft || left.getBoundingClientRect().width;
   const rightWidth = startRight || right.getBoundingClientRect().width;
@@ -562,6 +606,10 @@ function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0) {
   } catch {
     // Detached.
   }
+  // Record the shares from the values just written. Reading the rects a frame
+  // later can see the engine's 50 ms pane animation (or an occluded window),
+  // capture the pre-drag widths and snap the drag back.
+  rememberPairRatios(binding, left, right, clamped, total - clamped);
 }
 
 /** Re-apply shares after the engine has flushed the new split's layout.

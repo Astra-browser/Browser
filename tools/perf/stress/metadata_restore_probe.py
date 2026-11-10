@@ -99,10 +99,33 @@ const done = arguments[arguments.length - 1];
     if (priv && priv !== host) {
       const privateTab = await priv.Tabs.create({ request_id: "m-priv-tab", url: "__PRIVATE__" });
       await wait(500);
-      const privSave = await priv.Metadata.save();
-      step("the private window refuses to save", privSave.saved === false && privSave.reason === "private", privSave);
-      step("the private window loaded no organisation", priv.Metadata.status().private === true);
+      const privSave = await priv.Metadata.save({ private: true });
+      step("the private window refuses to save", privSave.saved === false, privSave);
+      step(
+        "the private window never loaded the owner's store",
+        priv.Metadata.status().available === false
+          && priv.Metadata.status().owner === false,
+        priv.Metadata.status()
+      );
+      step(
+        "the normal window's store is untouched",
+        host.Metadata.status().available === true
+          && host.Metadata.status().private === false,
+        host.Metadata.status()
+      );
       out.privateTab = privateTab?.astra_tab_id ?? null;
+      // Close the private window before quitting: SessionStore restores the
+      // last closed window; leaving a private window in front loses the
+      // normal window's tabs on restart.
+      const listed = await priv.Windows.list({ request_id: "m-private-list" });
+      const privateWindow = (listed.windows ?? []).find((w) => w.private === true);
+      if (privateWindow) {
+        await priv.Windows.close({
+          request_id: "m-private-close",
+          window_id: privateWindow.window_id,
+        });
+        await wait(1200);
+      }
     } else {
       step("the private window refused to save", false, "no private host");
     }

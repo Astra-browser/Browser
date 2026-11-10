@@ -22,9 +22,11 @@
 // What this module will and will not say:
 // - A reply is either real native state or an honest error. Nothing is
 //   reported as `applied` when the write did not land.
-// - `pause`, `resume`, `keep` and `discard` name engine features this build
-//   does not expose (a paused download and a type-held download have no native
-//   API); they answer `unavailable` rather than pretending.
+// - `pause`, `resume`, `keep` and `discard` use the engine's own transfer
+//   lifecycle: pause cancels the transfer and keeps the entry as paused,
+//   resume starts the same Download again, keep unblocks a reputation-held
+//   one, and discard deletes the held data (or the stopped entry). A failure
+//   answers `unavailable` rather than pretending.
 // - A malformed call answers `{ kind: "error", error: "invalid" }`; without a
 //   native Downloads manager every read says `supported: false` and every
 //   write says `unavailable`.
@@ -104,6 +106,10 @@ let nativePromise = null;
 let nativeViewAttached = false;
 let changeTimer = null;
 
+/** Transfers cancelled through `pause`, so the wire says paused rather than
+ *  cancelled while their data can still be restarted. */
+const pausedIds = new Set();
+
 /** Profiles that have called this module; an event names each one so the
  *  panel's own profile filter keeps working. */
 const knownProfiles = new Set();
@@ -131,6 +137,7 @@ export function __resetDownloadsForTests() {
   nativePromise = null;
   nativeViewAttached = false;
   knownProfiles.clear();
+  pausedIds.clear();
   lastIds = null;
   if (changeTimer !== null && typeof globalThis.clearTimeout === "function") {
     globalThis.clearTimeout(changeTimer);
@@ -213,9 +220,12 @@ function idOf(download) {
 }
 
 /** Wire state for one native Download. */
-function stateOf(download) {
+function stateOf(download, id = null) {
   if (download?.error) return "failed";
   if (download?.hasBlockedData) return "held";
+  if (download?.canceled && download?.stopped && id !== null && pausedIds.has(id)) {
+    return "paused";
+  }
   if (download?.canceled) return download?.stopped ? "cancelled" : "cancelling";
   if (download?.stopped) return download?.succeeded ? "completed" : "interrupted";
   if (!download?.startTime) return "pending";
@@ -223,8 +233,8 @@ function stateOf(download) {
 }
 
 /** A revision that only grows while the wire state does. */
-function revisionOf(download) {
-  const state = stateOf(download);
+function revisionOf(download, id = null) {
+  const state = stateOf(download, id);
   const rank = {
     pending: 0,
     receiving: 1,
@@ -269,13 +279,14 @@ function filenameOf(download) {
 
 /** One `DownloadView`; no invented fields. */
 function viewOf(download) {
+  const id = idOf(download);
   return {
-    id: idOf(download),
-    revision: revisionOf(download),
+    id,
+    revision: revisionOf(download, id),
     created_at: (download?.startTime ?? new Date()).toISOString(),
     filename: filenameOf(download),
     source: download?.source?.url ?? "",
-    state: stateOf(download),
+    state: stateOf(download, id),
     received: String(Math.max(0, download?.currentBytes ?? 0)),
     total:
       Number.isSafeInteger(download?.totalBytes) && download.totalBytes > 0
@@ -375,6 +386,7 @@ function makeNative(scope) {
     async cancel(id) {
       const download = await find(id);
       if (!download) return false;
+      pausedIds.delete(id);
       await download.cancel();
       return true;
     },
@@ -396,6 +408,7 @@ function makeNative(scope) {
     async forget(id) {
       const download = await find(id);
       if (!download) return false;
+      pausedIds.delete(id);
       await (await list()).remove(download);
       return true;
     },
@@ -406,21 +419,79 @@ function makeNative(scope) {
       for (const download of all) {
         if (download.stopped) await target.remove(download);
       }
+      pausedIds.clear();
       return true;
     },
 
-    // The engine exposes no pause/resume or type-held lifecycle to this
-    // build; the module answers `unavailable` instead of inventing one.
-    async pause() {
-      return false;
+    // The engine's own panel implements pause as cancel and resume as start
+    // (`downloadsCmd_pauseResume`); the entry stays in the list because its
+    // target and partial data are still there. The paused marker keeps the
+    // wire state honest between the two calls.
+    async pause(id) {
+      const download = await find(id);
+      if (!download || download.stopped) return false;
+      pausedIds.add(id);
+      try {
+        await download.cancel();
+      } catch {
+        pausedIds.delete(id);
+        return false;
+      }
+      return true;
     },
-    async resume() {
-      return false;
+    async resume(id) {
+      const download = await find(id);
+      if (!download || !download.stopped || download.succeeded) return false;
+      pausedIds.delete(id);
+      try {
+        // Firefox's own pause/resume starts the Download without waiting for
+        // the whole transfer: the promise settles when it finishes, and a
+        // later failure arrives as state through downloads-changed. Awaiting
+        // it here would keep the host call (and the UI) busy for the entire
+        // download.
+        const attempt = download.start();
+        attempt?.catch?.(() => {
+          // Restarting a canceled transfer can lose its first attempt to the
+          // teardown of the canceled connection. The engine accepts the same
+          // start again once that attempt has failed; retry once so Resume
+          // does not leave a network failure in front of the person.
+          try {
+            download.start()?.catch?.(() => {});
+          } catch {
+            // The engine refused the retry; the failed state is honest.
+          }
+        });
+      } catch {
+        return false;
+      }
+      return true;
     },
-    async keep() {
-      return false;
+    async keep(id) {
+      const download = await find(id);
+      if (!download?.hasBlockedData) return false;
+      try {
+        await download.unblock();
+      } catch {
+        return false;
+      }
+      return true;
     },
-    async discard() {
+    async discard(id) {
+      const download = await find(id);
+      if (!download) return false;
+      pausedIds.delete(id);
+      try {
+        if (download.hasBlockedData) {
+          await download.confirmBlock();
+          return true;
+        }
+        if (download.stopped) {
+          await (await list()).remove(download);
+          return true;
+        }
+      } catch {
+        return false;
+      }
       return false;
     },
   };

@@ -27,6 +27,10 @@ import {
   __setTabGroup,
   __spaceUserContextId,
   __tabsState,
+  __selectedInWindow,
+  __syncHistory,
+  __restoreSelection,
+  __itemsSnapshot,
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
@@ -528,6 +532,14 @@ export const Content = {
       __markPrivate(id, isPrivateWindow(win));
       tabOf.set(id, tab);
       idOf.set(tab, id);
+      // A restored tab arrives with the engine's own session history. Seed
+      // the model so Back/Forward project and act on the real entries.
+      try {
+        const restored = sessionHistoryOf(win, tab);
+        if (restored && restored.entries.length > 1) __syncHistory(id, restored);
+      } catch {
+        // A tab still being restored keeps the model's New Tab entry.
+      }
       const browser = tab.linkedBrowser ?? null;
       if (browser) {
         browsers.set(id, { browser, tab });
@@ -659,14 +671,13 @@ export const Content = {
       };
     };
     const clearMedia = () => {
-      const showing = Media.view()?.tab_id;
-      if (showing) Media.__projectMedia(showing, null);
+      const showing = Media.view(window_id)?.tab_id;
+      if (showing) Media.__projectMedia(showing, null, window_id);
     };
     const projectCurrentMedia = () => {
-      if (isPrivateWindow(win)) {
-        clearMedia();
-        return;
-      }
+      // A private window records nothing and owns no card: never touch the
+      // projection another window is showing.
+      if (isPrivateWindow(win)) return;
       const views = new Map();
       const candidates = [];
       for (const id of mediaStates.keys()) {
@@ -681,14 +692,14 @@ export const Content = {
           activeSince: state?.activeSince ?? 0,
         });
       }
-      const currentId = Media.view()?.tab_id ?? "";
+      const currentId = Media.view(window_id)?.tab_id ?? "";
       const currentLive = candidates.some((entry) => entry.id === currentId && entry.live);
       const next = chooseMedia({ currentId, currentLive, candidates });
       if (next === null) {
         clearMedia();
         return;
       }
-      Media.__projectMedia(next, views.get(next) ?? mediaView(next));
+      Media.__projectMedia(next, views.get(next) ?? mediaView(next), window_id);
     };
     const detachMedia = (id) => {
       const state = mediaStates.get(id);
@@ -880,7 +891,7 @@ export const Content = {
         return false;
       }
     };
-    Media.__setEngine({
+    const mediaEngine = isPrivateWindow(win) ? null : {
       dispatch: (id, action) => {
         const state = mediaStates.get(id);
         const controller = state?.controller ?? null;
@@ -965,7 +976,8 @@ export const Content = {
             return false;
         }
       },
-    });
+    };
+    if (mediaEngine) Media.__setEngine(mediaEngine, window_id);
     const refreshIcon = (id) => {
       const tab = tabOf.get(id);
       const browser = tab?.linkedBrowser;
@@ -1067,6 +1079,9 @@ export const Content = {
       return tab;
     };
     const loadIn = (id, url, force = false) => {
+      // A fresh model navigation cancels any traversal still settling: its
+      // commit must not be rewritten as the Back/Forward that came before.
+      historyMoves.delete(id);
       const tab = tabOf.get(id);
       const blank = url === "about:blank";
       if (!tab || (!isLoadableUrl(url) && !blank)) return;
@@ -1235,7 +1250,7 @@ export const Content = {
       } else {
         // An engine-created tab is in front. P4.3 adopts it; until then put
         // the model's tab back rather than showing a page the model lost.
-        const selected = __tabsState().selectedId;
+        const selected = __selectedInWindow(window_id);
         if (selected) activate(selected);
       }
       // The player follows the tab behind the page in front.
@@ -1248,8 +1263,11 @@ export const Content = {
       // The engine can select the successor before it reports TabClose. The
       // model must still treat the tab being removed as the one in front, or
       // `tabs.after-close` has no tab to step from.
-      if (__tabsState().selectedId !== id) {
-        void Tabs.select({ astra_tab_id: id });
+      if (__selectedInWindow(window_id) !== id) {
+        // Restore the closing tab as the model's selection without touching
+        // MRU, so after-close=recent steps from the tab that was really in
+        // front rather than the successor the engine selected first.
+        __restoreSelection(id);
       }
       nativeClosing += 1;
       void Tabs.close({ astra_tab_id: id });
@@ -1379,6 +1397,24 @@ export const Content = {
       }
       if (event.type === "tab.created" && id) {
         ensureTab(id, event.data.url, event.data.index);
+        return;
+      }
+      if (event.type === "tab.moved") {
+        // The sidebar order is the product order; the hidden native strip must
+        // agree, or SessionStore restores the old order and a later
+        // window.open lands beside stale neighbours.
+        const view = __itemsSnapshot(window_id);
+        applying = true;
+        try {
+          for (const [index, entry] of view.tabs.entries()) {
+            const native = tabOf.get(entry.id);
+            if (native) gb.moveTabTo(native, { tabIndex: index });
+          }
+        } catch {
+          // Grouped or split tabs keep their engine placement.
+        } finally {
+          applying = false;
+        }
         return;
       }
       if (event.type === "tab.closed" && id) {
@@ -1705,7 +1741,7 @@ export const Content = {
         __flushSpaceHistory();
         __unbindSplitWindow(archiveWindow);
         __forgetWindow(archiveWindow);
-        Media.__setEngine(null);
+        Media.__setEngine(null, window_id);
         for (const id of [...mediaStates.keys()]) detachMedia(id);
         try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}

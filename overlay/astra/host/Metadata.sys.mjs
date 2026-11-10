@@ -314,14 +314,19 @@ export const Metadata = {
    * bootstraps, so adopted native tabs land in an existing space.
    */
   async prepare({ private: isPrivate = false, window_id: windowId = "" } = {}) {
-    // A private window keeps nothing: no spaces restored, nothing written.
-    _private = isPrivate === true;
-    _windowId = typeof windowId === "string" ? windowId : "";
-    _owner = _private ? false : claimOwner();
-    if (_private) {
-      _available = false;
-      return { state: "private" };
+    // A private window keeps nothing: no spaces restored, nothing written,
+    // and it must not change the normal window's store state.
+    if (isPrivate === true) return { state: "private" };
+    _private = false;
+    const requested = typeof windowId === "string" ? windowId : "";
+    _owner = claimOwner();
+    // A second window shares this process-wide store. It must not reload the
+    // snapshot over the owner's copy or take the writer slot; the owner's
+    // snapshot already includes both windows' tabs.
+    if (!_owner && (_off !== null || _available || _snapshot !== null)) {
+      return { state: "secondary" };
     }
+    _windowId = requested;
     const reply = await Boot.coreCall({
       request_id: "metadata-load",
       name: "session.load",
@@ -348,7 +353,8 @@ export const Metadata = {
    * Re-apply each restored tab's space and pin. Called after the native tab
    * mount adopted the `SessionStore` tabs.
    */
-  async restore() {
+  async restore({ private: isPrivate = false } = {}) {
+    if (isPrivate === true) return { restored: false, reason: "private" };
     if (_private) return { restored: false, reason: "private" };
     if (!_available || _snapshot === null) {
       return { restored: false, reason: _available ? "no_snapshot" : "unavailable" };
@@ -401,9 +407,9 @@ export const Metadata = {
   },
 
   /** Write the current organisation. Never called before `prepare`. */
-  async save() {
+  async save({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (_private) return { saved: false, reason: "private" };
+    if (isPrivate === true || _private) return { saved: false, reason: "private" };
     if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
       return { saved: false, reason: "not_owner" };
     }
@@ -454,9 +460,9 @@ export const Metadata = {
    * first; if nothing was ever saved, this is a no-op rather than an empty
    * write that would erase the person's organisation.
    */
-  async flush() {
+  async flush({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (_private) return { saved: false, reason: "private" };
+    if (isPrivate === true || _private) return { saved: false, reason: "private" };
     if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
       return { saved: false, reason: "not_owner" };
     }
@@ -480,11 +486,14 @@ export const Metadata = {
 
   /** Subscribe once and keep the store current after every organisation change. */
   init({ private: isPrivate = _private, window_id: windowId = _windowId } = {}) {
-    _private = isPrivate === true;
-    _windowId = typeof windowId === "string" ? windowId : _windowId;
-    _owner = _private ? false : claimOwner();
-    if (_private) return;
+    // A private window owns no organisation: it neither subscribes nor
+    // claims the writer slot, and must not flip the normal window's flag.
+    if (isPrivate === true) return;
+    // A second window never steals the owner's subscription or identity.
     if (_off !== null) return;
+    _private = false;
+    _windowId = typeof windowId === "string" ? windowId : _windowId;
+    _owner = claimOwner();
     _off = addEventListener((event) => {
       if (typeof event?.type !== "string") return;
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
@@ -495,8 +504,10 @@ export const Metadata = {
     scheduleSave();
   },
 
-  /** Give up the writer slot so another window can persist. */
-  releaseOwner() {
+  /** Give up the writer slot so another window can persist. Only the window
+   *  that prepared the store may release it. */
+  releaseOwner({ window_id = "" } = {}) {
+    if (window_id && _windowId && window_id !== _windowId) return false;
     const shared = sharedServices();
     try {
       if (shared && shared.astraOrgOwner === _token) delete shared.astraOrgOwner;
@@ -504,9 +515,11 @@ export const Metadata = {
       // A frozen Services object is not worth failing teardown over.
     }
     _owner = false;
+    return true;
   },
 
-  dispose() {
+  dispose({ window_id = "" } = {}) {
+    if (window_id && _windowId && window_id !== _windowId) return false;
     resetTimer();
     _off?.();
     _off = null;
@@ -525,6 +538,7 @@ export const Metadata = {
     _lastSavedAt = null;
     _lastError = null;
     _lastSnapshot = null;
+    return true;
   },
 
   status() {
