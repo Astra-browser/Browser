@@ -8,7 +8,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 276 command wire names. */
+/** All 278 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -139,6 +139,8 @@ export type CommandName =
   | "page_style_toggle_for"
   | "page_styles"
   | "page_styles_all"
+  | "passkey_answer_prompt"
+  | "passkey_call"
   | "panel_hide"
   | "panel_intent"
   | "panel_layout"
@@ -418,6 +420,8 @@ export const COMMANDS: readonly CommandName[] = [
   "page_style_toggle_for",
   "page_styles",
   "page_styles_all",
+  "passkey_answer_prompt",
+  "passkey_call",
   "panel_hide",
   "panel_intent",
   "panel_layout",
@@ -567,7 +571,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 36 event channel names (post-rename). */
+/** All 37 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -585,6 +589,7 @@ export type EventChannel =
   | "notes-changed"
   | "operation-processed"
   | "page-permission-prompt-changed"
+  | "passkey-prompt-changed"
   | "resource-changed"
   | "runtime-status-changed"
   | "search-changed"
@@ -624,6 +629,7 @@ export const EVENTS: readonly EventChannel[] = [
   "notes-changed",
   "operation-processed",
   "page-permission-prompt-changed",
+  "passkey-prompt-changed",
   "resource-changed",
   "runtime-status-changed",
   "search-changed",
@@ -1317,6 +1323,16 @@ export interface PageStylesPayload {
 /** `page_styles_all` (pageStylesAll, d:page_assist.rs). */
 export interface PageStylesAllPayload {
   profile: string;
+}
+/** `passkey_answer_prompt` (passkeyAnswerPrompt, d:passkeys.rs). */
+export interface PasskeyAnswerPromptPayload {
+  tid: number;
+  action: string;
+  value?: string;
+}
+/** `passkey_call` (passkeyCall, d:passkeys.rs). */
+export interface PasskeyCallPayload {
+  call: unknown; // PasskeyCall
 }
 /** `panel_hide` (panelHide, d:lib.rs). */
 export interface PanelHidePayload {
@@ -2162,6 +2178,8 @@ export interface CommandPayloads {
   "page_style_toggle_for": PageStyleToggleForPayload;
   "page_styles": PageStylesPayload;
   "page_styles_all": PageStylesAllPayload;
+  "passkey_answer_prompt": PasskeyAnswerPromptPayload;
+  "passkey_call": PasskeyCallPayload;
   "panel_hide": PanelHidePayload;
   "panel_intent": PanelIntentPayload;
   "panel_layout": PanelLayoutPayload;

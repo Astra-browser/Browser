@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 36,
+  "count": 37,
   "renames": {
     "prev:account-changed": "astra:account-changed",
     "prev:import-progress": "astra:import-progress",
@@ -116,6 +116,12 @@
       "ts": "pagePermissionPromptChanged",
       "payload": {
         "x-astra-rust-type": "PagePermissionPromptChanged"
+      }
+    },
+    "passkey-prompt-changed": {
+      "ts": "passkeyPromptChanged",
+      "payload": {
+        "x-astra-rust-type": "PasskeyPromptChanged"
       }
     },
     "resource-changed": {

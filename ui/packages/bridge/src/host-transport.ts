@@ -49,6 +49,7 @@ export interface HostModules {
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Passkeys: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   TabHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -209,6 +210,8 @@ const ROUTES: Record<string, Route> = {
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
   page_source: ["PageSource", "pageSource", { id: "tab_id" }],
+  passkey_call: ["Passkeys", "call"],
+  passkey_answer_prompt: ["Passkeys", "answer"],
   page_find: ["Navigation", "pageFind"],
   browser_open_url: ["Search", "openUrl"],
   newtab_search_context: ["Search", "newtabContext", { tab_id: "tabId" }],

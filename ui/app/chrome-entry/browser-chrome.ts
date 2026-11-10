@@ -190,6 +190,7 @@ try {
     "ui-command": "astra:ui-command",
     "operation-processed": "astra:operation-processed",
     "page-permission-prompt-changed": "astra:page-permission-prompt",
+    "passkey-prompt-changed": "astra:passkey-prompt",
     "web-extension-prompt-changed": "astra:web-extension-prompt",
     "nav.find-result": "astra:find",
     "runtime-status-changed": "astra:runtime-status",

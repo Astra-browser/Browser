@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 276,
+  "count": 278,
   "commands": {
     "about_info": {
       "ts": "aboutInfo",
@@ -3075,6 +3075,59 @@
         },
         "ts": "unknown",
         "rust": "PageStylesAllV1"
+      }
+    },
+    "passkey_answer_prompt": {
+      "ts": "passkeyAnswerPrompt",
+      "rust": "d:passkeys.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tid": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tid",
+          "action"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "type": "boolean"
+        },
+        "ts": "boolean",
+        "rust": "bool"
+      }
+    },
+    "passkey_call": {
+      "ts": "passkeyCall",
+      "rust": "d:passkeys.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "x-astra-rust-type": "PasskeyCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "PasskeyResponse"
+        },
+        "ts": "unknown",
+        "rust": "PasskeyResponse"
       }
     },
     "panel_hide": {

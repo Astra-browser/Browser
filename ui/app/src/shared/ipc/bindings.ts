@@ -466,6 +466,8 @@ export const commands = {
 	operationAcknowledge: (operationId: string) => __TAURI_INVOKE<boolean>("operation_acknowledge", { operationId }),
 	runCommand: (id: string) => __TAURI_INVOKE<OperationAdmission>("run_command", { id }),
 	panelHide: () => __TAURI_INVOKE<void>("panel_hide"),
+	passkeyAnswerPrompt: (tid: number, action: string, value: (string | null)) => __TAURI_INVOKE<boolean>("passkey_answer_prompt", { tid, action, value }),
+	passkeyCall: (call: PasskeyCall) => __TAURI_INVOKE<PasskeyResponse>("passkey_call", { call }),
 	panelReady: () => __TAURI_INVOKE<{
 	window_id: string | null,
 	revision: string,
@@ -724,6 +726,7 @@ export const events = {
 	notesChanged: makeEvent<NotesChanged>("notes-changed"),
 	operationProcessed: makeEvent<OperationProcessed>("operation-processed"),
 	pagePermissionPromptChanged: makeEvent<PagePermissionPromptChanged>("page-permission-prompt-changed"),
+	passkeyPromptChanged: makeEvent<PasskeyPromptChanged>("passkey-prompt-changed"),
 	resourceChanged: makeEvent<ResourceChanged>("resource-changed"),
 	runtimeStatusChanged: makeEvent<RuntimeStatusChanged>("runtime-status-changed"),
 	searchChanged: makeEvent<SearchChanged>("search-changed"),
@@ -7833,6 +7836,79 @@ export type ZoomLevelView = {
 export type ZoomResponse =
 /**  The profile's levels after the call, by site. */
 { kind: "levels"; levels: ZoomLevelView[] } | { kind: "error"; error: ZoomError };
+
+
+/** A Settings command for the Astra passkey vault. */
+export type PasskeyCall =
+/**  Reads the vault's capability and lock state. */
+{ kind: "status" } |
+{ kind: "set_enabled"; enabled: boolean } |
+{ kind: "enable"; pin: string; system_unlock: boolean } |
+{ kind: "unlock"; pin: string } |
+{ kind: "lock" } |
+{ kind: "change_pin"; old_pin: string; new_pin: string } |
+{ kind: "set_system_unlock"; enabled: boolean } |
+{ kind: "list" } |
+{ kind: "remove"; id: string } |
+{ kind: "remove_all" } |
+{ kind: "destroy" };
+
+export type PasskeyCredentialView = {
+	id: string,
+	rp_id: string,
+	user_name: (string | null),
+	discoverable: boolean,
+	created_at: number,
+};
+
+export type PasskeyStatusView = {
+	enabled: boolean,
+	exists: boolean,
+	has_pin: boolean,
+	unlocked: boolean,
+	system_unlock: boolean,
+	system_auth_available: boolean,
+	credential_count: number,
+	pin_retries_left: number,
+	locked_for_secs: number,
+	error: (string | null),
+};
+
+export type PasskeyResponse = {
+	ok: boolean,
+	error: (string | null),
+	status: PasskeyStatusView,
+	credentials: PasskeyCredentialView[],
+};
+
+/** The engine's WebAuthn prompt, projected for Astra's sheet. */
+export type PasskeyPrompt =
+{ type: "presence" } |
+{ type: "pin-required" } |
+{ type: "pin-invalid"; retries: (number | null) } |
+{ type: "select-sign-result"; entities: PasskeySignResult[] } |
+{ type: "private-blocked" } |
+{ type: "already-registered" } |
+{ type: "select-device" } |
+{ type: "pin-auth-blocked" } |
+{ type: "pin-not-set" } |
+{ type: "uv-invalid"; retries: (number | null) } |
+{ type: "uv-blocked" } |
+{ type: "device-blocked" } |
+{ type: "cancel" };
+
+export type PasskeySignResult = {
+	/** The CTAP2 user handle, as the engine serialises it. */
+	id: number[],
+	name: (string | null),
+	display_name: (string | null),
+};
+
+export type PasskeyPromptChanged = {
+	prompt: (PasskeyPrompt | null),
+	origin?: string,
+	tid?: number,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

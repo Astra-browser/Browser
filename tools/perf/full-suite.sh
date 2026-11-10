@@ -35,7 +35,7 @@ CONTRACTS=(
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker
   menu_layer telemetry_blocklist migration_model search_model commands_model
-  blocker_coverage
+  blocker_coverage passkeys_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -86,6 +86,7 @@ PROBES=(
   "webext_prompt:tools/perf/stress/webext_prompt_probe.py"
   "webext_action:tools/perf/stress/webext_action_probe.py"
   "webext_ui:tools/perf/stress/webext_ui_probe.py"
+  "passkeys:tools/marionette-probe/passkeys-probe.py"
   "devtools:tools/perf/stress/devtools_probe.py"
   "first_load:tools/perf/stress/first_load_probe.py"
   "settings_native:tools/marionette-probe/settings-native-probe.py"

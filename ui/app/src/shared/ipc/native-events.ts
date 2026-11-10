@@ -27,6 +27,7 @@ import type {
   MediaPlayerChanged,
   OperationProcessed,
   PagePermissionPromptChanged,
+  PasskeyPromptChanged,
   RuntimeStatusChanged,
   SearchChanged,
   TabChanged,
@@ -80,6 +81,7 @@ export const nativeEventNames = {
   extensionActionFailed: "astra:extension-action-failed",
   extensionActionShortcut: "astra:extension-action-shortcut",
   pagePermissionPromptChanged: "astra:page-permission-prompt",
+  passkeyPromptChanged: "astra:passkey-prompt",
   webExtensionAccessRequested: "astra:web-extension-access",
   webExtensionPromptChanged: "astra:web-extension-prompt",
   webExtensionStoreClicked: "astra:web-extension-store-click",
@@ -140,6 +142,7 @@ export const events = {
   pagePermissionPromptChanged: scopedEvent<PagePermissionPromptChanged>(
     nativeEventNames.pagePermissionPromptChanged,
   ),
+  passkeyPromptChanged: scopedEvent<PasskeyPromptChanged>(nativeEventNames.passkeyPromptChanged),
   webExtensionAccessRequested: scopedEvent<WebExtensionAccessRequested>(
     nativeEventNames.webExtensionAccessRequested,
   ),
