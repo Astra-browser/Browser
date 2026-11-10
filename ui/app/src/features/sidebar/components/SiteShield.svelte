@@ -16,7 +16,10 @@
   );
   const shieldOn = $derived(blocking.applied_enabled === true && blocking.site?.paused !== true);
   const showShield = $derived(
-    shieldSite !== null &&
+    // The native site switch is process-wide; a private window must not offer
+    // a pause that would leak into normal windows.
+    tabs.profile?.()?.kind !== "incognito" &&
+      shieldSite !== null &&
       blocking.site !== null &&
       blocking.protection !== "unavailable" &&
       shield.visible,
