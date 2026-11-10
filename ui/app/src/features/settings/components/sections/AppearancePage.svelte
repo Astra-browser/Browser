@@ -141,6 +141,32 @@
   <ThemeColors {editor} bind:mode />
 </SettingsGroup>
 
+<SettingsGroup title={m.look_accent()}>
+  <SettingsRow
+    settingId="appearance.accent"
+    title={m.look_accent_theme()}
+    description={m.look_accent_desc()}
+  >
+    <Select
+      label={m.look_accent()}
+      labelHidden
+      value={preferences.value("ui.accent")}
+      disabled={preferences.saving()}
+      options={[
+        { value: "graphite", label: m.settings_graphite() },
+        { value: "sky", label: m.settings_sky() },
+        { value: "sage", label: m.settings_sage() },
+        { value: "rose", label: m.settings_rose() },
+        { value: "amber", label: m.settings_amber() },
+        { value: "teal", label: m.settings_teal() },
+        { value: "lavender", label: m.settings_lavender() },
+        { value: "orchid", label: m.settings_orchid() },
+      ]}
+      onchange={(v) => void preferences.set("ui.accent", v)}
+    />
+  </SettingsRow>
+</SettingsGroup>
+
 <SettingsGroup title={m.look_window()}>
   <SettingsRow
     settingId="appearance.material"

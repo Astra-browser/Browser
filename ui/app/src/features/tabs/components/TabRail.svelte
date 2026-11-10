@@ -155,7 +155,14 @@
       data-under-panel
       data-glide-scroller
     >
-      <ul bind:this={list} class="rail-list" data-tabs-drop role="list" aria-label={m.open_tabs()} data-close-buttons={closeButtons}>
+      <ul
+        bind:this={list}
+        class="rail-list"
+        data-tabs-drop
+        role="list"
+        aria-label={m.open_tabs()}
+        data-close-buttons={closeButtons}
+      >
         {#each entries as tab, index (tab.id)}
           {@const active = tab.id === inFront}
           <li
@@ -372,13 +379,6 @@
     color: var(--color-text);
   }
 
-  .rail-list > li:hover .rail-close {
-    opacity: 1;
-    scale: 1;
-    pointer-events: auto;
-    transition-delay: 160ms, 160ms, 0ms;
-  }
-
   /* "Show on every tab" is one setting for the expanded list and the compact
      rail. The rail used to ignore it, and Settings forces the compact column
      while the choice is made, so the setting looked dead. */
@@ -387,6 +387,13 @@
     scale: 1;
     pointer-events: auto;
     transition-delay: 0ms;
+  }
+
+  .rail-list > li:hover .rail-close {
+    opacity: 1;
+    scale: 1;
+    pointer-events: auto;
+    transition-delay: 160ms, 160ms, 0ms;
   }
 
   .rail-list > li:hover .rail-close:active {

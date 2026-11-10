@@ -196,6 +196,22 @@ export const fields = {
       label: () => m.zoom_percent({ percent }),
     })),
   },
+  "appearance.accent": {
+    section: "appearance",
+    label: m.look_accent_theme,
+    description: m.look_accent_desc,
+    initial: "graphite",
+    options: [
+      { value: "graphite", label: m.settings_graphite },
+      { value: "sky", label: m.settings_sky },
+      { value: "sage", label: m.settings_sage },
+      { value: "rose", label: m.settings_rose },
+      { value: "amber", label: m.settings_amber },
+      { value: "teal", label: m.settings_teal },
+      { value: "lavender", label: m.settings_lavender },
+      { value: "orchid", label: m.settings_orchid },
+    ],
+  },
   "appearance.zoom-levels": {
     section: "appearance",
     label: m.zoom_levels_title,
