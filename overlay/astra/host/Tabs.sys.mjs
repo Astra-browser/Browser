@@ -836,7 +836,7 @@ export const Tabs = {
     return ok(request_id, { bootstrapped: true, selected_tab_id: _selectedId });
   },
 
-  async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1 } = {}) {
+  async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1, dedupe = true } = {}) {
     if (typeof url !== "string" || url === "") {
       return err(request_id, "invalid_url", "url must be a non-empty string");
     }
@@ -845,7 +845,7 @@ export const Tabs = {
     // "Switch to an existing tab": opening a page that is already open in this
     // window and space selects that row instead of making a second copy. The
     // setting had a UI but no host reader at all.
-    if (url !== "about:blank" && Settings.current("tabs.switch-to-open") !== "false") {
+    if (dedupe && url !== "about:blank" && Settings.current("tabs.switch-to-open") !== "false") {
       const existing = activeOrder()
         .map((id) => _tabs.get(id))
         .find(
@@ -1255,6 +1255,8 @@ export const Tabs = {
       background: true,
       window_id: src.window_id,
       index: _order.indexOf(astra_tab_id) + 1,
+      // Duplicate is an explicit "make a copy"; it is never the dedupe path.
+      dedupe: false,
     });
     if (created.error) {
       return created;
