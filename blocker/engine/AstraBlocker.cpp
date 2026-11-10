@@ -207,6 +207,16 @@ bool ApplyChannelAction(nsIChannel* aChannel) {
   };
 
   if (block) {
+    // Never silently cancel a top-level document. The engine has its own Safe
+    // Browsing interstitial for malware; a filter-list document rule killed
+    // the navigation before connect, so the stage stayed on its own dark
+    // ground with no page and no explanation (owner: tlauncher.org). Filter
+    // lists still block every subresource, which is where the trackers and
+    // ads live.
+    if (isDocument) {
+      freeActions();
+      return false;
+    }
     freeActions();
     aChannel->Cancel(NS_ERROR_ABORT);
     return true;

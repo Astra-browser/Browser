@@ -1293,7 +1293,7 @@ export const Content = {
       onCommit: (id, url) => {
         if (!isPrivateWindow(win)) noteTabVisit(id, url);
       },
-      onStop: (id) => {
+      onStop: (id, browser) => {
         // A load can stop without a commit (a bfcache traversal, a cancelled
         // request, a same-document move). Clear the history direction and the
         // loading cover here so Back cannot leave an inert layer over the page
@@ -1301,9 +1301,30 @@ export const Content = {
         historyMoves.delete(id);
         __applyExternalUpdate(id, { loading: false });
         refreshIcon(id);
+        // The engine's failed page is its own about:neterror document. Read
+        // the document that really landed so the app can draw Astra's page
+        // instead of the native one.
+        try {
+          const spec = browser?.documentURI?.spec ?? "";
+          if (spec.startsWith("about:neterror") || spec.startsWith("about:blocked")) {
+            DialogPrompts.netErrorFor({ failedURI: spec, tabId: id });
+          }
+        } catch {
+          // A browser torn down as the load stopped.
+        }
       },
       onErrorPage: ({ astra_tab_id, url, browser }) => {
-        void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id });
+        void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id }).then(
+          (handled) => {
+            if (handled) return;
+            // The error document is committed in this same turn; set the
+            // app's failed page after that commit so Navigation does not
+            // clear it again.
+            setTimeout(() => {
+              DialogPrompts.netErrorFor({ failedURI: url, tabId: astra_tab_id });
+            }, 0);
+          },
+        );
       },
     });
     gb.addTabsProgressListener(progress);
