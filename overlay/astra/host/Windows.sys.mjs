@@ -162,13 +162,53 @@ export function __bindCurrentWindow(win) {
   if (!win) {
     return "";
   }
-  const existing = _native.get("win-1");
-  // Never let a second window steal win-1 from the window that owns it.
-  if (existing && existing !== win && existing.closed !== true) {
-    return "win-1";
+  // A window keeps its identity for its whole life. Binding the same native
+  // window again is a read, never a rebind.
+  const bound = _nativeIds.get(win);
+  if (bound && _native.get(bound) === win && win.closed !== true) {
+    return bound;
   }
-  bindNative("win-1", win, { replace: true });
-  return "win-1";
+  // Drop ids whose native window is gone, then reuse `win-1` only when no
+  // live window owns it.
+  for (const [candidate, native] of [..._native]) {
+    if (native?.closed === true) {
+      _native.delete(candidate);
+      _windows.delete(candidate);
+      _nativeIds.delete(native);
+    }
+  }
+  let id = "";
+  for (const [candidate, native] of _native) {
+    if (native === win) {
+      id = candidate;
+      break;
+    }
+  }
+  if (!id) {
+    const first = _native.get("win-1");
+    if (!first || first.closed === true) {
+      id = "win-1";
+    } else {
+      do {
+        id = `win-${_nextId++}`;
+      } while (_windows.has(id) || _native.has(id));
+    }
+  }
+  if (!_windows.has(id)) {
+    _windows.set(id, {
+      window_id: id,
+      focused: _focusedId === "",
+      fullscreen: false,
+      private: isPrivateWindow(win),
+      title: "Astra",
+    });
+    if (_focusedId === "") {
+      _focusedId = id;
+    }
+    emit("window.created", { window_id: id, private: isPrivateWindow(win) });
+  }
+  bindNative(id, win, { replace: true });
+  return id;
 }
 
 /** Read native state back into the projection before answering. */

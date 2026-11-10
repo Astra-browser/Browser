@@ -27,6 +27,7 @@ import {
   __setTabGroup,
   __spaceUserContextId,
   __tabsState,
+  __selectedInWindow,
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
@@ -1235,7 +1236,7 @@ export const Content = {
       } else {
         // An engine-created tab is in front. P4.3 adopts it; until then put
         // the model's tab back rather than showing a page the model lost.
-        const selected = __tabsState().selectedId;
+        const selected = __selectedInWindow(window_id);
         if (selected) activate(selected);
       }
       // The player follows the tab behind the page in front.
@@ -1248,7 +1249,7 @@ export const Content = {
       // The engine can select the successor before it reports TabClose. The
       // model must still treat the tab being removed as the one in front, or
       // `tabs.after-close` has no tab to step from.
-      if (__tabsState().selectedId !== id) {
+      if (__selectedInWindow(window_id) !== id) {
         void Tabs.select({ astra_tab_id: id });
       }
       nativeClosing += 1;
