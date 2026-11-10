@@ -20,6 +20,7 @@ const Windows = await import(path.join(HOST, "Windows.sys.mjs"));
 const Events = await import(path.join(HOST, "Events.sys.mjs"));
 
 const TabsApi = Tabs.Tabs;
+const { __syncHistory, __historyFor, __restoreSelection, __mruForTests } = Tabs;
 const WindowsApi = Windows.Windows;
 
 let passed = 0;
@@ -128,6 +129,42 @@ check(
   ),
   JSON.stringify(Tabs.__itemsSnapshot(secondId).tabs.map((tab) => tab.url)),
 );
+
+// === Restored history and selection restore ===============================
+const historyTab = await TabsApi.create({
+  request_id: "h",
+  url: "https://one.test/",
+  window_id: firstId,
+  background: true,
+});
+const historyId = historyTab.astra_tab_id;
+check(
+  "a restored tab takes the engine's real history",
+  __syncHistory(historyId, {
+    entries: [
+      { url: "https://one.test/" },
+      { url: "https://two.test/" },
+      { url: "https://three.test/" },
+    ],
+    index: 1,
+  }) === true &&
+    __historyFor(historyId)?.entries.length === 3 &&
+    __historyFor(historyId)?.index === 1,
+);
+const beforeMru = __mruForTests(firstId);
+const firstLive = Tabs.__itemsSnapshot(firstId).tabs.find(
+  (tab) => tab.id !== historyId,
+)?.id;
+if (firstLive) {
+  await TabsApi.select({ request_id: "m1", astra_tab_id: firstLive });
+  const mruBefore = __mruForTests(firstId);
+  __restoreSelection(firstLive);
+  check(
+    "restoring a selection does not rewrite the MRU stack",
+    JSON.stringify(__mruForTests(firstId)) === JSON.stringify(mruBefore),
+    JSON.stringify({ before: mruBefore, after: __mruForTests(firstId) }),
+  );
+}
 
 // === A closed native window's id is not handed out twice ==================
 second.closed = true;

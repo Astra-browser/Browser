@@ -60,6 +60,7 @@ PROBES=(
   "multiwindow:tools/perf/stress/gbrowser_multiwindow_probe.py"
   "multi_window_isolation:tools/marionette-probe/multi-window-isolation-probe.py"
   "downloads_lifecycle:tools/marionette-probe/downloads-lifecycle-probe.py"
+  "tab_order:tools/marionette-probe/tab-order-probe.py"
   "sessionstore:tools/perf/stress/sessionstore_probe.py"
   "containers_space:tools/perf/stress/containers_space_probe.py"
   "containers_private:tools/perf/stress/containers_private_move_probe.py"
