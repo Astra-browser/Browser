@@ -159,5 +159,29 @@ for (const id of [
   assert.ok(supported.includes("browser.work"));
 }
 
+// === Commands act on the calling window's tab, not the process-wide last ===
+{
+  const { Tabs } = HostAPI;
+  const a1 = (await Tabs.create({ request_id: "c-a1", url: "https://a.test/1", window_id: "win-a" })).astra_tab_id;
+  const a2 = (await Tabs.create({ request_id: "c-a2", url: "https://a.test/2", window_id: "win-a", background: true })).astra_tab_id;
+  const b1 = (await Tabs.create({ request_id: "c-b1", url: "https://b.test/", window_id: "win-b" })).astra_tab_id;
+  await Tabs.select({ request_id: "c-s1", astra_tab_id: a1 });
+  await Tabs.select({ request_id: "c-s2", astra_tab_id: b1 });
+  const moved = await Commands.run({ id: "tab.next", window_id: "win-a" });
+  const inA = await Tabs.list({ request_id: "c-la", window_id: "win-a" });
+  const inB = await Tabs.list({ request_id: "c-lb", window_id: "win-b" });
+  check("tab.next is admitted for its own window", moved.accepted === true);
+  check(
+    "tab.next moves the calling window's selection",
+    inA.selected_tab_id === a2,
+    JSON.stringify({ selected: inA.selected_tab_id, a2 }),
+  );
+  check(
+    "tab.next leaves the other window's selection alone",
+    inB.selected_tab_id === b1,
+    JSON.stringify({ selected: inB.selected_tab_id, b1 }),
+  );
+}
+
 console.log(`\ncommands_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
