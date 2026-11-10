@@ -25,6 +25,7 @@
   import { groundPath, notchShape, notchWidth } from "../lib/ground";
   import { layout, type Box } from "../lib/layout";
   import { WORDMARK } from "$shared/lib/wordmark";
+  import { flags } from "$shared/flags";
   import { reducedMotion } from "$shared/lib/motion";
   import {
     decode,
@@ -68,7 +69,7 @@
   const account = accountFoot({ private: () => incognito });
   // The account is in its own pane beside the page's settings, and the
   // settings keep the corner, so nothing moves when the account is known.
-  let showAccount = $derived(!!onaccount && account.available);
+  let showAccount = $derived(flags.account && !!onaccount && account.available);
   let signInWidth = $state(0);
   let profile = $derived(tabs.profile()?.id ?? null);
   let picture = $derived(newTabImage());

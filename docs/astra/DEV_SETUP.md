@@ -60,16 +60,24 @@ python3 tools/marionette-probe/version-probe.py \
 
 ### Product flags
 
-Work is off in the shipped build (D-48). To build the frame with Work for
-development, set the flag for the frame build or dev server:
+Each flag is a **build** decision, not a preference: off, the surface is not in
+the product. Flags are read at build time, so changing one needs a rebuild.
+
+| Flag | Default | Contains |
+|---|---|---|
+| `VITE_ASTRA_WORK` | off | Work: the agent environment, its rail switch, canvas and Settings pages (D-48) |
+| `VITE_ASTRA_AI` | **off** | Ask Astra, models, dictation, skills, memory, site styles, MCP connections, the AI switch |
+| `VITE_ASTRA_ACCOUNT` | **off** | Sign in to Astra, the account foot, plan and credits, the identity group |
 
 ```sh
-VITE_ASTRA_WORK=true bun run --filter @astra/frame build:chrome
-VITE_ASTRA_WORK=true bun run --filter @astra/frame dev
+# develop one of them
+VITE_ASTRA_AI=true bun run --filter @astra/frame build:chrome
+VITE_ASTRA_AI=true VITE_ASTRA_ACCOUNT=true bun run --filter @astra/frame dev
 ```
 
-The flag is read at build time, so changing it needs a rebuild. Beta 1 ships
-without it.
+A flag that is off removes its Settings pages, its shelf tool and its search
+results — there is no disabled control left behind. The shipped build has all
+three off.
 
 ## Installable release build
 

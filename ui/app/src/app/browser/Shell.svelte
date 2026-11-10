@@ -816,7 +816,7 @@
           />{/if}<PrivateReturn compact /><UpdateNotice view="glyph" onabout={openAbout} /><Dock
           compact
           tools={!inWork}
-          foot={inWork ? accountFoot : undefined}
+          foot={inWork && flags.account ? accountFoot : undefined}
         >
           {#snippet sites()}<EssentialsRail
               entries={railEssentials}

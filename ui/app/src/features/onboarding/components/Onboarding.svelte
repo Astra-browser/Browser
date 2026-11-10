@@ -2,6 +2,7 @@
   import { onMount, untrack, type Snippet } from "svelte";
   import { CheckListIcon, Note01Icon, PuzzleIcon, Shield01Icon } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
+  import { flags } from "$shared/flags";
   import { browserImport } from "$domain/browser-import";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
@@ -89,7 +90,8 @@
     step === "welcome" || step === "import" || step === "ai" || step === "ready",
   );
   // Work and its models are offered only while Work and AI are on.
-  let ai = $derived(preferences.aiEnabled());
+  // AI's pages exist only when the build carries AI at all.
+  let ai = $derived(flags.ai && preferences.aiEnabled());
   let place = $derived(position(step, ai));
 
   // The name forms once the window is actually on screen and its sky in

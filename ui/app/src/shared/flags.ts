@@ -17,4 +17,17 @@ export const flags = {
    * `VITE_ASTRA_WORK=true` to develop the surface.
    */
   work: isOn(import.meta.env.VITE_ASTRA_WORK),
+  /**
+   * AI: the Ask Astra panel, its shelf tool, models, dictation, skills, memory,
+   * site styles and the MCP connections. **Off**: no AI surface is built into
+   * the product at all — not a hidden switch, an absent one. Build with
+   * `VITE_ASTRA_AI=true` to develop it.
+   */
+  ai: isOn(import.meta.env.VITE_ASTRA_AI),
+  /**
+   * Account: Sign in to Astra, the account foot, plan and credits. **Off**:
+   * no sign-in, no identity group in Settings. Build with
+   * `VITE_ASTRA_ACCOUNT=true` to develop it.
+   */
+  account: isOn(import.meta.env.VITE_ASTRA_ACCOUNT),
 } as const;

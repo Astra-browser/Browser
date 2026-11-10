@@ -121,8 +121,12 @@ const versions: Partial<Record<PreferenceKey, number>> = {};
 export const value = (key: PreferenceKey) => values[key];
 export const saving = () => pending !== null;
 export const saveFailed = () => failed;
-/** AI: models, agents and dictation. Off, no AI surface is shown. */
-export const aiEnabled = () => values["ai.enabled"] !== "false";
+/** AI: models, agents and dictation. Off — by build flag or preference — no AI
+ *  surface is shown. The flag wins: a profile that kept "on" from a build with
+ *  AI enabled still gets no AI here. */
+export const aiEnabled = () => flags.ai && values["ai.enabled"] !== "false";
+/** Account: sign-in, plan and credits. Off, the identity group is absent. */
+export const accountEnabled = () => flags.account;
 export type Feature = "work" | "notes" | "tasks" | "time";
 /** A feature switch: off, the feature leaves the app; its data stays. A
  *  build flag that is off removes the feature even if a profile kept a
