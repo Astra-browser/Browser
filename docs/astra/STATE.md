@@ -11,6 +11,38 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: Speedometer 3.0/3.1 — why it was low and what changed (2026-11-10)
+
+The benchmark was failing outright, not just scoring low. FPP's
+`ReduceTimerPrecision` target clamps `performance.now()` to **16.667 ms** (one
+60 Hz atom); Speedometer 3.1 then aborts with `Got invalid 0-time total for
+suite TodoMVC-Vue: 0`. The runtime writer in `Privacy.sys.mjs` was also
+overwriting the shipped override set at startup with the old list, so the new
+FPP targets never applied. Both are fixed: the target is gone, both writers
+agree, and `performance.now()` is back to the engine's 1 ms floor.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Speedometer 3.1 | 19.9 / 20.2 / 20.2 (10 iterations, 3 runs), mean **20.1** | `tools/perf/speedometer/run_speedometer.py` (local 3.1 tree, real display, Hyprland geometry) | `out/speedometer/baseline-3.1-3.1.json` |
+| Speedometer 3.0 | 19.8 / 20.5 (5 iterations, 2 runs) | same harness, hosted 3.0 page | `out/speedometer/baseline-3.0-3.0.json` |
+| Timer precision | 16.667 ms → **1 ms**; the 0-time suite error is gone | `overlay/astra/mozilla.cfg`, `overlay/astra/host/Privacy.sys.mjs` | live `performance.now()` sample: min 1 ms, 258 distinct values |
+| Cosmetic actor cost | the parent query is skipped when the class/id set is unchanged, the debounce is 500 ms, same-origin iframes are no longer walked twice, and the actor does not start when the blocker is off | `overlay/astra/actors/AstraBlockerChild.sys.mjs`, `AstraBlockerParent.sys.mjs` | Speedometer 20.1 after the change; blocker-probe still PASS |
+| Protection cost | blocker off 19.4, FPP off 19.5, everything off 19.6 — no measurable Speedometer cost | harness `--pref` A/B | `out/speedometer/*.json` |
+
+**Why 20 and not 140.** Speedometer 3 is not a percentage and has no
+"infinity" result; it is calibrated against a reference machine and a fast
+desktop browser scores in the tens. The remaining gap to the 28.0 reference
+(Firefox 159, same machine) is the build: this dev binary has **no PGO and no
+LTO** (`MOZ_PGO: ''`, no `MOZ_LTO`), while the reference is a PGO+LTO build six
+engine versions newer. PGO is the next lever (~10-20%); it is a two-stage
+build and was not run here because the full build is ~70 min and this box has
+already OOM-killed an uncapped build. Recipe and numbers: `PERF.md` §7.
+
+**Verification:** `tools/perf/speedometer/run_speedometer.py` 3.1 3/3 and 3.0
+2/2 PASS; `blocker_coverage` 13/13; blocker-probe PASS; `superadblock-probe`
+still 482/482. The harness is manual (real display, ~35 s per 3.1 run) and is
+not in `full-suite.sh`.
+
 ## Owner report: 100% ad/tracker coverage + hardened fingerprinting (2026-11-10)
 
 The public Super Adblock Test probes 482 ad, tracker, analytics, social,

@@ -341,3 +341,69 @@ TODO, so the budget comparisons in §3 remain unbaselined. The favicon reader
 was reduced to one page read per origin (coalesced, cached, bounded at 256
 origins) in this run, which removes the duplicated page download on iconless
 sites; it is a network/CPU saving, not a measured RSS delta.
+
+## 7. Speedometer 3.0 / 3.1 (2026-11-10)
+
+Speedometer is the WebKit responsiveness benchmark: it runs TodoMVC-style
+applications in a loop and reports a score where higher is better. **It is not
+a percentage and has no "infinity" result.** Speedometer 3 is calibrated
+against a reference machine; a fast desktop browser lands in the tens, not the
+hundreds. A target of 140 is a Speedometer 2.x-scale number and cannot be
+reached on Speedometer 3 by any shipping browser.
+
+Harness: `tools/perf/speedometer/run_speedometer.py` (see its README). It
+serves the engine tree's Speedometer 3.1 copy locally (offline, deterministic)
+and uses the hosted 3.0 page; it drives the packaged dev build over Marionette,
+floats/resizes the window to 1600x1000 through Hyprland so the content
+viewport passes the 850x650 minimum, and records score, confidence interval,
+run time and a screenshot.
+
+Environment: i5-12500H, 144 Hz eDP, power profile `performance` (P-cores at
+~4.2 GHz), packaged dev build `0.1.744` (`--enable-release`, `-O2`, **no PGO,
+no LTO**), real display (the hidden Weston output throttles rAF to ~1 Hz and
+cannot measure this benchmark).
+
+| Benchmark | Iterations | Runs | Scores | Mean |
+|---|---:|---:|---|---:|
+| Speedometer 3.1 | 10 | 3 | 19.9 / 20.2 / 20.2 | **20.1** |
+| Speedometer 3.0 | 5 | 2 | 19.8 / 20.5 | **20.2** |
+| Stock Firefox 159 (reference) | 10 | 1 | 28.0 | 28.0 |
+
+### Why the score is where it is
+
+- **Fixed: timer precision.** FPP's `ReduceTimerPrecision` target clamped
+  `performance.now()` to **16.667 ms** (one 60 Hz atom). Speedometer 3.1 then
+  aborted with `Got invalid 0-time total for suite TodoMVC-Vue: 0` — no valid
+  score at all. Removing that target (the runtime writer in `Privacy.sys.mjs`
+  and `mozilla.cfg` now agree) restores the engine's **1 ms** floor. This is a
+  whole-browser fix: animation, media-timing and benchmark code all get
+  sub-frame timestamps again.
+- **Protection is not the cost.** With the blocker off: 19.4; FPP off: 19.5;
+  blocker + FPP + native ETP + query stripping + referrer trimming all off:
+  19.6. The ad/tracker/fingerprinting stack is free on this benchmark.
+- **The UI is not the cost.** A visible Astra page runs at 144.1 fps
+  (`requestAnimationFrame`, 2 s sample) against stock's 137.4 fps. Pure JS
+  (20M-iteration integer loop) is 58 ms on both builds. The remaining gap is
+  DOM/layout work plus the build.
+- **The build is the remaining gap.** `config.status` has `MOZ_PGO: ''` and no
+  `MOZ_LTO`; the reference Firefox 159 build ships PGO + LTO and is six
+  engine versions newer. A 30% gap on a DOM-heavy benchmark is the expected
+  shape of that difference.
+
+### Closing the remaining gap
+
+PGO is the next real lever (Mozilla's own numbers: ~10-20% on Speedometer;
+LTO adds a few more percent). It is a two-stage build and was **not run in
+this pass**: the machine's full build is ~70 min, PGO roughly doubles it,
+and the box already OOM-killed an uncapped build (see `BUILD_TIMES.md`).
+The safe recipe for a headless build host is:
+
+```sh
+export MOZ_PGO=1
+(cd forge/astra-forge && cargo run -q -- config --os linux --branding official)
+(cd forge/astra-forge && cargo run -q -- build --jobs 2)   # instrument, profile, rebuild
+```
+
+Then re-run the harness against the new `dist/bin/firefox` and record the
+score here. Until that build exists, 20.1 is the honest number for this dev
+binary, and the timer fix is the change that makes the benchmark valid at all.
