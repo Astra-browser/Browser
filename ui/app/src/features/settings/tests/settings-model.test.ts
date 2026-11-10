@@ -24,7 +24,6 @@ it("keeps AI and account out of a build that carries neither", async () => {
   }
   const aiSections = new Set(["ai", "skills", "memory", "sites", "mcp", "account"]);
   for (const query of ["models", "MCP", "account"]) {
-    expect(searchSections(query).map((section) => String(section.id))).not.toContain(...aiSections);
     expect(searchSections(query).some((section) => aiSections.has(String(section.id)))).toBe(false);
   }
   for (const query of ["API key", "Jev", "TypeSafe"]) {

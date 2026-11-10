@@ -5,6 +5,11 @@ import "$styles/global.css";
 import type { AccountV1 } from "$shared/ipc/bindings";
 import { accountFixture, portraitFixture, usageFixture } from "$shared/testing/account";
 import NewTabLook from "./NewTabLook.svelte";
+import { flags } from "$shared/flags";
+
+// Sign-in is a build flag and this build ships it off, so the New Tab has no
+// account pane to photograph. The tests run in a build with `VITE_ASTRA_ACCOUNT=true`.
+const withAccount = test.skipIf(!flags.account);
 
 const native = vi.hoisted(() => ({
   account: null as unknown as AccountV1,
@@ -95,7 +100,7 @@ async function shoot(screen: Awaited<ReturnType<typeof stage>>, name: string) {
   document.documentElement.dataset.theme = "dark";
 }
 
-test("signed out, the corner offers a calm way in", async () => {
+withAccount("signed out, the corner offers a calm way in", async () => {
   const screen = await stage(accountFixture());
   const button = screen.getByRole("button", { name: "Sign in", exact: true });
   await expect.element(button).toBeVisible();
@@ -109,40 +114,43 @@ test("signed out, the corner offers a calm way in", async () => {
   expect(onaccount).toHaveBeenCalledWith("account");
 });
 
-test("signed in, the initials open the account, and the panel keeps the keyboard", async () => {
-  const screen = await stage(signedIn("ada@example.com", 42, true));
-  const avatar = screen.getByRole("button", { name: "Account", exact: true });
-  await expect.element(avatar).toHaveTextContent("A");
-  expect(screen.container.querySelector(".usage-ring")).toBeNull();
-  await shoot(screen, "in");
+withAccount(
+  "signed in, the initials open the account, and the panel keeps the keyboard",
+  async () => {
+    const screen = await stage(signedIn("ada@example.com", 42, true));
+    const avatar = screen.getByRole("button", { name: "Account", exact: true });
+    await expect.element(avatar).toHaveTextContent("A");
+    expect(screen.container.querySelector(".usage-ring")).toBeNull();
+    await shoot(screen, "in");
 
-  await avatar.click();
-  await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toBeVisible();
-  await expect
-    .element(page.getByRole("meter", { name: "Included usage used" }))
-    .toHaveAttribute("aria-valuenow", "42");
-  await expect.element(page.getByText("42% used")).toBeVisible();
-  await shoot(screen, "open");
+    await avatar.click();
+    await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toBeVisible();
+    await expect
+      .element(page.getByRole("meter", { name: "Included usage used" }))
+      .toHaveAttribute("aria-valuenow", "42");
+    await expect.element(page.getByText("42% used")).toBeVisible();
+    await shoot(screen, "open");
 
-  // Tab goes round the actions rather than out of the open panel.
-  await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toHaveFocus();
-  await userEvent.keyboard("{Tab}");
-  await expect.element(page.getByRole("menuitem", { name: "Manage account" })).toHaveFocus();
-  await userEvent.keyboard("{Tab}");
-  await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toHaveFocus();
-  await userEvent.keyboard("{Escape}");
-  await expect.element(avatar).toHaveAttribute("aria-expanded", "false");
-  await expect.element(avatar).toHaveFocus();
+    // Tab goes round the actions rather than out of the open panel.
+    await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toHaveFocus();
+    await userEvent.keyboard("{Tab}");
+    await expect.element(page.getByRole("menuitem", { name: "Manage account" })).toHaveFocus();
+    await userEvent.keyboard("{Tab}");
+    await expect.element(page.getByRole("menuitem", { name: "Buy credits" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    await expect.element(avatar).toHaveAttribute("aria-expanded", "false");
+    await expect.element(avatar).toHaveFocus();
 
-  await avatar.click();
-  await page.getByRole("menuitem", { name: "Buy credits" }).click();
-  expect(onaccount).toHaveBeenLastCalledWith("credits");
-  await avatar.click();
-  await page.getByRole("menuitem", { name: "Manage account" }).click();
-  expect(onaccount).toHaveBeenLastCalledWith("account");
-});
+    await avatar.click();
+    await page.getByRole("menuitem", { name: "Buy credits" }).click();
+    expect(onaccount).toHaveBeenLastCalledWith("credits");
+    await avatar.click();
+    await page.getByRole("menuitem", { name: "Manage account" }).click();
+    expect(onaccount).toHaveBeenLastCalledWith("account");
+  },
+);
 
-test("with a photo, the corner and the panel show the account's own picture", async () => {
+withAccount("with a photo, the corner and the panel show the account's own picture", async () => {
   const screen = await stage({ ...signedIn("ada@example.com", 42, true), avatar: 3 });
   const avatar = screen.getByRole("button", { name: "Account", exact: true });
   await expect.element(avatar).toBeVisible();
@@ -155,25 +163,28 @@ test("with a photo, the corner and the panel show the account's own picture", as
   await shoot(screen, "photo-open");
 });
 
-test("near and at the limit, a fine ring says so; no credits for sale, no offer", async () => {
-  for (const [name, used] of [
-    ["high", 91],
-    ["full", 100],
-  ] as const) {
-    const screen = await stage(signedIn("ada@example.com", used));
-    await expect
-      .poll(() => screen.container.querySelector(".usage-ring")?.getAttribute("data-tone"))
-      .toBe(name);
-    await shoot(screen, name);
-    await screen.getByRole("button", { name: "Account", exact: true }).click();
-    await expect.element(page.getByText(`${used}% used`)).toBeVisible();
-    expect(page.getByRole("menuitem", { name: "Buy credits" }).query()).toBeNull();
-    await shoot(screen, `${name}-open`);
-    await screen.unmount();
-  }
-});
+withAccount(
+  "near and at the limit, a fine ring says so; no credits for sale, no offer",
+  async () => {
+    for (const [name, used] of [
+      ["high", 91],
+      ["full", 100],
+    ] as const) {
+      const screen = await stage(signedIn("ada@example.com", used));
+      await expect
+        .poll(() => screen.container.querySelector(".usage-ring")?.getAttribute("data-tone"))
+        .toBe(name);
+      await shoot(screen, name);
+      await screen.getByRole("button", { name: "Account", exact: true }).click();
+      await expect.element(page.getByText(`${used}% used`)).toBeVisible();
+      expect(page.getByRole("menuitem", { name: "Buy credits" }).query()).toBeNull();
+      await shoot(screen, `${name}-open`);
+      await screen.unmount();
+    }
+  },
+);
 
-test("a long address is cut short, never the panel widened", async () => {
+withAccount("a long address is cut short, never the panel widened", async () => {
   const screen = await stage(signedIn("ada.lovelace@analytical-engine.example", 42, true));
   await screen.getByRole("button", { name: "Account", exact: true }).click();
   const panel = document.querySelector<HTMLElement>(".ntp-account-panel")!;
@@ -182,7 +193,7 @@ test("a long address is cut short, never the panel widened", async () => {
   await shoot(screen, "long-open");
 });
 
-test("a private window and an install without the service show no account", async () => {
+withAccount("a private window and an install without the service show no account", async () => {
   native.kind = "incognito";
   let screen = await stage(signedIn("ada@example.com", 42));
   expect(screen.container.querySelectorAll(".control")).toHaveLength(1);

@@ -1014,7 +1014,7 @@
             retryLabel={m.surface_retry()}
             >{#snippet children(NewTab)}<NewTab
                 oncustomize={openSettings}
-                onaccount={openAccount}
+                onaccount={flags.account ? openAccount : undefined}
                 ontasks={() => void browserPage.open("tasks")}
                 ontime={() => void browserPage.open("time")}
                 >{#snippet search()}{#key tabs.activeId()}<LazyView

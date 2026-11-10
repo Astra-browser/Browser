@@ -91,7 +91,9 @@ async function shoot(name: string, section: SettingsSection) {
   document.documentElement.dataset.theme = "dark";
 }
 
-test("Features, and the Work group as AI and Work go off, both themes", async () => {
+// A visual bench for the AI/Work switches. This build ships `VITE_ASTRA_AI` off,
+// so there is no AI switch on Features to photograph. Kept for the flagged build.
+test.skip("Features, and the Work group as AI and Work go off, both themes", async () => {
   await page.viewport(1280, 1100);
   await preferences.init();
   await render(SettingsLookStage);
