@@ -1,0 +1,1 @@
+import{Y as e}from"./chrome-shared-BWjstlw3.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(100,n)??`Focused`)),r=((n={},r={})=>(r.locale??e(),t(98,n)??`Ads & trackers blocked`));export{n,r as t};

@@ -826,6 +826,9 @@ export const Tabs = {
         last_active_ms: Date.now(),
       });
       _order.push(astra_tab_id);
+      // The New Tab is the first place in the tab's own history: Back from the
+      // first page returns here instead of stopping at the first search.
+      __pushHistory(astra_tab_id, "about:blank");
       _selectedId = astra_tab_id;
       touchMru(astra_tab_id);
     }
@@ -856,7 +859,10 @@ export const Tabs = {
     });
     const at = insertionIndexFor({ index, window_id, space_id });
     _order.splice(at, 0, astra_tab_id);
-    __pushHistory(astra_tab_id, url);
+    // Seed the New Tab, then the page: a tab opened straight at a URL can
+    // still step Back to the blank place it started from.
+    __pushHistory(astra_tab_id, "about:blank");
+    if (url !== "about:blank") __pushHistory(astra_tab_id, url);
     emit("tab.created", {
       astra_tab_id,
       url,

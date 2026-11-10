@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";import{Y as t}from"./chrome-shared-BWjstlw3.js";var n=((n={},r={})=>(r.locale??t(),e(3639,n)??`A new space could not be made. Try again.`));export{n as t};

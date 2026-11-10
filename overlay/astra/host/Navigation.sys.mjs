@@ -40,19 +40,10 @@ function tabOf(astra_tab_id) {
   return { id, tab };
 }
 
-/** A New Tab is a place, not a step: it is never a Back/Forward entry. */
-function isBlankUrl(url) {
-  return url === "" || url === "about:blank";
-}
-
-// Push a committed URL onto a tab's stack without leaving a New Tab behind it.
-// `Tabs.create` seeds the stack with `about:blank`, so a plain push would make
-// the first real page sit on top of the New Tab and Back would land there.
-// Replacing that head (index stays 0) is what makes the first page reachable
-// with Back disabled, like a native browser. A URL equal to the head is a
-// reload and adds nothing; only a genuinely new URL truncates the forward
-// branch (`__pushHistory`). `__historyFor` returns the live object, so the
-// replacement happens in place.
+// Push a committed URL onto a tab's stack. The New Tab is the first entry, so
+// the first real page sits above it and Back can return to it (owner report:
+// Back stopped on the first search instead of the empty New Tab). A URL equal
+// to the head is a reload and adds nothing.
 function pushOrReplaceHistory(id, url) {
   const h = __historyFor(id);
   if (!h) {
@@ -60,20 +51,7 @@ function pushOrReplaceHistory(id, url) {
     return;
   }
   const head = h.index >= 0 ? h.entries[h.index] : null;
-  if (head === url) {
-    return;
-  }
-  if (isBlankUrl(head)) {
-    if (h.index === 0) {
-      // The fresh tab's New Tab: the real page takes its place.
-      h.entries[0] = url;
-      return;
-    }
-    // A blank head above real entries should not happen; drop it rather than
-    // keep a New Tab the person has to step through.
-    h.entries.splice(h.index, 1);
-    h.index -= 1;
-  }
+  if (head === url) return;
   __pushHistory(id, url);
 }
 
