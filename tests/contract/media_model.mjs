@@ -153,6 +153,27 @@ for (const action of ACTIONS) {
   check("a mismatched tab is rejected", Media.__projectMedia("tab-other", VIEW) === false);
   check("clearing emits once", Media.__projectMedia(TAB, null) === true && Media.view() === null);
 
+  // --- per-window engine and projection -----------------------------------
+  Media.__setEngine({ dispatch: (id) => id === TAB }, "win-1");
+  Media.__setEngine({ dispatch: () => false }, "win-2");
+  check(
+    "each window dispatches into its own engine",
+    (await Media.player({ id: TAB, action: { kind: "play" }, window_id: "win-1" })).accepted === true &&
+      (await Media.player({ id: TAB, action: { kind: "play" }, window_id: "win-2" })).accepted === false,
+  );
+  const beforeWindows = seen.length;
+  check("a window projection is accepted", Media.__projectMedia(TAB, VIEW, "win-1") === true);
+  check(
+    "a window projection is only visible in that window",
+    Media.view("win-1")?.tab_id === TAB && Media.view("win-2") === null,
+  );
+  check(
+    "the event names its window",
+    seen.length === beforeWindows + 1 && seen.at(-1).data?.window_id === "win-1",
+  );
+  Media.__projectMedia(TAB, null, "win-1");
+  check("clearing one window leaves the other empty, not the shared view", Media.view("win-1") === null);
+
   Media.__resetForTests();
   check("reset clears the engine", (await Media.player({ id: TAB, action: { kind: "play" } })).accepted === false);
 }

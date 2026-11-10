@@ -659,14 +659,13 @@ export const Content = {
       };
     };
     const clearMedia = () => {
-      const showing = Media.view()?.tab_id;
-      if (showing) Media.__projectMedia(showing, null);
+      const showing = Media.view(window_id)?.tab_id;
+      if (showing) Media.__projectMedia(showing, null, window_id);
     };
     const projectCurrentMedia = () => {
-      if (isPrivateWindow(win)) {
-        clearMedia();
-        return;
-      }
+      // A private window records nothing and owns no card: never touch the
+      // projection another window is showing.
+      if (isPrivateWindow(win)) return;
       const views = new Map();
       const candidates = [];
       for (const id of mediaStates.keys()) {
@@ -681,14 +680,14 @@ export const Content = {
           activeSince: state?.activeSince ?? 0,
         });
       }
-      const currentId = Media.view()?.tab_id ?? "";
+      const currentId = Media.view(window_id)?.tab_id ?? "";
       const currentLive = candidates.some((entry) => entry.id === currentId && entry.live);
       const next = chooseMedia({ currentId, currentLive, candidates });
       if (next === null) {
         clearMedia();
         return;
       }
-      Media.__projectMedia(next, views.get(next) ?? mediaView(next));
+      Media.__projectMedia(next, views.get(next) ?? mediaView(next), window_id);
     };
     const detachMedia = (id) => {
       const state = mediaStates.get(id);
@@ -880,7 +879,7 @@ export const Content = {
         return false;
       }
     };
-    Media.__setEngine({
+    const mediaEngine = isPrivateWindow(win) ? null : {
       dispatch: (id, action) => {
         const state = mediaStates.get(id);
         const controller = state?.controller ?? null;
@@ -965,7 +964,8 @@ export const Content = {
             return false;
         }
       },
-    });
+    };
+    if (mediaEngine) Media.__setEngine(mediaEngine, window_id);
     const refreshIcon = (id) => {
       const tab = tabOf.get(id);
       const browser = tab?.linkedBrowser;
@@ -1705,7 +1705,7 @@ export const Content = {
         __flushSpaceHistory();
         __unbindSplitWindow(archiveWindow);
         __forgetWindow(archiveWindow);
-        Media.__setEngine(null);
+        Media.__setEngine(null, window_id);
         for (const id of [...mediaStates.keys()]) detachMedia(id);
         try { gb.tabContainer.removeEventListener("TabSelect", onSelect); } catch {}
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
