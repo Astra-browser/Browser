@@ -5,6 +5,7 @@
   import Button from "$shared/ui/Button";
   import Field from "$shared/ui/Field";
   import SettingsRow from "$shared/ui/SettingsRow";
+  import { normalizeHomeUrl } from "../lib/home-url";
 
   let draft = $state(untrack(() => preferences.value("tabs.home")));
   let editing = $state(false);
@@ -14,6 +15,12 @@
     const value = preferences.value("tabs.home");
     if (!editing) draft = value;
   });
+
+  /** A bare host becomes an https address; words and schemes the stage cannot
+   *  show are invalid rather than a silent search from the Home control. */
+  function normalizeHome(text: string): string | null {
+    return normalizeHomeUrl(text);
+  }
 </script>
 
 <SettingsRow
@@ -24,9 +31,17 @@
   <form
     onsubmit={(event) => {
       event.preventDefault();
-      void preferences.set("tabs.home", draft.trim()).then(() => {
+      const normalized = normalizeHome(draft);
+      if (normalized === null) {
+        invalid = true;
+        return;
+      }
+      void preferences.set("tabs.home", normalized).then(() => {
         invalid = preferences.saveFailed();
-        if (!invalid) editing = false;
+        if (!invalid) {
+          draft = normalized;
+          editing = false;
+        }
       });
     }}
   >
