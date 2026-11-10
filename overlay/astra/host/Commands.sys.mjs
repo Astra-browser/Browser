@@ -95,8 +95,11 @@ const SHELL_ACTIONS = new Set([
   "page.viewSource",
   "window.closePrivate",
   "window.fullscreen",
+  "window.new",
+  "window.newPrivate",
   "window.showPrivate",
   "window.showRegular",
+  "window.togglePrivate",
 ]);
 
 /** Commands the app's own surfaces answer from `ui-command`. */
