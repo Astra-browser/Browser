@@ -299,8 +299,9 @@
   }
 
   .astra-wordmark {
+    /* The wordmark's own 3.2:1 box. */
     inline-size: 150px;
-    block-size: 22px;
+    block-size: 47px;
   }
 
   .meta,

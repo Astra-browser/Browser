@@ -62,8 +62,16 @@ export function layout(
   // where the clouds draw back toward the horizon, and the time and the
   // date read on one line under it.
   const horizon = Math.round(height * (height < 600 ? 0.62 : 0.6));
-  const markW = Math.round(Math.min(480, Math.max(260, width * 0.36)));
-  const markH = wordmark ? Math.ceil((markW * WORDMARK.height) / WORDMARK.width) : 0;
+  const markW0 = Math.round(Math.min(480, Math.max(260, width * 0.36)));
+  // Astra's lowercase wordmark is 3.2:1, where the uppercase stand-in it
+  // replaced was 7:1. Draw it taller (the same optical weight, less width) but
+  // cap the height by the sky above the horizon so the clock can never land on
+  // the ground, then let the width follow the art's own ratio.
+  const nameH = Math.ceil(markW0 * (84 / 585) * 1.35);
+  const skyRoom = Math.round((horizon - NOTCH.height) * 0.34);
+  const markH = wordmark ? Math.min(nameH, skyRoom) : 0;
+  // Even width so the name is centred on a whole pixel.
+  const markW = wordmark ? 2 * Math.round((markH * WORDMARK.width) / WORDMARK.height / 2) : 0;
   const clockGap = wordmark ? WHEN.gap : 0;
   const group = markH + (clock ? clockGap + WHEN.height : 0);
   const centre = NOTCH.height + (horizon - NOTCH.height) * 0.74;

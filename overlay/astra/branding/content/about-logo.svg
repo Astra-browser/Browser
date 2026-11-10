@@ -1,13 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- PLACEHOLDER brand mark for Astra (P1-T03). Owner supplies final logo/art.
-       Geometric "A": rounded-square field + white chevron-A. -->
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4f46e5"/>
-      <stop offset="1" stop-color="#7c3aed"/>
-    </linearGradient>
-  </defs>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#g)"/>
-  <path d="M256 108 L392 404 H322 L256 238 L190 404 H120 Z" fill="#ffffff"/>
-  <rect x="222" y="318" width="68" height="24" rx="12" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1024.00 1024.00" width="1024" height="1024" role="img" aria-label="Astra app icon">
+  <title>Astra app icon</title>
+  <rect width="1024" height="1024" fill="#F6F2EA"/>
+  <path fill="#0B0B0C" fill-rule="evenodd" d="M352.25,152.00 L352.25,852.00 L688.25,803.00 C716.25,572.00 541.25,278.00 422.25,173.00"/>
 </svg>

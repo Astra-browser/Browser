@@ -22,11 +22,13 @@ linux = "astra"
 windows = "Astra"
 macos = "Astra"
 
-# Placeholder artwork; owner supplies final logo/icon set.
+# Astra mark, v1 (D-38). Masters live in branding/assets/; every raster is
+# generated from them by `python3 tools/brand-assets.py` — never hand-edit the
+# PNG/ICO/ICNS outputs.
 [icons]
-svg = "overlay/astra/branding/PLACEHOLDER-logo.svg"
-png_512 = "overlay/astra/branding/PLACEHOLDER-icon-512.png"
-icns = "OWNER_DECISION"
-ico = "OWNER_DECISION"
+svg = "overlay/astra/branding/astra-logo.svg"
+png_512 = "overlay/astra/branding/astra-icon-512.png"
+icns = "overlay/astra/branding/astra.icns"
+ico = "overlay/astra/branding/astra.ico"
 
 ua_token = "Astra"                   # appended to the Firefox-compatible UA (D-14)

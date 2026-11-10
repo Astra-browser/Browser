@@ -2,7 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-# Astra about-dialog artwork (P1-T03). PLACEHOLDER brand; owner supplies final art.
+# Astra about-dialog artwork (P1-T03, brand v1 D-38). Rasters are generated
+# from branding/assets/ by tools/brand-assets.py.
 
 browser.jar:
 % content branding %content/branding/ contentaccessible=yes

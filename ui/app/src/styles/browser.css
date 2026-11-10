@@ -254,8 +254,9 @@
 }
 .astra-wordmark {
   display: block;
-  width: 260px;
-  height: 38px;
+  /* Matches the art's 3.2:1 ratio so `contain` fills the box edge to edge. */
+  width: 240px;
+  height: 75px;
   flex: none;
   background: var(--color-text);
   opacity: 0.9;

@@ -7,7 +7,10 @@ describe("layout", () => {
   it("stands the name low in the open sky with the time and the date under it", () => {
     const page = layout(1200, 800, FULL);
     expect(page.horizon).toBe(480);
-    expect(page.mark.w).toBe(432);
+    // The name keeps the wordmark's own 3.2:1 ratio: 84 tall, 270 wide.
+    expect(page.mark.h).toBe(84);
+    expect(page.mark.w).toBe(270);
+    expect(page.mark.w / page.mark.h).toBeCloseTo(3.22, 1);
     expect(page.mark.x + page.mark.w / 2).toBeCloseTo(600, 0);
     expect(page.when).toBe(page.mark.y + page.mark.h + 16);
     expect(page.when! + 20).toBeLessThan(page.horizon - 40);
