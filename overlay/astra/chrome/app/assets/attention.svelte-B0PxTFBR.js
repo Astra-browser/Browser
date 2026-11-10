@@ -1,0 +1,1 @@
+import{Sn as e,an as t,bn as n,nn as r}from"./chrome-shared-DvQDGH6n.js";var i=e(0),a=()=>r(i)>0;function o(){t(()=>n(i,r(i)+1));let e=!1;return()=>{e||(e=!0,t(()=>n(i,r(i)-1)))}}function s(e=3e3){setTimeout(o(),e)}export{s as n,a as r,o as t};

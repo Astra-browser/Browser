@@ -1,0 +1,1 @@
+import{Sn as e,bn as t,dn as n,nn as r}from"./chrome-shared-DvQDGH6n.js";var i=500;function a(a,o=i){let s=e(!1);return n(()=>{if(!a()){t(s,!1);return}let e=setTimeout(()=>t(s,!0),o);return()=>clearTimeout(e)}),{get current(){return r(s)}}}export{a as t};

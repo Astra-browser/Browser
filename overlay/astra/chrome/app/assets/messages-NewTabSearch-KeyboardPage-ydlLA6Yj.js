@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";import{Z as t}from"./chrome-shared-DvQDGH6n.js";var n=((n={},r={})=>(r.locale??t(),e(909,n)??`That action could not be completed. Please try again.`));export{n as t};
