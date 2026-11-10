@@ -77,6 +77,7 @@ import { Blocker, __resetBlockerForTests } from "./Blocker.sys.mjs";
 import { Privacy, __resetPrivacyForTests } from "./Privacy.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
 import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
+import { TabHistory, __resetTabHistoryForTests } from "./TabHistory.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
@@ -132,6 +133,7 @@ export {
   Operations,
   Metadata,
   PageSource,
+  TabHistory,
   DialogPrompts,
   addEventListener,
   emit,
@@ -173,6 +175,7 @@ export function __resetForTests() {
   __resetBlockerForTests();
   __resetPrivacyForTests();
   __resetPageSourceForTests();
+  __resetTabHistoryForTests();
   Media.__resetForTests();
   __resetMediaImportForTests();
   DialogPrompts.__resetForTests();
