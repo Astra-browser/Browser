@@ -34,14 +34,6 @@ vi.mock("$domain/blocker", () => ({
     refresh: vi.fn().mockResolvedValue(undefined),
   },
 }));
-vi.mock("$domain/credentials", () => ({
-  browserCredentials: {
-    current: () => null,
-    activate: vi.fn().mockResolvedValue(undefined),
-    deactivate: vi.fn(),
-  },
-  browserPasskeyStatus: () => "",
-}));
 
 afterEach(() => vi.clearAllMocks());
 

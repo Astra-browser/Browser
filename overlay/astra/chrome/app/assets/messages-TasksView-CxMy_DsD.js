@@ -1,0 +1,1 @@
+import{Z as e}from"./chrome-shared-UvscRW-7.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1088,n)??`Active`)),r=((n={},r={})=>(r.locale??e(),t(1181,n)??`Open in full`)),i=((n={},r={})=>(r.locale??e(),t(1184,n)??`Show`));export{r as n,n as r,i as t};

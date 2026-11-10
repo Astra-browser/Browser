@@ -1,1 +1,0 @@
-import"./ui-core-BsD1qM0P.js";import{Jt as e,Ut as t,Vt as n,Wt as r,at as i,hn as a,kt as o,un as s,wt as c}from"./chrome-shared-RuwxJ6Z2.js";function l(l,u){let d=i(u,`level`,3,3);var f=r(),p=a(f);o(p,()=>`h${d()}`,!1,(r,i)=>{c(r,0,`title svelte-9vka8n`);var a=e();s(()=>n(a,u.text)),t(i,a)}),t(l,f)}export{l as t};
