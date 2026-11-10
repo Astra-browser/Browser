@@ -1,0 +1,1 @@
+import{Q as e}from"./chrome-shared-CQTgntcI.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1002,n)??`Added`)),r=((n,r={})=>(r.locale??e(),t(1001,n)??`Line ${n?.line}`)),i=((n={},r={})=>(r.locale??e(),t(1003,n)??`Removed`));export{r as n,n as r,i as t};

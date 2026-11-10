@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";import{Z as t}from"./chrome-shared-UvscRW-7.js";var n=((n={},r={})=>(r.locale??t(),e(3201,n)??`Open History`));export{n as t};
