@@ -81,6 +81,11 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "bookmarks" } } },
             allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
           },
+          // The sidebar's options button opens that same shared app menu.
+          {
+            from: { element: { type: "features", captured: { module: "sidebar" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
           // Settings edits the sites focus shuts with the same control as Time.
           {
             from: { element: { type: "features", captured: { module: "settings" } } },
