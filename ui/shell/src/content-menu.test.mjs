@@ -8,7 +8,7 @@
 // real-tab preference and the open/close split.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { devTabFor, isContentBrowser, showDevTools } from "./content-menu.js";
+import { devTabFor, isContentBrowser, showDevTools, runChromeAction } from "./content-menu.js";
 
 /** A chrome window with a tab strip that finds `tab` for any browser. */
 function fakeWindow({ tab = null, toolbox = null, enabled = true, throwOnImport = false } = {}) {
@@ -148,5 +148,47 @@ describe("showDevTools", () => {
     }
     assert.equal(errors.length, 1);
     assert.match(String(errors[0][0]), /DevTools did not open/);
+  });
+});
+
+describe("chrome bookmark action privacy", () => {
+  function privateWindow(isPrivate) {
+    const utils = { isWindowPrivate: () => isPrivate };
+    return {
+      PrivateBrowsingUtils: utils,
+      ChromeUtils: { importESModule: () => ({ PrivateBrowsingUtils: utils }) },
+    };
+  }
+  function hostForBookmarks() {
+    const calls = [];
+    return {
+      calls,
+      Tabs: {
+        list: async () => ({
+          tabs: [{ selected: true, url: "https://example.test/", title: "Example" }],
+        }),
+      },
+      Bookmarks: {
+        call: async () => {
+          calls.push("save");
+          return { kind: "saved", id: "7" };
+        },
+      },
+      emit() {},
+    };
+  }
+
+  it("writes no bookmark from a private window", async () => {
+    const host = hostForBookmarks();
+    const result = await runChromeAction(privateWindow(true), host, "bookmark.current");
+    assert.deepEqual(result, { accepted: false });
+    assert.deepEqual(host.calls, []);
+  });
+
+  it("writes the bookmark in a normal window", async () => {
+    const host = hostForBookmarks();
+    const result = await runChromeAction(privateWindow(false), host, "bookmark.current");
+    assert.equal(result.accepted, true);
+    assert.deepEqual(host.calls, ["save"]);
   });
 });
