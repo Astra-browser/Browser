@@ -1,1 +1,0 @@
-import{Z as e}from"./chrome-shared-RuwxJ6Z2.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(3305,n)??`Archive`)),r=((n={},r={})=>(r.locale??e(),t(3304,n)??`Closing`)),i=((n={},r={})=>(r.locale??e(),t(3303,n)??`Opening`));export{r as n,n as r,i as t};
