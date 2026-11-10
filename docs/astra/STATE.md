@@ -31,6 +31,25 @@ renders `Version 0.1.742` (`Linux … · x86_64`), `astra.version` = `0.1.742`,
 engine still reports Firefox `153.6.0`. The tarball is
 `out/release/Astra-0.1.742-linux-x86_64.tar.xz`.
 
+## Owner report: per-site blocking toggle in the sidebar (2026-11-10, latest)
+
+The sidebar now carries a shield for the page in front, so the whole ad/tracker
+blocker can be switched off and on for one site without opening Settings or the
+address panel.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Sidebar toggle | shows the page's host, reads on/off, and flips the site policy; an off site is marked with the warning colour and a ban glyph | `ui/app/src/features/sidebar/components/SiteShield.svelte`, rendered by `SidebarHeader.svelte` (expanded trailing edge, compact head) | `sidebar-shield-probe.py` 10/10: exists, names `127.0.0.1`, starts on, click pauses, page reloads, click resumes |
+| Same policy as the address shield | `blockerSites.setProtected`; a global off turns blocking on instead | `$domain/blocker` (`setProtected`), `blocker.setEnabled` | probe: `paused:false → true → false`, page requested twice |
+| Fresh status | status is re-read on every commit (site context revision) and retried briefly while lists install | `SiteShield.svelte` effects | probe: a pause after the reload is accepted, not refused as stale |
+
+**Verification:** `SiteShield.component.test.ts` 3/3 (on, paused, global-off);
+`svelte-check` 0/0; scoped eslint/stylelint clean; live
+`tools/marionette-probe/sidebar-shield-probe.py` 10/10 on the packaged dev
+build; added to `tools/perf/full-suite.sh`. The full UI gate was not run to
+completion because another lane has an in-progress webextension change in this
+worktree (`ExtensionRow.svelte` boundary lint), which is outside this surface.
+
 ## Owner report: the 25-item list (2026-11-10, latest)
 
 One branch per issue, merged into `fix/media-popup-now-playing`; the packaged
