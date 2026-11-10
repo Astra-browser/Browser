@@ -51,6 +51,18 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/cloak":
+            body = (
+                '<!doctype html><title>cloak</title>'
+                f'<img id="cloaked" src="http://127.0.0.1.nip.io:{self.server.server_port}/ad.png">'
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/set-cookie":
             body = b"<!doctype html><title>cookie</title><script>document.cookie='astra=1; path=/';</script>"
         elif path == "/dest":
@@ -146,6 +158,9 @@ base = f"http://127.0.0.1.nip.io:{port}"
 profile = tempfile.mkdtemp(prefix="astra-shields-")
 with open(os.path.join(profile, "prefs.js"), "w") as f:
     f.write(f'user_pref("marionette.port", {PORT});\n')
+    f.write('user_pref("browser.cache.disk.enable", false);\n')
+    f.write('user_pref("browser.cache.memory.enable", false);\n')
+    f.write('user_pref("browser.cache.offline.enable", false);\n')
 log = open(os.path.join(profile, "log"), "wb")
 proc = subprocess.Popen(
     [FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access",
@@ -270,23 +285,34 @@ try:
         str(seen),
     )
 
-    # CNAME enforcement: mark the loopback host as cloaked and prove the hook
-    # cancels the next request.
+    # CNAME enforcement: a cloaked *subresource* is cancelled while the
+    # top-level document still loads (a document rule never cancels the page).
     m.chrome()
     m.js(
         "const s=Cc['@astra/blocker;1'].getService(Ci.nsIAstraBlockerService);"
         "s.setCloakedHost('127.0.0.1.nip.io', true); return 'ok';"
     )
     reset_hits()
-    navigate(m, base + "/")
+    cloak_page = f"http://localhost:{port}/cloak"
+    navigate(m, cloak_page)
+    wait_page(m, "cloak")
     time.sleep(2.5)
-    cloaked_hits = hits("/")
+    cloaked_hits = hits("/ad.png")
+    page_hits = hits("/cloak")
     m.chrome()
     m.js(
         "const s=Cc['@astra/blocker;1'].getService(Ci.nsIAstraBlockerService);"
         "s.setCloakedHost('127.0.0.1.nip.io', false); return 'ok';"
     )
-    check("CNAME-cloaked host is blocked", cloaked_hits == 0, f"hits={cloaked_hits}")
+    check(
+        "CNAME-cloaked subresource is blocked",
+        cloaked_hits == 0 and page_hits >= 1,
+        f"subresource={cloaked_hits} page={page_hits}",
+    )
+    # The native service's cloak set is an internal seam; clearing it is not
+    # part of the product path, so this probe pins the enforcement (a cloaked
+    # subresource is cancelled while the page still loads) and leaves the
+    # uncloak to the engine's own tests.
 
     # Block Scripts per-site (and the global inline-script CSP).
     reset_hits()
