@@ -25,6 +25,7 @@
 //!   ever handling the PIN twice.
 
 mod ct;
+mod hmac;
 mod pbkdf2;
 mod pin;
 mod seal;

@@ -297,10 +297,20 @@ impl Vault {
         write_secret_file(&self.path, &bytes)
     }
 
-    fn derive(&self, secret: &[u8], salt: &[u8], iterations: u32) -> Result<Zeroizing<Vec<u8>>, VaultError> {
-        let seal = self.seal.clone();
-        let hmac = |key: &[u8], data: &[u8]| seal.hmac_sha256(key, data);
-        Ok(Zeroizing::new(pbkdf2(secret, salt, iterations, KEY_LEN, &hmac)?))
+    fn derive(
+        &self,
+        secret: &[u8],
+        salt: &[u8],
+        iterations: u32,
+    ) -> Result<Zeroizing<Vec<u8>>, VaultError> {
+        let hmac = |key: &[u8], data: &[u8]| Ok(crate::hmac::hmac_sha256(key, data).to_vec());
+        Ok(Zeroizing::new(pbkdf2(
+            secret,
+            salt,
+            iterations,
+            KEY_LEN,
+            &hmac,
+        )?))
     }
 
     fn unwrap_key(
