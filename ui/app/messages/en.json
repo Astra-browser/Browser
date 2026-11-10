@@ -230,6 +230,8 @@
   "keymap_reserved": "That shortcut belongs to the system.",
   "keymap_invalid": "That key can't be used for a shortcut.",
   "keymap_failed": "Couldn't save the shortcut. Try again.",
+  "keymap_pending": "Save in {seconds}s",
+  "keymap_pending_help": "The new shortcut is not applied until you save it.",
   "keymap_reset": "Reset",
   "keymap_reset_all": "Restore default shortcuts",
   "keymap_reset_all_help": "Every shortcut goes back to how Astra ships.",

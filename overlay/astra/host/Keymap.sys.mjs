@@ -377,6 +377,10 @@ function keyToken(token) {
   if (functionKey) {
     return `F${functionKey[1]}`;
   }
+  const mouse = /^MOUSE([3-5])$/u.exec(upper);
+  if (mouse) {
+    return `Mouse${mouse[1]}`;
+  }
   return NAMED_KEYS.get(upper) ?? null;
 }
 
@@ -506,7 +510,7 @@ export const Keymap = {
    * command that holds the keys; `replace` takes them from that command in the
    * same change. Returns the KeymapOutcome the UI consumes.
    */
-  async bind({ id = "", accelerator = null, replace = false, platform = "other" } = {}) {
+  async bind({ id = "", accelerator = null, replace = false, platform = null } = {}) {
     if (
       typeof id !== "string" ||
       id.length === 0 ||
@@ -523,7 +527,7 @@ export const Keymap = {
     if (!customizable(spec)) {
       return outcome("fixed");
     }
-    const at = platformOf(platform);
+    const at = platformOf(platform ?? currentPlatform());
     const canonical = accelerator === null ? null : canonicalAccelerator(accelerator, at);
     if (accelerator !== null && canonical === null) {
       return outcome("invalid");

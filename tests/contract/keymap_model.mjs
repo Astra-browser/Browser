@@ -198,6 +198,20 @@ const off = addEventListener((event) => {
   check("recording ended", __keymapRecording() === false);
 }
 
+// === Platform and auxiliary mouse buttons ===
+{
+  const mac = await Keymap.bind({ id: "tab.new", accelerator: "Cmd+K", platform: "mac" });
+  check("an explicit mac platform accepts Cmd", mac.kind === "applied");
+  let entries = await Keymap.entries({ platform: "mac" });
+  check("the mac binding is stored", byId(entries, "tab.new").accelerator === "Cmd+K");
+
+  const mouse = await Keymap.bind({ id: "tab.new", accelerator: "Mouse3" });
+  check("an auxiliary mouse button binds", mouse.kind === "applied");
+  entries = await Keymap.entries();
+  check("the mouse binding is stored", byId(entries, "tab.new").accelerator === "Mouse3");
+  await Keymap.bind({ id: "tab.new", accelerator: null });
+}
+
 off();
 __resetKeymapForTests();
 __resetEventsForTests();

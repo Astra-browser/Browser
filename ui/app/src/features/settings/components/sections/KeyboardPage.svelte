@@ -3,7 +3,12 @@
   import { keymap, type KeymapEntry, type KeymapOutcome } from "$domain/keymap";
   import { preferences } from "$domain/preferences";
   import { IS_MAC } from "$shared/platform";
-  import { acceleratorFrom, acceleratorKeys, heldModifiers } from "$shared/lib/accelerator";
+  import {
+    acceleratorFrom,
+    acceleratorKeys,
+    heldModifiers,
+    mouseAccelerator,
+  } from "$shared/lib/accelerator";
   import SettingsGroup from "$shared/ui/SettingsGroup";
   import SettingsRow from "$shared/ui/SettingsRow";
   import Button from "$shared/ui/Button";
@@ -19,6 +24,33 @@
   let recordingId = $state<string | null>(null);
   let held = $state<string[]>([]);
   let notice = $state<Notice | null>(null);
+  /** A captured chord waits here for Save. It is not written to the host
+   *  until the person confirms, and the countdown drops it otherwise. */
+  let pending = $state<{ id: string; accelerator: string; left: number } | null>(null);
+  let pendingTimer: ReturnType<typeof setInterval> | null = null;
+  const SAVE_SECONDS = 15;
+
+  function cancelPending() {
+    if (pendingTimer !== null) clearInterval(pendingTimer);
+    pendingTimer = null;
+    pending = null;
+  }
+
+  function stage(id: string, accelerator: string) {
+    cancelPending();
+    pending = { id, accelerator, left: SAVE_SECONDS };
+    pendingTimer = setInterval(() => {
+      if (pending === null) return;
+      pending = { ...pending, left: pending.left - 1 };
+      if (pending.left <= 0) cancelPending();
+    }, 1000);
+  }
+
+  async function savePending() {
+    const captured = pending;
+    cancelPending();
+    if (captured) await bind(captured.id, captured.accelerator);
+  }
 
   function titleOf(id: string) {
     const entry = keymap.all().find((candidate) => candidate.id === id);
@@ -94,7 +126,19 @@
       return;
     }
     end();
-    void bind(id, accelerator);
+    // 15 seconds to confirm: a mistyped chord never reaches the host.
+    stage(id, accelerator);
+  }
+
+  function mousedown(event: MouseEvent) {
+    const id = recordingId;
+    if (id === null) return;
+    const accelerator = mouseAccelerator(event, IS_MAC);
+    if (accelerator === null) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    end();
+    stage(id, accelerator);
   }
 
   function keyup(event: KeyboardEvent) {
@@ -106,18 +150,24 @@
     const options = { capture: true };
     window.addEventListener("keydown", keydown, options);
     window.addEventListener("keyup", keyup, options);
+    window.addEventListener("mousedown", mousedown, options);
     window.addEventListener("blur", end);
     return () => {
       window.removeEventListener("keydown", keydown, options);
       window.removeEventListener("keyup", keyup, options);
+      window.removeEventListener("mousedown", mousedown, options);
       window.removeEventListener("blur", end);
     };
   });
 
-  $effect(() => () => end());
+  $effect(() => () => {
+    end();
+    cancelPending();
+  });
 
   function rowDescription(entry: KeymapEntry) {
     if (recordingId === entry.id) return m.keymap_recording_help();
+    if (pending?.id === entry.id) return m.keymap_pending_help();
     if (notice?.id === entry.id) return notice.text;
     return undefined;
   }
@@ -132,6 +182,17 @@
       {@const replace = notice?.id === entry.id ? notice.replace : undefined}
       <SettingsRow {title} description={rowDescription(entry)} settingId={`keymap.${entry.id}`}>
         <div class="shortcut">
+          {#if pending?.id === entry.id}
+            <span class="pending" role="timer" aria-live="polite"
+              >{m.keymap_pending({ seconds: pending.left })}</span
+            >
+            <Button variant="primary" size="compact" onclick={() => void savePending()}
+              >{m.search_save()}</Button
+            >
+            <Button variant="ghost" size="compact" onclick={cancelPending}
+              >{m.action_cancel()}</Button
+            >
+          {/if}
           {#if replace !== undefined && !recording}<Button
               variant="secondary"
               size="compact"
@@ -142,7 +203,11 @@
               onclick={() => void reset(entry.id)}>{m.keymap_reset()}</Button
             >{/if}
           <ShortcutField
-            keys={entry.accelerator ? acceleratorKeys(entry.accelerator, IS_MAC) : []}
+            keys={pending?.id === entry.id
+              ? acceleratorKeys(pending.accelerator, IS_MAC)
+              : entry.accelerator
+                ? acceleratorKeys(entry.accelerator, IS_MAC)
+                : []}
             {held}
             {recording}
             prompt={m.keymap_press()}
@@ -184,5 +249,12 @@
     align-items: center;
     gap: 8px;
     flex: none;
+  }
+
+  .pending {
+    color: var(--color-muted);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 </style>
