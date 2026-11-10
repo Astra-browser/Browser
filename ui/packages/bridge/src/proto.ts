@@ -16,7 +16,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 275 command wire names. */
+/** All 276 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -223,6 +223,7 @@ export type CommandName =
   | "voice_status"
   | "voice_stop"
   | "web_extension_answer_access"
+  | "web_extension_answer_prompt"
   | "web_extension_cancel"
   | "web_extension_choose_file"
   | "web_extension_confirm"
@@ -501,6 +502,7 @@ export const COMMANDS: readonly CommandName[] = [
   "voice_status",
   "voice_stop",
   "web_extension_answer_access",
+  "web_extension_answer_prompt",
   "web_extension_cancel",
   "web_extension_choose_file",
   "web_extension_confirm",
@@ -573,7 +575,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 35 event channel names (post-rename). */
+/** All 36 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -597,6 +599,7 @@ export type EventChannel =
   | "tab-changed"
   | "ui-command"
   | "web-extension-access-requested"
+  | "web-extension-prompt-changed"
   | "web-extension-store-clicked"
   | "work-changed"
   | "work-environment-changed"
@@ -635,6 +638,7 @@ export const EVENTS: readonly EventChannel[] = [
   "tab-changed",
   "ui-command",
   "web-extension-access-requested",
+  "web-extension-prompt-changed",
   "web-extension-store-clicked",
   "work-changed",
   "work-environment-changed",

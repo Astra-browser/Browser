@@ -1,7 +1,7 @@
 # IPC surface (P0-T03a, 2026-11-01) — authoritative command/event inventory
 
 Source: Tauri Specta output `frame/src/shared/ipc/bindings.ts` (7674 lines) cross-checked
-against every `#[tauri::command]` fn in `desktop/src` + `crates`. Result: **267 commands, 35 events, zero mismatches**.
+against every `#[tauri::command]` fn in `desktop/src` + `crates`. Result: **276 commands, 36 events, zero mismatches**.
 This file is the input to P0-T04 (`BrowserHost`) and P2-T02 (`astra-proto`).
 
 Conventions: every command takes `caller: WebviewWindow` first (caller-policy
@@ -11,7 +11,7 @@ camelCase TS wrappers. 8 event channels carry a previous-product prefix and **mu
 Legend: `prev_` / `prev:` / `Prev` mark verbatim source identifiers carrying the
 previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels, types).
 
-## Commands (275)
+## Commands (276)
 
 | Wire name | TS wrapper | Rust fn (file) | Params (minus caller) | Returns |
 |---|---|---|---|---|
@@ -220,6 +220,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `voice_status` | `voiceStatus` | `d:voice.rs` | `async caller: WebviewWindow` | `VoiceStatusV1` |
 | `voice_stop` | `voiceStop` | `d:voice.rs` | `caller: WebviewWindow, app: tauri::AppHandle, take: u32` | `bool` |
 | `web_extension_answer_access` | `webExtensionAnswerAccess` | `d:webext/mod.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, request: prev_ipc::WebExtensionAccessRequestView, allowed: bool,` | `Result<(), String>` |
+| `web_extension_answer_prompt` | `webExtensionAnswerPrompt` | `d:webext/mod.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, prompt_id: String, accept: bool, private_windows: bool, technical_data: bool,` | `Result<(), String>` |
 | `web_extension_cancel` | `webExtensionCancel` | `d:webext/mod.rs` | `async caller: WebviewWindow, review_id: String` | `` |
 | `web_extension_choose_file` | `webExtensionChooseFile` | `d:webext/mod.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, extensions: State<'_, WebExtensions>, folder: bool,` | `Result<Option<WebExtensionReview>, String>` |
 | `web_extension_confirm` | `webExtensionConfirm` | `d:webext/mod.rs` | `async caller: WebviewWindow, shell: State<'_, Handle>, extensions: State<'_, WebExtensions>, id: String, review_id: String,` | `Result<(), String>` |
@@ -291,7 +292,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `work_test_provider_key` | `workTestProviderKey` | `d:work_models.rs` | `async caller: WebviewWindow, expected_profile: String, provider: WorkModelProvider,` | `WorkModelsV1` |
 | `zoom_call` | `zoomCall` | `d:lib.rs` | `async caller: WebviewWindow, app: tauri::AppHandle, expected_profile: String, call: prev_ipc::ZoomCall,` | `prev_ipc::ZoomResponse` |
 
-## Events (35)
+## Events (36)
 
 | Wire channel | TS event | Payload type | Rename? |
 |---|---|---|---|
@@ -317,6 +318,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `tab-changed` | `tabChanged` | `TabChanged` | — |
 | `ui-command` | `uiCommand` | `UiCommand` | — |
 | `web-extension-access-requested` | `webExtensionAccessRequested` | `WebExtensionAccessRequested` | — |
+| `web-extension-prompt-changed` | `webExtensionPromptChanged` | `WebExtensionPromptChanged` | — |
 | `web-extension-store-clicked` | `webExtensionStoreClicked` | `WebExtensionStoreClicked` | — |
 | `work-changed` | `workChanged` | `WorkChanged` | — |
 | `work-environment-changed` | `workEnvironmentChanged` | `WorkEnvironmentChanged` | — |

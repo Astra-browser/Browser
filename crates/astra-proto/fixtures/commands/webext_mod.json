@@ -9,6 +9,15 @@
       }
     },
     {
+      "command": "web_extension_answer_prompt",
+      "payload": {
+        "prompt_id": "x",
+        "accept": true,
+        "private_windows": true,
+        "technical_data": true
+      }
+    },
+    {
       "command": "web_extension_cancel",
       "payload": {
         "review_id": "x"

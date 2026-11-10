@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 275,
+  "count": 276,
   "commands": {
     "about_info": {
       "ts": "aboutInfo",
@@ -4847,6 +4847,39 @@
         "required": [
           "request",
           "allowed"
+        ]
+      },
+      "returns": {
+        "schema": {},
+        "ts": "unknown",
+        "rust": "Result<(), String>"
+      }
+    },
+    "web_extension_answer_prompt": {
+      "ts": "webExtensionAnswerPrompt",
+      "rust": "d:webext/mod.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "prompt_id": {
+            "type": "string"
+          },
+          "accept": {
+            "type": "boolean"
+          },
+          "private_windows": {
+            "type": "boolean"
+          },
+          "technical_data": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt_id",
+          "accept",
+          "private_windows",
+          "technical_data"
         ]
       },
       "returns": {

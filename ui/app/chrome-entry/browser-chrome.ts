@@ -184,9 +184,13 @@ try {
   // bridge bus onto those same channels; the app code stays untouched.
   const DOM_CHANNELS: Record<string, string> = {
     "items-changed": "astra:items",
+    "extension-actions-changed": "astra:extension-actions",
+    "extension-action-failed": "astra:extension-action-failed",
+    "extension-action-shortcut": "astra:extension-action-shortcut",
     "ui-command": "astra:ui-command",
     "operation-processed": "astra:operation-processed",
     "page-permission-prompt-changed": "astra:page-permission-prompt",
+    "web-extension-prompt-changed": "astra:web-extension-prompt",
     "nav.find-result": "astra:find",
     "runtime-status-changed": "astra:runtime-status",
     "blocker-status-changed": "astra:blocker-status",

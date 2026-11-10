@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";import{Z as t}from"./chrome-shared-RuwxJ6Z2.js";var n=((n={},r={})=>(r.locale??t(),e(1630,n)??`Checking…`));export{n as t};

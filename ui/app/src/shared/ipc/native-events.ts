@@ -35,6 +35,7 @@ import type {
   VoiceLevels,
   SwipeScroll,
   WebExtensionAccessRequested,
+  WebExtensionPromptChanged,
   WebExtensionStoreClicked,
 } from "./bindings";
 
@@ -80,6 +81,7 @@ export const nativeEventNames = {
   extensionActionShortcut: "astra:extension-action-shortcut",
   pagePermissionPromptChanged: "astra:page-permission-prompt",
   webExtensionAccessRequested: "astra:web-extension-access",
+  webExtensionPromptChanged: "astra:web-extension-prompt",
   webExtensionStoreClicked: "astra:web-extension-store-click",
   webExtensionDropped: "astra:web-extension-dropped",
   browserReturn: "astra:browser-return",
@@ -140,6 +142,9 @@ export const events = {
   ),
   webExtensionAccessRequested: scopedEvent<WebExtensionAccessRequested>(
     nativeEventNames.webExtensionAccessRequested,
+  ),
+  webExtensionPromptChanged: scopedEvent<WebExtensionPromptChanged>(
+    nativeEventNames.webExtensionPromptChanged,
   ),
   webExtensionStoreClicked: scopedEvent<WebExtensionStoreClicked>(
     nativeEventNames.webExtensionStoreClicked,

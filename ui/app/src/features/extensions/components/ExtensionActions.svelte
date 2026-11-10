@@ -6,7 +6,7 @@
   import * as m from "$shared/i18n/messages";
   import Icon from "$shared/ui/Icon";
   import ExtensionActionIcon from "./ExtensionActionIcon.svelte";
-  import { holdWhilePopupOpen } from "../lib/popup-hold";
+  import { holdWhilePopupOpen } from "$session/attention.svelte";
 
   let profileId = $derived(tabs.profile()?.id ?? null);
   let tabId = $derived(tabs.activeId());
@@ -31,14 +31,6 @@
     if (profileId === null || tabId === null || !(target instanceof HTMLButtonElement)) return;
     if (action.presents_popup) holdWhilePopupOpen();
     void extensions.invoke(profileId, tabId, action, anchor(target));
-  }
-
-  function openMenu(event: MouseEvent, action: (typeof actions)[number]) {
-    event.preventDefault();
-    event.stopPropagation();
-    const target = event.currentTarget;
-    if (profileId === null || !(target instanceof HTMLElement)) return;
-    extensions.menu(profileId, action, target.getBoundingClientRect());
   }
 
   $effect(() => {
@@ -89,10 +81,9 @@
         data-extension-install={action.runtime.install_id}
         class="item"
         onclick={(event) => invoke(event, action)}
-        oncontextmenu={(event) => openMenu(event, action)}
       >
         <span class="glyph">
-          <ExtensionActionIcon rgba={action.icon_rgba_base64} />
+          <ExtensionActionIcon rgba={action.icon_rgba_base64} url={action.icon_url ?? null} />
           {#if action.badge.length > 0}
             <span aria-hidden="true" class="badge" data-unread={action.unread_badge}>
               {action.badge}

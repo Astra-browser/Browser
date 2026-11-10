@@ -25,9 +25,9 @@ beforeEach(() => {
 });
 
 describe("bridge wiring", () => {
-  test("covers the full surface (275 commands, 35 events)", () => {
-    expect(COMMANDS).toHaveLength(275);
-    expect(EVENTS).toHaveLength(35);
+  test("covers the full surface (276 commands, 36 events)", () => {
+    expect(COMMANDS).toHaveLength(276);
+    expect(EVENTS).toHaveLength(36);
   });
 
   test("standalone is selected outside chrome (?astra-mock=1)", async () => {

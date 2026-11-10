@@ -46,7 +46,7 @@ test("confirmation identifies the exact displayed review", async () => {
   native.prepare.mockResolvedValue({ status: "ok", data: review("review-a") });
   await webext.prepare("tab");
   await webext.confirm("review-a");
-  expect(native.confirm).toHaveBeenCalledExactlyOnceWith("same-extension", "review-a");
+  expect(native.confirm).toHaveBeenCalledExactlyOnceWith("same-extension", "review-a", false, true);
 });
 
 test("a stale displayed review cannot confirm or cancel a newer review of the same extension", async () => {

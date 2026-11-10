@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 35,
+  "count": 36,
   "renames": {
     "prev:account-changed": "astra:account-changed",
     "prev:import-progress": "astra:import-progress",
@@ -152,6 +152,12 @@
       "ts": "webExtensionAccessRequested",
       "payload": {
         "x-astra-rust-type": "WebExtensionAccessRequested"
+      }
+    },
+    "web-extension-prompt-changed": {
+      "ts": "webExtensionPromptChanged",
+      "payload": {
+        "x-astra-rust-type": "WebExtensionPromptChanged"
       }
     },
     "web-extension-store-clicked": {

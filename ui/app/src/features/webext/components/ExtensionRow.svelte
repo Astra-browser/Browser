@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { MoreHorizontalIcon, PuzzleIcon } from "@hugeicons/core-free-icons";
-  import type { WebExtensionView } from "$shared/ipc/bindings";
+  import {
+    ArrowUpRight01Icon,
+    MoreHorizontalIcon,
+    PinIcon,
+    PinOffIcon,
+    PuzzleIcon,
+  } from "@hugeicons/core-free-icons";
+  import type { ExtensionActionView, WebExtensionView } from "$shared/ipc/bindings";
   import { IS_WINDOWS } from "$shared/platform";
+  import { extensions } from "$domain/extensions";
   import { webext } from "$domain/webext";
   import Button from "$shared/ui/Button";
   import Icon from "$shared/ui/Icon";
@@ -9,8 +16,19 @@
   import Switch from "$shared/ui/Switch";
   import * as m from "$shared/i18n/messages";
   import SiteAccessEditor from "./SiteAccessEditor.svelte";
+  import { holdWhilePopupOpen } from "$session/attention.svelte";
 
-  let { extension }: { extension: WebExtensionView } = $props();
+  let {
+    extension,
+    action = null,
+    profileId = null,
+    tabId = null,
+  }: {
+    extension: WebExtensionView;
+    action?: ExtensionActionView | null;
+    profileId?: string | null;
+    tabId?: string | null;
+  } = $props();
   let removing = $state(false);
   let editingSites = $state(false);
   let sourceLabel = $derived(
@@ -40,8 +58,20 @@
   );
 
   let entries = $derived<MenuEntry[]>([
+    ...(action !== null
+      ? [{ kind: "item" as const, id: "open", label: m.webext_open_extension() }]
+      : []),
     ...(extension.has_options && extension.enabled
-      ? [{ kind: "item" as const, id: "options", label: m.webext_options() }]
+      ? [{ kind: "item" as const, id: "options", label: m.webext_extension_settings() }]
+      : []),
+    ...(action !== null
+      ? [
+          {
+            kind: "item" as const,
+            id: "pin",
+            label: extension.pinned ? m.webext_unpin() : m.webext_pin(),
+          },
+        ]
       : []),
     ...(extension.site_scoped
       ? [
@@ -75,10 +105,28 @@
   ]);
 
   function select(id: string) {
-    if (id === "options") void webext.openOptions(extension.id);
+    if (id === "open") openExtension();
+    else if (id === "pin") void webext.setPinned(extension.id, !extension.pinned);
+    else if (id === "options") void webext.openOptions(extension.id);
     else if (id === "all" || id === "click") void webext.setAccess(extension.id, id);
     else if (id === "sites") editingSites = true;
     else if (id === "remove") removing = true;
+  }
+
+  function openExtension(event?: MouseEvent) {
+    if (action !== null && profileId !== null && tabId !== null && action.enabled) {
+      if (action.presents_popup) holdWhilePopupOpen();
+      const target = event?.currentTarget;
+      const anchor = target instanceof HTMLElement ? target.getBoundingClientRect() : undefined;
+      void extensions.invoke(
+        profileId,
+        tabId,
+        action,
+        anchor ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0),
+      );
+    } else if (extension.has_options && extension.enabled) {
+      void webext.openOptions(extension.id);
+    }
   }
 </script>
 
@@ -131,6 +179,30 @@
     </span>
     {#if extension.site_scoped && extension.enabled}
       <span class="access">{access}</span>
+    {/if}
+    {#if action !== null || (extension.has_options && extension.enabled)}
+      <button
+        type="button"
+        class="row-action"
+        data-row-action={action !== null ? "extension" : "settings"}
+        title={action !== null ? m.webext_open_extension() : m.webext_extension_settings()}
+        aria-label={action !== null ? m.webext_open_extension() : m.webext_extension_settings()}
+        onclick={(event) => openExtension(event)}
+      >
+        <Icon icon={action !== null ? ArrowUpRight01Icon : PuzzleIcon} size={15} />
+      </button>
+    {/if}
+    {#if action !== null}
+      <button
+        type="button"
+        class="row-action pin-action"
+        aria-pressed={extension.pinned}
+        title={extension.pinned ? m.webext_unpin() : m.webext_pin()}
+        aria-label={extension.pinned ? m.webext_unpin() : m.webext_pin()}
+        onclick={() => void webext.setPinned(extension.id, !extension.pinned)}
+      >
+        <Icon icon={extension.pinned ? PinOffIcon : PinIcon} size={14} />
+      </button>
     {/if}
     <Switch
       label={m.webext_turned_on({ name: extension.name })}
@@ -242,6 +314,31 @@
   .limits {
     text-decoration: underline dotted;
     text-underline-offset: 2px;
+  }
+
+  .row-action {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-inset);
+    background: none;
+    color: var(--color-faint);
+    cursor: default;
+    outline: none;
+  }
+
+  .row-action:hover,
+  .row-action:focus-visible {
+    background: var(--row-hover);
+    color: var(--color-text);
+  }
+
+  .pin-action[aria-pressed="true"] {
+    color: var(--color-text);
   }
 
   /* The action stays whole beside its message, however long the message. */
