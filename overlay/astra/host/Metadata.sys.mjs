@@ -314,14 +314,12 @@ export const Metadata = {
    * bootstraps, so adopted native tabs land in an existing space.
    */
   async prepare({ private: isPrivate = false, window_id: windowId = "" } = {}) {
-    // A private window keeps nothing: no spaces restored, nothing written.
-    _private = isPrivate === true;
+    // A private window keeps nothing: no spaces restored, nothing written,
+    // and it must not change the normal window's store state.
+    if (isPrivate === true) return { state: "private" };
+    _private = false;
     _windowId = typeof windowId === "string" ? windowId : "";
-    _owner = _private ? false : claimOwner();
-    if (_private) {
-      _available = false;
-      return { state: "private" };
-    }
+    _owner = claimOwner();
     const reply = await Boot.coreCall({
       request_id: "metadata-load",
       name: "session.load",
@@ -348,7 +346,8 @@ export const Metadata = {
    * Re-apply each restored tab's space and pin. Called after the native tab
    * mount adopted the `SessionStore` tabs.
    */
-  async restore() {
+  async restore({ private: isPrivate = false } = {}) {
+    if (isPrivate === true) return { restored: false, reason: "private" };
     if (_private) return { restored: false, reason: "private" };
     if (!_available || _snapshot === null) {
       return { restored: false, reason: _available ? "no_snapshot" : "unavailable" };
@@ -480,10 +479,12 @@ export const Metadata = {
 
   /** Subscribe once and keep the store current after every organisation change. */
   init({ private: isPrivate = _private, window_id: windowId = _windowId } = {}) {
-    _private = isPrivate === true;
+    // A private window owns no organisation: it neither subscribes nor
+    // claims the writer slot, and must not flip the normal window's flag.
+    if (isPrivate === true) return;
+    _private = false;
     _windowId = typeof windowId === "string" ? windowId : _windowId;
-    _owner = _private ? false : claimOwner();
-    if (_private) return;
+    _owner = claimOwner();
     if (_off !== null) return;
     _off = addEventListener((event) => {
       if (typeof event?.type !== "string") return;

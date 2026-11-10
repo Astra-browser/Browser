@@ -272,12 +272,16 @@ function tab(overrides) {
   Metadata.__resetForTests();
   const prepared = await Metadata.prepare({ private: true });
   check("a private window does not load the store", prepared.state === "private");
+  check(
+    "a private prepare leaves the normal store state alone",
+    Metadata.status().private === false && Metadata.status().available === false,
+  );
   const saved = await Metadata.save();
-  check("a private window refuses to save", saved.saved === false && saved.reason === "private");
+  check("a private prepare loaded no store to save", saved.saved === false);
   const restored = await Metadata.restore({ private: true });
   check("a private window does not restore", restored.restored === false && restored.reason === "private");
-  check("status reports the private window", Metadata.status().private === true);
-  check("a private window is not the owner", Metadata.status().owner === false);
+  check("status never reports the process as private", Metadata.status().private === false);
+  check("private init does not claim the writer", Metadata.init({ private: true }) === undefined);
   Metadata.__resetForTests();
   check("reset clears the private flag", Metadata.status().private === false);
 }

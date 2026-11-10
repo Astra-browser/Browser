@@ -330,12 +330,15 @@
       if (coreStopped) return;
       coreStopped = true;
       // Flush the last organisation change before the sidecar exits; the
-      // debounced save may not have fired yet.
+      // debounced save may not have fired yet. A private window owns no
+      // organisation, so it must never flush the normal window's store.
       void (async () => {
-        try {
-          await host.Metadata?.flush?.();
-        } catch {
-          // The core is already gone; nothing left to persist.
+        if (!privateWindow) {
+          try {
+            await host.Metadata?.flush?.();
+          } catch {
+            // The core is already gone; nothing left to persist.
+          }
         }
         try {
           await host.Boot.shutdown({ request_id: "shell-quit", reason: "quit-application-granted" });
@@ -904,10 +907,14 @@
         try {
           // P5b: install the saved spaces before any tab exists, so a tab
           // adopted from SessionStore lands in a space that already exists.
-          try {
-            await host.Metadata?.prepare?.({ private: privateWindow, window_id: ownWindowId });
-          } catch {
-            // No core or no snapshot: the browser keeps its default space.
+          // A private window records nothing and must not take over the
+          // normal window's in-memory store.
+          if (!privateWindow) {
+            try {
+              await host.Metadata?.prepare?.({ private: privateWindow, window_id: ownWindowId });
+            } catch {
+              // No core or no snapshot: the browser keeps its default space.
+            }
           }
           // The native mount maps the model, so the model must exist before
           // it lists tabs; otherwise a bootstrap tab created in the gap is
@@ -922,8 +929,10 @@
           // Re-apply each restored tab's space and pin now that the native
           // mount adopted them, then keep the store current.
           try {
-            await host.Metadata?.restore?.();
-            host.Metadata?.init?.({ private: privateWindow, window_id: ownWindowId });
+            if (!privateWindow) {
+              await host.Metadata?.restore?.();
+              host.Metadata?.init?.({ private: privateWindow, window_id: ownWindowId });
+            }
           } catch {
             // A failed restore leaves the tabs where the engine put them.
           }
@@ -1140,8 +1149,10 @@
         // Already gone with the window.
       }
       try {
-        host.Metadata?.releaseOwner?.();
-        host.Metadata?.dispose?.();
+        if (!privateWindow) {
+          host.Metadata?.releaseOwner?.();
+          host.Metadata?.dispose?.();
+        }
       } catch {
         // Already torn down with the window.
       }
