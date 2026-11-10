@@ -35,6 +35,7 @@ CONTRACTS=(
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker
   menu_layer telemetry_blocklist migration_model search_model commands_model
+  blocker_coverage
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -92,6 +93,7 @@ PROBES=(
   "settings_audit:tools/marionette-probe/settings-audit-probe.py"
   "settings_parity:tools/marionette-probe/settings-parity-probe.py"
   "blocker:tools/marionette-probe/blocker-probe.py"
+  "superadblock:tools/marionette-probe/superadblock-probe.py"
   "shields:tools/marionette-probe/shields-probe.py"
   "fingerprint:tools/marionette-probe/fingerprint-probe.py"
   "tabs_settings:tools/marionette-probe/tabs-settings-probe.py"

@@ -1,0 +1,6248 @@
+{
+ "source": "https://superadblocktest.com/adblock.js",
+ "captured": "2026-11-10",
+ "probe_note": "Each host is fetched with fetch(no-cors) on /, /favicon.ico and /robots.txt; a host is blocked only when every path fails. The headline is a weighted module score, so the strict list must cover every scored host for all request types.",
+ "scored_categories": [
+  "A/B Testing",
+  "Ads",
+  "Advanced / Risky Host Checks",
+  "Affiliate Networks",
+  "Analytics",
+  "Consent Management",
+  "Email Tracking & Live Chat",
+  "OEM Vendors",
+  "Social Trackers",
+  "Tracking & Fingerprinting",
+  "Video Ads"
+ ],
+ "category_counts": {
+  "Ads": 160,
+  "Analytics": 67,
+  "Tracking & Fingerprinting": 32,
+  "Error Trackers": 15,
+  "Advanced / Risky Host Checks": 14,
+  "Social Trackers": 49,
+  "OEM Vendors": 69,
+  "Consent Management": 15,
+  "Affiliate Networks": 23,
+  "A/B Testing": 7,
+  "Email Tracking & Live Chat": 14,
+  "Video Ads": 17
+ },
+ "hosts": [
+  {
+   "host": "api.optimizely.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "api.optimizely.com"
+   ]
+  },
+  {
+   "host": "cdn.dynamicyield.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "cdn.dynamicyield.com"
+   ]
+  },
+  {
+   "host": "cdn.optimizely.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "cdn.optimizely.com"
+   ]
+  },
+  {
+   "host": "clientstream.launchdarkly.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "clientstream.launchdarkly.com"
+   ]
+  },
+  {
+   "host": "events.launchdarkly.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "events.launchdarkly.com"
+   ]
+  },
+  {
+   "host": "logx.optimizely.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "logx.optimizely.com"
+   ]
+  },
+  {
+   "host": "st.dynamicyield.com",
+   "scored": true,
+   "categories": [
+    "A/B Testing"
+   ],
+   "groups": [
+    "Experiment Platforms"
+   ],
+   "targets": [
+    "st.dynamicyield.com"
+   ]
+  },
+  {
+   "host": "a.teads.tv",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "a.teads.tv"
+   ]
+  },
+  {
+   "host": "aan.amazon.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "aan.amazon.com"
+   ]
+  },
+  {
+   "host": "aax.amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "aax.amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "acdn.adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "acdn.adnxs.com"
+   ]
+  },
+  {
+   "host": "ad.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "ad.doubleclick.net"
+   ]
+  },
+  {
+   "host": "ad.gt",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "ad.gt"
+   ]
+  },
+  {
+   "host": "adc3-launch.adcolony.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdColony"
+   ],
+   "targets": [
+    "adc3-launch.adcolony.com"
+   ]
+  },
+  {
+   "host": "adclick.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "adclick.g.doubleclick.net"
+   ]
+  },
+  {
+   "host": "adfox.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "adfox.yandex.ru"
+   ]
+  },
+  {
+   "host": "adfstat.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "adfstat.yandex.ru"
+   ]
+  },
+  {
+   "host": "adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "adnxs.com"
+   ]
+  },
+  {
+   "host": "adroll.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdRoll / NextRoll"
+   ],
+   "targets": [
+    "adroll.com"
+   ]
+  },
+  {
+   "host": "ads.microsoft.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Bing Ads / Microsoft Ads"
+   ],
+   "targets": [
+    "ads.microsoft.com"
+   ]
+  },
+  {
+   "host": "ads.pubmatic.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "PubMatic"
+   ],
+   "targets": [
+    "ads.pubmatic.com"
+   ]
+  },
+  {
+   "host": "ads.stickyadstv.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "ads.stickyadstv.com"
+   ]
+  },
+  {
+   "host": "ads.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "ads.yahoo.com"
+   ]
+  },
+  {
+   "host": "ads.youtube.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "YouTube / Video Ads"
+   ],
+   "targets": [
+    "ads.youtube.com"
+   ]
+  },
+  {
+   "host": "ads30.adcolony.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdColony"
+   ],
+   "targets": [
+    "ads30.adcolony.com"
+   ]
+  },
+  {
+   "host": "adserver.unityads.unity3d.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Unity Ads"
+   ],
+   "targets": [
+    "adserver.unityads.unity3d.com"
+   ]
+  },
+  {
+   "host": "adservetx.media.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Media.net"
+   ],
+   "targets": [
+    "adservetx.media.net"
+   ]
+  },
+  {
+   "host": "adservice.google.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "adservice.google.com"
+   ]
+  },
+  {
+   "host": "adsrvr.org",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "adsrvr.org"
+   ]
+  },
+  {
+   "host": "adtago.s3.amazonaws.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "adtago.s3.amazonaws.com"
+   ]
+  },
+  {
+   "host": "adtech.yahooinc.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "adtech.yahooinc.com"
+   ]
+  },
+  {
+   "host": "advertising-api-eu.amazon.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "advertising-api-eu.amazon.com"
+   ]
+  },
+  {
+   "host": "advertising.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "advertising.yahoo.com"
+   ]
+  },
+  {
+   "host": "advertising.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "advertising.yandex.ru"
+   ]
+  },
+  {
+   "host": "advice-ads.s3.amazonaws.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "advice-ads.s3.amazonaws.com"
+   ]
+  },
+  {
+   "host": "afs.googlesyndication.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "afs.googlesyndication.com"
+   ]
+  },
+  {
+   "host": "amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "analytics.query.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "analytics.query.yahoo.com"
+   ]
+  },
+  {
+   "host": "analytics.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "analytics.yahoo.com"
+   ]
+  },
+  {
+   "host": "analyticsengine.s3.amazonaws.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "analyticsengine.s3.amazonaws.com"
+   ]
+  },
+  {
+   "host": "apex.go.sonobi.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "apex.go.sonobi.com"
+   ]
+  },
+  {
+   "host": "api.fyber.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "api.fyber.com"
+   ]
+  },
+  {
+   "host": "api.taboola.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Taboola"
+   ],
+   "targets": [
+    "api.taboola.com"
+   ]
+  },
+  {
+   "host": "api.vungle.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Vungle / Liftoff"
+   ],
+   "targets": [
+    "api.vungle.com"
+   ]
+  },
+  {
+   "host": "applovin.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AppLovin"
+   ],
+   "targets": [
+    "applovin.com"
+   ]
+  },
+  {
+   "host": "appmetrica.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "appmetrica.yandex.ru"
+   ]
+  },
+  {
+   "host": "as.casalemedia.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "as.casalemedia.com"
+   ]
+  },
+  {
+   "host": "auction.unityads.unity3d.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Unity Ads"
+   ],
+   "targets": [
+    "auction.unityads.unity3d.com"
+   ]
+  },
+  {
+   "host": "bat.bing.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Bing Ads / Microsoft Ads"
+   ],
+   "targets": [
+    "bat.bing.com"
+   ]
+  },
+  {
+   "host": "bidder.criteo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "bidder.criteo.com"
+   ]
+  },
+  {
+   "host": "bingads.microsoft.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Bing Ads / Microsoft Ads"
+   ],
+   "targets": [
+    "bingads.microsoft.com"
+   ]
+  },
+  {
+   "host": "c.amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "c.amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "c.bing.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Bing Ads / Microsoft Ads"
+   ],
+   "targets": [
+    "c.bing.com"
+   ]
+  },
+  {
+   "host": "c.gumgum.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "c.gumgum.com"
+   ]
+  },
+  {
+   "host": "casalemedia.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "casalemedia.com"
+   ]
+  },
+  {
+   "host": "cdn.doubleverify.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "cdn.doubleverify.com"
+   ]
+  },
+  {
+   "host": "cdn.indexexchange.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "cdn.indexexchange.com"
+   ]
+  },
+  {
+   "host": "cdn.kargo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "cdn.kargo.com"
+   ]
+  },
+  {
+   "host": "cdn.mgid.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "MGID"
+   ],
+   "targets": [
+    "cdn.mgid.com"
+   ]
+  },
+  {
+   "host": "cdn.taboola.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Taboola"
+   ],
+   "targets": [
+    "cdn.taboola.com"
+   ]
+  },
+  {
+   "host": "cdn.teads.tv",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "cdn.teads.tv"
+   ]
+  },
+  {
+   "host": "cm.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "cm.g.doubleclick.net"
+   ]
+  },
+  {
+   "host": "config.unityads.unity3d.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Unity Ads"
+   ],
+   "targets": [
+    "config.unityads.unity3d.com"
+   ]
+  },
+  {
+   "host": "contextual.media.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Media.net"
+   ],
+   "targets": [
+    "contextual.media.net"
+   ]
+  },
+  {
+   "host": "contextweb.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "contextweb.com"
+   ]
+  },
+  {
+   "host": "criteo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "criteo.com"
+   ]
+  },
+  {
+   "host": "d.adroll.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdRoll / NextRoll"
+   ],
+   "targets": [
+    "d.adroll.com"
+   ]
+  },
+  {
+   "host": "d.applovin.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AppLovin"
+   ],
+   "targets": [
+    "d.applovin.com"
+   ]
+  },
+  {
+   "host": "dis.criteo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "dis.criteo.com"
+   ]
+  },
+  {
+   "host": "doubleverify.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "doubleverify.com"
+   ]
+  },
+  {
+   "host": "eb2.3lift.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "eb2.3lift.com"
+   ]
+  },
+  {
+   "host": "events3alt.adcolony.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdColony"
+   ],
+   "targets": [
+    "events3alt.adcolony.com"
+   ]
+  },
+  {
+   "host": "extmaps-api.yandex.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "extmaps-api.yandex.net"
+   ]
+  },
+  {
+   "host": "fastlane.rubiconproject.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "fastlane.rubiconproject.com"
+   ]
+  },
+  {
+   "host": "fls-na.amazon.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "fls-na.amazon.com"
+   ]
+  },
+  {
+   "host": "fw.adsafeprotected.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "fw.adsafeprotected.com"
+   ]
+  },
+  {
+   "host": "gemini.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "gemini.yahoo.com"
+   ]
+  },
+  {
+   "host": "geo.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "geo.yahoo.com"
+   ]
+  },
+  {
+   "host": "googleads.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads",
+    "Video Ads"
+   ],
+   "groups": [
+    "Google Ads",
+    "VAST / VPAID"
+   ],
+   "targets": [
+    "googleads.g.doubleclick.net",
+    "googleads.g.doubleclick.net/pagead/ads"
+   ]
+  },
+  {
+   "host": "googleads4.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "googleads4.g.doubleclick.net"
+   ]
+  },
+  {
+   "host": "googleadservices.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "googleadservices.com"
+   ]
+  },
+  {
+   "host": "googletagservices.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "googletagservices.com"
+   ]
+  },
+  {
+   "host": "gum.criteo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "gum.criteo.com"
+   ]
+  },
+  {
+   "host": "hbopenbid.pubmatic.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "PubMatic"
+   ],
+   "targets": [
+    "hbopenbid.pubmatic.com"
+   ]
+  },
+  {
+   "host": "htlb.casalemedia.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "htlb.casalemedia.com"
+   ]
+  },
+  {
+   "host": "htlbid.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "htlbid.com"
+   ]
+  },
+  {
+   "host": "ib.adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "ib.adnxs.com"
+   ]
+  },
+  {
+   "host": "image6.pubmatic.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "PubMatic"
+   ],
+   "targets": [
+    "image6.pubmatic.com"
+   ]
+  },
+  {
+   "host": "images.taboola.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Taboola"
+   ],
+   "targets": [
+    "images.taboola.com"
+   ]
+  },
+  {
+   "host": "indexexchange.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Index Exchange / Casale Media"
+   ],
+   "targets": [
+    "indexexchange.com"
+   ]
+  },
+  {
+   "host": "init.supersonicads.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "init.supersonicads.com"
+   ]
+  },
+  {
+   "host": "inmobi.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "inmobi.com"
+   ]
+  },
+  {
+   "host": "insightexpressai.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "insightexpressai.com"
+   ]
+  },
+  {
+   "host": "insights.adsrvr.org",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "insights.adsrvr.org"
+   ]
+  },
+  {
+   "host": "ir-na.amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "ir-na.amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "ironsource.mobi",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "ironsource.mobi"
+   ]
+  },
+  {
+   "host": "liftoff.io",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Vungle / Liftoff"
+   ],
+   "targets": [
+    "liftoff.io"
+   ]
+  },
+  {
+   "host": "live.chartboost.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "live.chartboost.com"
+   ]
+  },
+  {
+   "host": "log.fc.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "log.fc.yahoo.com"
+   ]
+  },
+  {
+   "host": "log.outbrain.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Outbrain"
+   ],
+   "targets": [
+    "log.outbrain.com"
+   ]
+  },
+  {
+   "host": "m.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "m.doubleclick.net"
+   ]
+  },
+  {
+   "host": "match.adsrvr.org",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "match.adsrvr.org"
+   ]
+  },
+  {
+   "host": "mc.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "mc.yandex.ru"
+   ]
+  },
+  {
+   "host": "media.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Media.net"
+   ],
+   "targets": [
+    "media.net"
+   ]
+  },
+  {
+   "host": "mediavisor.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "mediavisor.doubleclick.net"
+   ]
+  },
+  {
+   "host": "metrika.yandex.ru",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "metrika.yandex.ru"
+   ]
+  },
+  {
+   "host": "mgid.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "MGID"
+   ],
+   "targets": [
+    "mgid.com"
+   ]
+  },
+  {
+   "host": "ms.applovin.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AppLovin"
+   ],
+   "targets": [
+    "ms.applovin.com"
+   ]
+  },
+  {
+   "host": "nr.taboola.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Taboola"
+   ],
+   "targets": [
+    "nr.taboola.com"
+   ]
+  },
+  {
+   "host": "oas.openx.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "OpenX"
+   ],
+   "targets": [
+    "oas.openx.net"
+   ]
+  },
+  {
+   "host": "odb.outbrain.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Outbrain"
+   ],
+   "targets": [
+    "odb.outbrain.com"
+   ]
+  },
+  {
+   "host": "offerwall.yandex.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yandex"
+   ],
+   "targets": [
+    "offerwall.yandex.net"
+   ]
+  },
+  {
+   "host": "onclickads.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Propeller Ads"
+   ],
+   "targets": [
+    "onclickads.net"
+   ]
+  },
+  {
+   "host": "openx.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "OpenX"
+   ],
+   "targets": [
+    "openx.net"
+   ]
+  },
+  {
+   "host": "optimized-by.rubiconproject.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "optimized-by.rubiconproject.com"
+   ]
+  },
+  {
+   "host": "outcome-ssp.supersonicads.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Mobile Ad Networks"
+   ],
+   "targets": [
+    "outcome-ssp.supersonicads.com"
+   ]
+  },
+  {
+   "host": "pagead.l.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "pagead.l.doubleclick.net"
+   ]
+  },
+  {
+   "host": "pagead2.googleadservices.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "pagead2.googleadservices.com"
+   ]
+  },
+  {
+   "host": "pagead2.googlesyndication.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "pagead2.googlesyndication.com"
+   ]
+  },
+  {
+   "host": "pangleglobal.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Pangle / ByteDance"
+   ],
+   "targets": [
+    "pangleglobal.com"
+   ]
+  },
+  {
+   "host": "partnerads.ysm.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "partnerads.ysm.yahoo.com"
+   ]
+  },
+  {
+   "host": "pixel.adsafeprotected.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "pixel.adsafeprotected.com"
+   ]
+  },
+  {
+   "host": "pixel.rubiconproject.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "pixel.rubiconproject.com"
+   ]
+  },
+  {
+   "host": "prebid.adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "prebid.adnxs.com"
+   ]
+  },
+  {
+   "host": "propellerads.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Propeller Ads"
+   ],
+   "targets": [
+    "propellerads.com"
+   ]
+  },
+  {
+   "host": "propellerclick.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Propeller Ads"
+   ],
+   "targets": [
+    "propellerclick.com"
+   ]
+  },
+  {
+   "host": "pubads.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads",
+    "Video Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager",
+    "VAST / VPAID"
+   ],
+   "targets": [
+    "pubads.g.doubleclick.net",
+    "pubads.g.doubleclick.net/gampad/ads"
+   ]
+  },
+  {
+   "host": "pubmatic.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "PubMatic"
+   ],
+   "targets": [
+    "pubmatic.com"
+   ]
+  },
+  {
+   "host": "rcm-na.amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "rcm-na.amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "redirector.googlevideo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "YouTube / Video Ads"
+   ],
+   "targets": [
+    "redirector.googlevideo.com"
+   ]
+  },
+  {
+   "host": "rt.applovin.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AppLovin"
+   ],
+   "targets": [
+    "rt.applovin.com"
+   ]
+  },
+  {
+   "host": "rtb.openx.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "OpenX"
+   ],
+   "targets": [
+    "rtb.openx.net"
+   ]
+  },
+  {
+   "host": "rubiconproject.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "rubiconproject.com"
+   ]
+  },
+  {
+   "host": "s.adroll.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdRoll / NextRoll"
+   ],
+   "targets": [
+    "s.adroll.com"
+   ]
+  },
+  {
+   "host": "s.youtube.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "YouTube / Video Ads"
+   ],
+   "targets": [
+    "s.youtube.com"
+   ]
+  },
+  {
+   "host": "search.spotxchange.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "search.spotxchange.com"
+   ]
+  },
+  {
+   "host": "secure.adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "secure.adnxs.com"
+   ]
+  },
+  {
+   "host": "securepubads.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads",
+    "Video Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager",
+    "VAST / VPAID"
+   ],
+   "targets": [
+    "securepubads.g.doubleclick.net",
+    "securepubads.g.doubleclick.net/gampad/ads"
+   ]
+  },
+  {
+   "host": "servicer.mgid.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "MGID"
+   ],
+   "targets": [
+    "servicer.mgid.com"
+   ]
+  },
+  {
+   "host": "sharethrough.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "sharethrough.com"
+   ]
+  },
+  {
+   "host": "simage2.pubmatic.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "PubMatic"
+   ],
+   "targets": [
+    "simage2.pubmatic.com"
+   ]
+  },
+  {
+   "host": "sin3-ib.adnxs.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Xandr / AppNexus"
+   ],
+   "targets": [
+    "sin3-ib.adnxs.com"
+   ]
+  },
+  {
+   "host": "smartyads.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "smartyads.com"
+   ]
+  },
+  {
+   "host": "spotxchange.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Magnite / Rubicon / SpotX"
+   ],
+   "targets": [
+    "spotxchange.com"
+   ]
+  },
+  {
+   "host": "sslwidget.criteo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "sslwidget.criteo.com"
+   ]
+  },
+  {
+   "host": "stackadapt.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "stackadapt.com"
+   ]
+  },
+  {
+   "host": "static.adsafeprotected.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "static.adsafeprotected.com"
+   ]
+  },
+  {
+   "host": "static.criteo.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Criteo"
+   ],
+   "targets": [
+    "static.criteo.net"
+   ]
+  },
+  {
+   "host": "static.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "static.doubleclick.net"
+   ]
+  },
+  {
+   "host": "static.media.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Media.net"
+   ],
+   "targets": [
+    "static.media.net"
+   ]
+  },
+  {
+   "host": "stats.g.doubleclick.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "DoubleClick / Google Ad Manager"
+   ],
+   "targets": [
+    "stats.g.doubleclick.net"
+   ]
+  },
+  {
+   "host": "stickyadstv.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "stickyadstv.com"
+   ]
+  },
+  {
+   "host": "sync.kargo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "sync.kargo.com"
+   ]
+  },
+  {
+   "host": "tlx.3lift.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Exchanges & SSPs"
+   ],
+   "targets": [
+    "tlx.3lift.com"
+   ]
+  },
+  {
+   "host": "tpc.googlesyndication.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Google Ads"
+   ],
+   "targets": [
+    "tpc.googlesyndication.com"
+   ]
+  },
+  {
+   "host": "tps.doubleverify.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Ad Verification"
+   ],
+   "targets": [
+    "tps.doubleverify.com"
+   ]
+  },
+  {
+   "host": "trc.taboola.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Taboola"
+   ],
+   "targets": [
+    "trc.taboola.com"
+   ]
+  },
+  {
+   "host": "u.openx.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "OpenX"
+   ],
+   "targets": [
+    "u.openx.net"
+   ]
+  },
+  {
+   "host": "udc.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "udc.yahoo.com"
+   ]
+  },
+  {
+   "host": "udcm.yahoo.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Yahoo / Oath"
+   ],
+   "targets": [
+    "udcm.yahoo.com"
+   ]
+  },
+  {
+   "host": "unityads.unity3d.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Unity Ads"
+   ],
+   "targets": [
+    "unityads.unity3d.com"
+   ]
+  },
+  {
+   "host": "us-ads.openx.net",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "OpenX"
+   ],
+   "targets": [
+    "us-ads.openx.net"
+   ]
+  },
+  {
+   "host": "vungle.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Vungle / Liftoff"
+   ],
+   "targets": [
+    "vungle.com"
+   ]
+  },
+  {
+   "host": "wd.adcolony.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "AdColony"
+   ],
+   "targets": [
+    "wd.adcolony.com"
+   ]
+  },
+  {
+   "host": "webview.unityads.unity3d.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Unity Ads"
+   ],
+   "targets": [
+    "webview.unityads.unity3d.com"
+   ]
+  },
+  {
+   "host": "widgets.outbrain.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Outbrain"
+   ],
+   "targets": [
+    "widgets.outbrain.com"
+   ]
+  },
+  {
+   "host": "ws-na.amazon-adsystem.com",
+   "scored": true,
+   "categories": [
+    "Ads"
+   ],
+   "groups": [
+    "Amazon Ads"
+   ],
+   "targets": [
+    "ws-na.amazon-adsystem.com"
+   ]
+  },
+  {
+   "host": "clickadu.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "clickadu.com"
+   ]
+  },
+  {
+   "host": "coinimp.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "coinimp.com"
+   ]
+  },
+  {
+   "host": "exoclick.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "exoclick.com"
+   ]
+  },
+  {
+   "host": "juicyads.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "juicyads.com"
+   ]
+  },
+  {
+   "host": "mineralt.io",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "mineralt.io"
+   ]
+  },
+  {
+   "host": "minero.cc",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "minero.cc"
+   ]
+  },
+  {
+   "host": "monerominer.rocks",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "monerominer.rocks"
+   ]
+  },
+  {
+   "host": "popads.net",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "popads.net"
+   ]
+  },
+  {
+   "host": "popcash.net",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "popcash.net"
+   ]
+  },
+  {
+   "host": "popmyads.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "popmyads.com"
+   ]
+  },
+  {
+   "host": "statdynamic.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Suspicious Script Hosts"
+   ],
+   "targets": [
+    "statdynamic.com"
+   ]
+  },
+  {
+   "host": "trafficjunky.net",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Malvertising / Popups"
+   ],
+   "targets": [
+    "trafficjunky.net"
+   ]
+  },
+  {
+   "host": "webminepool.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "webminepool.com"
+   ]
+  },
+  {
+   "host": "www.coinimp.com",
+   "scored": true,
+   "categories": [
+    "Advanced / Risky Host Checks"
+   ],
+   "groups": [
+    "Browser Cryptominers"
+   ],
+   "targets": [
+    "www.coinimp.com"
+   ]
+  },
+  {
+   "host": "ad.linksynergy.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Rakuten Advertising"
+   ],
+   "targets": [
+    "ad.linksynergy.com"
+   ]
+  },
+  {
+   "host": "api.partnerstack.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "PartnerStack"
+   ],
+   "targets": [
+    "api.partnerstack.com"
+   ]
+  },
+  {
+   "host": "api.viglink.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Viglink / Sovrn"
+   ],
+   "targets": [
+    "api.viglink.com"
+   ]
+  },
+  {
+   "host": "cdn.viglink.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Viglink / Sovrn"
+   ],
+   "targets": [
+    "cdn.viglink.com"
+   ]
+  },
+  {
+   "host": "click.linksynergy.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Rakuten Advertising"
+   ],
+   "targets": [
+    "click.linksynergy.com"
+   ]
+  },
+  {
+   "host": "d.impactradius-event.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Impact"
+   ],
+   "targets": [
+    "d.impactradius-event.com"
+   ]
+  },
+  {
+   "host": "go.redirectingat.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Skimlinks"
+   ],
+   "targets": [
+    "go.redirectingat.com"
+   ]
+  },
+  {
+   "host": "go.skimresources.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Skimlinks"
+   ],
+   "targets": [
+    "go.skimresources.com"
+   ]
+  },
+  {
+   "host": "partnerstack.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "PartnerStack"
+   ],
+   "targets": [
+    "partnerstack.com"
+   ]
+  },
+  {
+   "host": "prf.hn",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Awin"
+   ],
+   "targets": [
+    "prf.hn"
+   ]
+  },
+  {
+   "host": "redirect.viglink.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Viglink / Sovrn"
+   ],
+   "targets": [
+    "redirect.viglink.com"
+   ]
+  },
+  {
+   "host": "redirector.skimresources.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Skimlinks"
+   ],
+   "targets": [
+    "redirector.skimresources.com"
+   ]
+  },
+  {
+   "host": "refersion.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Refersion"
+   ],
+   "targets": [
+    "refersion.com"
+   ]
+  },
+  {
+   "host": "s.skimresources.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Skimlinks"
+   ],
+   "targets": [
+    "s.skimresources.com"
+   ]
+  },
+  {
+   "host": "shareasale.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "ShareASale"
+   ],
+   "targets": [
+    "shareasale.com"
+   ]
+  },
+  {
+   "host": "t.pepperjamnetwork.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Pepperjam"
+   ],
+   "targets": [
+    "t.pepperjamnetwork.com"
+   ]
+  },
+  {
+   "host": "t.skimresources.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Skimlinks"
+   ],
+   "targets": [
+    "t.skimresources.com"
+   ]
+  },
+  {
+   "host": "track.linksynergy.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Rakuten Advertising"
+   ],
+   "targets": [
+    "track.linksynergy.com"
+   ]
+  },
+  {
+   "host": "www.anrdoezrs.net",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Commission Junction / CJ"
+   ],
+   "targets": [
+    "www.anrdoezrs.net"
+   ]
+  },
+  {
+   "host": "www.awin1.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Awin"
+   ],
+   "targets": [
+    "www.awin1.com"
+   ]
+  },
+  {
+   "host": "www.dpbolvw.net",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Commission Junction / CJ"
+   ],
+   "targets": [
+    "www.dpbolvw.net"
+   ]
+  },
+  {
+   "host": "www.tkqlhce.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Commission Junction / CJ"
+   ],
+   "targets": [
+    "www.tkqlhce.com"
+   ]
+  },
+  {
+   "host": "zenaps.com",
+   "scored": true,
+   "categories": [
+    "Affiliate Networks"
+   ],
+   "groups": [
+    "Awin"
+   ],
+   "targets": [
+    "zenaps.com"
+   ]
+  },
+  {
+   "host": "adm.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "adm.hotjar.com"
+   ]
+  },
+  {
+   "host": "analytics.adobe.io",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Adobe Analytics"
+   ],
+   "targets": [
+    "analytics.adobe.io"
+   ]
+  },
+  {
+   "host": "analytics.google.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "analytics.google.com"
+   ]
+  },
+  {
+   "host": "api-js.mixpanel.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Mixpanel"
+   ],
+   "targets": [
+    "api-js.mixpanel.com"
+   ]
+  },
+  {
+   "host": "api.amplitude.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Amplitude"
+   ],
+   "targets": [
+    "api.amplitude.com"
+   ]
+  },
+  {
+   "host": "api.luckyorange.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "api.luckyorange.com"
+   ]
+  },
+  {
+   "host": "api.mixpanel.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Mixpanel"
+   ],
+   "targets": [
+    "api.mixpanel.com"
+   ]
+  },
+  {
+   "host": "api.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "api.mouseflow.com"
+   ]
+  },
+  {
+   "host": "api.segment.io",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Segment"
+   ],
+   "targets": [
+    "api.segment.io"
+   ]
+  },
+  {
+   "host": "api2.amplitude.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Amplitude"
+   ],
+   "targets": [
+    "api2.amplitude.com"
+   ]
+  },
+  {
+   "host": "app.posthog.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "app.posthog.com"
+   ]
+  },
+  {
+   "host": "b.scorecardresearch.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "comScore / Scorecard"
+   ],
+   "targets": [
+    "b.scorecardresearch.com"
+   ]
+  },
+  {
+   "host": "c.clarity.ms",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Microsoft Clarity"
+   ],
+   "targets": [
+    "c.clarity.ms"
+   ]
+  },
+  {
+   "host": "careers.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "careers.hotjar.com"
+   ]
+  },
+  {
+   "host": "cdn-test.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "cdn-test.mouseflow.com"
+   ]
+  },
+  {
+   "host": "cdn.heapanalytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Heap Analytics"
+   ],
+   "targets": [
+    "cdn.heapanalytics.com"
+   ]
+  },
+  {
+   "host": "cdn.luckyorange.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "cdn.luckyorange.com"
+   ]
+  },
+  {
+   "host": "cdn.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "cdn.mouseflow.com"
+   ]
+  },
+  {
+   "host": "cdn.rudderlabs.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "cdn.rudderlabs.com"
+   ]
+  },
+  {
+   "host": "cdn.segment.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Segment"
+   ],
+   "targets": [
+    "cdn.segment.com"
+   ]
+  },
+  {
+   "host": "clarity.ms",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Microsoft Clarity"
+   ],
+   "targets": [
+    "clarity.ms"
+   ]
+  },
+  {
+   "host": "claritybt.freshmarketer.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "FreshWorks"
+   ],
+   "targets": [
+    "claritybt.freshmarketer.com"
+   ]
+  },
+  {
+   "host": "click.googleanalytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "click.googleanalytics.com"
+   ]
+  },
+  {
+   "host": "cloudflareinsights.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "cloudflareinsights.com"
+   ]
+  },
+  {
+   "host": "cs.luckyorange.net",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "cs.luckyorange.net"
+   ]
+  },
+  {
+   "host": "decide.mixpanel.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Mixpanel"
+   ],
+   "targets": [
+    "decide.mixpanel.com"
+   ]
+  },
+  {
+   "host": "edge.fullstory.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "FullStory"
+   ],
+   "targets": [
+    "edge.fullstory.com"
+   ]
+  },
+  {
+   "host": "eu.posthog.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "eu.posthog.com"
+   ]
+  },
+  {
+   "host": "events.hotjar.io",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "events.hotjar.io"
+   ]
+  },
+  {
+   "host": "events.segment.io",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Segment"
+   ],
+   "targets": [
+    "events.segment.io"
+   ]
+  },
+  {
+   "host": "fwtracks.freshmarketer.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "FreshWorks"
+   ],
+   "targets": [
+    "fwtracks.freshmarketer.com"
+   ]
+  },
+  {
+   "host": "google-analytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "google-analytics.com"
+   ]
+  },
+  {
+   "host": "googletagmanager.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Tag Manager"
+   ],
+   "targets": [
+    "googletagmanager.com"
+   ]
+  },
+  {
+   "host": "gtm.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "gtm.mouseflow.com"
+   ]
+  },
+  {
+   "host": "identify.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "identify.hotjar.com"
+   ]
+  },
+  {
+   "host": "in.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "in.hotjar.com"
+   ]
+  },
+  {
+   "host": "insights.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "insights.hotjar.com"
+   ]
+  },
+  {
+   "host": "metrics.adobe.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Adobe Analytics"
+   ],
+   "targets": [
+    "metrics.adobe.com"
+   ]
+  },
+  {
+   "host": "o2.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "o2.mouseflow.com"
+   ]
+  },
+  {
+   "host": "omtrdc.net",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Adobe Analytics"
+   ],
+   "targets": [
+    "omtrdc.net"
+   ]
+  },
+  {
+   "host": "pixel.quantserve.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Quantcast"
+   ],
+   "targets": [
+    "pixel.quantserve.com"
+   ]
+  },
+  {
+   "host": "quantcast.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Quantcast"
+   ],
+   "targets": [
+    "quantcast.com"
+   ]
+  },
+  {
+   "host": "quantserve.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Quantcast"
+   ],
+   "targets": [
+    "quantserve.com"
+   ]
+  },
+  {
+   "host": "realtime.luckyorange.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "realtime.luckyorange.com"
+   ]
+  },
+  {
+   "host": "region1.google-analytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "region1.google-analytics.com"
+   ]
+  },
+  {
+   "host": "rs.fullstory.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "FullStory"
+   ],
+   "targets": [
+    "rs.fullstory.com"
+   ]
+  },
+  {
+   "host": "rudderstack.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "rudderstack.com"
+   ]
+  },
+  {
+   "host": "s.clarity.ms",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Microsoft Clarity"
+   ],
+   "targets": [
+    "s.clarity.ms"
+   ]
+  },
+  {
+   "host": "sb.scorecardresearch.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "comScore / Scorecard"
+   ],
+   "targets": [
+    "sb.scorecardresearch.com"
+   ]
+  },
+  {
+   "host": "script.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "script.hotjar.com"
+   ]
+  },
+  {
+   "host": "settings.luckyorange.net",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "settings.luckyorange.net"
+   ]
+  },
+  {
+   "host": "snowplowanalytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "snowplowanalytics.com"
+   ]
+  },
+  {
+   "host": "ssl.google-analytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "ssl.google-analytics.com"
+   ]
+  },
+  {
+   "host": "static.cloudflareinsights.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "static.cloudflareinsights.com"
+   ]
+  },
+  {
+   "host": "static.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "static.hotjar.com"
+   ]
+  },
+  {
+   "host": "stats.wp.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Stats WP"
+   ],
+   "targets": [
+    "stats.wp.com"
+   ]
+  },
+  {
+   "host": "surveys.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "surveys.hotjar.com"
+   ]
+  },
+  {
+   "host": "tagmanager.google.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Tag Manager"
+   ],
+   "targets": [
+    "tagmanager.google.com"
+   ]
+  },
+  {
+   "host": "tools.mouseflow.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "MouseFlow"
+   ],
+   "targets": [
+    "tools.mouseflow.com"
+   ]
+  },
+  {
+   "host": "tracker.snowplowanalytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "tracker.snowplowanalytics.com"
+   ]
+  },
+  {
+   "host": "upload.luckyorange.net",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "upload.luckyorange.net"
+   ]
+  },
+  {
+   "host": "us.i.posthog.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Modern Product Analytics"
+   ],
+   "targets": [
+    "us.i.posthog.com"
+   ]
+  },
+  {
+   "host": "vars.hotjar.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Hotjar"
+   ],
+   "targets": [
+    "vars.hotjar.com"
+   ]
+  },
+  {
+   "host": "w1.luckyorange.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "LuckyOrange"
+   ],
+   "targets": [
+    "w1.luckyorange.com"
+   ]
+  },
+  {
+   "host": "www.google-analytics.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Analytics"
+   ],
+   "targets": [
+    "www.google-analytics.com",
+    "www.google-analytics.com/g/collect"
+   ]
+  },
+  {
+   "host": "www.googletagmanager.com",
+   "scored": true,
+   "categories": [
+    "Analytics"
+   ],
+   "groups": [
+    "Google Tag Manager"
+   ],
+   "targets": [
+    "www.googletagmanager.com"
+   ]
+  },
+  {
+   "host": "app.usercentrics.eu",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "app.usercentrics.eu"
+   ]
+  },
+  {
+   "host": "cdn.cookielaw.org",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cdn.cookielaw.org"
+   ]
+  },
+  {
+   "host": "cdn.privacy-mgmt.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cdn.privacy-mgmt.com"
+   ]
+  },
+  {
+   "host": "cmp.inmobi.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cmp.inmobi.com"
+   ]
+  },
+  {
+   "host": "cmp.osano.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cmp.osano.com"
+   ]
+  },
+  {
+   "host": "cmp.usercentrics.eu",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cmp.usercentrics.eu"
+   ]
+  },
+  {
+   "host": "consent.cookiebot.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "consent.cookiebot.com"
+   ]
+  },
+  {
+   "host": "consent.trustarc.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "consent.trustarc.com"
+   ]
+  },
+  {
+   "host": "consentcdn.cookiebot.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "consentcdn.cookiebot.com"
+   ]
+  },
+  {
+   "host": "cookiebot.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "cookiebot.com"
+   ]
+  },
+  {
+   "host": "fundingchoicesmessages.google.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "fundingchoicesmessages.google.com"
+   ]
+  },
+  {
+   "host": "geolocation.onetrust.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "geolocation.onetrust.com"
+   ]
+  },
+  {
+   "host": "privacyportal.onetrust.com",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "privacyportal.onetrust.com"
+   ]
+  },
+  {
+   "host": "sdk.privacy-center.org",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "sdk.privacy-center.org"
+   ]
+  },
+  {
+   "host": "sourcepoint.mgr.consensu.org",
+   "scored": true,
+   "categories": [
+    "Consent Management"
+   ],
+   "groups": [
+    "CMP Vendors"
+   ],
+   "targets": [
+    "sourcepoint.mgr.consensu.org"
+   ]
+  },
+  {
+   "host": "a.klaviyo.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "a.klaviyo.com"
+   ]
+  },
+  {
+   "host": "api.onesignal.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "api.onesignal.com"
+   ]
+  },
+  {
+   "host": "cdn.onesignal.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "cdn.onesignal.com"
+   ]
+  },
+  {
+   "host": "click.mailchimp.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Email Marketing"
+   ],
+   "targets": [
+    "click.mailchimp.com"
+   ]
+  },
+  {
+   "host": "customer.io",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "customer.io"
+   ]
+  },
+  {
+   "host": "js.driftt.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Live Chat Trackers"
+   ],
+   "targets": [
+    "js.driftt.com"
+   ]
+  },
+  {
+   "host": "list-manage.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Email Marketing"
+   ],
+   "targets": [
+    "list-manage.com"
+   ]
+  },
+  {
+   "host": "munchkin.marketo.net",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Email Marketing"
+   ],
+   "targets": [
+    "munchkin.marketo.net"
+   ]
+  },
+  {
+   "host": "sdk.iad-01.braze.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "sdk.iad-01.braze.com"
+   ]
+  },
+  {
+   "host": "static.klaviyo.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "static.klaviyo.com"
+   ]
+  },
+  {
+   "host": "track.customer.io",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Lifecycle Messaging"
+   ],
+   "targets": [
+    "track.customer.io",
+    "track.customer.io/events"
+   ]
+  },
+  {
+   "host": "track.hubspot.com",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Email Marketing"
+   ],
+   "targets": [
+    "track.hubspot.com"
+   ]
+  },
+  {
+   "host": "widget.intercom.io",
+   "scored": true,
+   "categories": [
+    "Email Tracking & Live Chat"
+   ],
+   "groups": [
+    "Live Chat Trackers"
+   ],
+   "targets": [
+    "widget.intercom.io"
+   ]
+  },
+  {
+   "host": "api.bugsnag.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Bugsnag"
+   ],
+   "targets": [
+    "api.bugsnag.com"
+   ]
+  },
+  {
+   "host": "app.bugsnag.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Bugsnag"
+   ],
+   "targets": [
+    "app.bugsnag.com"
+   ]
+  },
+  {
+   "host": "app.getsentry.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Sentry"
+   ],
+   "targets": [
+    "app.getsentry.com"
+   ]
+  },
+  {
+   "host": "bam-cell.nr-data.net",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "New Relic"
+   ],
+   "targets": [
+    "bam-cell.nr-data.net"
+   ]
+  },
+  {
+   "host": "bam.nr-data.net",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "New Relic"
+   ],
+   "targets": [
+    "bam.nr-data.net"
+   ]
+  },
+  {
+   "host": "browser-intake-datadoghq.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Datadog"
+   ],
+   "targets": [
+    "browser-intake-datadoghq.com"
+   ]
+  },
+  {
+   "host": "browser.sentry-cdn.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Sentry"
+   ],
+   "targets": [
+    "browser.sentry-cdn.com"
+   ]
+  },
+  {
+   "host": "cdn.lr-ingest.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "LogRocket"
+   ],
+   "targets": [
+    "cdn.lr-ingest.com"
+   ]
+  },
+  {
+   "host": "ingest.sentry.io",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Sentry"
+   ],
+   "targets": [
+    "ingest.sentry.io"
+   ]
+  },
+  {
+   "host": "js-agent.newrelic.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "New Relic"
+   ],
+   "targets": [
+    "js-agent.newrelic.com"
+   ]
+  },
+  {
+   "host": "notify.bugsnag.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Bugsnag"
+   ],
+   "targets": [
+    "notify.bugsnag.com"
+   ]
+  },
+  {
+   "host": "o0.ingest.sentry.io",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Sentry"
+   ],
+   "targets": [
+    "o0.ingest.sentry.io"
+   ]
+  },
+  {
+   "host": "r.lr-ingest.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "LogRocket"
+   ],
+   "targets": [
+    "r.lr-ingest.com"
+   ]
+  },
+  {
+   "host": "rum.browser-intake-datadoghq.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Datadog"
+   ],
+   "targets": [
+    "rum.browser-intake-datadoghq.com"
+   ]
+  },
+  {
+   "host": "sessions.bugsnag.com",
+   "scored": false,
+   "categories": [
+    "Error Trackers"
+   ],
+   "groups": [
+    "Bugsnag"
+   ],
+   "targets": [
+    "sessions.bugsnag.com"
+   ]
+  },
+  {
+   "host": "a.lenovo.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Lenovo"
+   ],
+   "targets": [
+    "a.lenovo.com"
+   ]
+  },
+  {
+   "host": "ad.lgappstv.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "ad.lgappstv.com"
+   ]
+  },
+  {
+   "host": "adlog.vivo.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Vivo"
+   ],
+   "targets": [
+    "adlog.vivo.com"
+   ]
+  },
+  {
+   "host": "ads-api.vivo.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Vivo"
+   ],
+   "targets": [
+    "ads-api.vivo.com"
+   ]
+  },
+  {
+   "host": "ads.huawei.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "ads.huawei.com"
+   ]
+  },
+  {
+   "host": "ads.roku.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "ads.roku.com"
+   ]
+  },
+  {
+   "host": "ads.vizio.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "ads.vizio.com"
+   ]
+  },
+  {
+   "host": "adsfs.oppomobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Oppo"
+   ],
+   "targets": [
+    "adsfs.oppomobile.com"
+   ]
+  },
+  {
+   "host": "advertising.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "advertising.apple.com"
+   ]
+  },
+  {
+   "host": "adx.ads.oppomobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Oppo"
+   ],
+   "targets": [
+    "adx.ads.oppomobile.com"
+   ]
+  },
+  {
+   "host": "amoeba.web.roku.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "amoeba.web.roku.com"
+   ]
+  },
+  {
+   "host": "analytics-api.samsunghealthcn.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "analytics-api.samsunghealthcn.com"
+   ]
+  },
+  {
+   "host": "api-adservices.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "api-adservices.apple.com"
+   ]
+  },
+  {
+   "host": "api.ad.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "api.ad.xiaomi.com"
+   ]
+  },
+  {
+   "host": "bdapi-ads.realmemobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Realme"
+   ],
+   "targets": [
+    "bdapi-ads.realmemobile.com"
+   ]
+  },
+  {
+   "host": "bdapi-in-ads.realmemobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Realme"
+   ],
+   "targets": [
+    "bdapi-in-ads.realmemobile.com"
+   ]
+  },
+  {
+   "host": "books-analytics-events.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "books-analytics-events.apple.com"
+   ]
+  },
+  {
+   "host": "browser.events.data.msn.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "browser.events.data.msn.com"
+   ]
+  },
+  {
+   "host": "ck.ads.oppomobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Oppo"
+   ],
+   "targets": [
+    "ck.ads.oppomobile.com"
+   ]
+  },
+  {
+   "host": "click.oneplus.cn",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "OnePlus"
+   ],
+   "targets": [
+    "click.oneplus.cn"
+   ]
+  },
+  {
+   "host": "config.samsungads.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "config.samsungads.com"
+   ]
+  },
+  {
+   "host": "data.ads.oppomobile.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Oppo"
+   ],
+   "targets": [
+    "data.ads.oppomobile.com"
+   ]
+  },
+  {
+   "host": "data.mistat.india.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "data.mistat.india.xiaomi.com"
+   ]
+  },
+  {
+   "host": "data.mistat.rus.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "data.mistat.rus.xiaomi.com"
+   ]
+  },
+  {
+   "host": "data.mistat.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "data.mistat.xiaomi.com"
+   ]
+  },
+  {
+   "host": "device-metrics-us-2.amazon.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "FireTV / Amazon"
+   ],
+   "targets": [
+    "device-metrics-us-2.amazon.com"
+   ]
+  },
+  {
+   "host": "device-metrics-us.amazon.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "FireTV / Amazon"
+   ],
+   "targets": [
+    "device-metrics-us.amazon.com"
+   ]
+  },
+  {
+   "host": "firebase-settings.crashlytics.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Google / Pixel / Android"
+   ],
+   "targets": [
+    "firebase-settings.crashlytics.com"
+   ]
+  },
+  {
+   "host": "globalapi.ad.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "globalapi.ad.xiaomi.com"
+   ]
+  },
+  {
+   "host": "grs.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "grs.hicloud.com"
+   ]
+  },
+  {
+   "host": "iadsdk.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "iadsdk.apple.com"
+   ]
+  },
+  {
+   "host": "info.lgsmartad.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "info.lgsmartad.com"
+   ]
+  },
+  {
+   "host": "iot-eu-logser.realme.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Realme"
+   ],
+   "targets": [
+    "iot-eu-logser.realme.com"
+   ]
+  },
+  {
+   "host": "iot-logser.realme.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Realme"
+   ],
+   "targets": [
+    "iot-logser.realme.com"
+   ]
+  },
+  {
+   "host": "logbak.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "logbak.hicloud.com"
+   ]
+  },
+  {
+   "host": "logs.roku.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "logs.roku.com"
+   ]
+  },
+  {
+   "host": "logservice.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "logservice.hicloud.com"
+   ]
+  },
+  {
+   "host": "logservice1.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "logservice1.hicloud.com"
+   ]
+  },
+  {
+   "host": "mads-eu.amazon.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "FireTV / Amazon"
+   ],
+   "targets": [
+    "mads-eu.amazon.com"
+   ]
+  },
+  {
+   "host": "metrics.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "metrics.apple.com"
+   ]
+  },
+  {
+   "host": "metrics.data.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "metrics.data.hicloud.com"
+   ]
+  },
+  {
+   "host": "metrics.icloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "metrics.icloud.com"
+   ]
+  },
+  {
+   "host": "metrics.mzstatic.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "metrics.mzstatic.com"
+   ]
+  },
+  {
+   "host": "metrics2.data.hicloud.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Huawei"
+   ],
+   "targets": [
+    "metrics2.data.hicloud.com"
+   ]
+  },
+  {
+   "host": "ngfts.lge.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "ngfts.lge.com"
+   ]
+  },
+  {
+   "host": "nmetrics.samsung.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "nmetrics.samsung.com"
+   ]
+  },
+  {
+   "host": "notes-analytics-events.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "notes-analytics-events.apple.com"
+   ]
+  },
+  {
+   "host": "open.oneplus.net",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "OnePlus"
+   ],
+   "targets": [
+    "open.oneplus.net"
+   ]
+  },
+  {
+   "host": "samsung-com.112.2o7.net",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "samsung-com.112.2o7.net"
+   ]
+  },
+  {
+   "host": "samsungads.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "samsungads.com"
+   ]
+  },
+  {
+   "host": "sdkconfig.ad.intl.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "sdkconfig.ad.intl.xiaomi.com"
+   ]
+  },
+  {
+   "host": "sdkconfig.ad.xiaomi.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "sdkconfig.ad.xiaomi.com"
+   ]
+  },
+  {
+   "host": "settings-win.data.microsoft.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "settings-win.data.microsoft.com"
+   ]
+  },
+  {
+   "host": "smartclip.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "smartclip.com"
+   ]
+  },
+  {
+   "host": "smartclip.net",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "smartclip.net"
+   ]
+  },
+  {
+   "host": "smetrics.samsung.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Samsung"
+   ],
+   "targets": [
+    "smetrics.samsung.com"
+   ]
+  },
+  {
+   "host": "telemetry.microsoft.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "telemetry.microsoft.com"
+   ]
+  },
+  {
+   "host": "tr.iadsdk.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "tr.iadsdk.apple.com"
+   ]
+  },
+  {
+   "host": "tracking.miui.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "tracking.miui.com"
+   ]
+  },
+  {
+   "host": "tracking.rus.miui.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Xiaomi"
+   ],
+   "targets": [
+    "tracking.rus.miui.com"
+   ]
+  },
+  {
+   "host": "tvinteractive.tv",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "tvinteractive.tv"
+   ]
+  },
+  {
+   "host": "tvpixel.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Smart TV / Roku / Vizio"
+   ],
+   "targets": [
+    "tvpixel.com"
+   ]
+  },
+  {
+   "host": "us.ibs.lgappstv.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "us.ibs.lgappstv.com"
+   ]
+  },
+  {
+   "host": "us.info.lgsmartad.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "us.info.lgsmartad.com"
+   ]
+  },
+  {
+   "host": "vortex-win.data.microsoft.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "vortex-win.data.microsoft.com"
+   ]
+  },
+  {
+   "host": "vortex.data.microsoft.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "vortex.data.microsoft.com"
+   ]
+  },
+  {
+   "host": "watson.telemetry.microsoft.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Microsoft / Windows"
+   ],
+   "targets": [
+    "watson.telemetry.microsoft.com"
+   ]
+  },
+  {
+   "host": "xp.apple.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "Apple"
+   ],
+   "targets": [
+    "xp.apple.com"
+   ]
+  },
+  {
+   "host": "yumenetworks.com",
+   "scored": true,
+   "categories": [
+    "OEM Vendors"
+   ],
+   "groups": [
+    "LG"
+   ],
+   "targets": [
+    "yumenetworks.com"
+   ]
+  },
+  {
+   "host": "ad.mail.ru",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Mail.ru"
+   ],
+   "targets": [
+    "ad.mail.ru"
+   ]
+  },
+  {
+   "host": "ads-api.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "ads-api.tiktok.com"
+   ]
+  },
+  {
+   "host": "ads-api.twitter.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "ads-api.twitter.com"
+   ]
+  },
+  {
+   "host": "ads-api.x.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "ads-api.x.com"
+   ]
+  },
+  {
+   "host": "ads-sg.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "ads-sg.tiktok.com"
+   ]
+  },
+  {
+   "host": "ads.linkedin.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "LinkedIn"
+   ],
+   "targets": [
+    "ads.linkedin.com"
+   ]
+  },
+  {
+   "host": "ads.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "ads.pinterest.com"
+   ]
+  },
+  {
+   "host": "ads.snapchat.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Snapchat"
+   ],
+   "targets": [
+    "ads.snapchat.com"
+   ]
+  },
+  {
+   "host": "ads.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "ads.tiktok.com"
+   ]
+  },
+  {
+   "host": "ads.vk.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "VK / VKontakte"
+   ],
+   "targets": [
+    "ads.vk.com"
+   ]
+  },
+  {
+   "host": "ads.x.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "ads.x.com"
+   ]
+  },
+  {
+   "host": "an.facebook.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Facebook / Meta"
+   ],
+   "targets": [
+    "an.facebook.com"
+   ]
+  },
+  {
+   "host": "analytics-sg.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "analytics-sg.tiktok.com"
+   ]
+  },
+  {
+   "host": "analytics.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "analytics.pinterest.com"
+   ]
+  },
+  {
+   "host": "analytics.pointdrive.linkedin.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "LinkedIn"
+   ],
+   "targets": [
+    "analytics.pointdrive.linkedin.com"
+   ]
+  },
+  {
+   "host": "analytics.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "analytics.tiktok.com"
+   ]
+  },
+  {
+   "host": "analytics.twitter.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "analytics.twitter.com"
+   ]
+  },
+  {
+   "host": "analytics.x.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "analytics.x.com"
+   ]
+  },
+  {
+   "host": "business-api.tiktok.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "business-api.tiktok.com"
+   ]
+  },
+  {
+   "host": "connect.facebook.net",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Facebook / Meta"
+   ],
+   "targets": [
+    "connect.facebook.net"
+   ]
+  },
+  {
+   "host": "ct.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "ct.pinterest.com"
+   ]
+  },
+  {
+   "host": "d.reddit.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Reddit"
+   ],
+   "targets": [
+    "d.reddit.com"
+   ]
+  },
+  {
+   "host": "dc.ads.linkedin.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "LinkedIn"
+   ],
+   "targets": [
+    "dc.ads.linkedin.com"
+   ]
+  },
+  {
+   "host": "events.reddit.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Reddit"
+   ],
+   "targets": [
+    "events.reddit.com"
+   ]
+  },
+  {
+   "host": "events.redditmedia.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Reddit"
+   ],
+   "targets": [
+    "events.redditmedia.com"
+   ]
+  },
+  {
+   "host": "graph.facebook.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Facebook / Meta"
+   ],
+   "targets": [
+    "graph.facebook.com"
+   ]
+  },
+  {
+   "host": "graph.instagram.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Instagram"
+   ],
+   "targets": [
+    "graph.instagram.com"
+   ]
+  },
+  {
+   "host": "i.instagram.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Instagram"
+   ],
+   "targets": [
+    "i.instagram.com"
+   ]
+  },
+  {
+   "host": "log.byteoversea.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "log.byteoversea.com"
+   ]
+  },
+  {
+   "host": "log.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "log.pinterest.com"
+   ]
+  },
+  {
+   "host": "mcs-va.tiktokv.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "mcs-va.tiktokv.com"
+   ]
+  },
+  {
+   "host": "mon.byteoversea.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "mon.byteoversea.com"
+   ]
+  },
+  {
+   "host": "mon.tiktokv.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "TikTok"
+   ],
+   "targets": [
+    "mon.tiktokv.com"
+   ]
+  },
+  {
+   "host": "pixel.facebook.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Facebook / Meta"
+   ],
+   "targets": [
+    "pixel.facebook.com"
+   ]
+  },
+  {
+   "host": "pixel.quora.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Quora"
+   ],
+   "targets": [
+    "pixel.quora.com"
+   ]
+  },
+  {
+   "host": "pixel.redditmedia.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Reddit"
+   ],
+   "targets": [
+    "pixel.redditmedia.com"
+   ]
+  },
+  {
+   "host": "px.ads.linkedin.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "LinkedIn"
+   ],
+   "targets": [
+    "px.ads.linkedin.com"
+   ]
+  },
+  {
+   "host": "px.srvcs.tumblr.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Tumblr"
+   ],
+   "targets": [
+    "px.srvcs.tumblr.com"
+   ]
+  },
+  {
+   "host": "qevents.quora.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Quora"
+   ],
+   "targets": [
+    "qevents.quora.com"
+   ]
+  },
+  {
+   "host": "sc-analytics.appspot.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Snapchat"
+   ],
+   "targets": [
+    "sc-analytics.appspot.com"
+   ]
+  },
+  {
+   "host": "sc-static.net",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Snapchat"
+   ],
+   "targets": [
+    "sc-static.net"
+   ]
+  },
+  {
+   "host": "snap.licdn.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "LinkedIn"
+   ],
+   "targets": [
+    "snap.licdn.com"
+   ]
+  },
+  {
+   "host": "static.ads-twitter.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "X / Twitter"
+   ],
+   "targets": [
+    "static.ads-twitter.com"
+   ]
+  },
+  {
+   "host": "top-fwz1.mail.ru",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Mail.ru"
+   ],
+   "targets": [
+    "top-fwz1.mail.ru"
+   ]
+  },
+  {
+   "host": "tr.facebook.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Facebook / Meta"
+   ],
+   "targets": [
+    "tr.facebook.com"
+   ]
+  },
+  {
+   "host": "tr.snapchat.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Snapchat"
+   ],
+   "targets": [
+    "tr.snapchat.com"
+   ]
+  },
+  {
+   "host": "trk.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "trk.pinterest.com"
+   ]
+  },
+  {
+   "host": "vk.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "VK / VKontakte"
+   ],
+   "targets": [
+    "vk.com/rtrg"
+   ],
+   "scoped_only": "vk.com/rtrg",
+   "note": "The probe tests only the /rtrg path; a host-wide rule would block the whole social network. The bundled EasyList path rule covers it."
+  },
+  {
+   "host": "widgets.pinterest.com",
+   "scored": true,
+   "categories": [
+    "Social Trackers"
+   ],
+   "groups": [
+    "Pinterest"
+   ],
+   "targets": [
+    "widgets.pinterest.com"
+   ]
+  },
+  {
+   "host": "ad.crwdcntrl.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Lotame"
+   ],
+   "targets": [
+    "ad.crwdcntrl.net"
+   ]
+  },
+  {
+   "host": "adjust.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "adjust.com"
+   ]
+  },
+  {
+   "host": "api.rlcdn.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "LiveRamp"
+   ],
+   "targets": [
+    "api.rlcdn.com"
+   ]
+  },
+  {
+   "host": "api2.branch.io",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "api2.branch.io"
+   ]
+  },
+  {
+   "host": "app.adjust.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "app.adjust.com"
+   ]
+  },
+  {
+   "host": "app.appsflyer.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "app.appsflyer.com"
+   ]
+  },
+  {
+   "host": "appsflyer.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "appsflyer.com"
+   ]
+  },
+  {
+   "host": "bcp.crwdcntrl.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "bcp.crwdcntrl.net"
+   ]
+  },
+  {
+   "host": "bidswitch.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "bidswitch.net"
+   ]
+  },
+  {
+   "host": "bluekai.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "bluekai.com"
+   ]
+  },
+  {
+   "host": "bnc.lt",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "bnc.lt"
+   ]
+  },
+  {
+   "host": "cdn.permutive.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Behavioral Analytics"
+   ],
+   "targets": [
+    "cdn.permutive.com"
+   ]
+  },
+  {
+   "host": "cdn.siftscience.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Behavioral Analytics"
+   ],
+   "targets": [
+    "cdn.siftscience.com"
+   ]
+  },
+  {
+   "host": "control.kochava.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "control.kochava.com"
+   ]
+  },
+  {
+   "host": "crwdcntrl.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "crwdcntrl.net"
+   ]
+  },
+  {
+   "host": "fingerprintjs.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Browser Fingerprinting"
+   ],
+   "targets": [
+    "fingerprintjs.com"
+   ]
+  },
+  {
+   "host": "fpjs.io",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Browser Fingerprinting"
+   ],
+   "targets": [
+    "fpjs.io"
+   ]
+  },
+  {
+   "host": "id5-sync.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "id5-sync.com"
+   ]
+  },
+  {
+   "host": "idsync.rlcdn.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "LiveRamp"
+   ],
+   "targets": [
+    "idsync.rlcdn.com"
+   ]
+  },
+  {
+   "host": "kochava.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "kochava.com"
+   ]
+  },
+  {
+   "host": "onetag-sys.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "onetag-sys.com"
+   ]
+  },
+  {
+   "host": "pippio.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "pippio.com"
+   ]
+  },
+  {
+   "host": "pixel.mathtag.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "pixel.mathtag.com"
+   ]
+  },
+  {
+   "host": "prod.uidapi.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "prod.uidapi.com"
+   ]
+  },
+  {
+   "host": "sdk-api-v1.singular.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Mobile Attribution"
+   ],
+   "targets": [
+    "sdk-api-v1.singular.net"
+   ]
+  },
+  {
+   "host": "siftscience.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Behavioral Analytics"
+   ],
+   "targets": [
+    "siftscience.com"
+   ]
+  },
+  {
+   "host": "sync-tm.everesttech.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "sync-tm.everesttech.net"
+   ]
+  },
+  {
+   "host": "sync.crwdcntrl.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Lotame"
+   ],
+   "targets": [
+    "sync.crwdcntrl.net"
+   ]
+  },
+  {
+   "host": "sync.mathtag.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "sync.mathtag.com"
+   ]
+  },
+  {
+   "host": "tags.bluekai.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Identity Resolution"
+   ],
+   "targets": [
+    "tags.bluekai.com"
+   ]
+  },
+  {
+   "host": "tags.crwdcntrl.net",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "Lotame"
+   ],
+   "targets": [
+    "tags.crwdcntrl.net"
+   ]
+  },
+  {
+   "host": "wzrkt.com",
+   "scored": true,
+   "categories": [
+    "Tracking & Fingerprinting"
+   ],
+   "groups": [
+    "CleverTap / Push"
+   ],
+   "targets": [
+    "wzrkt.com"
+   ]
+  },
+  {
+   "host": "2975c.v.fwmrm.net",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "FreeWheel / Comcast"
+   ],
+   "targets": [
+    "2975c.v.fwmrm.net"
+   ]
+  },
+  {
+   "host": "ads.tremorhub.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Video Ad Servers"
+   ],
+   "targets": [
+    "ads.tremorhub.com"
+   ]
+  },
+  {
+   "host": "bea4.v.fwmrm.net",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "FreeWheel / Comcast"
+   ],
+   "targets": [
+    "bea4.v.fwmrm.net"
+   ]
+  },
+  {
+   "host": "capi.connatix.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Connatix"
+   ],
+   "targets": [
+    "capi.connatix.com"
+   ]
+  },
+  {
+   "host": "cd.connatix.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Connatix"
+   ],
+   "targets": [
+    "cd.connatix.com"
+   ]
+  },
+  {
+   "host": "dai.google.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "VAST / VPAID"
+   ],
+   "targets": [
+    "dai.google.com"
+   ]
+  },
+  {
+   "host": "g.jwpsrv.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "JW Player Ads"
+   ],
+   "targets": [
+    "g.jwpsrv.com"
+   ]
+  },
+  {
+   "host": "metrics.brightcove.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Brightcove"
+   ],
+   "targets": [
+    "metrics.brightcove.com"
+   ]
+  },
+  {
+   "host": "mssl.fwmrm.net",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "FreeWheel / Comcast"
+   ],
+   "targets": [
+    "mssl.fwmrm.net"
+   ]
+  },
+  {
+   "host": "prd.jwpltx.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "JW Player Ads"
+   ],
+   "targets": [
+    "prd.jwpltx.com"
+   ]
+  },
+  {
+   "host": "s.innovid.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Innovid"
+   ],
+   "targets": [
+    "s.innovid.com"
+   ]
+  },
+  {
+   "host": "ssl.p.jwpcdn.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "JW Player Ads"
+   ],
+   "targets": [
+    "ssl.p.jwpcdn.com"
+   ]
+  },
+  {
+   "host": "tremorhub.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Video Ad Servers"
+   ],
+   "targets": [
+    "tremorhub.com"
+   ]
+  },
+  {
+   "host": "vid.connatix.com",
+   "scored": true,
+   "categories": [
+    "Video Ads"
+   ],
+   "groups": [
+    "Connatix"
+   ],
+   "targets": [
+    "vid.connatix.com"
+   ]
+  }
+ ]
+}

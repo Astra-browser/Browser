@@ -28,9 +28,17 @@ const LANGUAGE_BACKUP_PREF = "astra.privacy.language-backup";
 const COOKIE_MODES = new Set(["allow", "block-third-party", "partition"]);
 const FP_MODES = new Set(["off", "standard", "aggressive"]);
 const FP_STANDARD =
-  "+WebGLRenderInfo,+WebGLVendorSanitize,+WebGLRendererConstant,+AudioContext,+AudioSampleRate,+MediaCapabilities,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision";
+  "+WebGLRenderInfo,+WebGLRenderCapability,+WebGLVendorSanitize,+WebGLRendererConstant,+WebGLRandomization" +
+  ",+AudioContext,+AudioSampleRate,+MediaCapabilities,+MediaDevices,+MediaError,+NetworkConnection" +
+  ",+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo" +
+  ",+FrameRate,+WebCodecs,+WebGPULimits,+WebGPUIsFallbackAdapter,+WebGPUSubgroupSizes" +
+  ",+VideoElementMozFrames,+VideoElementMozFrameDelay,+VideoElementPlaybackQuality";
+// Timer precision is deliberately not reduced here. FPP's
+// ReduceTimerPrecision target clamps performance.now() to 16.667 ms (one
+// 60 Hz atom), which makes Speedometer report 0-time suites and breaks
+// real animation code. The engine's default 1 ms timer floor still applies.
 const FP_AGGRESSIVE =
-  "+CanvasRandomization,+EfficientCanvasRandomization,+AudioContext,+AudioSampleRate,+MediaCapabilities,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision,+WebGLRenderInfo,+WebGLVendorSanitize,+WebGLRendererConstant,+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowOuterSize,+WindowScreenXY,+WindowInnerScreenXY,+JSLocale,+JSLocalePrompt,+RoundWindowSize,+MouseEventScreenPoint";
+  "+CanvasRandomization,+EfficientCanvasRandomization,+AudioContext,+AudioSampleRate,+MediaCapabilities,+MediaDevices,+MediaError,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+WebGLRenderInfo,+WebGLRenderCapability,+WebGLVendorSanitize,+WebGLRendererConstant,+WebGLRandomization,+FrameRate,+WebCodecs,+WebGPULimits,+WebGPUIsFallbackAdapter,+WebGPUSubgroupSizes,+VideoElementMozFrames,+VideoElementMozFrameDelay,+VideoElementPlaybackQuality,+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowOuterSize,+WindowScreenXY,+WindowInnerScreenXY,+JSLocale,+JSLocalePrompt,+RoundWindowSize,+MouseEventScreenPoint";
 const FP_SCREEN =
   "+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowOuterSize,+WindowScreenXY,+WindowInnerScreenXY,+RoundWindowSize,+MouseEventScreenPoint";
 const FP_LANGUAGE = "+JSLocale,+JSLocalePrompt";

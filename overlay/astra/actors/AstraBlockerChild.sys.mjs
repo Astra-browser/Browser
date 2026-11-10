@@ -10,7 +10,7 @@
 
 const STYLE_ID = "astra-blocker-style";
 const MAX_SELECTORS = 4096;
-const DEBOUNCE_MS = 250;
+const DEBOUNCE_MS = 500;
 
 export class AstraBlockerChild extends JSWindowActorChild {
   #style = null;
@@ -18,9 +18,11 @@ export class AstraBlockerChild extends JSWindowActorChild {
   #timer = null;
   #url = "";
   #started = false;
-  #seen = new Set();
+  #seenClasses = new Set();
+  #seenIds = new Set();
   #scriptInjected = false;
   #request = 0;
+  #refreshed = false;
 
   handleEvent(event) {
     if (event.type === "DOMContentLoaded") {
@@ -60,8 +62,16 @@ export class AstraBlockerChild extends JSWindowActorChild {
     this.#started = true;
 
     const observed = collectObserved(doc);
+    this.#seenClasses = new Set(observed.classes);
+    this.#seenIds = new Set(observed.ids);
     const reply = await this.#ask([], []);
     if (!this.#started || !this.document) return;
+    if (reply?.enabled === false) {
+      // The blocker is off (or both cosmetic payloads are off): no observer,
+      // no DOM walk, no per-mutation query.
+      this.#started = false;
+      return;
+    }
     this.#apply(doc, reply);
 
     if (typeof this.contentWindow?.MutationObserver === "function") {
@@ -93,14 +103,15 @@ export class AstraBlockerChild extends JSWindowActorChild {
   async #refresh(doc) {
     if (!doc || !this.#started) return;
     const observed = collectObserved(doc);
-    if (
-      observed.classes.length === 0 &&
-      observed.ids.length === 0 &&
-      this.#seen.size === 0
-    ) {
-      return;
-    }
-    const reply = await this.#ask(observed.classes, observed.ids);
+    const fresh =
+      observed.classes.some((name) => !this.#seenClasses.has(name)) ||
+      observed.ids.some((name) => !this.#seenIds.has(name));
+    for (const name of observed.classes) this.#seenClasses.add(name);
+    for (const name of observed.ids) this.#seenIds.add(name);
+    if (!fresh && this.#refreshed) return;
+    if (this.#seenClasses.size === 0 && this.#seenIds.size === 0) return;
+    this.#refreshed = true;
+    const reply = await this.#ask([...this.#seenClasses], [...this.#seenIds]);
     if (!this.#started || !this.document) return;
     this.#apply(doc, reply);
   }
@@ -177,13 +188,6 @@ function collectObserved(doc) {
       if (classes.size > 4096) classes.clear();
       if (ids.size > 4096) ids.clear();
       if (element.shadowRoot) walk(element.shadowRoot);
-      if (element.tagName === "IFRAME") {
-        try {
-          if (element.contentDocument) walk(element.contentDocument);
-        } catch {
-          // Cross-origin frame: its own actor handles it.
-        }
-      }
     }
   };
   walk(doc);

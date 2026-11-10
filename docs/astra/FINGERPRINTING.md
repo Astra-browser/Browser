@@ -9,7 +9,10 @@
 | Layer | Pref | Default | What it does |
 |---|---|---|---|
 | FPP | `privacy.fingerprintingProtection` (+ `.pbmode`) | on | Firefox's low-breakage fingerprinting protection: canvas/audio randomization, font visibility, GPU model hiding, screen/hardware-concurrency tiering |
-| FPP targets | `privacy.fingerprintingProtection.overrides` | `+WebGLRenderInfo,+WebGLVendorSanitize,+WebGLRendererConstant,+AudioContext,+AudioSampleRate,+MediaCapabilities,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision` | Strengthens the default set: hides the GPU model, audio stack parameters, media/network capabilities, base-system fonts and display metrics |
+| FPP targets | `privacy.fingerprintingProtection.overrides` | `+WebGLRenderInfo,+WebGLRenderCapability,+WebGLVendorSanitize,+WebGLRendererConstant,+WebGLRandomization,+AudioContext,+AudioSampleRate,+MediaCapabilities,+MediaDevices,+MediaError,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision,+FrameRate,+WebCodecs,+WebGPULimits,+WebGPUIsFallbackAdapter,+WebGPUSubgroupSizes,+VideoElementMozFrames,+VideoElementMozFrameDelay,+VideoElementPlaybackQuality` | Strengthens the default set: hides the GPU model, capabilities and rendered pixels, audio stack parameters, media/network capabilities and device labels, base-system fonts, display metrics, frame rate, WebCodecs/WebGPU limits and video playback statistics |
+| Native tracking lists | `privacy.trackingprotection.{,pb,cryptomining,fingerprinting,emailtracking}enabled` | on | Defence in depth next to Astra's filter engine: ETP's Disconnect list, cryptominer and fingerprinting lists, and email tracking-pixel stripping in webmail |
+| Query stripping | `privacy.query_stripping.{enabled,enabled.pbmode,strip_on_share.enabled}` | on | The engine's maintained tracking-parameter set is stripped before the first request and when a link is shared, alongside the blocker's `$removeparam` |
+| Referrer trimming | `network.http.referer.{trimmingPolicy,XOriginTrimmingPolicy}` | `2` | Same-origin requests drop the path; cross-origin requests send only the origin, removing a common cross-site identifier |
 | Native tracking protection | `privacy.trackingprotection.enabled` | not set by Astra | Firefox's own list layer stays at its upstream default; Astra's filter lists are the tracker blocker |
 | Cookies | `network.cookie.cookieBehavior` | `5` (upstream app default) | Third-party cookies blocked |
 | RFP | `privacy.resistFingerprinting` | **off** | Full strict spoofing (screen, DPR, canvas per call, GPU); opt-in because it breaks layouts and some sites |
@@ -55,6 +58,16 @@ RFP remains an opt-in; when enabled in a test profile it additionally
 randomized the canvas per call, forced `dpr=2`, `hardwareConcurrency=4` and a
 constant WebGL renderer. It is not the default because the screen spoofing
 (`25×25` in the headless probe) breaks real layouts.
+
+The 2026-11-10 hardening added the capability/pixel/WebGPU/WebCodecs/media
+targets listed above plus native tracking lists, query stripping and referrer
+trimming. The target set and every pref are asserted by
+`tests/contract/blocker_coverage.mjs`; the live `fingerprint-probe.py` and
+`shields-probe.py` still pass on the packaged build, and the full
+`superadblock-probe.py` run is 100% with zero reachable probes. The new media
+and WebGPU targets are contract-checked, not individually measured by the
+probe; they are FPP's own documented targets and keep the user agent,
+timezone and screen real.
 
 ## What this does not claim
 
