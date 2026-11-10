@@ -43,9 +43,9 @@ Each run writes `out/stress-<stamp>/<browser>-<scenario>-rN/`:
 | `meta.json` | timings, checks, tab map, animations, UI lag |
 | `shots/` | chrome screenshots |
 
-The same per-run block is appended to `observations.md` at the repo root;
-`summarize.py` writes the consolidated `STRESS_REPORT.md` and inserts a key-
-observations block into `observations.md`.
+The same per-run block is appended to `docs/performance/OBSERVATIONS.md`;
+`summarize.py` writes the consolidated `docs/performance/STRESS_REPORT.md` and
+inserts a key-observations block into `docs/performance/OBSERVATIONS.md`.
 
 ## Scenarios
 
@@ -73,6 +73,6 @@ observations block into `observations.md`.
   `video`, `css`, `3d`, `js` (or `?hb=1`) run the rAF counter.
 - Astra's content stage measures ~56–60 rAF/s on this 144 Hz panel while stock
   reaches ~135–149. Animated workloads are compared per frame as well as in
-  absolute terms; see `STRESS_REPORT.md`.
+  absolute terms; see `docs/performance/STRESS_REPORT.md`.
 - A pre-existing Firefox/profile on the machine is never counted: the sampler
   only walks descendants of the PID it launched.

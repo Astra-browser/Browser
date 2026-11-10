@@ -17,5 +17,5 @@ to file/dir names *and* contents, with `--dry-run` diff report first.
 ## Implementation (scheduled with P3-T01, when `ui/` + `crates/` exist)
 
 Rust CLI in `forge/` (or `xtask`): walk, case-variant match, rewrite, report.
-Until then, `plan.md` + all Phase 0 docs are maintained by hand under the
+Until then, `docs/planning/PLAN.md` + all Phase 0 docs are maintained by hand under the
 same rule — verified by the lint above.

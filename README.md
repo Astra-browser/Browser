@@ -121,7 +121,7 @@ Live browser probes drive the packaged build through Marionette; see
 | `forge/astra-forge/` | build/fetch/overlay/lint tool |
 | `config/`, `branding/`, `upstream.toml` | mozconfig template, brand values, pinned upstream |
 | `tests/`, `tools/` | contract tests, probes, lint and release scripts |
-| `docs/astra/` | scope, state, decisions, dev setup and subsystem contracts |
+| `docs/` | plans, scope/state, performance reports and subsystem contracts (see `docs/README.md`) |
 
 ## Troubleshooting
 

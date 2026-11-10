@@ -1261,11 +1261,11 @@ backlog.
 
 ## Later phases
 
-P7–P11 all `todo` — see `plan.md` §§8–11.
+P7–P11 all `todo` — see `docs/planning/PLAN.md` §§8–11.
 
 ## Native binding merge (2026-11-04)
 
-Execution plan and phase status: `merge.md`. The new wire shapes below are
+Execution plan and phase status: `docs/planning/MERGE.md`. The new wire shapes below are
 recorded here per SCOPE rule 5.
 
 | Shape | Why | Phase |

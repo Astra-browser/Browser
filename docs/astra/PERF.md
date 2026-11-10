@@ -153,7 +153,8 @@ the real headed build runs. It covers one tab, New Tab, 8 static tabs, 2/6
 real-click UI tour, against both the Astra dev build and the installed stock
 Firefox 159.
 
-Results: `STRESS_REPORT.md` (consolidated) and `observations.md` (one block per
+Results: `docs/performance/STRESS_REPORT.md` (consolidated) and
+`docs/performance/OBSERVATIONS.md` (one block per
 run); raw samples in `out/stress-final/`. Headline: **settled idle is fine and
 memory is +~75 MiB**, but a fast page load leaves the tab in `loading: true`
 for 15 s (`Content.watch()` waits for a poll to see `isLoadingDocument=true`),
