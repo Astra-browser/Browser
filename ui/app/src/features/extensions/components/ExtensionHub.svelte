@@ -69,7 +69,11 @@
     else if (id === "remove") removing = extension.id;
   }
 
-  function openStore() {
+  function openChromeStore() {
+    void commands.browserOpenUrl("https://chromewebstore.google.com/", true);
+  }
+
+  function openFirefoxStore() {
     void commands.browserOpenUrl("https://addons.mozilla.org/firefox/", true);
   }
 
@@ -121,8 +125,11 @@
         <Button size="compact" variant="primary" onclick={() => void webext.chooseFile(false)}
           >{m.webext_install_file()}</Button
         >
-        <Button size="compact" variant="secondary" data-dismiss onclick={() => openStore()}
+        <Button size="compact" variant="secondary" data-dismiss onclick={() => openChromeStore()}
           >{m.webext_open_store()}</Button
+        >
+        <Button size="compact" variant="secondary" data-dismiss onclick={() => openFirefoxStore()}
+          >{m.webext_open_firefox_store()}</Button
         >
       </div>
     </div>
@@ -223,8 +230,11 @@
         <Icon icon={Upload01Icon} size={13} />
         {m.webext_install_file()}
       </button>
-      <button type="button" class="foot-link" data-dismiss onclick={() => openStore()}>
+      <button type="button" class="foot-link" data-dismiss onclick={() => openChromeStore()}>
         {m.webext_open_store()}
+      </button>
+      <button type="button" class="foot-link" data-dismiss onclick={() => openFirefoxStore()}>
+        {m.webext_open_firefox_store()}
       </button>
     </footer>
   {/if}
@@ -543,9 +553,9 @@
 
   .hub-foot {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
+    gap: 2px 8px;
     margin-block-start: 4px;
     padding: 4px 6px 1px;
     border-block-start: 1px solid var(--color-menu-separator);

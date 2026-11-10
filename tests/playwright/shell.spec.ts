@@ -123,6 +123,56 @@ test.describe("browser shell", () => {
         message: "sidebar widens after a rightward drag",
       })
       .toBeGreaterThan(before);
+    // With room, the utilities settle back onto one line.
+    await expect
+      .poll(() => page.locator(".utility-bar").evaluate((bar) => getComputedStyle(bar).display))
+      .toBe("flex");
+  });
+
+  test("the utility bar stays inside the column as it is dragged narrow", async ({ page }) => {
+    await openScreen(page, "shell");
+    const handle = page.getByRole("separator", { name: "Resize sidebar" });
+    const box = await handle.boundingBox();
+    expect(box, "resize handle has a box").not.toBeNull();
+    if (!box) return;
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 50, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    const bar = page.locator(".utility-bar");
+    await expect
+      .poll(() => bar.evaluate((element) => getComputedStyle(element).display))
+      .toBe("grid");
+    const columns = await bar.evaluate(
+      (element) => getComputedStyle(element).gridTemplateColumns.split(" ").length,
+    );
+    expect(columns).toBe(4);
+
+    const aside = await sidebar(page).boundingBox();
+    const barBox = await bar.boundingBox();
+    expect(aside, "sidebar has a box").not.toBeNull();
+    expect(barBox, "utility bar has a box").not.toBeNull();
+    if (!aside || !barBox) return;
+    expect(barBox.x).toBeGreaterThanOrEqual(aside.x - 0.5);
+    expect(barBox.x + barBox.width).toBeLessThanOrEqual(aside.x + aside.width + 0.5);
+  });
+
+  test("one extension door opens an opaque hub over the tab list", async ({ page }) => {
+    await openScreen(page, "shell");
+    const aside = sidebar(page);
+    // Menus opened from the column carry the column's opaque material policy,
+    // so the tab list can never read through a panel's labels.
+    await expect(aside).toHaveAttribute("data-menu-material", "opaque");
+    await expect(page.getByRole("button", { name: "Extensions", exact: true })).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Extensions", exact: true }).click();
+    const panel = page.locator(".extension-popover");
+    await expect(panel).toHaveAttribute("data-open", "true");
+    await expect(panel).toHaveAttribute("data-menu-material", "opaque");
+    const background = await panel.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(background).not.toMatch(/rgba\([^)]*,\s*0?\.\d+\)/u);
   });
 
   test("Tools menu opens a named menu and Escape puts it away", async ({ page }) => {

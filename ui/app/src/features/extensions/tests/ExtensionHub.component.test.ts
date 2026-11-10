@@ -150,14 +150,13 @@ test("the switch turns the extension off through the host", async () => {
   expect(native.setEnabled).toHaveBeenCalledExactlyOnceWith("ext-a", false);
 });
 
-test("managing opens the extensions page, and the store opens in a tab", async () => {
+test("managing opens the extensions page, and each store opens its own tab", async () => {
   native.extensions = [extension()];
   const screen = await render(ExtensionHub);
   await screen.getByRole("button", { name: "Manage extensions" }).click();
   expect(native.openPage).toHaveBeenCalledExactlyOnceWith("extensions");
   await screen.getByRole("button", { name: "Chrome Web Store" }).click();
-  expect(native.openUrl).toHaveBeenCalledExactlyOnceWith(
-    "https://addons.mozilla.org/firefox/",
-    true,
-  );
+  expect(native.openUrl).toHaveBeenLastCalledWith("https://chromewebstore.google.com/", true);
+  await screen.getByRole("button", { name: "Firefox Add-ons" }).click();
+  expect(native.openUrl).toHaveBeenLastCalledWith("https://addons.mozilla.org/firefox/", true);
 });

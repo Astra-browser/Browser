@@ -20,10 +20,8 @@
   import { favicons } from "$domain/favicons";
   import { mediaPlayer } from "$domain/media-player";
   import { preferences } from "$domain/preferences";
-  import { surface as browserPage } from "$domain/surface";
   import { tabs } from "$domain/tabs";
   import { webext } from "$domain/webext";
-  import { commands } from "$shared/ipc/bindings";
   import * as tools from "$session/tools.svelte";
   import { mediaTabs, railToolActive, sleepingTabs } from "../lib/rail-model";
 
@@ -74,10 +72,13 @@
 </script>
 
 <!--
-  The column's utilities, at its head: media, downloads, notes, spaces and the
-  sleeping list, with the shape toggle first. They used to be a 44px strip
-  beside the column; folding them into the column's own top row gives that
-  width back to the page while keeping every entry one click away.
+  The column's utilities, at its head: media, downloads, notes, spaces, the
+  sleeping list and the one extension door, with the shape toggle first. They
+  used to be a 44px strip beside the column; folding them into the column's
+  own top row gives that width back to the page while keeping every entry one
+  click away. The extension door is a single button: the hub it opens carries
+  the installed extensions, the page actions, management, both stores and
+  installing from a file, so there is no second puzzle to explain.
   Every entry has a real caller — the two tool panels through `$session/tools`,
   the spaces and media lists through the window's own tab projection. It never
   reads another window's or a private window's data.
@@ -96,55 +97,6 @@
     </button>
   {/if}
   {#if ontoggle && !compact}<span class="bar-rule" aria-hidden="true"></span>{/if}
-
-  <div class="bar-cell" style:--step={ontoggle ? 2 : 1}>
-    <Disclosure
-      label={m.webext_page_title()}
-      triggerTitle={m.webext_page_title()}
-      menu
-      align="start"
-      triggerClass="rail-item"
-      panelClass="bar-popover"
-    >
-      {#snippet trigger()}<Icon icon={PuzzleIcon} size={18} />{/snippet}
-      <button
-        type="button"
-        role="menuitem"
-        class="ui-menu-item rail-row"
-        style:--row={0}
-        onclick={() => void browserPage.open("extensions")}
-      >
-        {m.webext_manage()}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        class="ui-menu-item rail-row"
-        style:--row={1}
-        onclick={() => void commands.browserOpenUrl("https://chromewebstore.google.com/", true)}
-      >
-        {m.webext_open_store()}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        class="ui-menu-item rail-row"
-        style:--row={2}
-        onclick={() => void commands.browserOpenUrl("https://addons.mozilla.org/firefox/", true)}
-      >
-        {m.webext_open_firefox_store()}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        class="ui-menu-item rail-row"
-        style:--row={3}
-        onclick={() => void webext.chooseFile(false)}
-      >
-        {m.webext_install_file()}
-      </button>
-    </Disclosure>
-  </div>
 
   <div class="bar-cell" style:--step={ontoggle ? 1 : 0}>
     <Disclosure
@@ -330,7 +282,7 @@
     flex: 1;
     flex-wrap: wrap;
     align-items: center;
-    gap: 1px;
+    gap: 2px;
     min-inline-size: 0;
     color: var(--color-muted);
   }
@@ -470,16 +422,18 @@
     transform-origin: top left;
   }
 
-  /* The column can be dragged down to 180px. Below the width all seven plates
-     need, the row becomes a deliberate grid rather than a ragged flex wrap,
-     and the hairline that separates the shape toggle steps out of the way. */
-  @container (max-width: 236px) {
+  /* The column can be dragged from 180px up to 460px. When the row cannot fit
+     every plate (including the shield the header keeps beside the bar), it
+     becomes a deliberate four-column grid rather than a ragged flex wrap: two
+     even rows, centred, with the hairline put away. The same rule keeps the
+     bar inside the column at every width instead of spilling or clipping. */
+  @container (max-width: 260px) {
     .utility-bar:not([data-compact]) {
       display: grid;
       flex: 1;
-      grid-template-columns: repeat(auto-fit, 26px);
-      justify-content: start;
-      gap: 2px;
+      grid-template-columns: repeat(4, 26px);
+      justify-content: center;
+      gap: 4px;
       min-inline-size: 0;
     }
 
@@ -489,6 +443,11 @@
   }
 
   @container (max-width: 196px) {
+    .utility-bar:not([data-compact]) {
+      grid-template-columns: repeat(4, 24px);
+      gap: 2px;
+    }
+
     .utility-bar:not([data-compact]) .rail-button,
     .utility-bar:not([data-compact]) :global(.rail-item) {
       inline-size: 24px;

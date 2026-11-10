@@ -6,7 +6,9 @@ Usage: python3 tools/marionette-probe/utility-bar-probe.py <profile-dir> <out-di
 Checks, against a fresh packaged dev build:
   * no 44px rail; the sidebar is the column alone (240px at rest),
   * the media/downloads/notes/spaces/sleeping marks and the shape toggle are
-    in one row inside the column,
+    an even four-column grid inside the column at 240px, with one extension
+    door rather than two,
+  * the extension hub opens opaque over the tab list,
   * the media popover opens under the bar and inside the column,
   * opening a tool keeps a 56px column with the same marks in a two-column
     grid and the panel at the window's top edge,
@@ -95,6 +97,7 @@ STATE = js("""
   const column = d.querySelector('.sidebar-browser-column');
   const host = d.querySelector('.sidebar-tool-host');
   const panel = d.querySelector('.bar-popover');
+  const extensionPanel = d.querySelector('.extension-popover');
   const items = bar ? [...bar.querySelectorAll('button')].map((b) => ({
     name: b.getAttribute('aria-label'), ...box(b),
   })) : [];
@@ -108,9 +111,22 @@ STATE = js("""
     host: box(host),
     bar: box(bar),
     display: bar ? getComputedStyle(bar).display : null,
+    gridColumns: bar ? getComputedStyle(bar).gridTemplateColumns : null,
     compact: bar ? bar.hasAttribute('data-compact') : null,
+    extensions: bar
+      ? [...bar.querySelectorAll('button')].filter(
+          (b) => b.getAttribute('aria-label') === 'Extensions').length
+      : 0,
     items,
     panel: panel ? { ...box(panel), open: panel.getAttribute('data-open') } : null,
+    extensionPanel: extensionPanel
+      ? {
+          ...box(extensionPanel),
+          open: extensionPanel.getAttribute('data-open'),
+          material: extensionPanel.getAttribute('data-menu-material'),
+          background: getComputedStyle(extensionPanel).backgroundColor,
+        }
+      : null,
     columnBar: !!d.querySelector('.sidebar-browser-column .utility-bar'),
     toolClose: !!d.querySelector('.sidebar-tool-host .shared-tool-header button[aria-label="Close tool"]'),
     railSearch: !!d.querySelector('.sidebar-browser-column .rail-search button'),
@@ -169,13 +185,20 @@ def main():
         aside = expanded["sidebar"] or {}
         check("no route beside the column", expanded["oldRail"] is False)
         check("the page inset is the column alone", aside.get("w") == 240, aside)
-        check("the bar is one row", expanded["display"] == "flex", expanded["display"])
+        check(
+            "the bar is an even four-column grid at the default width",
+            expanded["display"] == "grid"
+            and len((expanded["gridColumns"] or "").split()) == 4,
+            {"display": expanded["display"], "columns": expanded["gridColumns"]},
+        )
         check(
             "every utility is in the bar",
-            {"Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs"} <= names,
+            {"Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs", "Extensions"}
+            <= names,
             names,
         )
         check("the shape toggle heads it", "Toggle sidebar" in names, names)
+        check("one extension door", expanded["extensions"] == 1, expanded["extensions"])
         check(
             "no mark leaves the column",
             all(item["right"] <= aside.get("right", 0) for item in expanded["items"]),
@@ -187,6 +210,21 @@ def main():
             expanded["animations"],
         )
         m.shot(os.path.join(outdir, "utility-bar-expanded.png"))
+
+        check("extensions opens", m.js(CLICK("Extensions")) == "ok")
+        time.sleep(1.0)
+        hub = json.loads(m.js(STATE))
+        hub_panel = hub["extensionPanel"] or {}
+        check(
+            "the extension hub is opaque over the tab list",
+            hub_panel.get("open") == "true"
+            and hub_panel.get("material") == "opaque"
+            and "rgba" not in (hub_panel.get("background") or ""),
+            hub_panel,
+        )
+        m.shot(os.path.join(outdir, "utility-bar-extensions.png"))
+        m.js(CLICK("Extensions"))
+        time.sleep(0.4)
 
         check("media opens", m.js(CLICK("Media")) == "ok")
         time.sleep(0.7)
@@ -251,7 +289,7 @@ def main():
             "the panel closes back to the expanded head",
             closed["host"] is None
             and (closed["sidebar"] or {}).get("w") == 240
-            and closed["display"] == "flex",
+            and closed["display"] == "grid",
             closed,
         )
         m.shot(os.path.join(outdir, "utility-bar-expanded-again.png"))
