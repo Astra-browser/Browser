@@ -407,8 +407,12 @@ function startTracking(profile) {
       return;
     }
     if (!TRACK_EVENTS.has(event.type)) return;
-    recordActivity(clock());
+    const at = clock();
+    recordActivity(at);
     persist(false);
+    // A navigation can move the page in front onto (or off) the Focus shut
+    // list without the session clock changing; republish so the cover follows.
+    if (session !== null) publish(at);
   });
   if (typeof globalThis.window !== "undefined") {
     persistTimer = setInterval(() => {
