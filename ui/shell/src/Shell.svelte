@@ -1151,20 +1151,25 @@
           <p class="slot-error" role="alert">{slotError}</p>
         {/if}
         {#if loadingHost}
-          <div class="load-skeleton" aria-hidden="true">
-            <div class="sk sk-bar"></div>
-            <div class="sk sk-hero"></div>
-            <div class="sk sk-line" style:inline-size="62%"></div>
-            <div class="sk sk-line" style:inline-size="86%"></div>
-            <div class="sk sk-line" style:inline-size="74%"></div>
-            <div class="sk sk-line" style:inline-size="40%"></div>
-          </div>
           <div class="loading-stage" role="status" aria-live="polite">
             <span class="loading-spinner" aria-hidden="true"></span>
             <span>{loadingHost}</span>
           </div>
         {/if}
       </div>
+      {#if loadingHost}
+        <!-- The skeleton is a stage surface, not a page card: it covers the
+             whole content column while a page arrives, so the rounded card
+             inset and its empty frame never show during a load. -->
+        <div class="load-skeleton" aria-hidden="true">
+          <div class="sk sk-bar"></div>
+          <div class="sk sk-hero"></div>
+          <div class="sk sk-line" style:inline-size="62%"></div>
+          <div class="sk sk-line" style:inline-size="86%"></div>
+          <div class="sk sk-line" style:inline-size="74%"></div>
+          <div class="sk sk-line" style:inline-size="40%"></div>
+        </div>
+      {/if}
     </div>
   </div>
   <details class="astra-about">
@@ -1436,13 +1441,14 @@
   .load-skeleton {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 3;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 6% 8%;
+    padding: 24px 32px;
     background: var(--shell-loading-ground);
     pointer-events: none;
+    border-radius: 0;
   }
 
   .sk {
