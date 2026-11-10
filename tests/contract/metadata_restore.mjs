@@ -286,6 +286,21 @@ function tab(overrides) {
   check("reset clears the private flag", Metadata.status().private === false);
 }
 
+// --- A second window never tears the owner's store down ---------------------
+{
+  Metadata.__resetForTests();
+  await Metadata.prepare({ window_id: "win-a" });
+  check(
+    "a non-owner window cannot dispose the store",
+    Metadata.dispose({ window_id: "win-b" }) === false,
+  );
+  check(
+    "a non-owner window cannot release the owner's slot",
+    Metadata.releaseOwner({ window_id: "win-b" }) === false,
+  );
+  Metadata.__resetForTests();
+}
+
 // --- Exposed test seams ------------------------------------------------------
 {
   check("Metadata exposes the capture function", Metadata.capture === buildSnapshot);
