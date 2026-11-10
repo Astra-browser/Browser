@@ -57,6 +57,12 @@ const XHTML_NS = "http://www.w3.org/1999/xhtml";
 let _backend = null; // { raster(url, doc) } -> Uint8Array | null
 let _eventSink = null; // (view) => void
 let _liveBackendPromise = null;
+/** Origin -> { at, source } after a page/icon read. A page without a declared
+ *  icon would otherwise be downloaded again on every commit, because Places
+ *  has no raster to answer with. */
+const _sourceCache = new Map();
+const _sourceInflight = new Map();
+const SOURCE_CACHE_MS = 5 * 60 * 1000;
 
 // Replacement backend; returns a reset function so a suite can undo it.
 export function __setFaviconBackend(backend) {
@@ -78,6 +84,8 @@ export function __resetFaviconsForTests() {
   _liveBackendPromise = null;
   _storedCache.clear();
   _inflight.clear();
+  _sourceCache.clear();
+  _sourceInflight.clear();
 }
 
 function emit(view) {
@@ -376,7 +384,28 @@ function createPlacesBackend(PlacesUtils) {
       if (fromPlaces) {
         return fromPlaces;
       }
-      const source = await fetchIconSource(doc, url);
+      const origin = originOf(url);
+      const cached = origin ? _sourceCache.get(origin) : null;
+      if (cached && Date.now() - cached.at < SOURCE_CACHE_MS) {
+        return cached.source ? drawRaster(doc, cached.source) : null;
+      }
+      // A commit and its title update can ask at the same time; one read per
+      // origin is enough, and a page without an icon is remembered so the
+      // whole HTML is not downloaded again on the next commit.
+      let pending = origin ? _sourceInflight.get(origin) : null;
+      if (!pending) {
+        pending = fetchIconSource(doc, url).then((source) => {
+          if (origin) _sourceCache.set(origin, { at: Date.now(), source });
+          return source;
+        });
+        if (origin) {
+          _sourceInflight.set(origin, pending);
+          pending.finally(() => {
+            if (_sourceInflight.get(origin) === pending) _sourceInflight.delete(origin);
+          });
+        }
+      }
+      const source = await pending;
       if (!source) {
         return null;
       }
