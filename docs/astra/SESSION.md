@@ -1,7 +1,7 @@
 # Session handoff — Astra (written 2026-11-01, updated as work proceeds)
 
 Read this first in a new session, then `docs/astra/STATE.md` for task locks
-and `plan.md` §1.5 for the workflow rules.
+and `docs/planning/PLAN.md` §1.5 for the workflow rules.
 
 ## Goal
 
@@ -23,7 +23,7 @@ verified), `LICENSE` (MPL), `NOTICE`, `LICENSES.md` (25/25 permissive),
 
 ## Standing rules (owner-set, do not relax)
 
-- `plan.md` is Astra-only: 0 occurrences of the previous product name (any
+- `docs/planning/PLAN.md` is Astra-only: 0 occurrences of the previous product name (any
   case). Only `NOTICE` + `docs/astra/PROVENANCE.md` may name it (allow-listed).
 - One task, one agent, one `agent/<task>-<slug>` branch; STATE.md is the lock
   registry; only the orchestrator merges; commit every change (§1.5, D-23/24).

@@ -2,7 +2,7 @@
 
 ## The one rule
 
-`plan.md` is the source of truth. Read §1 (operating rules, lanes,
+`docs/planning/PLAN.md` is the source of truth. Read §1 (operating rules, lanes,
 orchestration §1.5) before touching anything. If the plan and this file
 disagree, the plan wins.
 

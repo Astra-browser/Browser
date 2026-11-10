@@ -2,7 +2,7 @@
 """Turn a stress-matrix output directory into one consolidated report.
 
 Reads every run's summary.json + meta.json + samples.jsonl + reports.jsonl and
-writes STRESS_REPORT.md. Numbers are computed, not copied by hand.
+writes `docs/performance/STRESS_REPORT.md`. Numbers are computed, not copied by hand.
 
 Two windows are reported separately, because they answer different questions:
 
@@ -21,6 +21,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+PERF_DIR = os.path.join(ROOT, "docs", "performance")
 sys.path.insert(0, HERE)
 from run_matrix import analyze_reports  # noqa: E402
 
@@ -749,7 +750,7 @@ def _findings(runs, sm, tm, rget):
 
 
 def update_observations(outdir):
-    path = os.path.join(ROOT, "observations.md")
+    path = os.path.join(PERF_DIR, "OBSERVATIONS.md")
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as fh:
@@ -834,14 +835,14 @@ def update_index(outdir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=os.path.join(ROOT, "out", "stress-final"))
-    ap.add_argument("--out", default=os.path.join(ROOT, "STRESS_REPORT.md"))
+    ap.add_argument("--out", default=os.path.join(PERF_DIR, "STRESS_REPORT.md"))
     args = ap.parse_args()
     text = build(args.dir)
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(text)
     update_observations(args.dir)
     update_index(args.dir)
-    print(f"wrote {args.out}, updated observations.md and runs.json")
+    print(f"wrote {args.out}, updated docs/performance/OBSERVATIONS.md and runs.json")
 
 
 if __name__ == "__main__":

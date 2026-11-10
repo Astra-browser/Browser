@@ -1,7 +1,7 @@
 # Astra performance plan — lighter and faster than Firefox
 
-> Status: proposal (2026-11-04). Baseline data: `STRESS_REPORT.md`,
-> `observations.md`, `docs/astra/PERF.md` §7. Engine: ESR 153.6.0. Comparison:
+> Status: proposal (2026-11-04). Baseline data: `docs/performance/STRESS_REPORT.md`,
+> `docs/performance/OBSERVATIONS.md`, `docs/astra/PERF.md` §7. Engine: ESR 153.6.0. Comparison:
 > installed Firefox 159.0 on the same box.
 
 ## 1. The thesis
