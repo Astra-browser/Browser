@@ -329,6 +329,26 @@ async function threeTabs() {
   }
 }
 
+// === tabs.switch-to-open ==================================================
+{
+  reset();
+  await Tabs.bootstrap({ request_id: "boot" });
+  const url = "https://dup.example/";
+  const first = await Tabs.create({ request_id: "d-1", url, background: true });
+  const count = (await list()).length;
+  const again = await Tabs.create({ request_id: "d-2", url, background: true });
+  check(
+    "a URL already open in this space reuses its tab",
+    again.astra_tab_id === first.astra_tab_id && again.existing === true,
+    JSON.stringify(again),
+  );
+  check("no second tab is created", (await list()).length === count);
+
+  await Settings.set({ key: "tabs.switch-to-open", value: "false" });
+  const fresh = await Tabs.create({ request_id: "d-3", url, background: true });
+  check("off opens a second copy", fresh.astra_tab_id !== first.astra_tab_id);
+}
+
 // === tabs.archive ========================================================
 {
   const HOUR = 60 * 60 * 1000;
