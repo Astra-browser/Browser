@@ -78,16 +78,20 @@ relationship and the tight tracking; the lockup geometry is built around them.
 
 | Path | What it is |
 |---|---|
-| `svg/astra-symbol.svg` | Master symbol, ink, square canvas |
-| `svg/astra-symbol-small.svg` | Small-size cut (fuller head, shorter luff) |
-| `svg/astra-symbol-white.svg` / `-black.svg` | One-colour cuts |
-| `svg/astra-wordmark.svg` | Wordmark, outlined |
-| `svg/astra-lockup-horizontal.svg` | Primary lockup |
-| `svg/astra-lockup-horizontal-reversed.svg` | Primary lockup, paper on ink |
-| `svg/astra-lockup-stacked.svg` | Secondary lockup |
-| `svg/astra-app-icon.svg` / `-dark.svg` | 1024 tile, full bleed |
-| `web/` | favicon.ico, PNG set, maskable icon, webmanifest, head snippet |
-| `sheets/` | Concept exploration, identity board, context board |
+| `branding/assets/astra-symbol.svg` | Master symbol, ink, square canvas |
+| `branding/assets/astra-symbol-small.svg` | Small-size cut (fuller head, shorter luff) |
+| `branding/assets/astra-symbol-white.svg` / `-black.svg` | One-colour cuts |
+| `branding/assets/astra-wordmark.svg` | Wordmark, outlined |
+| `branding/assets/astra-lockup-horizontal.svg` | Primary lockup |
+| `branding/assets/astra-lockup-horizontal-reversed.svg` | Primary lockup, paper on ink |
+| `branding/assets/astra-lockup-stacked.svg` | Secondary lockup |
+| `branding/assets/astra-app-icon.svg` / `-dark.svg` | 1024 tile, full bleed |
+| `overlay/astra/branding/` | GTK icons, 512 icon, `.ico`, `.icns`, about:logo artwork |
+| `ui/app/public/` | SVG-first app art, favicon set, web icons |
+| `design/astra-logo/sheets/` | Concept exploration, identity board, context board |
+
+Regenerate every raster with `python3 tools/brand-assets.py`; never hand-edit
+the generated PNG, `.ico` or `.icns`.
 
 ## Known limits
 
