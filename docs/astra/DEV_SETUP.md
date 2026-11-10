@@ -38,6 +38,26 @@ It runs `engine/obj-astra-linux/dist/bin/firefox` with `-no-remote` and a
 profile in `out/dev-profile`, and prints the build command if the binary is
 missing.
 
+## Versioning the dev/alpha build
+
+Astra's own version lives in `branding/astra.toml`; the Firefox pin in
+`upstream.toml` is separate and never changes with it. Bump the `version`
+value on every build handed to a tester:
+
+```toml
+# branding/astra.toml
+version = "0.1.743"
+```
+
+`forge overlay` renders it into the `astra.version` pref (About reads it
+through `about_info`), and `tools/package-release.sh` uses it for the archive
+name and `BUILD.txt`. Verify a build before handing it out:
+
+```sh
+python3 tools/marionette-probe/version-probe.py \
+  out/release/stage/Astra/firefox     # or the dev build's firefox
+```
+
 ### Product flags
 
 Work is off in the shipped build (D-48). To build the frame with Work for

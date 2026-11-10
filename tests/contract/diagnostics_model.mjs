@@ -54,6 +54,7 @@ const prefs = {
     if (name === "astra.blocker.installed") {
       return JSON.stringify({ lists: { a: {}, b: {}, c: {} } });
     }
+    if (name === "astra.version") return "0.1.742";
     if (name === "astra.settings.appearance") return "dark";
     if (name === "astra.settings.zoom.default") return "110";
     if (name === "astra.settings.performance.sleep") return "true";
@@ -85,7 +86,8 @@ const { System } = await import(path.join(HOST, "System.sys.mjs"));
 const report = await System.diagnosticsReport();
 
 check("a report is returned", typeof report === "string" && report.length > 0);
-check("the report names the Astra build", /Astra: 153\.0 \(20261101000000\)/u.test(report ?? ""));
+check("the report names the Astra build", /Astra: 0\.1\.742 \(build 20261101000000\)/u.test(report ?? ""));
+check("the report names the engine it runs on", /Engine: Firefox 153\.0/u.test(report ?? ""));
 check("the report names the platform", /Platform: Linux x86_64-gcc3/u.test(report ?? ""));
 check("the report names the system build", /System build: 6\.17\.0/u.test(report ?? ""));
 check("the report names the locale", /Locale: en-US/u.test(report ?? ""));

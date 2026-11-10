@@ -30,9 +30,11 @@
 //   window. A tier is therefore never announced for a platform that cannot
 //   draw it. `ui_info` applies the resolved native tier as it reads it, so the
 //   boot answer and the window agree.
-// - `about_info` answers `null`. The app's version, the OS product version
-//   and the arch are the bundle's facts; nothing in this tree holds them yet,
-//   and a placeholder version would be read on About as the real one.
+// - `about_info` answers Astra's own product version, the OS product string
+//   the engine reports and the CPU arch. The version is the pref the branding
+//   renderer writes from `branding/astra.toml` (never the Firefox pin), and
+//   any of the three facts missing answers `null` — About shows nothing rather
+//   than a placeholder version it would be read as real.
 // - `update_status` and `update_check` answer `{ state: "unavailable" }`: no
 //   updater is connected, so nothing is checked, downloaded or installed and
 //   no version is named. `update_check` is advisory — it starts nothing and
@@ -112,6 +114,43 @@ function platformInfo() {
     // A partial or hostile global is the same as no chrome.
   }
   return { os: "", build: "" };
+}
+
+/** Astra's own product version, as the shipped pref names it. `null` when the
+ *  build carries no version: About must not read an invented number. */
+function astraVersion(services) {
+  try {
+    const version = services.prefs?.getStringPref?.("astra.version", "");
+    return typeof version === "string" && version.trim() !== ""
+      ? version.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The OS product string this process can read (name + version), or "". */
+function osProduct(services) {
+  try {
+    const name = services.sysinfo?.getProperty?.("name") ?? "";
+    const version = services.sysinfo?.getProperty?.("version") ?? "";
+    return [name, version]
+      .map((part) => String(part).trim())
+      .filter((part) => part !== "")
+      .join(" ");
+  } catch {
+    return "";
+  }
+}
+
+/** The CPU half of the engine's ABI string (`x86_64-gcc3` -> `x86_64`). */
+function archName(services) {
+  try {
+    const abi = String(services.appinfo?.XPCOMABI ?? "");
+    return abi.split("-")[0].trim();
+  } catch {
+    return "";
+  }
 }
 
 /** The chrome `Services`, or null outside a chrome process. */
@@ -299,9 +338,17 @@ function noUpdater() {
 }
 
 export const System = {
-  // `AboutInfo | null`: no version, OS product name or arch is known here.
+  // `AboutInfo | null`: Astra's own version plus the OS and arch this process
+  // can read. Any fact missing is `null`: About shows nothing rather than a
+  // version the person would take as the build's.
   async aboutInfo() {
-    return null;
+    const services = servicesForUse();
+    if (!services) return null;
+    const version = astraVersion(services);
+    const os = osProduct(services);
+    const arch = archName(services);
+    if (!version || !os || !arch) return null;
+    return { version, os, arch };
   },
 
   /**
@@ -329,7 +376,8 @@ export const System = {
       const lines = [
         "Astra diagnostics",
         `Generated: ${new Date().toISOString()}`,
-        `Astra: ${String(app.version ?? "unknown")} (${String(app.buildID ?? "unknown")})`,
+        `Astra: ${astraVersion(services) ?? "unknown"} (build ${String(app.buildID ?? "unknown")})`,
+        `Engine: Firefox ${String(app.version ?? "unknown")}`,
         `Platform: ${String(app.OS ?? "")} ${String(app.XPCOMABI ?? "")}`.trim(),
         `System build: ${String(services.sysinfo?.getProperty?.("build") ?? "unknown")}`,
         `Locale: ${String(services.locale?.appLocales?.[0] ?? "unknown")}`,

@@ -5,6 +5,9 @@
 // Astra branding-specific prefs (P1-T03). RENDERED by `forge overlay` from
 // branding/astra.toml. Update URLs are OWNER_DECISION (release blockers);
 // dev builds point at a localhost fixture that serves nothing.
+// Astra's own product version (branding/astra.toml `version`). About reads it
+// through `about_info`; the engine pin stays in upstream.toml.
+pref("astra.version", "@ASTRA_VERSION@");
 pref("startup.homepage_override_url", "");
 pref("startup.homepage_welcome_url", "about:welcome");
 pref("startup.homepage_welcome_url.additional", "");
