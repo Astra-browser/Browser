@@ -188,3 +188,46 @@
 ||wd.adcolony.com^
 ||weather-analytics-events.apple.com^
 ||webview.unityads.unity3d.com^
+
+! --- Owner report 2026-11-10: first-party telemetry and ad SDK endpoints ---
+! Host-anchored (no $third-party) so a same-site request matches too, and
+! $important so an unbreak/cookie exception cannot cancel the block.
+||c.bing.com^$important
+||api.vungle.com^$important
+||liftoff.io^$important
+||api.fyber.com^$important
+||ironsource.mobi^$important
+||s.youtube.com^$important
+||redirector.googlevideo.com^$important
+||tagmanager.google.com^$important
+||fingerprintjs.com^$important
+||bnc.lt^$important
+||mineralt.io^$important
+||graph.facebook.com^$important
+||analytics.x.com^$important
+||widgets.pinterest.com^$important
+||qevents.quora.com^$important
+||sc-analytics.appspot.com^$important
+||d.reddit.com^$important
+||mon.tiktokv.com^$important
+||xp.apple.com^$important
+||browser.events.data.msn.com^$important
+||device-metrics-us.amazon.com^$important
+||device-metrics-us-2.amazon.com^$important
+||mads-eu.amazon.com^$important
+||cdn.cookielaw.org^$important
+||consent.trustarc.com^$important
+||cdn.privacy-mgmt.com^$important
+||s.skimresources.com^$important
+||go.skimresources.com^$important
+||redirector.skimresources.com^$important
+||cdn.viglink.com^$important
+||st.dynamicyield.com^$important
+||clientstream.launchdarkly.com^$important
+||static.klaviyo.com^$important
+||a.klaviyo.com^$important
+||widget.intercom.io^$important
+||js.driftt.com^$important
+||dai.google.com^$important
+||g.jwpsrv.com^$important
+||ssl.p.jwpcdn.com^$important
