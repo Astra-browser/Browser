@@ -1,1 +1,0 @@
-import{Y as e}from"./chrome-shared-BWjstlw3.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(254,n)??`Zoom in`)),r=((n={},r={})=>(r.locale??e(),t(255,n)??`Zoom out`));export{n,r as t};

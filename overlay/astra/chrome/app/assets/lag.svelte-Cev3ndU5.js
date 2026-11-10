@@ -1,1 +1,0 @@
-import{bn as e,en as t,ln as n,vn as r}from"./chrome-shared-BWjstlw3.js";var i=500;function a(a,o=i){let s=e(!1);return n(()=>{if(!a()){r(s,!1);return}let e=setTimeout(()=>r(s,!0),o);return()=>clearTimeout(e)}),{get current(){return t(s)}}}export{a as t};

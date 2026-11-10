@@ -45,6 +45,7 @@ export interface HostModules {
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Migration: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;

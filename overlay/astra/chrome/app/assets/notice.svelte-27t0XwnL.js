@@ -1,0 +1,1 @@
+import{bn as e,en as t,vn as n}from"./chrome-shared-BvjkpsMN.js";var r=e(null),i=0,a=()=>t(r);function o(e,t=`link`){i+=1,n(r,{id:i,text:e,kind:t})}function s(e){t(r)?.id===e&&n(r,null)}export{a as n,o as r,s as t};
