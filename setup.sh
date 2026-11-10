@@ -32,6 +32,16 @@ die() { echo "setup.sh: $*" >&2; exit 1; }
 
 [ "$(uname -m)" = "x86_64" ] || die "x86_64-only (running on $(uname -m))"
 
+# Read-only verify mode needs no sudo and no distro packages.
+if [ "$CHECK_ONLY" = 1 ]; then
+  STAGE="$ROOT/out/release/stage/Astra"
+  [ -x "$STAGE/install.sh" ] || die "no packaged build yet (run ./setup.sh first)"
+  bash "$STAGE/install.sh" --check-deps
+  ( cd "$STAGE" && ./firefox --version )
+  echo "setup.sh: this machine runs the packaged build"
+  exit 0
+fi
+
 # --- sudo up front -----------------------------------------------------------
 step "sudo (one password prompt for all installs below)"
 sudo -v
@@ -58,15 +68,6 @@ case " $DISTRO_ID $DISTRO_LIKE " in
 esac
 echo "setup.sh: distro=$DISTRO_ID like='$DISTRO_LIKE' family=$FAMILY"
 [ "$FAMILY" != "unknown" ] || die "unsupported distro (no /etc/os-release match for '$DISTRO_ID')"
-
-if [ "$CHECK_ONLY" = 1 ]; then
-  STAGE="$ROOT/out/release/stage/Astra"
-  [ -x "$STAGE/install.sh" ] || die "no packaged build yet (run ./setup.sh first)"
-  bash "$STAGE/install.sh" --check-deps
-  ( cd "$STAGE" && ./firefox --version )
-  echo "setup.sh: this machine runs the packaged build"
-  exit 0
-fi
 
 # --- OS packages (build + runtime) ----------------------------------------------
 step "installing OS packages ($FAMILY)"
