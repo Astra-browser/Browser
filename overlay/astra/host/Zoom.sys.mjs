@@ -279,6 +279,82 @@ function restoreGlobal(service, value) {
   });
 }
 
+/** The chrome `Services`, or null in Node/preview. */
+function servicesOf() {
+  try {
+    const scopes = [globalThis];
+    if (globalThis.window && globalThis.window !== globalThis) {
+      scopes.push(globalThis.window);
+    }
+    const view = globalThis.document?.defaultView;
+    if (view && !scopes.includes(view)) scopes.push(view);
+    for (const scope of scopes) {
+      if (scope?.Services?.wm) return scope.Services;
+    }
+  } catch {
+    // A partial global is the same as no chrome.
+  }
+  return null;
+}
+
+/**
+ * Clear the zoom FullZoom has already applied to a live page.
+ *
+ * Removing the content pref only changes what the next location change reads;
+ * FullZoom keeps its own value on the browser, so after "Reset all" (or a
+ * single-site forget) an open page stayed at the old level and the button
+ * looked dead. Reset every matching browser to the global default (or 100%)
+ * from the window's own FullZoom, which is the engine's supported path.
+ *
+ * `site` is a bare host, or null to reset every page. Private tabs are reset
+ * too: resetting applies a level, it never records one.
+ */
+function resetLiveBrowsers(site, fallback) {
+  const services = servicesOf();
+  if (!services?.wm?.getEnumerator) return;
+  let windows;
+  try {
+    windows = services.wm.getEnumerator("navigator:browser");
+  } catch {
+    return;
+  }
+  const wanted = typeof site === "string" && site !== "" ? site.toLowerCase() : null;
+  const level = Number.isFinite(fallback) && fallback > 0 ? fallback : 1;
+  while (windows.hasMoreElements()) {
+    let win;
+    try {
+      win = windows.getNext();
+    } catch {
+      break;
+    }
+    const tabs = win?.gBrowser?.tabs;
+    if (!tabs) continue;
+    for (const tab of tabs) {
+      const browser = tab?.linkedBrowser;
+      if (!browser) continue;
+      if (wanted !== null) {
+        let host = "";
+        try {
+          host = hostOf(browser.currentURI?.spec ?? "").toLowerCase();
+        } catch {
+          host = "";
+        }
+        if (host !== wanted) continue;
+      }
+      try {
+        if (typeof win.FullZoom?.reset === "function") {
+          win.FullZoom.reset(browser);
+        } else {
+          browser.fullZoom = level;
+          if (typeof browser.setFullZoom === "function") browser.setFullZoom(level);
+        }
+      } catch {
+        // One torn-down browser must not stop the rest of the reset.
+      }
+    }
+  }
+}
+
 function setSite(service, site, zoom) {
   return new Promise((resolve) => {
     let settled = false;
@@ -341,6 +417,9 @@ export const Zoom = {
       if (!(await removeSite(service, site))) {
         return { kind: "error", error: "unavailable" };
       }
+      // A live page keeps the value FullZoom already applied; reset it so the
+      // forgotten level is visible without waiting for a reload.
+      resetLiveBrowsers(site, await readGlobal(service));
       return levels(service);
     }
     // Reset all sites but keep the global default zoom.
@@ -349,6 +428,7 @@ export const Zoom = {
       return { kind: "error", error: "unavailable" };
     }
     if (global !== null) await restoreGlobal(service, global);
+    resetLiveBrowsers(null, global);
     return levels(service);
   },
 
