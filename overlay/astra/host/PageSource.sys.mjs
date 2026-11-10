@@ -46,7 +46,13 @@ export function setDriver(driver, window_id = "") {
  */
 export async function pageSource({ tab_id = "", window_id = "" } = {}) {
   const key = typeof window_id === "string" ? window_id : "";
-  const driver = key === "" ? _driver : (_drivers.get(key) ?? null);
+  let driver = key === "" ? _driver : (_drivers.get(key) ?? null);
+  // A direct (non-relayed) caller has no window id. With one live window its
+  // driver is unambiguous; more than one stays an honest null rather than
+  // reading another window's page.
+  if (!driver && key === "" && _drivers.size === 1) {
+    driver = [..._drivers.values()][0];
+  }
   if (!driver) return null;
   if (typeof tab_id !== "string" || tab_id === "") return null;
   let result = null;
