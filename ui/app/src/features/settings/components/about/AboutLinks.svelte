@@ -3,20 +3,22 @@
   import { commands } from "$shared/ipc/bindings";
   import Icon from "$shared/ui/Icon";
   import BookOpen01Icon from "@hugeicons/core-free-icons/BookOpen01Icon";
+  import Briefcase01Icon from "@hugeicons/core-free-icons/Briefcase01Icon";
   import DiscordIcon from "@hugeicons/core-free-icons/DiscordIcon";
-  import GithubIcon from "@hugeicons/core-free-icons/GithubIcon";
+  import GitlabIcon from "@hugeicons/core-free-icons/GitlabIcon";
   import GlobeIcon from "@hugeicons/core-free-icons/GlobeIcon";
   import HelpCircleIcon from "@hugeicons/core-free-icons/HelpCircleIcon";
-  import YoutubeIcon from "@hugeicons/core-free-icons/YoutubeIcon";
+  import NewTwitterIcon from "@hugeicons/core-free-icons/NewTwitterIcon";
   import { IS_MAC } from "$shared/platform";
-  import { links } from "../../lib/links";
+  import { links, type AboutLink } from "../../lib/links";
 
   const icons = {
     website: GlobeIcon,
     docs: IS_MAC ? BookOpen01Icon : HelpCircleIcon,
-    github: GithubIcon,
+    portfolio: Briefcase01Icon,
+    gitlab: GitlabIcon,
     discord: DiscordIcon,
-    youtube: YoutubeIcon,
+    x: NewTwitterIcon,
   };
 
   // The link opens in a tab of Astra, never as a navigation of Settings.
@@ -26,12 +28,23 @@
   }
 </script>
 
+{#snippet tile(link: AboutLink)}
+  <span class="glyph"><Icon icon={icons[link.id]} size={21} strokeWidth={1.6} /></span>
+  <span class="name">{link.label()}</span>
+{/snippet}
+
 <nav class="links" aria-label={m.about_links()}>
   {#each links as link (link.id)}
-    <a class="link" href={link.url} onclick={(event) => open(event, link.url)}>
-      <span class="glyph"><Icon icon={icons[link.id]} size={21} strokeWidth={1.6} /></span>
-      <span class="name">{link.label()}</span>
-    </a>
+    {#if link.url}
+      <a class="link" href={link.url} onclick={(event) => open(event, link.url!)}>
+        {@render tile(link)}
+      </a>
+    {:else}
+      <span class="link soon">
+        {@render tile(link)}
+        <span class="note">{m.about_link_soon()}</span>
+      </span>
+    {/if}
   {/each}
 </nav>
 
@@ -41,6 +54,7 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px 10px;
+    max-inline-size: 290px;
   }
 
   .link {
@@ -70,12 +84,22 @@
       scale var(--motion-slow) var(--ease-spring);
   }
 
-  .link:hover .glyph {
-    background: var(--color-tile-hover);
+  .note {
+    color: var(--color-muted);
+    font-size: var(--text-caption);
   }
 
   .link:hover {
     color: var(--color-text);
+  }
+
+  .link.soon {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .link:hover .glyph {
+    background: var(--color-tile-hover);
   }
 
   .link:active .glyph {

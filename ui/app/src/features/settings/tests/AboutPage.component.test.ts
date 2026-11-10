@@ -154,15 +154,30 @@ test("the links open Astra's own pages in a tab", async () => {
   const screen = await render(AboutPage);
   const links = screen.getByRole("navigation", { name: "Astra on the web" });
   for (const [name, url] of [
-    ["Website", "https://astra.example"],
-    [IS_MAC ? "Docs" : "Help", "https://astra.example/docs"],
-    ["GitHub", "https://github.com/astra-browser/Astra"],
-    ["Discord", "https://example.com/community"],
-    ["YouTube", "https://example.com/video"],
+    ["Website", "https://gitlab.com/kyoiske/astra"],
+    ["Portfolio", "https://kyoikse.uno/"],
+    ["GitLab", "https://gitlab.com/kyoiske/astra"],
+    ["Discord", "https://discord.com/users/778460273073848342"],
+    ["X", "https://x.com/RemY__San"],
   ] as const) {
     await links.getByRole("link", { name }).click();
     expect(native.openUrl).toHaveBeenLastCalledWith(url, true);
   }
+});
+
+test("Help says it is coming soon instead of opening a dead page", async () => {
+  native.status = { state: "upToDate" };
+  const screen = await render(AboutPage);
+  const links = screen.getByRole("navigation", { name: "Astra on the web" });
+  await expect.element(links.getByText(IS_MAC ? "Docs" : "Help", { exact: true })).toBeVisible();
+  await expect.element(links.getByText("Coming soon")).toBeVisible();
+  expect(links.getByRole("link", { name: IS_MAC ? "Docs" : "Help" }).query()).toBeNull();
+});
+
+test("the author gets credit at the bottom of About", async () => {
+  native.status = { state: "upToDate" };
+  const screen = await render(AboutPage);
+  await expect.element(screen.getByText("Built by Srijan Raj")).toBeVisible();
 });
 
 /** What the clipboard does: the item's text is awaited, and a failure there rejects the write. */
@@ -186,7 +201,7 @@ test("one click copies the diagnostics, and the preview shows the same text", as
   const item = write.mock.calls[0]?.[0][0];
   expect(await (await item?.getType("text/plain"))?.text()).toBe(REPORT);
   await vi.waitFor(() =>
-    expect(notices.notice()?.text).toBe("Copied. Paste it into your GitHub issue."),
+    expect(notices.notice()?.text).toBe("Copied. Paste it into your GitLab issue."),
   );
   expect(native.report).toHaveBeenCalledTimes(2);
 
