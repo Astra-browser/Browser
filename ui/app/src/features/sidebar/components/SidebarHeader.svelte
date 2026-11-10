@@ -3,13 +3,15 @@
   import type { Snippet } from "svelte";
   import { EllipsisIcon } from "@hugeicons/core-free-icons";
   import { tabs } from "$domain/tabs";
-  import { blocker, siteMenuState } from "$domain/blocker";
-  import { pageSite } from "$domain/site-data";
+  import { blocker, blockerSites, siteMenuState } from "$domain/blocker";
+  import { clearRequest, pageSite } from "$domain/site-data";
   import { extensions } from "$domain/extensions";
   import { webext } from "$domain/webext";
+  import { surface } from "$domain/surface";
   import { uiCommands as ui } from "$domain/ui-commands";
+  import { toggleMode } from "$session/sidebar-mode.svelte";
+  import { openAt } from "$features/menus";
   import { untrack } from "svelte";
-  import { commands } from "$shared/ipc/bindings";
   import { IS_MAC } from "$shared/platform";
   import { fullscreen } from "$shared/lib/fullscreen.svelte";
   import IconButton from "$shared/ui/IconButton";
@@ -41,28 +43,71 @@
     const anchor = target.getBoundingClientRect();
     menuAnchor = anchor;
     const { siteProtected, canHide } = siteMenuState(blocker.status());
+    const url = active?.url ?? null;
     // A private window keeps nothing to clear, and only a web page has a site.
     const canClearData =
       tabs.profile()?.kind !== "incognito" &&
       (active?.content ?? "web") === "web" &&
-      pageSite(active?.url) !== null;
-    const listed = extensions
-      .activeActions(tabs.profile()?.id ?? null, tabs.activeId())
-      .map((action) => ({
-        id: action.runtime.install_id,
-        label: action.badge ? `${action.label} (${action.badge})` : action.label,
-        icon: action.icon_rgba_base64,
-        enabled: action.enabled,
-      }));
-    void commands.sidebarMenuPopup(
-      anchor.left,
-      anchor.bottom,
-      siteProtected,
-      canHide,
-      canClearData,
-      listed,
-      webext.isAvailable(),
-    );
+      pageSite(url) !== null;
+    const profile = tabs.profile()?.id ?? null;
+    const tab = tabs.activeId();
+    const actions = extensions.activeActions(profile, tab);
+    const rows: Parameters<typeof openAt>[0]["items"] = [
+      ...(siteProtected !== null
+        ? [
+            {
+              kind: "item" as const,
+              id: "sidebar.siteProtection",
+              label: `Site protection: ${siteProtected ? "On" : "Off"}`,
+            },
+          ]
+        : []),
+      ...(canHide ? [{ kind: "item" as const, id: "sidebar.hide", label: "Hide sidebar" }] : []),
+      ...(canClearData
+        ? [
+            {
+              kind: "item" as const,
+              id: "sidebar.clearData",
+              label: m.native_clear_data_for_this_site_more(),
+            },
+          ]
+        : []),
+      ...(actions.length > 0
+        ? [
+            { kind: "separator" as const },
+            ...actions.map((action) => ({
+              kind: "item" as const,
+              id: `sidebar.extension.${action.runtime.install_id}`,
+              label: action.badge ? `${action.label} (${action.badge})` : action.label,
+              disabled: !action.enabled,
+            })),
+          ]
+        : []),
+      ...(webext.isAvailable()
+        ? [
+            ...(actions.length > 0 ? [{ kind: "separator" as const }] : []),
+            {
+              kind: "item" as const,
+              id: "sidebar.manageExtensions",
+              label: m.native_manage_extensions_more(),
+            },
+          ]
+        : []),
+    ];
+    openAt({ x: anchor.left, y: anchor.bottom, items: rows }, (choice) => {
+      if (choice === "sidebar.siteProtection" && siteProtected !== null)
+        void blockerSites.setProtected(!siteProtected);
+      else if (choice === "sidebar.hide") toggleMode();
+      else if (choice === "sidebar.clearData") clearRequest.ask(url);
+      else if (choice === "sidebar.manageExtensions") void surface.open("extensions");
+      else if (choice.startsWith("sidebar.extension.")) {
+        const id = choice.slice("sidebar.extension.".length);
+        const action = actions.find((candidate) => candidate.runtime.install_id === id);
+        if (profile !== null && tab !== null && action) {
+          void extensions.invoke(profile, tab, action, anchor);
+        }
+      }
+    });
   }
 
   let handledCommand = 0;
