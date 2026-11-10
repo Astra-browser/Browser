@@ -596,6 +596,18 @@
   });
   // Beside a new tab the window, whatever it is made of, takes on the
   // sky's light; it gives it back as a page arrives.
+  $effect(() => {
+    // Focus shuts a site by taking its page off the stage: the tab returns to
+    // its New Tab and the cover stands where the page was. The host raises
+    // `focus.cover=<site>` when the selected page is on the shut list.
+    const cover = focus.cover();
+    const id = tabs.activeId();
+    const tab = tabs.activeTab();
+    if (!cover || !id || !tab) return;
+    if (tab.url && tab.url !== "about:blank") {
+      void tabs.navigate(id, "about:blank");
+    }
+  });
   let skyShown = $derived(newTabShown && newTabImage() === null);
   // The card a page stands on. A native page cannot paint its own drop, and
   // the internal stages paint only their ground, so the column draws the card
