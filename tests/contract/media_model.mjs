@@ -173,6 +173,9 @@ for (const action of ACTIONS) {
   );
   Media.__projectMedia(TAB, null, "win-1");
   check("clearing one window leaves the other empty, not the shared view", Media.view("win-1") === null);
+  Media.__projectMedia(TAB, VIEW, "win-2");
+  Media.__setEngine(null, "win-2");
+  check("removing a window's engine drops its retained card", Media.view("win-2") === null);
 
   Media.__resetForTests();
   check("reset clears the engine", (await Media.player({ id: TAB, action: { kind: "play" } })).accepted === false);
