@@ -1,0 +1,18 @@
+{
+  "$comment": "GENERATED minimal valid payloads (generate.py).",
+  "cases": [
+    {
+      "command": "passkey_answer_prompt",
+      "payload": {
+        "tid": 0,
+        "action": "x"
+      }
+    },
+    {
+      "command": "passkey_call",
+      "payload": {
+        "call": {}
+      }
+    }
+  ]
+}

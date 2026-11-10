@@ -1,7 +1,7 @@
 # IPC surface (P0-T03a, 2026-11-01) — authoritative command/event inventory
 
 Source: Tauri Specta output `frame/src/shared/ipc/bindings.ts` (7674 lines) cross-checked
-against every `#[tauri::command]` fn in `desktop/src` + `crates`. Result: **276 commands, 36 events, zero mismatches**.
+against every `#[tauri::command]` fn in `desktop/src` + `crates`. Result: **278 commands, 37 events, zero mismatches**.
 This file is the input to P0-T04 (`BrowserHost`) and P2-T02 (`astra-proto`).
 
 Conventions: every command takes `caller: WebviewWindow` first (caller-policy
@@ -11,7 +11,7 @@ camelCase TS wrappers. 8 event channels carry a previous-product prefix and **mu
 Legend: `prev_` / `prev:` / `Prev` mark verbatim source identifiers carrying the
 previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels, types).
 
-## Commands (276)
+## Commands (278)
 
 | Wire name | TS wrapper | Rust fn (file) | Params (minus caller) | Returns |
 |---|---|---|---|---|
@@ -144,6 +144,8 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `page_style_toggle_for` | `pageStyleToggleFor` | `d:page_assist.rs` | `async caller: WebviewWindow, profile: String, site: String, style: String, enabled: bool,` | `PageStylesAllV1` |
 | `page_styles` | `pageStyles` | `d:page_assist.rs` | `async caller: WebviewWindow, tab: String` | `PageStylesV1` |
 | `page_styles_all` | `pageStylesAll` | `d:page_assist.rs` | `async caller: WebviewWindow, profile: String` | `PageStylesAllV1` |
+| `passkey_answer_prompt` | `passkeyAnswerPrompt` | `d:passkeys.rs` | `caller: WebviewWindow, tid: u64, action: String, value: Option<String>,` | `bool` |
+| `passkey_call` | `passkeyCall` | `d:passkeys.rs` | `caller: WebviewWindow, call: PasskeyCall,` | `PasskeyResponse` |
 | `panel_hide` | `panelHide` | `d:lib.rs` | `caller: WebviewWindow, app: tauri::AppHandle` | `` |
 | `panel_intent` | `panelIntent` | `d:lib.rs` | `caller: WebviewWindow, app: tauri::AppHandle, intent: prev_ipc::PanelIntent,` | `bool` |
 | `panel_layout` | `panelLayout` | `d:lib.rs` | `caller: WebviewWindow, overlay: State<'_, overlay::Overlay>, layout: prev_ipc::PanelLayout,` | `` |
@@ -292,7 +294,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `work_test_provider_key` | `workTestProviderKey` | `d:work_models.rs` | `async caller: WebviewWindow, expected_profile: String, provider: WorkModelProvider,` | `WorkModelsV1` |
 | `zoom_call` | `zoomCall` | `d:lib.rs` | `async caller: WebviewWindow, app: tauri::AppHandle, expected_profile: String, call: prev_ipc::ZoomCall,` | `prev_ipc::ZoomResponse` |
 
-## Events (36)
+## Events (37)
 
 | Wire channel | TS event | Payload type | Rename? |
 |---|---|---|---|
@@ -312,6 +314,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `notes-changed` | `notesChanged` | `NotesChanged` | — |
 | `operation-processed` | `operationProcessed` | `OperationProcessed` | — |
 | `page-permission-prompt-changed` | `pagePermissionPromptChanged` | `PagePermissionPromptChanged` | — |
+| `passkey-prompt-changed` | `passkeyPromptChanged` | `PasskeyPromptChanged` | — |
 | `resource-changed` | `resourceChanged` | `ResourceChanged` | — |
 | `runtime-status-changed` | `runtimeStatusChanged` | `RuntimeStatusChanged` | — |
 | `search-changed` | `searchChanged` | `SearchChanged` | — |

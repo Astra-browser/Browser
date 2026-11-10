@@ -4,6 +4,9 @@ engine/
 # upstream tree at the repo root is generated.
 !blocker/engine/
 !blocker/engine/**
+# The passkey crate is source of truth; the fetched engine tree stays ignored.
+!passkeys/engine/
+!passkeys/engine/**
 out/
 target/
 ui/node_modules/
@@ -26,6 +29,8 @@ obj-*/
 audit-logs/
 crates/*/target/
 forge/*/target/
+passkeys/engine/target/
+passkeys/engine/Cargo.lock
 *.log
 coverage/
 .nyc_output/

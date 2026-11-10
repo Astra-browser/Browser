@@ -387,6 +387,7 @@
   const POPUP_SELECTOR = [
     '[role="menu"]:not([inert]):not([data-open="false"])',
     '[role="dialog"]:not([inert]):not([data-open="false"])',
+    '[role="alertdialog"]:not([inert]):not([data-open="false"])',
     '[role="listbox"]:not([inert]):not([data-open="false"])',
     "dialog[open]",
     ".ui-disclosure-panel[data-open='true']",

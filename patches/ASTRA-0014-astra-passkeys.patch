@@ -1,0 +1,1398 @@
+Patch-Id: ASTRA-0014
+Title: Astra platform passkeys (software WebAuthn authenticator + encrypted vault)
+Tier: P2
+Upstream-Files: dom/webauthn/authrs_bridge/Cargo.toml, dom/webauthn/authrs_bridge/src/lib.rs, dom/webauthn/components.conf, dom/webauthn/moz.build, modules/libpref/init/StaticPrefList.yaml, toolkit/modules/WebAuthnPromptHelper.sys.mjs, Cargo.lock, Cargo.toml
+Intent: Linux has no platform authenticator, so `WebAuthnService.h` falls back to `authrs_bridge`, which only spoke USB; every resident-key or user-verification request ended at "Touch your security key". This adds a CTAP2.1 `internal` platform token backed by `astra_passkeys` (toolkit/components/astra_passkeys, staged from passkeys/engine): ES256 credentials sealed at rest with AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC) from NSS, a vault key wrapped by PBKDF2-HMAC-SHA256-600k over the CTAP2 PIN hash (the same value ClientPIN transmits, so the WebAuthn path never sees the plaintext PIN twice), `alwaysUv`, system authentication (fprintd) with PIN fallback, persisted rate limits, and a per-transaction lock. `nsIAstraPasskeys` is the Settings seam (status/create/unlock/lock/change PIN/system unlock/list/remove), registered as `@astra/passkeys;1`. `WebAuthnPromptHelper` stands its native doorhanger down when `astra.passkeys.ui` is true so Astra's sheet answers. A request that is not a passkey request still uses the USB path, and a private browsing context is cancelled at the prompt seam before the token can act.
+Risk: medium (new WebAuthn transport and a credential store; the token is only offered when the vault exists and the `security.webauthn.astra_passkeys` pref is on, USB keeps working for non-passkey requests, and the at-rest format fails closed on any MAC mismatch)
+Test: `passkeys/engine` cargo test 16/16 (PBKDF2 vectors, seal tamper, lockout, device unlock, PIN change, corrupt file); `tests/contract/passkeys_model.mjs` 19/19; `wire_coverage.mjs` 51/51; `check-drift.sh` clean; `tools/marionette-probe/passkeys-probe.py` 26/26 on the packaged dev build (create, platform attachment + internal transport, sign in, wrong PIN + retries, browser-wide switch, UVPAA false when off, vault 0600 and no PIN/RP in clear, one credential listed)
+Verified-On: 153.6.0
+Removal-Plan: delete the pref + component + IDL and drop `astra_passkeys` from gkrust; the vault file is inert without the token. If upstream gains a Linux platform provider, replace `PlatformToken` with that service and keep the vault only as a migration source
+---
+diff --git a/Cargo.lock b/Cargo.lock
+index b222165535..328adc1447 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -317,6 +317,19 @@ dependencies = [
+  "xpcom",
+ ]
+ 
++[[package]]
++name = "astra_passkeys"
++version = "0.1.0"
++dependencies = [
++ "base64 0.22.1",
++ "log",
++ "rand",
++ "serde",
++ "serde_json",
++ "sha2",
++ "zeroize",
++]
++
+ [[package]]
+ name = "async-task"
+ version = "4.3.0"
+@@ -455,13 +468,16 @@ dependencies = [
+ name = "authrs_bridge"
+ version = "0.1.0"
+ dependencies = [
++ "astra_passkeys",
+  "authenticator",
+  "base64 0.22.1",
+  "cstr",
+  "log",
+  "moz_task",
+  "nserror",
++ "nss-rs",
+  "nsstring",
++ "pkcs11-bindings",
+  "rand",
+  "serde",
+  "serde_cbor_2",
+diff --git a/Cargo.toml b/Cargo.toml
+index 665d02c00c..7f20c9d87f 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -92,6 +92,7 @@ exclude = [
+   "media/mp4parse-rust/mp4parse",
+   "media/mp4parse-rust/mp4parse_capi",
+   "xpcom/rust/gkrust_utils",
++  "toolkit/components/astra_passkeys",
+   "toolkit/components/protobuf/scripts",
+   "toolkit/crashreporter/minidump-analyzer",
+   "tools/lint/test/files/clippy",
+diff --git a/dom/webauthn/AstraPasskeys.h b/dom/webauthn/AstraPasskeys.h
+new file mode 100644
+index 0000000000..a6011dfe96
+--- /dev/null
++++ b/dom/webauthn/AstraPasskeys.h
+@@ -0,0 +1,14 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef mozilla_dom_AstraPasskeys_h_
++#define mozilla_dom_AstraPasskeys_h_
++
++#include "nsISupportsUtils.h"
++
++extern "C" {
++nsresult astra_passkeys_constructor(REFNSIID iid, void** result);
++}
++
++#endif  // mozilla_dom_AstraPasskeys_h_
+diff --git a/dom/webauthn/authrs_bridge/Cargo.toml b/dom/webauthn/authrs_bridge/Cargo.toml
+index c8bc3d7378..bf9e921dc0 100644
+--- a/dom/webauthn/authrs_bridge/Cargo.toml
++++ b/dom/webauthn/authrs_bridge/Cargo.toml
+@@ -5,13 +5,16 @@ edition = "2021"
+ authors = ["Martin Sirringhaus", "John Schanck"]
+ 
+ [dependencies]
++astra_passkeys = { path = "../../../toolkit/components/astra_passkeys" }
+ authenticator = { tag = "v0.6.0", git = "https://github.com/mozilla/authenticator-rs", features = ["gecko"] }
+ base64 = "^0.22"
+ cstr = "0.2"
+ log = "0.4"
+ moz_task = { path = "../../../xpcom/rust/moz_task" }
+ nserror = { path = "../../../xpcom/rust/nserror" }
++nss-rs = { version = ">=0.12", git = "https://github.com/mozilla/nss-rs" }
+ nsstring = { path = "../../../xpcom/rust/nsstring" }
++pkcs11-bindings = "0.1.7" 
+ rand = "0.8"
+ serde = { version = "1", features = ["derive"] }
+ serde_cbor_2 = "0.13"
+diff --git a/dom/webauthn/authrs_bridge/src/lib.rs b/dom/webauthn/authrs_bridge/src/lib.rs
+index c06b1242e8..e119b55418 100644
+--- a/dom/webauthn/authrs_bridge/src/lib.rs
++++ b/dom/webauthn/authrs_bridge/src/lib.rs
+@@ -10,6 +10,7 @@ extern crate xpcom;
+ 
+ use authenticator::{
+     authenticatorservice::{RegisterArgs, SignArgs},
++    ctap2,
+     ctap2::attestation::{AAGuid, AttestationObject, AttestationStatement},
+     ctap2::commands::{get_info::AuthenticatorVersion, PinUvAuthResult},
+     ctap2::server::{
+@@ -21,7 +22,8 @@ use authenticator::{
+     },
+     errors::AuthenticatorError,
+     statecallback::StateCallback,
+-    AuthenticatorInfo, BioEnrollmentResult, CredentialManagementResult, InteractiveRequest,
++    AuthenticatorInfo, BioEnrollmentResult, CredentialManagementResult, FidoDevice,
++    InteractiveRequest,
+     ManageResult, Pin, RegisterResult, SignResult, StateMachine, StatusPinUv, StatusUpdate,
+ };
+ use base64::Engine;
+@@ -52,6 +54,13 @@ mod about_webauthn_controller;
+ use about_webauthn_controller::*;
+ mod test_token;
+ use test_token::TestTokenManager;
++mod nss_seal;
++use nss_seal::NssSeal;
++mod platform;
++use platform::PlatformToken;
++mod passkeys_service;
++use astra_passkeys::{Vault, VaultStatus};
++use std::path::PathBuf;
+ 
+ fn authrs_to_nserror(e: AuthenticatorError) -> nsresult {
+     match e {
+@@ -230,9 +239,7 @@ impl WebAuthnRegisterResult {
+         // hint as to which transports to try. In production, we only support the "usb" transport.
+         // In tests, the result is not very important, but we can at least return "internal" if
+         // we're simulating platform attachment.
+-        if static_prefs::pref!("security.webauth.webauthn_enable_softtoken")
+-            && self.result.borrow().attachment == AuthenticatorAttachment::Platform
+-        {
++        if self.result.borrow().attachment == AuthenticatorAttachment::Platform {
+             Ok(thin_vec![nsString::from("internal")])
+         } else {
+             Ok(thin_vec![nsString::from("usb")])
+@@ -508,12 +515,19 @@ fn status_callback(
+             }
+             Ok(StatusUpdate::PresenceRequired) => {
+                 debug!("STATUS: Waiting for user presence");
+-                send_prompt(
+-                    BrowserPromptType::Presence,
+-                    tid,
+-                    origin,
+-                    browsing_context_id,
+-                )?;
++                let platform = transaction
++                    .lock()
++                    .ok()
++                    .and_then(|guard| guard.as_ref().map(|state| state.platform))
++                    .unwrap_or(false);
++                if !platform {
++                    send_prompt(
++                        BrowserPromptType::Presence,
++                        tid,
++                        origin,
++                        browsing_context_id,
++                    )?;
++                }
+             }
+             Ok(StatusUpdate::PinUvError(StatusPinUv::PinRequired(sender))) => {
+                 let mut guard = transaction.lock().unwrap();
+@@ -576,12 +590,21 @@ fn status_callback(
+                 )?;
+             }
+             Ok(StatusUpdate::PinUvError(StatusPinUv::UvBlocked)) => {
+-                send_prompt(
+-                    BrowserPromptType::UvBlocked,
+-                    tid,
+-                    origin,
+-                    browsing_context_id,
+-                )?;
++                // For the Astra token this is the normal "system verification
++                // unavailable, ask for the PIN" beat, not an error to show.
++                let platform = transaction
++                    .lock()
++                    .ok()
++                    .and_then(|guard| guard.as_ref().map(|state| state.platform))
++                    .unwrap_or(false);
++                if !platform {
++                    send_prompt(
++                        BrowserPromptType::UvBlocked,
++                        tid,
++                        origin,
++                        browsing_context_id,
++                    )?;
++                }
+             }
+             Ok(StatusUpdate::PinUvError(StatusPinUv::PinIsTooShort))
+             | Ok(StatusUpdate::PinUvError(StatusPinUv::PinIsTooLong(..))) => {
+@@ -682,6 +705,7 @@ impl TransactionPromise {
+ 
+ struct TransactionState {
+     tid: u64,
++    platform: bool,
+     promise: TransactionPromise,
+     pin_receiver: PinReceiver,
+     selection_receiver: SelectionReceiver,
+@@ -689,40 +713,62 @@ struct TransactionState {
+     puat_cache: Option<PinUvAuthResult>, // Cached credential to avoid repeated PIN-entries
+ }
+ 
++struct PlatformState {
++    path: String,
++    vault: Arc<Vault>,
++}
++
+ // AuthrsService provides an nsIWebAuthnService built on top of authenticator-rs.
+ #[xpcom(implement(nsIWebAuthnService), atomic)]
+ pub struct AuthrsService {
+     usb_token_manager: Mutex<StateMachine>,
+     test_token_manager: TestTokenManager,
++    platform: Mutex<Option<PlatformState>>,
+     transaction: Arc<Mutex<Option<TransactionState>>>,
+ }
+ 
+ impl AuthrsService {
++    fn platform_vault(&self) -> Option<Arc<Vault>> {
++        if !static_prefs::pref!("security.webauthn.astra_passkeys") {
++            return None;
++        }
++        let path = crate::platform::pref_vault_path()?;
++        let mut guard = self.platform.lock().ok()?;
++        if let Some(state) = guard.as_ref() {
++            if state.path == path {
++                return Some(state.vault.clone());
++            }
++        }
++        let vault = Arc::new(Vault::open(PathBuf::from(&path), Arc::new(NssSeal)));
++        *guard = Some(PlatformState {
++            path,
++            vault: vault.clone(),
++        });
++        Some(vault)
++    }
++
++    fn platform_status(&self) -> Option<VaultStatus> {
++        self.platform_vault().map(|vault| vault.status())
++    }
++
+     xpcom_method!(pin_callback => PinCallback(aTransactionId: u64, aPin: *const nsACString));
+     fn pin_callback(&self, transaction_id: u64, pin: &nsACString) -> Result<(), nsresult> {
+-        if static_prefs::pref!("security.webauth.webauthn_enable_usbtoken") {
+-            let mut guard = self.transaction.lock().unwrap();
+-            let Some(transaction) = guard.as_mut() else {
+-                // No ongoing transaction
+-                return Err(NS_ERROR_FAILURE);
+-            };
+-            let Some((tid, channel)) = transaction.pin_receiver.take() else {
+-                // We weren't expecting a pin.
+-                return Err(NS_ERROR_FAILURE);
+-            };
+-            if tid != transaction_id {
+-                // The browser is confused about which transaction is active.
+-                // This shouldn't happen
+-                return Err(NS_ERROR_FAILURE);
+-            }
+-            channel
+-                .send(Pin::new(&pin.to_string()))
+-                .or(Err(NS_ERROR_FAILURE))
+-        } else {
+-            // Silently accept request, if all webauthn-options are disabled.
+-            // Used for testing.
+-            Ok(())
++        let mut guard = self.transaction.lock().unwrap();
++        let Some(transaction) = guard.as_mut() else {
++            return Ok(());
++        };
++        let Some((tid, channel)) = transaction.pin_receiver.take() else {
++            // We weren't expecting a PIN. The softtoken test path accepts the
++            // callback without prompting, so this is not an error.
++            return Ok(());
++        };
++        if tid != transaction_id {
++            // The browser is confused about which transaction is active.
++            return Err(NS_ERROR_FAILURE);
+         }
++        channel
++            .send(Pin::new(&pin.to_string()))
++            .or(Err(NS_ERROR_FAILURE))
+     }
+ 
+     xpcom_method!(selection_callback => SelectionCallback(aTransactionId: u64, aSelection: u64));
+@@ -748,6 +794,11 @@ impl AuthrsService {
+ 
+     xpcom_method!(get_is_uvpaa => GetIsUVPAA() -> bool);
+     fn get_is_uvpaa(&self) -> Result<bool, nsresult> {
++        if let Some(status) = self.platform_status() {
++            if status.has_pin {
++                return Ok(true);
++            }
++        }
+         if static_prefs::pref!("security.webauth.webauthn_enable_usbtoken") {
+             Ok(false)
+         } else if static_prefs::pref!("security.webauth.webauthn_enable_softtoken") {
+@@ -835,14 +886,11 @@ impl AuthrsService {
+         };
+ 
+         let mut authenticator_attachment = nsString::new();
+-        if unsafe { args.GetAuthenticatorAttachment(&mut *authenticator_attachment) }
+-            .to_result()
+-            .is_ok()
+-        {
+-            if authenticator_attachment.eq("platform") {
+-                return Err(NS_ERROR_FAILURE);
+-            }
+-        }
++        let attachment_platform =
++            unsafe { args.GetAuthenticatorAttachment(&mut *authenticator_attachment) }
++                .to_result()
++                .is_ok()
++                && authenticator_attachment.eq("platform");
+ 
+         let mut credential_protection_policy = None;
+         let mut enforce_credential_protection_policy = None;
+@@ -941,6 +989,16 @@ impl AuthrsService {
+             use_ctap1_fallback: !static_prefs::pref!("security.webauthn.ctap2"),
+         };
+ 
++        // Platform passkeys live in the Astra vault and are used for requests
++        // that ask for a resident key, require user verification, or pin the
++        // platform attachment. Everything else keeps the security-key path.
++        let platform_vault = self.platform_vault();
++        let use_platform = platform_vault.is_some()
++            && (attachment_platform
++                || resident_key_req != ResidentKeyRequirement::Discouraged
++                || user_verification_req == UserVerificationRequirement::Required);
++        let platform_lock = platform_vault.clone();
++
+         let mut guard = self.transaction.lock().unwrap();
+         debug_assert!(
+             guard.is_none(),
+@@ -948,6 +1006,7 @@ impl AuthrsService {
+         );
+         *guard = Some(TransactionState {
+             tid,
++            platform: use_platform,
+             promise: TransactionPromise::Register(promise),
+             pin_receiver: None,
+             selection_receiver: None,
+@@ -1002,15 +1061,24 @@ impl AuthrsService {
+                     let _ = cancel_prompts(tid);
+                 }
+                 let _ = promise.resolve_or_reject(result.map_err(authrs_to_nserror));
++                if let Some(vault) = platform_lock.as_ref() {
++                    vault.lock();
++                }
+                 *guard = None;
+             }),
+         );
+ 
+-        // The authenticator crate provides an `AuthenticatorService` which can dispatch a request
+-        // in parallel to any number of transports. We only support the USB transport in production
+-        // configurations, so we do not need the full generality of `AuthenticatorService` here.
+-        // We disable the USB transport in tests that use virtual devices.
+-        if static_prefs::pref!("security.webauth.webauthn_enable_usbtoken") {
++        if use_platform {
++            let token = PlatformToken::new(platform_vault.unwrap());
++            RunnableBuilder::new("AuthrsService::MakeCredential::Platform", move || {
++                let mut token = token;
++                let _ = token.init();
++                let _ = ctap2::register(&mut token, info, status_tx, state_callback, &|| true);
++            })
++            .may_block(true)
++            .dispatch_background_task()
++            .inspect_err(|_| self.discard_transaction())?;
++        } else if static_prefs::pref!("security.webauth.webauthn_enable_usbtoken") {
+             // TODO(Bug 1855290) Remove this presence prompt
+             send_prompt(
+                 BrowserPromptType::Presence,
+@@ -1075,6 +1143,10 @@ impl AuthrsService {
+             })
+             .collect();
+ 
++        let mut allow_transports = ThinVec::new();
++        let _ = unsafe { args.GetAllowListTransports(&mut allow_transports) };
++        let internal_hint = allow_transports.iter().any(|t| t & 8 != 0);
++
+         let mut user_verification = nsString::new();
+         unsafe { args.GetUserVerification(&mut *user_verification) }.to_result()?;
+         let mut user_verification_req = if user_verification.eq("required") {
+@@ -1187,6 +1259,14 @@ impl AuthrsService {
+             use_ctap1_fallback: !static_prefs::pref!("security.webauthn.ctap2"),
+         };
+ 
++        // An empty allow list is the discoverable-credential (passkey) flow;
++        // a non-empty list is handled by the security-key path so hardware
++        // keys keep working without a settings change.
++        let platform_vault = self.platform_vault();
++        let use_platform =
++            platform_vault.is_some() && (info.allow_list.is_empty() || internal_hint);
++        let platform_lock = platform_vault.clone();
++
+         let mut guard = self.transaction.lock().unwrap();
+         debug_assert!(
+             guard.is_none(),
+@@ -1194,6 +1274,7 @@ impl AuthrsService {
+         );
+         *guard = Some(TransactionState {
+             tid,
++            platform: use_platform,
+             promise: TransactionPromise::Sign(promise),
+             pin_receiver: None,
+             selection_receiver: None,
+@@ -1253,10 +1334,26 @@ impl AuthrsService {
+                     let _ = cancel_prompts(tid);
+                 }
+                 let _ = promise.resolve_or_reject(result.map_err(authrs_to_nserror));
++                if let Some(vault) = platform_lock.as_ref() {
++                    vault.lock();
++                }
+                 *guard = None;
+             }),
+         );
+ 
++        if use_platform {
++            let token = PlatformToken::new(platform_vault.unwrap());
++            RunnableBuilder::new("AuthrsService::GetAssertion::Platform", move || {
++                let mut token = token;
++                let _ = token.init();
++                let _ = ctap2::sign(&mut token, info, status_tx, state_callback, &|| true);
++            })
++            .may_block(true)
++            .dispatch_background_task()
++            .inspect_err(|_| self.discard_transaction())?;
++            return Ok(());
++        }
++
+         // TODO(Bug 1855290) Remove this presence prompt
+         send_prompt(
+             BrowserPromptType::Presence,
+@@ -1545,6 +1642,7 @@ impl AuthrsService {
+             }
+             *guard = Some(TransactionState {
+                 tid: 0,
++                platform: false,
+                 promise: TransactionPromise::Listen,
+                 pin_receiver: None,
+                 selection_receiver: None,
+@@ -1671,6 +1769,7 @@ pub unsafe extern "C" fn authrs_service_constructor(
+     let wrapper = AuthrsService::allocate(InitAuthrsService {
+         usb_token_manager: Mutex::new(StateMachine::new()),
+         test_token_manager: TestTokenManager::new(),
++        platform: Mutex::new(None),
+         transaction: Arc::new(Mutex::new(None)),
+     });
+ 
+diff --git a/dom/webauthn/authrs_bridge/src/nss_seal.rs b/dom/webauthn/authrs_bridge/src/nss_seal.rs
+new file mode 100644
+index 0000000000..69f4341d37
+--- /dev/null
++++ b/dom/webauthn/authrs_bridge/src/nss_seal.rs
+@@ -0,0 +1,159 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++//! NSS implementation of the `astra_passkeys::Seal` backend.
++//!
++//! The wrappers mirror `authenticator/src/crypto/nss.rs`: AES-256-CBC,
++//! HMAC-SHA256 and PK11 random bytes, all from the NSS PKCS#11 module the
++//! browser already initialised.
++
++use astra_passkeys::{Seal, VaultError};
++use nss_rs::p11::{
++    PK11Origin, PK11_CreateContextBySymKey, PK11_Decrypt, PK11_DigestFinal, PK11_DigestOp,
++    PK11_Encrypt, PK11_GenerateRandom, PK11_ImportSymKey, Slot,
++};
++use nss_rs::{IntoResult, SECItem, SECItemBorrowed};
++use pkcs11_bindings::{CKA_ENCRYPT, CKA_SIGN, CKM_AES_CBC, CKM_SHA256_HMAC};
++use std::os::raw::{c_int, c_uint};
++use std::ptr;
++
++const KEY_LEN: usize = 32;
++const IV_LEN: usize = 16;
++const SHA256_LENGTH: usize = 32;
++
++pub struct NssSeal;
++
++impl Seal for NssSeal {
++    fn random(&self, len: usize) -> Result<Vec<u8>, VaultError> {
++        nss_rs::init().map_err(|_| VaultError::Crypto)?;
++        let count = c_int::try_from(len).map_err(|_| VaultError::Crypto)?;
++        let mut out = vec![0u8; len];
++        unsafe { PK11_GenerateRandom(out.as_mut_ptr(), count) }
++            .into_result()
++            .map_err(|_| VaultError::Crypto)?;
++        Ok(out)
++    }
++
++    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<Vec<u8>, VaultError> {
++        nss_rs::init().map_err(|_| VaultError::Crypto)?;
++        let len = u32::try_from(data.len()).map_err(|_| VaultError::Crypto)?;
++        let slot = Slot::internal().map_err(|_| VaultError::Crypto)?;
++        let sym_key = unsafe {
++            PK11_ImportSymKey(
++                *slot,
++                CKM_SHA256_HMAC,
++                PK11Origin::PK11_OriginUnwrap,
++                CKA_SIGN,
++                SECItemBorrowed::wrap(key)
++                    .map_err(|_| VaultError::Crypto)?
++                    .as_mut(),
++                ptr::null_mut(),
++            )
++            .into_result()
++            .map_err(|_| VaultError::Crypto)?
++        };
++        let param = SECItemBorrowed::make_empty();
++        let context = unsafe {
++            PK11_CreateContextBySymKey(CKM_SHA256_HMAC, CKA_SIGN, *sym_key, param.as_ref())
++                .into_result()
++                .map_err(|_| VaultError::Crypto)?
++        };
++        unsafe {
++            PK11_DigestOp(*context, data.as_ptr(), len)
++                .into_result()
++                .map_err(|_| VaultError::Crypto)?
++        };
++        let mut digest = vec![0u8; SHA256_LENGTH];
++        let mut digest_len = 0u32;
++        unsafe {
++            PK11_DigestFinal(
++                *context,
++                digest.as_mut_ptr(),
++                &mut digest_len,
++                digest.len() as u32,
++            )
++            .into_result()
++            .map_err(|_| VaultError::Crypto)?
++        };
++        if digest_len as usize != SHA256_LENGTH {
++            return Err(VaultError::Crypto);
++        }
++        Ok(digest)
++    }
++
++    fn aes_cbc_encrypt(
++        &self,
++        key: &[u8],
++        iv: &[u8],
++        data: &[u8],
++    ) -> Result<Vec<u8>, VaultError> {
++        aes_cbc(key, iv, data, true)
++    }
++
++    fn aes_cbc_decrypt(
++        &self,
++        key: &[u8],
++        iv: &[u8],
++        data: &[u8],
++    ) -> Result<Vec<u8>, VaultError> {
++        aes_cbc(key, iv, data, false)
++    }
++}
++
++fn aes_cbc(key: &[u8], iv: &[u8], data: &[u8], encrypt: bool) -> Result<Vec<u8>, VaultError> {
++    nss_rs::init().map_err(|_| VaultError::Crypto)?;
++    if key.len() != KEY_LEN || iv.len() != IV_LEN || data.len() % IV_LEN != 0 {
++        return Err(VaultError::Crypto);
++    }
++    let len = c_uint::try_from(data.len()).map_err(|_| VaultError::Crypto)?;
++    let slot = Slot::internal().map_err(|_| VaultError::Crypto)?;
++    let sym_key = unsafe {
++        PK11_ImportSymKey(
++            *slot,
++            CKM_AES_CBC,
++            PK11Origin::PK11_OriginUnwrap,
++            CKA_ENCRYPT,
++            SECItemBorrowed::wrap(key)
++                .map_err(|_| VaultError::Crypto)?
++                .as_mut(),
++            ptr::null_mut(),
++        )
++        .into_result()
++        .map_err(|_| VaultError::Crypto)?
++    };
++    let mut params = SECItemBorrowed::wrap(iv).map_err(|_| VaultError::Crypto)?;
++    let params_ptr: *mut SECItem = params.as_mut();
++    let mut out_len: c_uint = 0;
++    let mut out = vec![0u8; data.len()];
++    let result = unsafe {
++        if encrypt {
++            PK11_Encrypt(
++                *sym_key,
++                CKM_AES_CBC,
++                params_ptr,
++                out.as_mut_ptr(),
++                &mut out_len,
++                len,
++                data.as_ptr(),
++                len,
++            )
++        } else {
++            PK11_Decrypt(
++                *sym_key,
++                CKM_AES_CBC,
++                params_ptr,
++                out.as_mut_ptr(),
++                &mut out_len,
++                len,
++                data.as_ptr(),
++                len,
++            )
++        }
++    };
++    result.into_result().map_err(|_| VaultError::Crypto)?;
++    if out_len as usize != data.len() {
++        return Err(VaultError::Crypto);
++    }
++    Ok(out)
++}
+diff --git a/dom/webauthn/authrs_bridge/src/passkeys_service.rs b/dom/webauthn/authrs_bridge/src/passkeys_service.rs
+new file mode 100644
+index 0000000000..d40d83c74f
+--- /dev/null
++++ b/dom/webauthn/authrs_bridge/src/passkeys_service.rs
+@@ -0,0 +1,178 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++//! `nsIAstraPasskeys` — the vault management seam used by Astra Settings.
++//!
++//! This is deliberately separate from the WebAuthn path: the token owns its
++//! own `Vault` instance, so unlocking in Settings never leaves the WebAuthn
++//! authenticator unlocked (and vice versa).
++
++use crate::nss_seal::NssSeal;
++use crate::platform::pref_vault_path;
++use astra_passkeys::{hash_pin, Vault, VaultError};
++use nserror::{
++    nsresult, NS_ERROR_DOM_INVALID_STATE_ERR, NS_ERROR_DOM_NOT_ALLOWED_ERR, NS_ERROR_FAILURE,
++    NS_ERROR_INVALID_ARG, NS_ERROR_NOT_IMPLEMENTED, NS_OK,
++};
++use nsstring::{nsACString, nsCString};
++use serde_json::json;
++use std::sync::{Arc, Mutex};
++use xpcom::xpcom_method;
++
++struct State {
++    path: String,
++    vault: Arc<Vault>,
++}
++
++#[xpcom(implement(nsIAstraPasskeys), atomic)]
++pub struct AstraPasskeysService {
++    state: Mutex<Option<State>>,
++}
++
++fn map_error(error: VaultError) -> nsresult {
++    match error {
++        VaultError::PinPolicy | VaultError::Invalid => NS_ERROR_INVALID_ARG,
++        VaultError::AuthFailed | VaultError::Locked => NS_ERROR_DOM_NOT_ALLOWED_ERR,
++        VaultError::RateLimited { .. }
++        | VaultError::NotInitialized
++        | VaultError::AlreadyInitialized => NS_ERROR_DOM_INVALID_STATE_ERR,
++        VaultError::Unsupported => NS_ERROR_NOT_IMPLEMENTED,
++        VaultError::Crypto | VaultError::Io => NS_ERROR_FAILURE,
++    }
++}
++
++impl AstraPasskeysService {
++    fn vault(&self) -> Result<Arc<Vault>, nsresult> {
++        let path = pref_vault_path().ok_or(NS_ERROR_DOM_INVALID_STATE_ERR)?;
++        let mut guard = self.state.lock().map_err(|_| NS_ERROR_FAILURE)?;
++        if let Some(state) = guard.as_ref() {
++            if state.path == path {
++                return Ok(state.vault.clone());
++            }
++        }
++        let vault = Arc::new(Vault::open(
++            std::path::PathBuf::from(&path),
++            Arc::new(NssSeal),
++        ));
++        *guard = Some(State {
++            path,
++            vault: vault.clone(),
++        });
++        Ok(vault)
++    }
++
++    fn status_json(&self) -> Result<String, nsresult> {
++        let status = self.vault()?.status();
++        serde_json::to_string(&json!({
++            "exists": status.exists,
++            "has_pin": status.has_pin,
++            "unlocked": status.unlocked,
++            "system_unlock": status.system_unlock,
++            "system_auth_available": status.system_auth_available,
++            "credential_count": status.credential_count,
++            "pin_retries_left": status.pin_retries_left,
++            "locked_for_secs": status.locked_for_secs,
++        }))
++        .map_err(|_| NS_ERROR_FAILURE)
++    }
++}
++
++impl AstraPasskeysService {
++    xpcom_method!(get_status_json => GetStatusJson() -> nsACString);
++    fn get_status_json(&self) -> Result<nsCString, nsresult> {
++        Ok(nsCString::from(self.status_json()?))
++    }
++
++    xpcom_method!(create => Create(aPin: *const nsACString, aSystemUnlock: bool));
++    fn create(&self, pin: &nsACString, system_unlock: bool) -> Result<(), nsresult> {
++        let pin = hash_pin(&pin.to_string()).map_err(map_error)?;
++        self.vault()?
++            .create(&pin, system_unlock)
++            .map_err(map_error)
++    }
++
++    xpcom_method!(unlock => Unlock(aPin: *const nsACString));
++    fn unlock(&self, pin: &nsACString) -> Result<(), nsresult> {
++        let pin = hash_pin(&pin.to_string()).map_err(map_error)?;
++        self.vault()?.unlock_with_pin(&pin).map_err(map_error)
++    }
++
++    xpcom_method!(lock => Lock());
++    fn lock(&self) -> Result<(), nsresult> {
++        self.vault()?.lock();
++        Ok(())
++    }
++
++    xpcom_method!(change_pin => ChangePin(aOldPin: *const nsACString, aNewPin: *const nsACString));
++    fn change_pin(&self, old_pin: &nsACString, new_pin: &nsACString) -> Result<(), nsresult> {
++        let old_pin = hash_pin(&old_pin.to_string()).map_err(map_error)?;
++        let new_pin = hash_pin(&new_pin.to_string()).map_err(map_error)?;
++        let vault = self.vault()?;
++        if !vault.is_unlocked() {
++            vault.unlock_with_pin(&old_pin).map_err(map_error)?;
++        }
++        vault.change_pin(&new_pin).map_err(map_error)
++    }
++
++    xpcom_method!(set_system_unlock => SetSystemUnlock(aEnabled: bool));
++    fn set_system_unlock(&self, enabled: bool) -> Result<(), nsresult> {
++        let vault = self.vault()?;
++        if !vault.is_unlocked() {
++            return Err(NS_ERROR_DOM_NOT_ALLOWED_ERR);
++        }
++        vault.set_system_unlock(enabled).map_err(map_error)
++    }
++
++    xpcom_method!(list_json => ListJson() -> nsACString);
++    fn list_json(&self) -> Result<nsCString, nsresult> {
++        use base64::Engine as _;
++        let e = base64::engine::general_purpose::STANDARD;
++        let credentials = self.vault()?.list().map_err(map_error)?;
++        let rows: Vec<_> = credentials
++            .into_iter()
++            .map(|c| {
++                json!({
++                    "id": e.encode(&c.id),
++                    "rp_id": c.rp_id,
++                    "user_name": c.user_name,
++                    "discoverable": c.discoverable,
++                    "created_at": c.created_at,
++                })
++            })
++            .collect();
++        Ok(nsCString::from(
++            serde_json::to_string(&rows).map_err(|_| NS_ERROR_FAILURE)?,
++        ))
++    }
++
++    xpcom_method!(remove_credential => RemoveCredential(aCredentialIdBase64: *const nsACString) -> bool);
++    fn remove_credential(&self, id: &nsACString) -> Result<bool, nsresult> {
++        use base64::Engine as _;
++        let id = base64::engine::general_purpose::STANDARD
++            .decode(id.to_string())
++            .map_err(|_| NS_ERROR_INVALID_ARG)?;
++        self.vault()?.delete(&id).map_err(map_error)
++    }
++
++    xpcom_method!(remove_all_credentials => RemoveAllCredentials());
++    fn remove_all_credentials(&self) -> Result<(), nsresult> {
++        self.vault()?.delete_all().map_err(map_error)
++    }
++
++    xpcom_method!(destroy => Destroy());
++    fn destroy(&self) -> Result<(), nsresult> {
++        self.vault()?.destroy().map_err(map_error)
++    }
++}
++
++#[no_mangle]
++pub extern "C" fn astra_passkeys_constructor(
++    iid: *const xpcom::nsIID,
++    result: *mut *mut xpcom::reexports::libc::c_void,
++) -> nsresult {
++    let service = AstraPasskeysService::allocate(InitAstraPasskeysService {
++        state: Mutex::new(None),
++    });
++    unsafe { service.QueryInterface(iid, result) }
++}
+diff --git a/dom/webauthn/authrs_bridge/src/platform.rs b/dom/webauthn/authrs_bridge/src/platform.rs
+new file mode 100644
+index 0000000000..5b051fa96e
+--- /dev/null
++++ b/dom/webauthn/authrs_bridge/src/platform.rs
+@@ -0,0 +1,466 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++//! Astra's platform authenticator.
++//!
++//! A CTAP2.1 platform token (`internal` transport) backed by the encrypted
++//! `astra_passkeys` vault. Every operation requires user verification:
++//! `always_uv` is set, the OS verifier (fprintd) is tried first, and the PIN
++//! from `ClientPIN` unlocks the vault when that is unavailable. The vault is
++//! the only credential store; nothing is cached in the token between
++//! transactions.
++
++use astra_passkeys::{NewCredential, PinHash, StoredCredential, Vault, VaultError, AAGUID};
++use authenticator::crypto::{ecdsa_p256_sha256_sign_raw, COSEAlgorithm, COSEKey, SharedSecret};
++use authenticator::ctap2::attestation::{
++    AAGuid, AttestationObject, AttestationStatement, AttestedCredentialData, AuthenticatorData,
++    AuthenticatorDataFlags, Extension,
++};
++use authenticator::ctap2::client_data::ClientDataHash;
++use authenticator::ctap2::commands::client_pin::{ClientPIN, ClientPinResponse, PINSubcommand};
++use authenticator::ctap2::commands::get_assertion::{
++    GetAssertion, GetAssertionResponse, GetAssertionResult,
++};
++use authenticator::ctap2::commands::get_info::{
++    AuthenticatorInfo, AuthenticatorOptions, AuthenticatorVersion,
++};
++use authenticator::ctap2::commands::get_version::{GetVersion, U2FInfo};
++use authenticator::ctap2::commands::make_credentials::{MakeCredentials, MakeCredentialsResult};
++use authenticator::ctap2::commands::reset::Reset;
++use authenticator::ctap2::commands::selection::Selection;
++use authenticator::ctap2::commands::{CommandError, RequestCtap1, RequestCtap2, StatusCode};
++use authenticator::ctap2::preflight::CheckKeyHandle;
++use authenticator::ctap2::server::{
++    AuthenticatorAttachment, CredentialProtectionPolicy, PublicKeyCredentialDescriptor,
++    PublicKeyCredentialUserEntity, Transport,
++};
++use authenticator::errors::HIDError;
++use authenticator::{FidoDevice, FidoDeviceIO, FidoProtocol, VirtualFidoDevice};
++use cstr::cstr;
++use nsstring::nsCString;
++use rand::{thread_rng, RngCore};
++use std::sync::Arc;
++use xpcom::interfaces::nsIPrefBranch;
++
++const SYSTEM_AUTH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
++const UV_RETRIES: u8 = 3;
++
++/// The vault path the chrome application publishes at startup. Absent or empty
++/// means the platform token is not offered.
++pub(crate) fn pref_vault_path() -> Option<String> {
++    let mut path = nsCString::new();
++    let prefs =
++        xpcom::get_service::<nsIPrefBranch>(cstr!("@mozilla.org/preferences-service;1"))?;
++    unsafe { prefs.GetCharPref(cstr!("astra.passkeys.vault").as_ptr(), &mut *path) }
++        .to_result()
++        .ok()?;
++    let path = path.to_string();
++    if path.is_empty() {
++        None
++    } else {
++        Some(path)
++    }
++}
++
++pub struct PlatformToken {
++    vault: Arc<Vault>,
++    protocol: FidoProtocol,
++    shared_secret: Option<SharedSecret>,
++    authenticator_info: Option<AuthenticatorInfo>,
++    pin_token: Vec<u8>,
++}
++
++fn status_error(code: StatusCode) -> HIDError {
++    HIDError::Command(CommandError::StatusCode(code, None))
++}
++
++fn vault_error(error: VaultError) -> HIDError {
++    match error {
++        VaultError::RateLimited { .. } => status_error(StatusCode::PinAuthBlocked),
++        VaultError::Locked => status_error(StatusCode::PinRequired),
++        VaultError::AuthFailed => status_error(StatusCode::PinInvalid),
++        VaultError::PinPolicy => status_error(StatusCode::PinPolicyViolation),
++        _ => HIDError::DeviceError,
++    }
++}
++
++fn policy_to_u8(policy: CredentialProtectionPolicy) -> u8 {
++    match policy {
++        CredentialProtectionPolicy::UserVerificationOptional => 0x01,
++        CredentialProtectionPolicy::UserVerificationOptionalWithCredentialIDList => 0x02,
++        CredentialProtectionPolicy::UserVerificationRequired => 0x03,
++    }
++}
++
++impl std::fmt::Debug for PlatformToken {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("PlatformToken")
++            .field("protocol", &self.protocol)
++            .finish_non_exhaustive()
++    }
++}
++
++impl PlatformToken {
++    pub fn new(vault: Arc<Vault>) -> Self {
++        let mut pin_token = vec![0u8; 32];
++        thread_rng().fill_bytes(&mut pin_token);
++        Self {
++            vault,
++            protocol: FidoProtocol::CTAP2,
++            shared_secret: None,
++            authenticator_info: None,
++            pin_token,
++        }
++    }
++
++    fn status(&self) -> astra_passkeys::VaultStatus {
++        self.vault.status()
++    }
++
++    fn encrypted_pin_token(&self) -> Result<ClientPinResponse, HIDError> {
++        let secret = self.shared_secret.as_ref().ok_or(HIDError::DeviceError)?;
++        let pin_token = secret.encrypt(&self.pin_token).or(Err(HIDError::DeviceError))?;
++        Ok(ClientPinResponse {
++            pin_token: Some(pin_token),
++            ..Default::default()
++        })
++    }
++
++    fn verified(&self) -> Result<(), HIDError> {
++        if self.vault.is_unlocked() {
++            Ok(())
++        } else {
++            Err(status_error(StatusCode::PinRequired))
++        }
++    }
++}
++
++impl FidoDevice for PlatformToken {
++    fn pre_init(&mut self) -> Result<(), HIDError> {
++        Ok(())
++    }
++
++    fn should_try_ctap2(&self) -> bool {
++        true
++    }
++
++    fn initialized(&self) -> bool {
++        true
++    }
++
++    fn is_u2f(&mut self) -> bool {
++        true
++    }
++
++    fn get_shared_secret(&self) -> Option<&SharedSecret> {
++        self.shared_secret.as_ref()
++    }
++
++    fn set_shared_secret(&mut self, shared_secret: SharedSecret) {
++        self.shared_secret = Some(shared_secret);
++    }
++
++    fn get_authenticator_info(&self) -> Option<&AuthenticatorInfo> {
++        self.authenticator_info.as_ref()
++    }
++
++    fn set_authenticator_info(&mut self, authenticator_info: AuthenticatorInfo) {
++        self.authenticator_info = Some(authenticator_info);
++    }
++
++    fn get_protocol(&self) -> FidoProtocol {
++        self.protocol
++    }
++
++    fn downgrade_to_ctap1(&mut self) {
++        self.protocol = FidoProtocol::CTAP1
++    }
++}
++
++impl FidoDeviceIO for PlatformToken {
++    fn send_msg_cancellable<Out, Req: RequestCtap1<Output = Out> + RequestCtap2<Output = Out>>(
++        &mut self,
++        msg: &Req,
++        keep_alive: &dyn Fn() -> bool,
++    ) -> Result<Out, HIDError> {
++        if !self.initialized() {
++            return Err(HIDError::DeviceNotInitialized);
++        }
++        match self.get_protocol() {
++            FidoProtocol::CTAP1 => self.send_ctap1_cancellable(msg, keep_alive),
++            FidoProtocol::CTAP2 => self.send_cbor_cancellable(msg, keep_alive),
++        }
++    }
++
++    fn send_cbor_cancellable<Req: RequestCtap2>(
++        &mut self,
++        msg: &Req,
++        _keep_alive: &dyn Fn() -> bool,
++    ) -> Result<Req::Output, HIDError> {
++        msg.send_to_virtual_device(self)
++    }
++
++    fn send_ctap1_cancellable<Req: RequestCtap1>(
++        &mut self,
++        msg: &Req,
++        _keep_alive: &dyn Fn() -> bool,
++    ) -> Result<Req::Output, HIDError> {
++        msg.send_to_virtual_device(self)
++    }
++}
++
++impl VirtualFidoDevice for PlatformToken {
++    fn check_key_handle(&self, req: &CheckKeyHandle) -> Result<(), HIDError> {
++        let credentials = self
++            .vault
++            .credentials_for_rp(&req.rp.id, &[], false)
++            .map_err(vault_error)?;
++        if credentials.iter().any(|c| c.id == req.key_handle) {
++            Ok(())
++        } else {
++            Err(HIDError::DeviceError)
++        }
++    }
++
++    fn client_pin(&self, req: &ClientPIN) -> Result<ClientPinResponse, HIDError> {
++        match req.subcommand {
++            PINSubcommand::GetKeyAgreement => {
++                let (_private, public) = COSEKey::generate(COSEAlgorithm::ECDH_ES_HKDF256)
++                    .map_err(|_| HIDError::DeviceError)?;
++                Ok(ClientPinResponse {
++                    key_agreement: Some(public),
++                    ..Default::default()
++                })
++            }
++            PINSubcommand::GetPinRetries => Ok(ClientPinResponse {
++                pin_retries: Some(self.status().pin_retries_left.min(8) as u8),
++                ..Default::default()
++            }),
++            PINSubcommand::GetUvRetries => Ok(ClientPinResponse {
++                uv_retries: Some(UV_RETRIES),
++                ..Default::default()
++            }),
++            PINSubcommand::GetPinUvAuthTokenUsingUvWithPermissions => {
++                if !self.status().system_unlock {
++                    return Err(status_error(StatusCode::UvBlocked));
++                }
++                if astra_passkeys::verify_system_auth(SYSTEM_AUTH_TIMEOUT)
++                    && self.vault.unlock_with_device().is_ok()
++                {
++                    self.encrypted_pin_token()
++                } else {
++                    Err(status_error(StatusCode::UvBlocked))
++                }
++            }
++            PINSubcommand::GetPinUvAuthTokenUsingPinWithPermissions
++            | PINSubcommand::GetPINToken => {
++                let Some(encrypted) = req.pin_hash_enc.as_ref() else {
++                    return Err(status_error(StatusCode::PinRequired));
++                };
++                let secret = self.shared_secret.as_ref().ok_or(HIDError::DeviceError)?;
++                let plain = secret.decrypt(encrypted).or(Err(HIDError::DeviceError))?;
++                let pin = PinHash::from_bytes(&plain).or(Err(HIDError::DeviceError))?;
++                match self.vault.unlock_with_pin(&pin) {
++                    Ok(()) => self.encrypted_pin_token(),
++                    Err(VaultError::RateLimited { .. }) => {
++                        Err(status_error(StatusCode::PinAuthBlocked))
++                    }
++                    Err(VaultError::AuthFailed) => Err(status_error(StatusCode::PinInvalid)),
++                    Err(e) => Err(vault_error(e)),
++                }
++            }
++            _ => Err(HIDError::UnsupportedCommand),
++        }
++    }
++
++    fn get_info(&self) -> Result<AuthenticatorInfo, HIDError> {
++        let status = self.status();
++        Ok(AuthenticatorInfo {
++            versions: vec![AuthenticatorVersion::FIDO_2_1],
++            options: AuthenticatorOptions {
++                platform_device: true,
++                resident_key: true,
++                client_pin: Some(status.has_pin),
++                pin_uv_auth_token: Some(true),
++                user_verification: Some(true),
++                make_cred_uv_not_rqd: Some(false),
++                always_uv: Some(true),
++                ..Default::default()
++            },
++            ..Default::default()
++        })
++    }
++
++    fn get_version(&self, _req: &GetVersion) -> Result<U2FInfo, HIDError> {
++        Err(HIDError::UnsupportedCommand)
++    }
++
++    fn make_credentials(&self, req: &MakeCredentials) -> Result<MakeCredentialsResult, HIDError> {
++        if !req
++            .pub_cred_params
++            .iter()
++            .any(|p| p.alg == COSEAlgorithm::ES256)
++        {
++            return Err(status_error(StatusCode::UnsupportedAlgorithm));
++        }
++        if req.pin_uv_auth_param.is_none() {
++            return Err(status_error(StatusCode::PinRequired));
++        }
++        self.verified()?;
++
++        let user = req
++            .user
++            .as_ref()
++            .ok_or_else(|| status_error(StatusCode::InvalidParameter))?;
++
++        let excluded: Vec<Vec<u8>> = req.exclude_list.iter().map(|d| d.id.clone()).collect();
++        if !excluded.is_empty() {
++            let existing = self
++                .vault
++                .credentials_for_rp(&req.rp.id, &excluded, false)
++                .map_err(vault_error)?;
++            if !existing.is_empty() {
++                return Err(status_error(StatusCode::CredentialExcluded));
++            }
++        }
++
++        let (private_key, public_key) =
++            COSEKey::generate(COSEAlgorithm::ES256).map_err(|_| HIDError::DeviceError)?;
++        let public_key_bytes =
++            serde_cbor_2::to_vec(&public_key).map_err(|_| HIDError::DeviceError)?;
++        let mut id = [0u8; 32];
++        thread_rng().fill_bytes(&mut id);
++
++        let cred_protect = req
++            .extensions
++            .cred_protect
++            .unwrap_or(CredentialProtectionPolicy::UserVerificationRequired);
++        self.vault
++            .add_credential(NewCredential {
++                id: id.to_vec(),
++                rp_id: req.rp.id.clone(),
++                user_handle: user.id.clone(),
++                user_name: user.name.clone(),
++                private_key,
++                public_key: public_key_bytes,
++                discoverable: req.options.resident_key.unwrap_or(true),
++                cred_protect: policy_to_u8(cred_protect),
++            })
++            .map_err(vault_error)?;
++
++        let mut extensions = Extension::default();
++        extensions.cred_protect = req.extensions.cred_protect;
++        if req.extensions.min_pin_length == Some(true) {
++            extensions.min_pin_length = Some(u64::from(astra_passkeys::MIN_PIN_LENGTH_HINT));
++        }
++        let mut flags =
++            AuthenticatorDataFlags::USER_PRESENT | AuthenticatorDataFlags::USER_VERIFIED;
++        if extensions.has_some() {
++            flags |= AuthenticatorDataFlags::EXTENSION_DATA;
++        }
++        flags |= AuthenticatorDataFlags::ATTESTED;
++
++        let auth_data = AuthenticatorData {
++            rp_id_hash: req.rp.hash(),
++            flags,
++            counter: 0,
++            credential_data: Some(AttestedCredentialData {
++                aaguid: AAGuid(AAGUID),
++                credential_id: id.to_vec(),
++                credential_public_key: public_key,
++            }),
++            extensions,
++        };
++
++        Ok(MakeCredentialsResult {
++            attachment: AuthenticatorAttachment::Platform,
++            att_obj: AttestationObject {
++                att_stmt: AttestationStatement::None,
++                auth_data,
++            },
++            extensions: Default::default(),
++            ep_attestation: None,
++            large_blob_key: None,
++            unsigned_extension_outputs: None,
++        })
++    }
++
++    fn get_assertion(&self, req: &GetAssertion) -> Result<Vec<GetAssertionResult>, HIDError> {
++        if req.pin_uv_auth_param.is_none() {
++            return Err(status_error(StatusCode::PinRequired));
++        }
++        self.verified()?;
++
++        let allow: Vec<Vec<u8>> = req.allow_list.iter().map(|d| d.id.clone()).collect();
++        let discoverable_only = allow.is_empty();
++        let credentials = self
++            .vault
++            .credentials_for_rp(&req.rp.id, &allow, discoverable_only)
++            .map_err(vault_error)?;
++
++        let eligible: Vec<&StoredCredential> = credentials
++            .iter()
++            .filter(|c| {
++                c.cred_protect != 0x03
++                    || self.vault.is_unlocked()
++            })
++            .collect();
++        if eligible.is_empty() {
++            return Err(status_error(StatusCode::NoCredentials));
++        }
++
++        let flags = AuthenticatorDataFlags::USER_PRESENT | AuthenticatorDataFlags::USER_VERIFIED;
++        let mut assertions = Vec::with_capacity(eligible.len());
++        for credential in eligible {
++            let auth_data = AuthenticatorData {
++                rp_id_hash: req.rp.hash(),
++                flags,
++                counter: 0,
++                credential_data: None,
++                extensions: Extension::default(),
++            };
++            let mut data = auth_data.to_vec();
++            data.extend_from_slice(req.client_data_hash.as_ref());
++            let signature = ecdsa_p256_sha256_sign_raw(&credential.private_key, &data)
++                .map_err(|_| HIDError::DeviceError)?;
++            let assertion = GetAssertionResponse {
++                credentials: Some(PublicKeyCredentialDescriptor {
++                    id: credential.id.clone(),
++                    transports: vec![Transport::Internal],
++                }),
++                auth_data,
++                signature,
++                user: Some(PublicKeyCredentialUserEntity {
++                    id: credential.user_handle.clone(),
++                    name: credential.user_name.clone(),
++                    display_name: None,
++                }),
++                number_of_credentials: Some(1),
++                user_selected: None,
++                large_blob_key: None,
++                unsigned_extension_outputs: None,
++                ep_attestation: None,
++                att_stmt: None,
++            };
++            assertions.push(GetAssertionResult {
++                assertion: assertion.into(),
++                attachment: AuthenticatorAttachment::Platform,
++                extensions: Default::default(),
++                user_selected: None,
++                large_blob_key: None,
++                large_blob_array: None,
++            });
++        }
++        Ok(assertions)
++    }
++
++    fn reset(&self, _req: &Reset) -> Result<(), HIDError> {
++        self.verified()?;
++        self.vault.delete_all().map_err(vault_error)
++    }
++
++    fn selection(&self, _req: &Selection) -> Result<(), HIDError> {
++        Err(HIDError::UnsupportedCommand)
++    }
++}
+diff --git a/dom/webauthn/components.conf b/dom/webauthn/components.conf
+index 326269c960..3854676143 100644
+--- a/dom/webauthn/components.conf
++++ b/dom/webauthn/components.conf
+@@ -3,6 +3,13 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ Classes = [
++    {
++        'cid': '{69e2f0f9-3f0e-4a2e-9a35-0d6b3b5b7a41}',
++        'contract_ids': ['@astra/passkeys;1'],
++        'headers': ['/dom/webauthn/AstraPasskeys.h'],
++        'legacy_constructor': 'astra_passkeys_constructor',
++        'processes': ProcessSelector.MAIN_PROCESS_ONLY,
++    },
+     {
+         'cid': '{ebe8a51d-bd54-4838-b031-cd2289990e14}',
+         'contract_ids': ['@mozilla.org/webauthn/service;1'],
+diff --git a/dom/webauthn/moz.build b/dom/webauthn/moz.build
+index d83540224f..70e1b59b6d 100644
+--- a/dom/webauthn/moz.build
++++ b/dom/webauthn/moz.build
+@@ -16,6 +16,7 @@ XPCOM_MANIFESTS += [
+ ]
+ 
+ XPIDL_SOURCES += [
++    "nsIAstraPasskeys.idl",
+     "nsIWebAuthnArgs.idl",
+     "nsIWebAuthnAttObj.idl",
+     "nsIWebAuthnPromise.idl",
+diff --git a/dom/webauthn/nsIAstraPasskeys.idl b/dom/webauthn/nsIAstraPasskeys.idl
+new file mode 100644
+index 0000000000..513969c49d
+--- /dev/null
++++ b/dom/webauthn/nsIAstraPasskeys.idl
+@@ -0,0 +1,32 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "nsISupports.idl"
++
++/**
++ * Astra platform-passkey vault management.
++ *
++ * The same encrypted vault the in-tree WebAuthn platform token reads. Settings
++ * uses this to create the vault, change the PIN, list/remove credentials and
++ * toggle the OS verification path. WebAuthn itself never goes through this
++ * interface: the token talks to the Rust vault directly.
++ *
++ * `statusJson` and `listJson` are small JSON objects (the vault's own shapes);
++ * PINs and private keys never appear in either.
++ */
++[scriptable, uuid(56085a44-c3d1-4f39-a9f6-b7c69d7a5ac6)]
++interface nsIAstraPasskeys : nsISupports {
++  readonly attribute ACString statusJson;
++
++  void create(in ACString pin, in boolean systemUnlock);
++  void unlock(in ACString pin);
++  void lock();
++  void changePin(in ACString oldPin, in ACString newPin);
++  void setSystemUnlock(in boolean enabled);
++
++  ACString listJson();
++  boolean removeCredential(in ACString credentialIdBase64);
++  void removeAllCredentials();
++  void destroy();
++};
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index ce7b15fbe9..d7db6190ef 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -18455,6 +18455,15 @@
+   value: false
+   mirror: always
+ 
++# Astra platform passkeys: a software platform authenticator backed by an
++# encrypted, PIN-gated vault in the profile. Off means the platform token is
++# not offered at all; security keys keep working.
++- name: security.webauthn.astra_passkeys
++  type: RelaxedAtomicBool
++  value: true
++  mirror: always
++  rust: true
++
+ # Block Worker/SharedWorker scripts with wrong MIME type.
+ - name: security.block_Worker_with_wrong_mime
+   type: bool
+diff --git a/toolkit/modules/WebAuthnPromptHelper.sys.mjs b/toolkit/modules/WebAuthnPromptHelper.sys.mjs
+index 02d026777b..9892ce9d7c 100644
+--- a/toolkit/modules/WebAuthnPromptHelper.sys.mjs
++++ b/toolkit/modules/WebAuthnPromptHelper.sys.mjs
+@@ -6,6 +6,9 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ const lazy = {};
+ 
++// `Services` is a global in system modules; importing it here fails the
++// loader and would take the whole helper (and its observer) down.
++
+ XPCOMUtils.defineLazyServiceGetter(
+   lazy,
+   "webauthnService",
+@@ -49,6 +52,12 @@ export let WebAuthnPromptHelper = {
+         }
+         return;
+       case this._topic:
++        // Astra renders the passkey prompt in its own surface. The app sets
++        // this preference when it takes over; without it (headless chrome,
++        // tests) the native notification remains the fallback.
++        if (Services.prefs.getBoolPref("astra.passkeys.ui", false)) {
++          return;
++        }
+         break;
+       default:
+         return;

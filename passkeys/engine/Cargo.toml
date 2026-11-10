@@ -1,0 +1,27 @@
+[package]
+name = "astra_passkeys"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Astra platform passkeys: PIN-gated, encrypted credential vault for the in-tree WebAuthn authenticator"
+
+[dependencies]
+base64 = "0.22"
+log = "0.4"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lib]
+name = "astra_passkeys"
+path = "src/lib.rs"
+
+# Standalone: the crate is a path dependency of the engine's gkrust, but it
+# also builds and tests on its own. The crypto backend stays in the engine so
+# this crate never links NSS.
+[workspace]

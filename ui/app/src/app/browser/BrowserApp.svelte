@@ -10,6 +10,8 @@
   import { PeekLayer, peek } from "$features/peek";
   import { webext } from "$domain/webext";
   import { PagePermissionPrompt } from "$features/permissions";
+  import { PasskeyPrompt } from "$features/passkeys";
+  import { passkeys } from "$domain/passkeys";
   import { updateNotices } from "$features/updates";
   import * as sidebar from "$session/sidebar-mode.svelte";
   import { Dividers } from "$features/split";
@@ -123,6 +125,7 @@
   }
 
   onMount(installCloseService);
+  onMount(() => void passkeys.start());
   // The startup read can land before the session has a profile, which lists
   // nothing; read again once the profile is known, and when it changes.
   let extensionProfile = $derived(tabs.profile()?.id);
@@ -278,6 +281,8 @@
   {#key webext.accessRequest()!.request}
     <WebExtensionAccessPrompt request={webext.accessRequest()!} />
   {/key}
+{:else if passkeys.prompt() !== null}
+  <PasskeyPrompt />
 {:else if pagePermissionSheet !== null}
   {#key `${pagePermissionSheet.profile_id}:${pagePermissionSheet.item_id}:${pagePermissionSheet.request_id}`}
     <PagePermissionPrompt prompt={pagePermissionSheet} />

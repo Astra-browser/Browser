@@ -6,10 +6,10 @@
 //! Source of truth: docs/astra/ipc-surface.md via schemas/*.json.
 //! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.
 
-/// Number of commands in the v1 surface (ipc-surface.md: 276).
-pub const COMMAND_COUNT: usize = 276;
-/// Number of event channels in the v1 surface (ipc-surface.md: 36).
-pub const EVENT_COUNT: usize = 36;
+/// Number of commands in the v1 surface (ipc-surface.md: 278).
+pub const COMMAND_COUNT: usize = 278;
+/// Number of event channels in the v1 surface (ipc-surface.md: 37).
+pub const EVENT_COUNT: usize = 37;
 
 /// Every command wire name (snake_case, stable).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,6 +143,8 @@ pub enum CommandName {
     PageStyleToggleFor,
     PageStyles,
     PageStylesAll,
+    PasskeyAnswerPrompt,
+    PasskeyCall,
     PanelHide,
     PanelIntent,
     PanelLayout,
@@ -311,6 +313,7 @@ pub enum EventChannel {
     EvtNotesChanged,
     EvtOperationProcessed,
     EvtPagePermissionPromptChanged,
+    EvtPasskeyPromptChanged,
     EvtResourceChanged,
     EvtRuntimeStatusChanged,
     EvtSearchChanged,
@@ -464,6 +467,8 @@ pub const COMMANDS: &[&str] = &[
     "page_style_toggle_for",
     "page_styles",
     "page_styles_all",
+    "passkey_answer_prompt",
+    "passkey_call",
     "panel_hide",
     "panel_intent",
     "panel_layout",
@@ -630,6 +635,7 @@ pub const EVENTS: &[&str] = &[
     "notes-changed",
     "operation-processed",
     "page-permission-prompt-changed",
+    "passkey-prompt-changed",
     "resource-changed",
     "runtime-status-changed",
     "search-changed",
@@ -785,6 +791,8 @@ impl CommandName {
             CommandName::PageStyleToggleFor => "page_style_toggle_for",
             CommandName::PageStyles => "page_styles",
             CommandName::PageStylesAll => "page_styles_all",
+            CommandName::PasskeyAnswerPrompt => "passkey_answer_prompt",
+            CommandName::PasskeyCall => "passkey_call",
             CommandName::PanelHide => "panel_hide",
             CommandName::PanelIntent => "panel_intent",
             CommandName::PanelLayout => "panel_layout",
@@ -1066,6 +1074,8 @@ impl CommandName {
             "page_style_toggle_for" => Some(CommandName::PageStyleToggleFor),
             "page_styles" => Some(CommandName::PageStyles),
             "page_styles_all" => Some(CommandName::PageStylesAll),
+            "passkey_answer_prompt" => Some(CommandName::PasskeyAnswerPrompt),
+            "passkey_call" => Some(CommandName::PasskeyCall),
             "panel_hide" => Some(CommandName::PanelHide),
             "panel_intent" => Some(CommandName::PanelIntent),
             "panel_layout" => Some(CommandName::PanelLayout),
@@ -1238,6 +1248,7 @@ impl EventChannel {
             EventChannel::EvtNotesChanged => "notes-changed",
             EventChannel::EvtOperationProcessed => "operation-processed",
             EventChannel::EvtPagePermissionPromptChanged => "page-permission-prompt-changed",
+            EventChannel::EvtPasskeyPromptChanged => "passkey-prompt-changed",
             EventChannel::EvtResourceChanged => "resource-changed",
             EventChannel::EvtRuntimeStatusChanged => "runtime-status-changed",
             EventChannel::EvtSearchChanged => "search-changed",

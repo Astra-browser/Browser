@@ -102,6 +102,26 @@ fixes to the ignored `engine/` tree idempotently.
 **Never run the engine build without `--jobs 2`**: the gkrust LTO link has
 OOM-killed this machine and taken the editor with it (BUILD_TIMES.md).
 
+### Low-memory build (desktop session alive)
+
+The final `gkrust` link defaults to **fat LTO** (`-Clto`), which peaked at
+18.3 GB anonymous RSS here and was OOM-killed while the editor and two browsers
+held ~13 GB. The rest of the build never needs that much.
+
+- zswap is already enabled on this machine (`/sys/module/zswap/parameters/enabled`
+  is `Y`); there is no zram device. Do not add another swap layer.
+- `sccache` is already configured by `out/mozconfig.linux`; a resumed build
+  reuses it.
+- For a probe build, cap the LTO peak by running that one rustc invocation as
+  thin LTO. Edit `config/makefiles/rust.mk` line ~121 from
+  `cargo_rustc_flags += -Clto$(if ...)` to `+= -Clto=thin`, build, then revert
+  the file. Thin LTO reuses the existing bitcode rlibs, so only `gkrust`
+  re-links (about 7 minutes here) and the RSS stays under ~6 GB.
+- Run the build detached so an editor/harness restart cannot kill the link:
+  `setsid nohup env MALLOC_ARENA_MAX=2 nice -n 15 cargo run -q -- build --jobs 2 &`.
+  Product builds keep fat LTO; this is a dev-machine RAM cap only.
+
+
 After `build:chrome` or the shell build, stage before refreshing the dist:
 `cargo run -q -- overlay` copies `overlay/astra/` into `engine/astra/`, then
 `cargo run -q -- build --faster` links those files into `dist/bin`. Running

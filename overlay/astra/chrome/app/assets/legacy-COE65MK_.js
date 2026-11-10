@@ -1,0 +1,1 @@
+import{Vn as e}from"./chrome-shared-UvscRW-7.js";e();

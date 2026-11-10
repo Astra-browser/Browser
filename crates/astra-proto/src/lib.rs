@@ -14,7 +14,7 @@
 //!   `deny_unknown_fields`), so either side can add fields freely;
 //! * an unknown protocol version **fails fast** via [`check_version`];
 //! * command/event names are the generated [`CommandName`] / [`EventChannel`]
-//!   registries in [`generated`] (276 commands + 36 events from
+//!   registries in [`generated`] (278 commands + 37 events from
 //!   `docs/astra/ipc-surface.md` via `schemas/*.json`).
 
 pub mod generated;
@@ -182,8 +182,8 @@ mod tests {
     fn registry_counts_match_surface() {
         assert_eq!(COMMANDS.len(), COMMAND_COUNT);
         assert_eq!(EVENTS.len(), EVENT_COUNT);
-        assert_eq!(COMMAND_COUNT, 276);
-        assert_eq!(EVENT_COUNT, 36);
+        assert_eq!(COMMAND_COUNT, 278);
+        assert_eq!(EVENT_COUNT, 37);
         assert!(COMMANDS.contains(&"tabs_navigate"));
         assert!(EVENTS.contains(&"tab-changed"));
         // Renamed channels carry the new prefix, never the old one.

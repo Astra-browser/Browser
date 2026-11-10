@@ -148,6 +148,8 @@ export type CommandName =
   | "page_styles"
   | "page_styles_all"
   | "panel_hide"
+  | "passkey_answer_prompt"
+  | "passkey_call"
   | "panel_intent"
   | "panel_layout"
   | "panel_ready"
@@ -427,6 +429,8 @@ export const COMMANDS: readonly CommandName[] = [
   "page_styles",
   "page_styles_all",
   "panel_hide",
+  "passkey_answer_prompt",
+  "passkey_call",
   "panel_intent",
   "panel_layout",
   "panel_ready",
@@ -575,7 +579,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 36 event channel names (post-rename). */
+/** All 37 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -593,6 +597,7 @@ export type EventChannel =
   | "notes-changed"
   | "operation-processed"
   | "page-permission-prompt-changed"
+  | "passkey-prompt-changed"
   | "resource-changed"
   | "runtime-status-changed"
   | "search-changed"
@@ -632,6 +637,7 @@ export const EVENTS: readonly EventChannel[] = [
   "notes-changed",
   "operation-processed",
   "page-permission-prompt-changed",
+  "passkey-prompt-changed",
   "resource-changed",
   "runtime-status-changed",
   "search-changed",
