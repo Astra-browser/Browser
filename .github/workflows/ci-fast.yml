@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       # The previous product name must not appear outside the allow-list
       # (PROVENANCE.md carries the required attribution).
-      - run: ./tools/brand-lint.sh plan.md docs/astra tools branding
+      - run: ./tools/brand-lint.sh docs/planning docs/astra tools branding
   contract-harness:
     # P1-T11: no-browser self-test of the geckodriver contract harness.
     # Proves runner + fixture are sound without a 70-minute engine build.

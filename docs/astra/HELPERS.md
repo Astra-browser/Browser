@@ -5,7 +5,7 @@ concept: each helper is a child run linked by `parent_run_id`, with **its own
 container**, **its own visible source pane**, **its own budgets**, and
 **per-helper cancel**.
 
-## Acceptance (from plan.md)
+## Acceptance (from docs/planning/PLAN.md)
 
 3 helpers in parallel demo; cancellation leaves no orphan tabs.
 

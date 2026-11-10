@@ -12,7 +12,7 @@ CPU / RAM / GPU once a second while the workload is running, then writes:
   <run>/ui_actions.json   UI-tour latencies/checks (ui-tour only)
   <run>/shots/*.png       chrome screenshots
 
-and appends the same run to ../../observations.md (repo root).
+and appends the same run to `docs/performance/OBSERVATIONS.md`.
 
 Usage:
   python3 run_matrix.py --browser astra --scenario baseline-1tab
@@ -51,7 +51,7 @@ ASTRA_BIN = os.environ.get(
 )
 STOCK_BIN = os.environ.get("STOCK_FIREFOX", "/usr/bin/firefox")
 FIXTURES = os.path.join(HERE, "fixtures")
-OBSERVATIONS = os.path.join(ROOT, "observations.md")
+OBSERVATIONS = os.path.join(ROOT, "docs", "performance", "OBSERVATIONS.md")
 PORTS = [8111, 8112, 8113, 8114]
 # Test-harness-only: place every measured window on this Hyprland output and
 # give keyboard focus back to the owner's monitor as soon as the window maps.
@@ -1597,7 +1597,7 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--no-observations", action="store_true",
-                    help="do not append this run to observations.md (probes)")
+                    help="do not append this run to docs/performance/OBSERVATIONS.md (probes)")
     args = ap.parse_args()
     global WRITE_OBS
     WRITE_OBS = not args.no_observations

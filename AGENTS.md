@@ -39,7 +39,7 @@ In short:
 | Decisions / rationale | `docs/astra/DECISIONS.md` |
 | Run + rebuild the dev build | `docs/astra/DEV_SETUP.md` |
 | UI implementation rules | `ui/app/AGENTS.md` |
-| Master plan (background) | `plan.md` |
+| Master plan (background) | `docs/planning/PLAN.md` |
 
 ## Standing project rules
 

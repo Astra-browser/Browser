@@ -48,11 +48,10 @@ UI_IDEA
 
 ui_inspiration/
 
-# Local release notes (working doc, intentionally not published)
-release.md
-
-bugs.txt
-image.png
+# Local working docs (intentionally not published)
+/docs/release/release.md
+/docs/notes/bugs.txt
+/docs/astra/assets/image.png
 
 # Extracted release tarball (local install/test artifact)
 /Astra/
