@@ -711,8 +711,20 @@
     // P1-T10 content slot keeps the whole main column until the user (or a
     // toolbar action) opens a second slot. The mount is still present.
     splitMount.hidden = true;
+    // A private window records nothing, including its split layout: the chrome
+    // localStorage is shared with every window and survives a restart.
+    const splitStorage = (() => {
+      if (!privateWindow) return undefined;
+      const values = new Map();
+      return {
+        getItem: (key) => (values.has(key) ? values.get(key) : null),
+        setItem: (key, value) => values.set(key, String(value)),
+        removeItem: (key) => values.delete(key),
+      };
+    })();
     const splitApi = mountSplit(splitMount, host, {
       tabs: [],
+      storage: splitStorage,
       onChange: (state) => {
         splitMount.hidden = state.slots.length < 2;
       },
