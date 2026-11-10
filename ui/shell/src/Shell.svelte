@@ -267,9 +267,10 @@
     // shape and bounds; the shell supplies the document read.
     try {
       host.PageSource?.setDriver?.(async (tabId) => {
-        // Never read a private window's page from chrome.
+        // Never read a private window's page from chrome, and never let one
+        // window's driver answer for a tab it does not own.
         if (privateWindow) return null;
-        const list = await host.Tabs.list({ request_id: newRequestId() });
+        const list = await host.Tabs.list({ request_id: newRequestId(), window_id: ownWindowId });
         const tab = (list.tabs ?? []).find((t) => t.astra_tab_id === tabId);
         if (!tab) return null;
         const url = typeof tab.url === "string" ? tab.url : "";
@@ -278,7 +279,7 @@
         const text = await response.text();
         const cap = 2_000_000;
         return { url, text: text.slice(0, cap), truncated: text.length > cap };
-      });
+      }, ownWindowId);
     } catch {
       // No host module: the Source page shows "no document".
     }
@@ -1135,7 +1136,7 @@
         // Already gone with the window.
       }
       try {
-        host.PageSource?.setDriver?.(null);
+        host.PageSource?.setDriver?.(null, ownWindowId);
       } catch {
         // Already gone with the window.
       }
