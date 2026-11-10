@@ -10,3 +10,7 @@
 # Dev channel suffix per owner direction (release drops it, P8).
 MOZ_APP_DISPLAYNAME="@ASTRA_DISPLAY_NAME@ Nightly"
 MOZ_MACBUNDLE_ID=astra-nightly
+# Own remoting identity: without this the build inherits firefox-default and
+# a running Firefox (or another Astra install) captures our launches and
+# vice versa. Must match the packaged desktop entry's StartupWMClass.
+MOZ_APP_REMOTINGNAME=astra-nightly
