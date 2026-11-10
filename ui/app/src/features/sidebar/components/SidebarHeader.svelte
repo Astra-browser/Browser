@@ -190,4 +190,12 @@
   .sidebar-toolbar {
     container-type: inline-size;
   }
+
+  /* When the utilities become the two-row grid, the shield belongs on the
+     first row with the tools instead of floating at the seam between rows. */
+  @container (max-width: 260px) {
+    .sidebar-toolbar :global(.site-shield) {
+      align-self: flex-start;
+    }
+  }
 </style>

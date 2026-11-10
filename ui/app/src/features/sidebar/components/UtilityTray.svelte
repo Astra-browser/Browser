@@ -134,6 +134,11 @@
     max-block-size: calc(100vh - 120px);
     padding: var(--menu-pad);
     overflow-y: auto;
+
+    /* It floats over the page, not over the desktop: solid, so the page's own
+       text never reads through the tray's labels. */
+    background: var(--color-float);
+    backdrop-filter: none;
   }
 
   .tray-body {

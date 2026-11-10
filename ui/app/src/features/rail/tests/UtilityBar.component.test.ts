@@ -165,16 +165,56 @@ test("at rail width the bar becomes the two-column tool grid", async () => {
   expect(getComputedStyle(row.querySelector<HTMLElement>(".rail-row-title")!).display).toBe("none");
 });
 
-test("the bar reflows as a grid when the column is dragged narrow", async () => {
+test("the bar is one row when the column has room", async () => {
   await tabs.init();
   project();
   const screen = await render(UtilityBar, { ontoggle: () => {} });
   const host = screen.container;
-  host.style.inlineSize = "190px";
+  host.style.inlineSize = "320px";
+  host.style.containerType = "inline-size";
+  const element = host.querySelector<HTMLElement>(".utility-bar")!;
+  await expect.poll(() => getComputedStyle(element).display).toBe("flex");
+  // One row: the bar is no taller than its 26px plate.
+  expect(element.getBoundingClientRect().height).toBeLessThanOrEqual(30);
+});
+
+test("the bar reflows as an even four-column grid when the column is dragged narrow", async () => {
+  await tabs.init();
+  project();
+  const screen = await render(UtilityBar, { ontoggle: () => {} });
+  const host = screen.container;
+  host.style.inlineSize = "240px";
   host.style.containerType = "inline-size";
   const element = host.querySelector<HTMLElement>(".utility-bar")!;
   await expect.poll(() => getComputedStyle(element).display).toBe("grid");
+  // Four plates per row, not a ragged wrap: eight entries make exactly two
+  // even rows at the default 240px column.
+  expect(getComputedStyle(element).gridTemplateColumns.split(" ")).toHaveLength(4);
   expect(getComputedStyle(host.querySelector<HTMLElement>(".bar-rule")!).display).toBe("none");
+  const hostBox = host.getBoundingClientRect();
+  for (const button of element.querySelectorAll<HTMLElement>("button")) {
+    const box = button.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(hostBox.left - 0.5);
+    expect(box.right).toBeLessThanOrEqual(hostBox.right + 0.5);
+  }
+});
+
+test("the narrow grid still fits the column at its 180px minimum", async () => {
+  await tabs.init();
+  project();
+  const screen = await render(UtilityBar, { ontoggle: () => {} });
+  const host = screen.container;
+  host.style.inlineSize = "180px";
+  host.style.containerType = "inline-size";
+  const element = host.querySelector<HTMLElement>(".utility-bar")!;
+  await expect.poll(() => getComputedStyle(element).display).toBe("grid");
+  expect(getComputedStyle(element).gridTemplateColumns.split(" ")).toHaveLength(4);
+  const hostBox = host.getBoundingClientRect();
+  for (const button of element.querySelectorAll<HTMLElement>("button")) {
+    const box = button.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(hostBox.left - 0.5);
+    expect(box.right).toBeLessThanOrEqual(hostBox.right + 0.5);
+  }
 });
 
 test("every utility entry is named, and each opens its own surface", async () => {
@@ -289,9 +329,17 @@ test("the extensions entry opens the hub for every installed extension", async (
     },
   ];
   const screen = await bar();
+  // One door, not two: the old manage/store menu is folded into the hub.
+  expect(screen.getByRole("button", { name: "Extensions", exact: true }).elements()).toHaveLength(
+    1,
+  );
   await screen.getByRole("button", { name: "Extensions", exact: true }).click();
   await expect.element(screen.getByText("Bitwarden", { exact: true })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Manage extensions" })).toBeVisible();
+  // Everything the second puzzle used to carry is still one click away.
+  await expect.element(screen.getByRole("button", { name: "Chrome Web Store" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Firefox Add-ons" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Install from file" })).toBeVisible();
 });
 
 test("the appearance switch turns the window dark from a light window", async () => {

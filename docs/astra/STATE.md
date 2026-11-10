@@ -11,6 +11,32 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: sidebar utility bar — one extension door, resize-safe layout (2026-11-11)
+
+The head of the column had two puzzle buttons (a manage/store menu and the
+extension hub) and wrapped into a ragged second row at the default 240px,
+leaving the theme plate alone beside the shield. Both are fixed.
+
+| Surface | What changed | Files | Verified |
+|---|---|---|---|
+| Extension door | one puzzle button; the hub now carries installed extensions, page actions, Manage, Chrome Web Store, Firefox Add-ons and Install from file | `features/rail/components/UtilityBar.svelte`, `features/extensions/components/ExtensionHub.svelte` | UtilityBar + ExtensionHub component suites; live Playwright `shell.spec.ts` "one extension door…" |
+| Utility bar layout | one row with room; a centred 4×2 grid when the column is ≤260px, 24px plates ≤196px, the rule hides in the grid, and the shield aligns to the first row | `UtilityBar.svelte`, `features/sidebar/components/SidebarHeader.svelte` | UtilityBar tests at 320/240/180; live drag tests in `shell.spec.ts` |
+| Popovers in dark mode | every menu/disclosure opened from the column is opaque (`data-menu-material="opaque"`), and the address tray is solid, so the tab list never reads through a panel's labels | `features/sidebar/components/Sidebar.svelte`, `UtilityTray.svelte` | MenuMaterial suite; live Playwright asserts the hub panel is opaque |
+| Store bug | the hub's "Chrome Web Store" row opened the Firefox store; each store now opens its own URL | `ExtensionHub.svelte` | ExtensionHub component suite |
+
+**Verification:** `bun run --filter @astra/frame check` green (typecheck 0,
+eslint/stylelint/prettier/knip clean, 1249 unit tests); the four touched
+component suites 37/37; live Playwright `shell.spec.ts` 3/3 for the resize and
+opaque-hub checks; live `utility-bar-probe.py` 30/30 against the rebuilt
+packaged dev build (four-column grid, one extension door, opaque hub, media
+popover inside the column, tool-panel head, hide/peek). The full
+`shell.spec.ts` still fails four checks that depend on elements absent from the
+frozen golden shell (the "Address and search" textbox and the Browse/Work
+radiogroup); those files were not touched here and the failures are reported
+separately. `bun run --filter @astra/frame build` also still fails at the
+startup-request budget (40 vs 24); `build:chrome` is green and this change adds
+no startup graph node, so the failure is reported separately.
+
 ## Review follow-ups: shield pause, procedural ads, timer target (2026-11-10)
 
 A review of the blocker/FPP batch found five issues; all are fixed on

@@ -524,6 +524,13 @@
   }
 </script>
 
+<!--
+  Every menu, popover and disclosure opened from the column is opaque: it lies
+  over the tab list, and a translucent sheet there leaves the list's own titles
+  showing through its labels. The material policy travels with the trigger, so
+  one attribute covers the bar's panels, the address tray, the spaces stack and
+  menus opened from a tab row.
+-->
 <aside
   bind:this={aside}
   data-hidden={away || undefined}
@@ -544,7 +551,7 @@
   aria-label={m.ui_browser_sidebar()}
   style:width={`${width}px`}
   style:--sidebar-width={`${columnWidth}px`}
-  data-menu-material={IS_WINDOWS && !settings ? "opaque" : undefined}
+  data-menu-material="opaque"
   data-reshaping={reshaping}
   data-sidebar-resize-settling={resizeSettling}
   data-header-fresh={headerFresh}
