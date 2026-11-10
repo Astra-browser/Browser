@@ -431,6 +431,27 @@ export const Content = {
       if (!tab) return "";
       return idOf.get(tab) || tab.getAttribute("astra-tab-id") || "";
     };
+    /**
+     * The URL a tab is for, including a lazily restored tab that has not been
+     * selected yet. A pending tab's `currentURI` is about:blank, but
+     * SessionStore already knows the saved URL; reading it here is what keeps
+     * "continue where you left off" from looking like an empty session.
+     */
+    const urlOfTab = (tab) => {
+      try {
+        if (tab?.hasAttribute?.("pending")) {
+          const lazy = win?.SessionStore?.getLazyTabValue?.(tab, "url");
+          if (typeof lazy === "string" && lazy !== "") return lazy;
+        }
+      } catch {
+        // SessionStore is not available in this window.
+      }
+      try {
+        return tab?.linkedBrowser?.currentURI?.spec || "";
+      } catch {
+        return "";
+      }
+    };
     const bindTab = (id, tab) => {
       if (!id || !tab) return;
       tab.setAttribute("astra-tab-id", id);
@@ -939,6 +960,11 @@ export const Content = {
         const wanted = contextFor(id);
         const free = [...gb.tabs].find((candidate) => {
           if (idOfTab(candidate)) return false;
+          // A pending/restored tab is a saved page, not a free bootstrap tab:
+          // its currentURI is still about:blank until it is first selected.
+          if (candidate.hasAttribute("pending") || candidate.hasAttribute("restored")) {
+            return false;
+          }
           try {
             const spec = candidate.linkedBrowser?.currentURI?.spec;
             const context = Number(candidate.getAttribute("usercontextid") || 0);
@@ -1472,7 +1498,7 @@ export const Content = {
       let url = "about:blank";
       let title = "";
       try {
-        url = tab.linkedBrowser?.currentURI?.spec || url;
+        url = urlOfTab(tab) || url;
         title = tab.linkedBrowser?.contentTitle || "";
       } catch {
         // A tab that is still restoring.
@@ -1496,8 +1522,19 @@ export const Content = {
     try {
       const now = await Tabs.list({ request_id, window_id });
       const rows = now.tabs ?? [];
-      const blank = rows.find((t) => !t.url || t.url === "about:blank");
-      const restored = rows.filter((t) => t.url && t.url !== "about:blank");
+      // The bootstrap row is blank in the model *and* still blank natively.
+      // A lazily restored page also reads about:blank in the model, so the
+      // native URL (SessionStore's saved URL for a pending tab) decides.
+      const blank = rows.find((t) => {
+        if (t.url && t.url !== "about:blank") return false;
+        const spec = urlOfTab(tabOf.get(t.astra_tab_id));
+        return (
+          !spec ||
+          spec === "about:blank" ||
+          spec.startsWith("chrome://browser/content/blanktab")
+        );
+      });
+      const restored = rows.filter((t) => t !== blank);
       if (blank && restored.length > 0) {
         const chosen = restored.find((t) => t.selected) ?? restored[0];
         await Tabs.close({ astra_tab_id: blank.astra_tab_id });
