@@ -59,6 +59,7 @@ export class RowDrag {
   #down: { x: number; y: number } | null = null;
   #id = "";
   #dragging = false;
+  #capture: { element: HTMLElement; pointerId: number } | null = null;
   #pointer = { x: 0, y: 0 };
   #frame = 0;
   #swallow = false;
@@ -77,6 +78,11 @@ export class RowDrag {
 
   down(event: PointerEvent, id: string) {
     if (event.button !== 0) return;
+    // A press always starts clean. If the previous gesture never saw its
+    // release (the row it captured was rebuilt, or the release landed on
+    // another surface), its card would otherwise stay under the pointer and
+    // follow the next move: a stray icon with no drag behind it.
+    if (this.#down !== null || this.#dragging) this.#reset();
     this.#down = { x: event.clientX, y: event.clientY };
     this.#id = id;
     this.#dragging = false;
@@ -90,8 +96,12 @@ export class RowDrag {
       Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y) > 4
     ) {
       const target = event.currentTarget;
-      if (target instanceof HTMLElement) target.setPointerCapture(event.pointerId);
+      if (target instanceof HTMLElement) {
+        target.setPointerCapture(event.pointerId);
+        this.#capture = { element: target, pointerId: event.pointerId };
+      }
       this.#dragging = true;
+      this.#listen();
       tabDrag.begin(this.#id);
       document.body.style.cursor = "grabbing";
       this.#bounds =
@@ -127,6 +137,12 @@ export class RowDrag {
   }
 
   up(event: PointerEvent) {
+    // The window listener may settle the gesture before the row's own
+    // handler sees it; the second report must not run the drop twice.
+    if (this.#down === null && !this.#dragging) return;
+    // Stop listening before the capture is released, so the implicit
+    // `lostpointercapture` cannot be mistaken for the row disappearing.
+    this.#unlisten();
     const over = document.elementFromPoint(event.clientX, event.clientY);
     const before = placeBefore(over, event.clientX, event.clientY, this.#id);
     const dragged = this.#dragging;
@@ -168,6 +184,8 @@ export class RowDrag {
   }
 
   cancel(event: PointerEvent) {
+    if (this.#down === null && !this.#dragging) return;
+    this.#unlisten();
     this.#release(event);
     this.#reorder?.release();
     this.#reset();
@@ -206,13 +224,67 @@ export class RowDrag {
   }
 
   #release(event: PointerEvent) {
-    const target = event.currentTarget;
-    if (target instanceof HTMLElement && target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
+    const captured = this.#capture;
+    if (
+      captured !== null &&
+      captured.pointerId === event.pointerId &&
+      captured.element.hasPointerCapture(event.pointerId)
+    ) {
+      captured.element.releasePointerCapture(event.pointerId);
     }
+    this.#capture = null;
+  }
+
+  /**
+   * A gesture has one release, wherever it lands. Waiting only for the row's
+   * own `pointerup` is what left the card behind when the row was rebuilt
+   * mid-drag or the pointer was released over another surface; the window
+   * still sees that release, so the gesture can always end.
+   */
+  #onPointerUp = (event: PointerEvent) => {
+    // Only the press that owns the gesture releases it.
+    if (event.button !== 0) return;
+    this.up(event);
+  };
+  #onPointerCancel = (event: PointerEvent) => this.cancel(event);
+  #onLostCapture = (event: PointerEvent) => {
+    if (!this.#dragging || this.#down === null) return;
+    // Capture is lost only while the gesture is still live when the row is
+    // gone; its release will never arrive here. Drop the card with the row.
+    if (this.#capture === null || this.#capture.pointerId === event.pointerId) this.abandon();
+  };
+  #onBlur = () => this.abandon();
+  #onVisibility = () => {
+    if (document.hidden) this.abandon();
+  };
+  #onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.#swallow = true;
+    this.abandon();
+  };
+
+  #listen() {
+    window.addEventListener("pointerup", this.#onPointerUp, true);
+    window.addEventListener("pointercancel", this.#onPointerCancel, true);
+    window.addEventListener("blur", this.#onBlur);
+    window.addEventListener("keydown", this.#onKey, true);
+    document.addEventListener("lostpointercapture", this.#onLostCapture, true);
+    document.addEventListener("visibilitychange", this.#onVisibility);
+  }
+
+  #unlisten() {
+    window.removeEventListener("pointerup", this.#onPointerUp, true);
+    window.removeEventListener("pointercancel", this.#onPointerCancel, true);
+    window.removeEventListener("blur", this.#onBlur);
+    window.removeEventListener("keydown", this.#onKey, true);
+    document.removeEventListener("lostpointercapture", this.#onLostCapture, true);
+    document.removeEventListener("visibilitychange", this.#onVisibility);
   }
 
   #reset() {
+    this.#unlisten();
     if (this.#frame !== 0) {
       cancelAnimationFrame(this.#frame);
       this.#frame = 0;
@@ -220,6 +292,7 @@ export class RowDrag {
     this.#down = null;
     this.#id = "";
     this.#dragging = false;
+    this.#capture = null;
     this.#reorder = null;
     this.ghost = null;
     document.body.style.cursor = "";

@@ -174,3 +174,73 @@ test("a tab carried out of its list shows a card with its title, and the far hal
   await expect.poll(() => native.setEssential.mock.calls.length).toBe(2);
   expect(native.setEssential).toHaveBeenLastCalledWith("a", false, null);
 });
+
+test("a release the row never sees still drops the card", async () => {
+  const { row } = await list();
+  const handle = row("a").querySelector<HTMLElement>(".tab-open")!;
+  const home = row("a").getBoundingClientRect();
+  const { init } = drag(handle, { x: home.left + 20, y: home.top + home.height / 2 });
+  await frame();
+  expect(document.querySelector(".drag-card")).not.toBeNull();
+
+  // The row the gesture captured can be rebuilt mid-drag, so its release is
+  // never delivered there. The window still gets it: no card may survive it.
+  window.dispatchEvent(
+    new PointerEvent("pointerup", {
+      ...init,
+      clientX: home.left + 20,
+      clientY: home.top + home.height / 2,
+    }),
+  );
+  await expect.poll(() => document.querySelector(".drag-card")).toBeNull();
+});
+
+test("a lost capture drops the card with the row", async () => {
+  const { row } = await list();
+  const handle = row("a").querySelector<HTMLElement>(".tab-open")!;
+  const home = row("a").getBoundingClientRect();
+  drag(handle, { x: home.left + 20, y: home.top + home.height / 2 });
+  await frame();
+  expect(document.querySelector(".drag-card")).not.toBeNull();
+
+  handle.dispatchEvent(new PointerEvent("lostpointercapture", { bubbles: true, pointerId: 1 }));
+  await expect.poll(() => document.querySelector(".drag-card")).toBeNull();
+});
+
+test("a fresh press clears a card left by a gesture that never ended", async () => {
+  const { row } = await list();
+  const first = row("a").querySelector<HTMLElement>(".tab-open")!;
+  const home = row("a").getBoundingClientRect();
+  drag(first, { x: home.left + 20, y: home.top + home.height / 2 });
+  await frame();
+  expect(document.querySelector(".drag-card")).not.toBeNull();
+
+  // The pointer is pressed again without the previous release ever arriving.
+  // That press owns a new gesture; the orphaned card must not follow it.
+  const next = row("b").getBoundingClientRect();
+  const second = row("b").querySelector<HTMLElement>(".tab-open")!;
+  second.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      bubbles: true,
+      pointerId: 2,
+      button: 0,
+      isPrimary: true,
+      clientX: next.left + 20,
+      clientY: next.top + next.height / 2,
+    }),
+  );
+  await expect.poll(() => document.querySelector(".drag-card")).toBeNull();
+});
+
+test("Escape abandons a carry without dropping it", async () => {
+  const { row } = await list();
+  const handle = row("a").querySelector<HTMLElement>(".tab-open")!;
+  const home = row("a").getBoundingClientRect();
+  drag(handle, { x: home.left + 20, y: home.top + home.height / 2 });
+  await frame();
+  expect(document.querySelector(".drag-card")).not.toBeNull();
+
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await expect.poll(() => document.querySelector(".drag-card")).toBeNull();
+  expect(native.setEssential).not.toHaveBeenCalled();
+});
