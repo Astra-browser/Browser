@@ -144,12 +144,14 @@ device-key wrap; without it every operation asks for the PIN.
 - `passkeys/engine`: `cargo test` — 16 tests (PBKDF2 vectors, seal tamper
   rejection, wrong-PIN lockout, device unlock, PIN change, persistence,
   corrupt-file handling).
-- `tests/contract/passkeys_model.mjs` — 16 checks on the Settings seam and
-  prompt answers.
+- `tests/contract/passkeys_model.mjs` — 19 checks on the Settings seam, the
+  prompt answers and the private-context refusal.
 - `tests/contract/wire_coverage.mjs` — both new routes and the new channel.
 - `crates/astra-proto/check-drift.sh` — registries, fixtures, TS.
-- Live probe: `tools/marionette-probe/passkeys-probe.py` on the packaged dev
-  build (create, sign in, lockout, toggle, private window).
+- Live probe: `tools/marionette-probe/passkeys-probe.py` 24/24 on the packaged
+  dev build (create, sign in, wrong PIN + retries, browser-wide toggle, vault
+  file at rest, list). The full lockout timer and a real private window are
+  covered by unit/contract tests, not the live probe.
 
 ## 7. Cross-device QR/hybrid design (not shipped)
 
