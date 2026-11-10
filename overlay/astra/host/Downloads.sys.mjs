@@ -353,8 +353,13 @@ function makeNative(scope) {
         Ci.nsIFilePicker,
       );
       const win = services.wm?.getMostRecentWindow?.("navigator:browser") ?? null;
+      // nsIFilePicker.init takes the window's BrowsingContext in this engine,
+      // not the chrome window proxy (the proxy throws and the picker never
+      // opens, which made "Choose folder" a silent no-op).
+      const context = win?.browsingContext ?? null;
+      if (!context) return null;
       picker.init(
-        win,
+        context,
         "Choose a downloads folder",
         Ci.nsIFilePicker.modeGetFolder,
       );

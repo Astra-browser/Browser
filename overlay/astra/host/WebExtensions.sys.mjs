@@ -441,8 +441,11 @@ export const WebExtensions = {
     try {
       const picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
       const win = Services.wm.getMostRecentWindow("navigator:browser");
+      // nsIFilePicker.init is typed against a BrowsingContext in this engine.
+      const context = win?.browsingContext ?? null;
+      if (!context) return null;
       picker.init(
-        win,
+        context,
         folder ? "Choose extension folder" : "Choose extension package",
         folder ? Ci.nsIFilePicker.modeGetFolder : Ci.nsIFilePicker.modeOpen
       );
