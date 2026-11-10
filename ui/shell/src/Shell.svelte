@@ -484,7 +484,7 @@
       if (!id) return;
       event.preventDefault();
       event.stopPropagation();
-      void host.Commands.run({ id });
+      void host.Commands.run({ id, window_id: ownWindowId });
     };
     win.addEventListener("keydown", onGlobalKey, true);
     // Auxiliary mouse buttons are shortcuts too (back / forward / extra).
@@ -507,7 +507,7 @@
       if (!id) return;
       event.preventDefault();
       event.stopPropagation();
-      void host.Commands.run({ id });
+      void host.Commands.run({ id, window_id: ownWindowId });
     };
     win.addEventListener("mousedown", onGlobalMouse, true);
     // A page's fullscreen request can be refused by the engine for reasons
