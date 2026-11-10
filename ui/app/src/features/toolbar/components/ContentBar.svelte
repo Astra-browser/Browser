@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { ArrowLeft02Icon, ArrowRight02Icon, Home01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+  import {
+    ArrowLeft02Icon,
+    ArrowRight02Icon,
+    Home01Icon,
+    Refresh01Icon,
+  } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
   import { commands } from "$shared/ipc/bindings";
   import IconButton from "$shared/ui/IconButton";
