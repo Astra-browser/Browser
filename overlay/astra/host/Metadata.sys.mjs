@@ -407,9 +407,9 @@ export const Metadata = {
   },
 
   /** Write the current organisation. Never called before `prepare`. */
-  async save() {
+  async save({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (_private) return { saved: false, reason: "private" };
+    if (isPrivate === true || _private) return { saved: false, reason: "private" };
     if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
       return { saved: false, reason: "not_owner" };
     }
@@ -460,9 +460,9 @@ export const Metadata = {
    * first; if nothing was ever saved, this is a no-op rather than an empty
    * write that would erase the person's organisation.
    */
-  async flush() {
+  async flush({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (_private) return { saved: false, reason: "private" };
+    if (isPrivate === true || _private) return { saved: false, reason: "private" };
     if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
       return { saved: false, reason: "not_owner" };
     }

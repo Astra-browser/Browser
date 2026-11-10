@@ -83,6 +83,11 @@ check(
   (await pageSource({ tab_id: "a", window_id: "win-2" })) === null &&
     (await pageSource({ tab_id: "a", window_id: "win-1" })).url === "normal",
 );
+setDriver(null);
+check(
+  "a direct caller with one live window is served that window",
+  (await pageSource({ tab_id: "a" })).url === "normal",
+);
 
 __resetPageSourceForTests();
 check("reset clears the driver", (await pageSource({ tab_id: "z" })) === null);
