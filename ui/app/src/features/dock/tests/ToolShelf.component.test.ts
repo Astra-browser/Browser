@@ -6,11 +6,11 @@ import * as notices from "$session/notice.svelte";
 import { preferences } from "$domain/preferences";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import type { ProfilesView } from "$shared/ipc/bindings";
+import { ContextMenu } from "$features/menus";
 import ToolShelf from "../components/ToolShelf.svelte";
 
 const native = vi.hoisted(() => ({
   run: vi.fn(async () => ({ accepted: true, operation_id: null })),
-  toolsMenu: vi.fn(async () => true),
   profiles: vi.fn(async () => ({ status: "ok" as const, data: null as ProfilesView | null })),
   switchTo: vi.fn(async () => ({ accepted: true, operation_id: null })),
 }));
@@ -18,6 +18,16 @@ const native = vi.hoisted(() => ({
 const names = (root: HTMLElement) =>
   [...root.querySelectorAll(".shelf-item")].map((item) =>
     item.querySelector(":scope > span:not(.ui-menu-icon, .shelf-keys)")?.textContent?.trim(),
+  );
+
+const menuLabels = () =>
+  [...document.querySelectorAll(".shell-menu-item .shell-menu-label")].map((node) =>
+    node.textContent?.trim(),
+  );
+
+const menuRow = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>(".shell-menu-item")].find(
+    (item) => item.querySelector(".shell-menu-label")?.textContent?.trim() === label,
   );
 
 const avatar = { style: "initials" as const, color: 1, symbol: 0, revision: 0 };
@@ -34,7 +44,6 @@ vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
     runCommand: native.run,
-    toolsMenuPopup: native.toolsMenu,
     profilesGet: native.profiles,
     profilesSwitch: native.switchTo,
     settingGet: async () => null,
@@ -77,6 +86,7 @@ test("the profile opens on a switcher of who you are, then the tools", async () 
   native.profiles.mockResolvedValueOnce({ status: "ok" as const, data: ROSTER });
   await page.viewport(1200, 800);
   const screen = await render(ToolShelf);
+  await render(ContextMenu);
   screen.container.style.paddingBlockStart = "480px";
   const tools = screen.getByRole("button", { name: /^Tools/ });
   await expect.element(tools).toHaveAttribute("aria-haspopup", "menu");
@@ -112,8 +122,35 @@ test("the profile opens on a switcher of who you are, then the tools", async () 
   await screen.getByRole("menuitem", { name: /^Personal — / }).click();
   expect(native.run).toHaveBeenLastCalledWith("settings.profiles");
 
+  // A right-click is the app's own menu, with the stack's rows, not a host
+  // popup that has no route.
   await tools.click({ button: "right" });
-  expect(native.toolsMenu).toHaveBeenCalledOnce();
+  await expect
+    .poll(menuLabels)
+    .toEqual([
+      "Personal — Profile Settings",
+      "Work",
+      "New Incognito Window",
+      "Ask Astra",
+      "Notes",
+      "Tasks",
+      "Time",
+      "History",
+      "Downloads",
+      "Bookmarks",
+      "Settings",
+    ]);
+
+  // Every row calls the same thing the stack row does, in this window.
+  native.switchTo.mockClear();
+  native.run.mockClear();
+  menuRow("Work")!.click();
+  await expect.poll(() => native.switchTo.mock.calls).toEqual([["p2"]]);
+
+  await tools.click({ button: "right" });
+  await expect.poll(menuLabels).toContain("Settings");
+  menuRow("Settings")!.click();
+  await expect.poll(() => native.run.mock.calls).toEqual([["browser.settings"]]);
 });
 
 test("with one profile the head is you alone, and a private window beside you", async () => {

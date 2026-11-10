@@ -86,6 +86,11 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "sidebar" } } },
             allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
           },
+          // The tool shelf's right-click menu is the app menu too.
+          {
+            from: { element: { type: "features", captured: { module: "dock" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
           // Settings edits the sites focus shuts with the same control as Time.
           {
             from: { element: { type: "features", captured: { module: "settings" } } },
