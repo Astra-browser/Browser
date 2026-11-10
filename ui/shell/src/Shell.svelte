@@ -1163,8 +1163,8 @@
       }
       try {
         if (!privateWindow) {
-          host.Metadata?.releaseOwner?.();
-          host.Metadata?.dispose?.();
+          host.Metadata?.releaseOwner?.({ window_id: ownWindowId });
+          host.Metadata?.dispose?.({ window_id: ownWindowId });
         }
       } catch {
         // Already torn down with the window.
