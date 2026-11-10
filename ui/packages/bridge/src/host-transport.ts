@@ -186,6 +186,8 @@ const ROUTES: Record<string, Route> = {
   // closed-tab/forget kinds to the Places-backed HistoryCall module.
   history_call: ["SpaceHistory", "call"],
   about_info: ["System", "aboutInfo"],
+  diagnostics_report: ["System", "diagnosticsReport"],
+  diagnostics_show_logs: ["System", "diagnosticsShowLogs"],
   system_clock_24h: ["System", "systemClock24h"],
   update_status: ["System", "updateStatus"],
   update_check: ["System", "updateCheck"],
