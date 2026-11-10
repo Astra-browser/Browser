@@ -34,7 +34,7 @@ CONTRACTS=(
   media_model media_selection webext_view wire_coverage containers_isolation settings_native
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker
-  menu_layer telemetry_blocklist migration_model
+  menu_layer telemetry_blocklist migration_model search_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
