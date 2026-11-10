@@ -30,7 +30,7 @@ echo "== contracts"
 CONTRACTS=(
   hostapi_v1 shell_assembly frame_model tab_lifecycle stage_rect tabs_admission
   dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert diagnostics_model
-  permissions_prompt operations_ledger metadata_restore page_source_model
+  permissions_prompt operations_ledger metadata_restore page_source_model tab_history
   media_model media_selection webext_view wire_coverage containers_isolation settings_native
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker

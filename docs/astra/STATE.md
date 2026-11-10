@@ -831,6 +831,19 @@ recorded below; this list is what is still genuinely unwired.
   been exercised with one page; multi-pane and Work pane relayout remain
   unverified.
 
+### Wire record: Back/Forward history menu (2026-11-10)
+
+- `tabs_history` → `TabHistory.list` and `tabs_history_go` →
+  `Navigation.goToHistory`; both map the app's `id` onto `astra_tab_id`.
+- New `TabHistory.sys.mjs` host module. `Content.mountNative` installs its
+  driver over `SessionStore.getSessionHistory(tab)` and clears it on detach.
+- `Navigation.goToHistory` steps the model stack and commits with
+  `history: "back" | "forward"` plus the new `history_index` event field, which
+  `Content` consumes to call `browser.gotoIndex(index)`.
+- Why: the native `history_menu_popup` had no route, so a right-click or held
+  press on Back/Forward did nothing; the menu is now drawn in the app and each
+  row answers with a real session-history jump.
+
 ### Settings bound to native prefs (closed 2026-11-05)
 
 `overlay/astra/host/Settings.sys.mjs` now has a native adapter. Keys below read

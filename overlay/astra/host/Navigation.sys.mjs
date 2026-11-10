@@ -154,6 +154,36 @@ export const Navigation = {
     return ok(request_id, { astra_tab_id: id, went_forward: true, url: tab.url });
   },
 
+  // Jump straight to one entry the Back/Forward menu named. The model steps
+  // its own stack so `history`/`history_index` reach Content, which then asks
+  // the engine for the same index; the address the engine really shows is
+  // folded back into the entry by `__commitExternal`.
+  async goToHistory({ request_id = "", astra_tab_id = "", index = -1 } = {}) {
+    const { id, tab } = tabOf(astra_tab_id);
+    if (!tab) {
+      return err(request_id, "no_such_tab", `unknown tab ${astra_tab_id || "(none selected)"}`);
+    }
+    const h = __historyFor(id);
+    if (!h || !Array.isArray(h.entries) || h.entries.length === 0) {
+      return ok(request_id, { astra_tab_id: id, moved: false, url: tab.url });
+    }
+    if (!Number.isInteger(index)) {
+      return ok(request_id, { astra_tab_id: id, moved: false, index: h.index, url: tab.url });
+    }
+    const target = Math.min(h.entries.length - 1, Math.max(0, index));
+    if (target === h.index) {
+      return ok(request_id, { astra_tab_id: id, moved: false, index: h.index, url: tab.url });
+    }
+    const previous = h.index;
+    h.index = target;
+    commit(id, h.entries[target], {
+      loading: true,
+      history: target < previous ? "back" : "forward",
+      history_index: target,
+    });
+    return ok(request_id, { astra_tab_id: id, moved: true, index: target, url: tab.url });
+  },
+
   async reload({ request_id = "", astra_tab_id = "" } = {}) {
     const { id, tab } = tabOf(astra_tab_id);
     if (!tab) {

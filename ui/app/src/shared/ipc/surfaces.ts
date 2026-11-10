@@ -174,3 +174,22 @@ export const cloneTabToSpace = (
     "tabs_clone_to_space",
     { id, space, includeHistory, background },
   );
+
+// --- Session history -------------------------------------------------------
+
+/** The pages behind and ahead of a tab, as the engine kept them. */
+export interface TabHistoryView {
+  index: number;
+  entries: Array<{ url: string; title: string }>;
+}
+
+export const tabHistory = (id: string) => invoke<TabHistoryView>("tabs_history", { id });
+
+export const tabHistoryGo = (id: string, index: number) =>
+  invoke<{ astra_tab_id: string; moved: boolean; index?: number; url?: string }>(
+    "tabs_history_go",
+    {
+      id,
+      index,
+    },
+  );

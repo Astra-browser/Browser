@@ -58,6 +58,7 @@ astra.jar:
   content/astra/res/host/Operations.sys.mjs (host/Operations.sys.mjs)
   content/astra/res/host/Metadata.sys.mjs (host/Metadata.sys.mjs)
   content/astra/res/host/PageSource.sys.mjs (host/PageSource.sys.mjs)
+  content/astra/res/host/TabHistory.sys.mjs (host/TabHistory.sys.mjs)
   content/astra/res/host/DialogPrompts.sys.mjs (host/DialogPrompts.sys.mjs)
   content/astra/res/host/Helpers.sys.mjs (host/Helpers.sys.mjs)
   content/astra/res/host/Sidebar.sys.mjs (host/Sidebar.sys.mjs)

@@ -81,6 +81,12 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "bookmarks" } } },
             allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
           },
+          // The content bar's Back/Forward history menu is the same shared
+          // presenter: its rows are drawn by the app, not a native popup.
+          {
+            from: { element: { type: "features", captured: { module: "toolbar" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
           // Settings edits the sites focus shuts with the same control as Time.
           {
             from: { element: { type: "features", captured: { module: "settings" } } },
