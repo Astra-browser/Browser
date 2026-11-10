@@ -318,3 +318,26 @@ Engine/UI work in this pass that targets the same cost centres: revision
 pruning for closed tabs, an in-flight epoch on the extension list, one
 `WeakMap` host lookup per window, and a bounded core-call timeout so a wedged
 sidecar cannot stall session saves.
+
+## 6. Confirmation run 0.1.744 (2026-11-10, installed release binary)
+
+`ASTRA_BINARY=~/.local/opt/astra/firefox python3 tools/perf/run_all.py --runs 1
+--out out/perf-0.1.744` (headed release build; all four benches PASS).
+
+| Metric | 0.1.744 | Note |
+|---|---|---|
+| Startup cold / warm | 0.302 s / 0.301 s | same Marionette-listen proxy as §1 |
+| RAM 1 tab | 674 MiB | includes the native stage + app frame |
+| RAM 10 tabs | 929 MiB | |
+| RAM 50 tabs | 947 MiB | |
+| RAM 50 tabs sleeping | 1 177 MiB | same-origin fixtures share content processes; `discardBrowser` does not shrink them here |
+| Tab switch median / p95 | 21.5 / 87.5 ms | one run, loaded box |
+| Scroll step median / p95 | 16.7 / 16.7 ms | |
+| Blocker p50 / p95 / p99 | 2 160 / 2 616 / 2 852 ns | 131 724 rules, seed 76.5 ms |
+
+These are **not** a regression verdict against §1: that table was measured
+before the native tab stage and the current UI. The stock-ESR column is still
+TODO, so the budget comparisons in §3 remain unbaselined. The favicon reader
+was reduced to one page read per origin (coalesced, cached, bounded at 256
+origins) in this run, which removes the duplicated page download on iconless
+sites; it is a network/CPU saving, not a measured RSS delta.

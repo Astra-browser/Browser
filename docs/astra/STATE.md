@@ -74,6 +74,24 @@ windows can still open browser pages (their durable writes are refused); the
 `AsyncTabSwitcher` assertion seen while closing a private window under the
 hidden Weston compositor is engine-side and did not reproduce outside it.
 
+**Installed verification (0.1.744).** The tarball was installed over the
+previous `~/.local/opt/astra` with the bundled `install.sh`. `version-probe.py`
+reports `astra.version` 0.1.744 and About `Version 0.1.744`; the installed
+binary passes the edge matrix (21), multi-window isolation (11), downloads
+lifecycle (15), tab order (6), tabs churn (20) and native surfaces (44/44).
+A copy of the existing `~/.mozilla/astra` profile boots on the installed build
+with `Metadata.status().available === true`, `restored === true`, three spaces
+and its tab. The old process was still running while the folder was replaced,
+so a restart is required to pick up the new binary.
+
+**Perf (0.1.744, installed binary, `run_all.py --runs 1`):** startup 0.302 s
+cold / 0.301 s warm; 1-tab baseline 674 MiB, 10 tabs 929 MiB, 50 tabs 947 MiB,
+50 sleeping 1 177 MiB; tab switch 21.5 ms median (p95 87.5); scroll step
+16.7 ms median; blocker 131 724 rules, p95 2 616 ns. The memory numbers are
+higher than the 2026-11-02 table because that table predates the native tab
+stage and the current UI; the stock-ESR column is still TODO, so no budget
+verdict is claimed. `perf-0.1.744` holds the JSON.
+
 ## Dev/alpha version 0.1.742 (2026-11-10)
 
 The first build handed to dev/alpha testers carries Astra's **own** product
