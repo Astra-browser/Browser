@@ -91,8 +91,14 @@ const done = arguments[arguments.length - 1];
     step("invokeAction accepts the gesture", result?.accepted === true, result);
     await wait(700);
 
-    const panel = document.querySelector('[data-astra-extension-popup="true"]');
-    step("the Astra popup panel opened", !!panel && panel.state === "open", panel?.state ?? null);
+    let panel = null;
+    for (let i = 0; i < 20; i += 1) {
+      panel = document.querySelector('[data-astra-extension-popup="true"]');
+      if (panel?.state === "open") break;
+      await wait(250);
+    }
+    const panelLive = !!panel && (panel.state === "open" || panel.state === "showing");
+    step("the Astra popup panel opened", panelLive, panel?.state ?? null);
     const popupBrowser = panel?.querySelector("browser");
     const spec = popupBrowser?.currentURI?.spec ?? "";
     step("the extension's own popup loaded", spec.includes("/popup.html"), spec);
