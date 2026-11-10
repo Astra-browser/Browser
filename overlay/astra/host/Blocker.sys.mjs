@@ -1193,10 +1193,45 @@ function writeSiteException(host, paused) {
   );
 }
 
+/**
+ * The site shield must also pause the engine's own tracker lists (ETP). The
+ * Astra engine pause alone leaves Disconnect-listed hosts blocked, so the
+ * shield would report "off" while requests were still cancelled. Firefox
+ * stores a per-site ETP exception as a `trackingprotection` permission on the
+ * top-level principal (and `trackingprotection-pb` in private windows).
+ */
+function setNativeSiteException(host, paused) {
+  const site = String(host ?? "").trim().toLowerCase();
+  if (!site) return;
+  try {
+    const uri = Services.io.newURI(`https://${site}`);
+    const principal = Services.scriptSecurityManager.createContentPrincipal(
+      uri,
+      {},
+    );
+    const pm = Services.perms;
+    for (const type of ["trackingprotection", "trackingprotection-pb"]) {
+      if (paused) {
+        pm.addFromPrincipal(
+          principal,
+          type,
+          Ci.nsIPermissionManager.ALLOW_ACTION,
+          Ci.nsIPermissionManager.EXPIRE_NEVER,
+        );
+      } else {
+        pm.removeFromPrincipal(principal, type);
+      }
+    }
+  } catch {
+    // A malformed host or a locked permission store must not stop the engine.
+  }
+}
+
 function applySiteExceptions(native) {
   for (const host of readSiteExceptions()) {
     try {
       native.setSiteEnabled(host, false);
+      setNativeSiteException(host, true);
     } catch {
       // A single bad host must not stop the install.
     }
@@ -1210,6 +1245,7 @@ function applySiteExceptions(native) {
         policy.aggressive === true,
         policy.scripts === true,
       );
+      setNativeSiteException(host, policy.enabled !== true);
     } catch {
       // A single bad host must not stop the install.
     }
@@ -1373,6 +1409,7 @@ function liveBackend() {
         const native = resolveNative();
         if (!native?.setSiteEnabled) return false;
         native.setSiteEnabled(site, enabled);
+        setNativeSiteException(site, enabled === false);
         return writeSiteException(site, enabled === false);
       } catch {
         return false;
@@ -1383,6 +1420,7 @@ function liveBackend() {
         const native = resolveNative();
         if (!native?.setSitePolicy) return false;
         native.setSitePolicy(site, enabled, aggressive, scripts);
+        setNativeSiteException(site, enabled === false);
         writeSiteException(site, enabled === false);
         return writeSitePolicy(site, { enabled, aggressive, scripts });
       } catch {

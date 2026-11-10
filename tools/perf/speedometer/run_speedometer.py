@@ -16,11 +16,11 @@ browser over Marionette, and records the score, confidence interval and run
 time. For 3.0 it uses the hosted page (the engine tree has no 3.0 copy) unless
 `--url` points at a local mirror.
 
-Usage (always on the private display):
-  tools/perf/hidden-display.sh python3 tools/perf/speedometer/run_speedometer.py \
+Usage (real display; the private Weston output throttles rAF to ~1 Hz):
+  python3 tools/perf/speedometer/run_speedometer.py \
       --version 3.1 --runs 3 --label baseline
 
-  tools/perf/hidden-display.sh python3 tools/perf/speedometer/run_speedometer.py \
+  python3 tools/perf/speedometer/run_speedometer.py \
       --version 3.0 --runs 3 --label baseline
 
 Exit 0 when every run produced a valid score, 1 otherwise, 2 when the local
@@ -33,6 +33,7 @@ import functools
 import http.server
 import json
 import os
+import re
 import shutil
 import socket
 import socketserver
@@ -61,6 +62,7 @@ class M:
                 time.sleep(0.1)
         else:
             raise RuntimeError("no marionette")
+        self.sock.settimeout(120)
         self.f = self.sock.makefile("rb")
         self._id = 0
         self._read()
@@ -239,9 +241,11 @@ def main():
             key, _, value = pref.partition("=")
             if not key or not _:
                 raise SystemExit(f"invalid --pref {pref!r}; expected KEY=VALUE")
-            try:
-                parsed = json.loads(value)
-            except ValueError:
+            if value in ("true", "false"):
+                parsed = value == "true"
+            elif re.fullmatch(r"-?\d+", value):
+                parsed = int(value)
+            else:
                 parsed = value
             f.write(f"user_pref({json.dumps(key)}, {json.dumps(parsed)});\n")
     log = open(os.path.join(profile, "log"), "wb")
@@ -299,16 +303,28 @@ def main():
                 60,
             )
             report.setdefault("viewport", size)
-
-            result = wait(
-                lambda: m.js(
-                    "const r=document.getElementById('result-number');"
-                    "const n=r ? r.textContent.trim() : '';"
-                    "if (n === 'Error') return 'Error';"
-                    "return /^[0-9]/.test(n) ? n : '';"
-                ),
-                args.run_timeout,
+            check(
+                f"{args.label} {args.version} run {run} viewport is at least 800x600",
+                bool(size),
+                str(report.get("viewport")),
             )
+
+            def poll_result():
+                try:
+                    return m.js(
+                        "const r=document.getElementById('result-number');"
+                        "const n=r ? r.textContent.trim() : '';"
+                        "if (n === 'Error') return 'Error';"
+                        "return /^[0-9]/.test(n) ? n : '';"
+                    )
+                except (EOFError, OSError):
+                    return ""
+                except Exception:
+                    # A navigation can make the old browsing context dead for
+                    # one poll; the next one sees the new document.
+                    return ""
+
+            result = wait(poll_result, args.run_timeout)
             elapsed = round(time.time() - started, 1)
             data = read_result(m)
             data["elapsed_s"] = elapsed
@@ -337,6 +353,13 @@ def main():
         log.close()
         if httpd:
             httpd.shutdown()
+            httpd.server_close()
+        if proc.poll() is None:
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                pass
         shutil.rmtree(profile, ignore_errors=True)
 
     print("speedometer:", "PASS" if not failures else "FAIL: " + ", ".join(failures))

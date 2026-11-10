@@ -120,9 +120,10 @@ the user value each boot.
 |---|---|---|
 | `privacy.fingerprintingProtection` | `true` | Low-breakage FPP in normal windows |
 | `privacy.fingerprintingProtection.pbmode` | `true` | Same in private windows |
-| `privacy.fingerprintingProtection.overrides` | `+WebGLRenderInfo,+WebGLVendorSanitize,+WebGLRendererConstant,+AudioContext,+AudioSampleRate,+MediaCapabilities,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+ReduceTimerPrecision` | Hide GPU/audio/font/display surfaces while leaving UA/timezone/screen intact |
+| `privacy.fingerprintingProtection.overrides` | `+WebGLRenderInfo,+WebGLRenderCapability,+WebGLVendorSanitize,+WebGLRendererConstant,+WebGLRandomization,+AudioContext,+AudioSampleRate,+MediaCapabilities,+MediaDevices,+MediaError,+NetworkConnection,+FontVisibilityBaseSystem,+CSSResolution,+CSSDeviceSize,+CSSColorInfo,+FrameRate,+WebCodecs,+WebGPULimits,+WebGPUIsFallbackAdapter,+WebGPUSubgroupSizes,+VideoElementMozFrames,+VideoElementMozFrameDelay,+VideoElementPlaybackQuality` | Hide GPU/audio/font/display/media/WebGPU surfaces while leaving UA/timezone/screen intact; timer precision stays at the 1 ms floor (the 16.667 ms FPP atom breaks timing-sensitive code) |
 
-Tracker blocking is the Astra filter-list engine (`BLOCKER.md`), not native
-tracking protection. See `FINGERPRINTING.md` for the measured surfaces and the
-limits. `media.volume_scale` is a **string** pref (`"0.0"`), used by probes
+Tracker blocking is the Astra filter-list engine (`BLOCKER.md`); native ETP
+lists run as a second layer and the site shield writes a `trackingprotection`
+permission when it pauses a site. See `FINGERPRINTING.md` for the measured
+surfaces and the limits. `media.volume_scale` is a **string** pref (`"0.0"`), used by probes
 only, never by the product.

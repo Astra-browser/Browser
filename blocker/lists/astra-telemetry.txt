@@ -244,7 +244,6 @@
 ! who needs a social embed, consent banner, chat widget or affiliate
 ! redirect can pause shields for that one site from the address panel
 ! or the sidebar shield.
-! <<< superadblock-strict
 !
 ! Deliberately not emitted as host rules:
 !   vk.com - inventory probes only /rtrg; a host rule would block vk.com
@@ -709,3 +708,4 @@
 ||r.lr-ingest.com^$important
 ||rum.browser-intake-datadoghq.com^$important
 ||sessions.bugsnag.com^$important
+! <<< superadblock-strict

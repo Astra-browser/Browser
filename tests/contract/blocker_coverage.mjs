@@ -102,7 +102,9 @@ check(
 );
 
 // 4. No host rule appears twice in the generated section.
-const section = source.slice(source.indexOf("! >>> superadblock-strict"));
+const markerIndex = source.indexOf("! >>> superadblock-strict");
+check("strict section marker exists", markerIndex !== -1);
+const section = markerIndex === -1 ? "" : source.slice(markerIndex);
 const dups = [];
 const seen = new Set();
 for (const line of section.split("\n")) {
@@ -215,6 +217,22 @@ check(
   "timer precision is not reduced to the 16.667 ms frame atom",
   !targets.has("ReduceTimerPrecision") &&
     !runtimeTargets.has("ReduceTimerPrecision"),
+);
+check(
+  "per-site aggressive also excludes ReduceTimerPrecision",
+  !/"\+AllTargets"/.test(privacy) &&
+    /\+AllTargets,-ReduceTimerPrecision/.test(privacy),
+);
+
+// The site shield must pause the engine's own ETP lists too, or "off" still
+// leaves Disconnect-listed hosts blocked.
+const BLOCKER = path.join(ROOT, "overlay/astra/host/Blocker.sys.mjs");
+const blockerSource = fs.readFileSync(BLOCKER, "utf8");
+check(
+  "site shield pauses native ETP per site",
+  /trackingprotection/.test(blockerSource) &&
+    /addFromPrincipal/.test(blockerSource) &&
+    /setNativeSiteException/.test(blockerSource),
 );
 
 const REQUIRED_PREFS = [

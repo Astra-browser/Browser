@@ -109,7 +109,6 @@ def render_section(data=None, head_text=""):
         "! who needs a social embed, consent banner, chat widget or affiliate",
         "! redirect can pause shields for that one site from the address panel",
         "! or the sidebar shield.",
-        END,
     ]
     if SKIP:
         lines.append("!")
@@ -124,6 +123,7 @@ def render_section(data=None, head_text=""):
         lines.append(f"! {CATEGORY_TITLE.get(category, category)}")
         for host in sorted(set(by_category[category])):
             lines.append(f"||{host}^$important")
+    lines.append(END)
     return "\n".join(lines) + "\n"
 
 
@@ -148,8 +148,11 @@ def main(argv):
     with open(LIST, encoding="utf-8") as f:
         current = f.read()
 
-    head, _tail = split(current)
+    head, tail = split(current)
     desired = head.rstrip("\n") + "\n\n" + render_section(None, head)
+    if tail and tail.strip():
+        # Hand-maintained rules after the generated section are preserved.
+        desired += "\n" + tail.rstrip("\n") + "\n"
 
     if args.check:
         if current != desired:
