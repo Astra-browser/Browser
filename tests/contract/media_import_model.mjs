@@ -157,6 +157,32 @@ __setMediaImportHooksForTests({
 const unavailable = await MediaImport.import({ expected_profile: PROFILE });
 check("a failed store is unavailable, not imported", unavailable.kind === "refused" && unavailable.error === "unavailable");
 
+// The app's running-profile token is "default" (Tabs.sys.mjs PROFILE_ID), not
+// a ULID. The New Tab picker passes that token, so a ULID-only check refused
+// every real request before the picker opened ("Choose an image that Astra can
+// open"). A private window still cannot store a background.
+saved = null;
+picked = { name: "background.png", bytes: PNG };
+__setMediaImportHooksForTests({
+  pick: async () => picked,
+  save: async (profile, digest, bytes) => {
+    saved = { profile, digest, bytes };
+    return true;
+  },
+});
+const defaultProfile = await MediaImport.import({ expected_profile: "default" });
+check(
+  "the app's default profile token imports",
+  defaultProfile.kind === "imported" && saved?.profile === "default",
+  JSON.stringify(defaultProfile),
+);
+const privateProfile = await MediaImport.import({ expected_profile: "incognito" });
+check(
+  "a private profile cannot store a background",
+  privateProfile.kind === "refused" && privateProfile.error === "invalid",
+  JSON.stringify(privateProfile),
+);
+
 __resetMediaImportForTests();
 const noEngine = await MediaImport.import({ expected_profile: PROFILE });
 check("no engine and no hook refuses honestly", noEngine.kind === "refused" && noEngine.error === "unavailable");

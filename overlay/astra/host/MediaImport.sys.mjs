@@ -33,7 +33,7 @@ const MAX_FILE_BYTES = 32 * 1024 * 1024;
 const MAX_DIMENSION = 8192;
 const MAX_NAME_BYTES = 255;
 
-const PROFILE = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+const PROFILE = /^(?:default|[0-9A-HJKMNP-TV-Z]{26})$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
 
 const WIDTH = /^[1-9][0-9]{0,4}$/u;
