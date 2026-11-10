@@ -287,6 +287,24 @@ const bookmarks = (call) =>
   const same = await bookmarks({ kind: "import_space", from: source, to: source });
   check("importing a space into itself is refused", same.kind === "error");
 
+  // A brand-new source space has never saved a bookmark, so its folder does
+  // not exist yet. That is an empty source, not a failed import (the settings
+  // page showed "The bookmarks could not be imported." for this case).
+  await Tabs.createSpace({ name: "Empty source", look: null });
+  const emptySource = __spacesState().active_space_id;
+  await Tabs.switchSpace({ space: source });
+  const fromEmpty = await bookmarks({
+    kind: "import_space",
+    from: emptySource,
+    to: source,
+  });
+  check(
+    "an empty source imports zero bookmarks instead of failing",
+    fromEmpty.kind === "imported" && fromEmpty.count === 0,
+    JSON.stringify(fromEmpty),
+  );
+  check("an empty import changes nothing", owned(RUNNING).length === 3);
+
   // A space owned by another profile is refused without revealing it.
   await Profiles.create({
     name: "Work",

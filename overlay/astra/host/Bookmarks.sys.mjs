@@ -639,7 +639,10 @@ async function importSpace(profile, call) {
   }
   const base = await backend();
   const fromRoot = await spaceRoot(base, from, { create: false });
-  if (!fromRoot) return error(profile, "missing");
+  // A space with no bookmarks has no folder yet (the root is created lazily on
+  // the first save), so a missing source folder means an empty source, not a
+  // failed import. Ownership was already checked above.
+  if (!fromRoot) return { kind: "imported", count: 0, truncated: false };
   const toRoot = await spaceRoot(base, to, { create: true });
   const { copied, truncated } = await copyTree(base, fromRoot, toRoot, 0);
   return { kind: "imported", count: copied, truncated };
