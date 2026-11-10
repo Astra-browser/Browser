@@ -11,6 +11,53 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: the 25-item list (2026-11-10, latest)
+
+One branch per issue, merged into `fix/media-popup-now-playing`; the packaged
+dev build (engine `build --jobs 2`, then `overlay` + `build --faster`) was
+probed live with `tools/marionette-probe/owner-report-probe.py` (**24/24**) and
+`tools/perf/stress/sessionstore_probe.py` (restore: both pages, model and
+native). Contract suites are green (see "Verification").
+
+| # | Surface | What changed | Verified |
+|---|---|---|---|
+| 1 | Continue where left off | `Content.ensureTab` no longer reuses a pending SessionStore tab as the bootstrap blank; adoption reads `SessionStore.getLazyTabValue`; the bootstrap cleanup decides by the native URL | live `sessionstore_probe`: 2/2 pages after quit/relaunch |
+| 2 | Home URL | Home control in `ContentBar`; bare hosts normalise to https; words/other schemes rejected | unit `home-url` 3/3, typecheck |
+| 3 | Import / Export | new `Migration.sys.mjs` over `MigrationUtils` + Places export, native save picker, progress snapshots, import-progress channel; 5 routes | contract `migration_model` 15/15 |
+| 4 | Download folder | `nsIFilePicker.init` takes a BrowsingContext; fixed Downloads, MediaImport, WebExtensions | contract `native_file_picker` 6/6 |
+| 5 | Back leaves page unclickable | top-level `STATE_STOP` clears loading + history direction; busy-false clears it; loading slot is pointer-transparent | live: page loads, Back works, stage not loading |
+| 6 | tlauncher dark | a filter-list document verdict no longer cancels the navigation (subresources still blocked); source of truth in `blocker/engine/AstraBlocker.cpp` | live: tlauncher URL committed; document rule still matches |
+| 7 | Accent colour | Appearance has the missing accent picker writing `ui.accent`; catalog row | typecheck/format/unit |
+| 8 | Reset all zoom | `Zoom.forget*` resets live browsers through the window's `FullZoom` | live: page returns to 100%; `zoom_home_material` 46 |
+| 9 | Back to the first New Tab | about:blank is the tab's first history entry; first page pushes above it; Content can load about:blank | live: B→A→New Tab |
+| 10 | Links from other apps | the native tab is adopted and committed by the normal path | live handoff: `firefox -url` adds the URL to the model |
+| 11 | Switch to existing tab | `tabs.switch-to-open` reads in `Tabs.create`; Duplicate bypasses it | live ordinary open reuses, Duplicate copies |
+| 12 | After close | native removal re-asserts the closing tab, suppresses engine TabSelect, applies the model's choice to deck | live: previous tab selected in model + native |
+| 13 | Close button always | compact `TabRail` reads `tabs.close-button` and exposes `data-close-buttons` | component `SpaceRail` 6/6 |
+| 14 | New Tab background picker | MediaImport accepts the app's `default` profile token; picker context fixed | contract 42/42 |
+| 15 | Unblocked tracker hosts | 39 host-anchored `$important` rules in the bundled Astra list; seed refreshed | live `checkUrl`: 39/39 block; `telemetry_blocklist` 40 |
+| 16 | Focus shut sites | host raises `focus.cover=<site>` on navigation; shell returns the tab to its New Tab | live: shut site leaves the stage; `time_model` 189 |
+| 17 | Inactive tab sleeping | untouched `browser.tabs.unloadOnLowMemory` reads as Astra's on default; driver starts on Linux; retry extended | live: setting true + driver running |
+| 18 | Copy bookmarks between spaces | a missing source folder is an empty import, not `missing` | contract `spaces_profiles_model` 39 |
+| 19 | Shortcuts | 15 s Save/Cancel pending capture; Mouse3/4/5 in both parsers + shell; platform passed; shell reloads keymap on `keymap-changed` | component `KeyboardPage` 2/2; `keymap_model` 69 |
+| 20 | Native error pages | `about:neterror`/`about:blocked` map to Astra's failed pane; document loads are not cancelled | contract `dialog_prompts_cert` 31; live tlauncher |
+| 21 | Clear-data time range | portalled menu layer raised above the dialog scrim/panel | static `menu_layer` 5/5 |
+| 22 | Diagnostics | real redacted report from this process/profile | live: report text returned |
+| 23 | Show logs folder | reveals `ProfD/astra/logs` (or `ProfD`) | live: reveals; contract `diagnostics_model` 11 |
+| 24 | Loading skeleton | moved out of the inset page card: full content column, no rounded card | shell build + typecheck |
+| 25 | Incognito | `window.new/newPrivate/togglePrivate/closePrivate` admitted by host and shell; private window opens | live: command admitted, private window appears |
+
+**Verification:** `bun run --filter @astra/frame check` (0 errors; 1249 tests,
+2 environment skips); contract suites listed above; `forge lint` 13/13;
+`state-check` and `brand-lint` clean; live `owner-report-probe.py` 24/24 and
+`sessionstore_probe.py` PASS.
+
+**Deferred / limits:** Focus removes a shut site from the stage but the
+request-level cancel still needs the engine Net hook (`FocusBlockHook` is not
+registered); import/export pickers and the clear-data range were verified by
+contract/static layering, not driven through a native dialog; the skeleton is
+verified by build and CSS contract, not a screenshot assertion.
+
 ## Owner report: the older space's floating player stays live (2026-11-10, latest)
 
 **Symptom:** after adding a space while a video played in the older space, that

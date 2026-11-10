@@ -268,6 +268,18 @@ check("tlauncher is not left blank by a cancelled document",
       launcher.get("url", "").startswith("https://tlauncher.org"),
       json.dumps(launcher))
 
+# --- sleeping tabs driver -------------------------------------------------
+perf = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  return { sleep: await host.Settings.get({ key: "performance.sleep" }),
+           status: host.Performance.status() };
+})();
+""")
+check("inactive-tab sleeping is on by default", perf.get("sleep") == "true", json.dumps(perf))
+check("the sleeping-tabs driver is running", perf.get("status", {}).get("running") is True,
+      json.dumps(perf.get("status")))
+
 # --- externally handed link ----------------------------------------------
 subprocess.run([FIREFOX, "-profile", profile, "-url", site + "/external-link"],
                cwd=os.path.join(ROOT, "engine/obj-astra-linux/dist/bin"),
