@@ -43,6 +43,7 @@ astra.jar:
   content/astra/res/host/History.sys.mjs (host/History.sys.mjs)
   content/astra/res/host/Containers.sys.mjs (host/Containers.sys.mjs)
   content/astra/res/host/Dialogs.sys.mjs (host/Dialogs.sys.mjs)
+  content/astra/res/host/Passkeys.sys.mjs (host/Passkeys.sys.mjs)
   content/astra/res/host/Permissions.sys.mjs (host/Permissions.sys.mjs)
   content/astra/res/host/BrowsingData.sys.mjs (host/BrowsingData.sys.mjs)
   content/astra/res/host/Blocker.sys.mjs (host/Blocker.sys.mjs)
