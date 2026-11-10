@@ -22,6 +22,7 @@
   import * as requests from "../lib/space-requests.svelte";
   import { arrive, spaceSwipe, stepSpace } from "../lib/space-swipe";
   import { closeOnMiddleClick } from "../lib/middle-click";
+  import { preferences } from "$domain/preferences";
 
   let {
     entries,
@@ -41,6 +42,11 @@
   } = $props();
 
   let inFront = $derived(activeId === undefined ? tabs.activeId() : activeId);
+
+  // The close-button choice applies to the compact rail too. It is the column
+  // that is on screen while Settings is open, so ignoring it here made the
+  // setting look dead.
+  let closeButtons = $derived(preferences.value("tabs.close-button"));
 
   function handleContextMenu(event: MouseEvent, tab: TabView) {
     event.preventDefault();
@@ -149,7 +155,7 @@
       data-under-panel
       data-glide-scroller
     >
-      <ul bind:this={list} class="rail-list" data-tabs-drop role="list" aria-label={m.open_tabs()}>
+      <ul bind:this={list} class="rail-list" data-tabs-drop role="list" aria-label={m.open_tabs()} data-close-buttons={closeButtons}>
         {#each entries as tab, index (tab.id)}
           {@const active = tab.id === inFront}
           <li
@@ -371,6 +377,16 @@
     scale: 1;
     pointer-events: auto;
     transition-delay: 160ms, 160ms, 0ms;
+  }
+
+  /* "Show on every tab" is one setting for the expanded list and the compact
+     rail. The rail used to ignore it, and Settings forces the compact column
+     while the choice is made, so the setting looked dead. */
+  .rail-list[data-close-buttons="always"] .rail-close {
+    opacity: 1;
+    scale: 1;
+    pointer-events: auto;
+    transition-delay: 0ms;
   }
 
   .rail-list > li:hover .rail-close:active {
