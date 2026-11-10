@@ -33,6 +33,14 @@ MOZCONFIG="$ROOT/out/mozconfig.linux"
 RELEASE="$ROOT/out/release"
 BRAND="$ROOT/overlay/astra/branding"
 
+# Astra's own build version, from the single source of truth. This is what
+# testers see; the engine pin (`VERSION` below) stays the Firefox version.
+ASTRA_VERSION="$(sed -nE 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*"?([^"#]+)"?[[:space:]]*$/\1/p' "$ROOT/branding/astra.toml" | head -n1 | tr -d '[:space:]')"
+[ -n "$ASTRA_VERSION" ] || {
+  echo "branding/astra.toml has no version" >&2
+  exit 1
+}
+
 with_build=0
 [ "${1:-}" = "--with-build" ] && with_build=1
 
@@ -85,7 +93,7 @@ echo "== mach package"
 
 SRC_TARBALL="$(ls -1 "$DIST"/firefox-*.en-US.linux-x86_64.tar.xz | head -1)"
 VERSION="$(basename "$SRC_TARBALL" | sed -E 's/^firefox-([0-9.]+)\..*/\1/')"
-NAME="Astra-$VERSION-linux-x86_64"
+NAME="Astra-$ASTRA_VERSION-linux-x86_64"
 STAGE="$RELEASE/stage"
 APP="$STAGE/Astra"
 
@@ -264,11 +272,11 @@ GIT_COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
 GIT_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
 cat > "$APP/BUILD.txt" <<BUILD
 product: Astra
-version: $VERSION
+version: $ASTRA_VERSION
 platform: linux-x86_64
 built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 git: $GIT_BRANCH @ $GIT_COMMIT
-engine: Firefox ESR 153.6.0 (pinned upstream)
+engine: Firefox ESR $VERSION (pinned upstream)
 work-flag: off (VITE_ASTRA_WORK unset)
 package: $NAME
 BUILD

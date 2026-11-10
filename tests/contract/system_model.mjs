@@ -11,8 +11,9 @@
 //   - `ui_info` answers the opaque `none` tier: no native material has been
 //     discovered, so no tier is claimed; Boot does not answer it, so this
 //     module is the only answer and nothing is duplicated
-//   - `about_info` answers `null`: no version, OS product name or arch is
-//     known here, and no placeholder version is offered
+//   - `about_info` answers Astra's own version (the `astra.version` pref the
+//     branding renderer writes) plus the OS and arch the process reads; any
+//     fact missing answers `null`, so no placeholder version is offered
 //   - `update_status` and `update_check` answer `unavailable`: no updater is
 //     connected, no version is named, and a check never reports `checking`,
 //     `upToDate` or `ready` for work it did not do
@@ -162,23 +163,71 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
   );
 }
 
-// === about_info: null, never a placeholder version =========================
+// === about_info: the build's own facts, or null with nothing to read ======
 {
+  check(
+    "about_info answers null outside chrome",
+    (await System.aboutInfo()) === null,
+  );
+
+  globalThis.Services = {
+    appinfo: { OS: "Linux", XPCOMABI: "x86_64-gcc3" },
+    sysinfo: {
+      getProperty: (name) =>
+        ({ name: "Linux", version: "6.17.0" })[name] ?? "",
+    },
+    prefs: {
+      getStringPref: (name, fallback) =>
+        name === "astra.version" ? "0.1.742" : fallback,
+    },
+  };
+
   const answer = await System.aboutInfo();
-  check("about_info answers null", answer === null);
   check(
-    "about_info is either null or the three AboutInfo strings",
-    answer === null ||
-      (sameKeys(answer, ["version", "os", "arch"]) &&
-        ["version", "os", "arch"].every(
-          (key) => typeof answer[key] === "string" && answer[key] !== "",
-        )),
+    "about_info answers exactly the three AboutInfo strings",
+    sameKeys(answer, ["version", "os", "arch"]) &&
+      ["version", "os", "arch"].every(
+        (key) => typeof answer[key] === "string" && answer[key] !== "",
+      ),
   );
   check(
-    "about_info invents no placeholder version today",
-    answer === null || !/^(0\.0\.0|unknown|dev|mock)$/iu.test(answer.version),
+    "about_info names the Astra version the build carries",
+    answer?.version === "0.1.742",
   );
-  check("about_info answers the same twice", (await System.aboutInfo()) === null);
+  check(
+    "about_info names the OS product the engine reads",
+    answer?.os === "Linux 6.17.0",
+  );
+  check(
+    "about_info names the CPU, not the ABI triple",
+    answer?.arch === "x86_64",
+  );
+  check(
+    "about_info answers the same facts twice",
+    JSON.stringify(await System.aboutInfo()) === JSON.stringify(answer),
+  );
+
+  // A build with no version pref says nothing, rather than inventing one.
+  globalThis.Services.prefs.getStringPref = (_name, fallback) => fallback;
+  check(
+    "about_info invents no version when the build names none",
+    (await System.aboutInfo()) === null,
+  );
+
+  // A hostile pref service answers null instead of throwing.
+  globalThis.Services.prefs.getStringPref = () => {
+    throw new Error("no prefs");
+  };
+  check(
+    "about_info survives a hostile pref read",
+    (await System.aboutInfo()) === null,
+  );
+
+  delete globalThis.Services;
+  check(
+    "about_info is null again once chrome is gone",
+    (await System.aboutInfo()) === null,
+  );
 }
 
 // === update_status / update_check: unavailable, and nothing claimed ========

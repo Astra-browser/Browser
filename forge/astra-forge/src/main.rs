@@ -361,8 +361,18 @@ fn read_branding(root: &Path) -> Result<std::collections::HashMap<String, String
         .get("binary_name")
         .cloned()
         .unwrap_or_else(|| "astra".into());
+    // Astra's own build version, never the engine pin. Required: an empty
+    // version must fail the overlay instead of rendering a placeholder that
+    // About would show as real.
+    let version = raw.get("version").cloned().unwrap_or_default();
+    if version.is_empty() {
+        return Err(
+            "branding/astra.toml: version is required (Astra's dev/alpha build number)".into(),
+        );
+    }
     m.insert("ASTRA_DISPLAY_NAME".into(), display);
     m.insert("ASTRA_BINARY_NAME".into(), binary.clone());
+    m.insert("ASTRA_VERSION".into(), version);
     m.insert("ASTRA_APP_ID".into(), dev("app_id", "com.astra.dev"));
     m.insert(
         "ASTRA_VENDOR".into(),

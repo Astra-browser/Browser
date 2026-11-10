@@ -11,6 +11,26 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Dev/alpha version 0.1.742 (2026-11-10)
+
+The first build handed to dev/alpha testers carries Astra's **own** product
+version `0.1.742`. It lives in `branding/astra.toml` (`version`), separate from
+the Firefox pin in `upstream.toml`; bump that one value on every build that
+leaves the machine.
+
+| Path | What it does |
+|---|---|
+| `branding/astra.toml` | single source; `forge overlay` fails without it |
+| `overlay/astra/branding/pref/astra-branding.js.in` | renders `pref("astra.version", …)` |
+| `overlay/astra/host/System.sys.mjs` | `about_info` answers `{version, os, arch}` from real process reads; any fact missing is `null` |
+| `tools/package-release.sh` | archive name `Astra-0.1.742-linux-x86_64.tar.xz` + `BUILD.txt` (engine pin recorded separately) |
+
+Verified: `system_model` 99/99 and
+`tools/marionette-probe/version-probe.py` against the packaged tarball — About
+renders `Version 0.1.742` (`Linux … · x86_64`), `astra.version` = `0.1.742`,
+engine still reports Firefox `153.6.0`. The tarball is
+`out/release/Astra-0.1.742-linux-x86_64.tar.xz`.
+
 ## Owner report: the older space's floating player stays live (2026-11-10, latest)
 
 **Symptom:** after adding a space while a video played in the older space, that
