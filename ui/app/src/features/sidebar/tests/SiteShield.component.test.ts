@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   setProtected: vi.fn(async () => true),
   setEnabled: vi.fn(async () => ({ state: "processed", disposition: { outcome: "applied" } })),
   refresh: vi.fn(async () => {}),
+  profile: { kind: "default" },
 }));
 
 vi.mock("$domain/blocker", () => ({
@@ -33,6 +34,7 @@ vi.mock("$domain/tabs", () => ({
   tabs: {
     activeId: () => "a",
     activeTab: () => ({ url: "https://news.example/story", projection_revision: "r1" }),
+    profile: () => state.profile,
   },
 }));
 
@@ -50,6 +52,7 @@ afterEach(() => {
   state.setProtected.mockClear();
   state.setEnabled.mockClear();
   state.refresh.mockClear();
+  state.profile = { kind: "default" };
 });
 
 test("the sidebar shield names the page's site and turns blocking off", async () => {
@@ -85,4 +88,11 @@ test("with blocking off globally the same control turns it on", async () => {
   button.click();
   await vi.waitFor(() => expect(state.setEnabled).toHaveBeenLastCalledWith(true));
   expect(state.setProtected).not.toHaveBeenCalled();
+});
+
+test("a private window has no per-site switch (the policy is process-wide)", async () => {
+  state.profile = { kind: "incognito" };
+  state.status.site = site(false);
+  const screen = await render(SiteShield);
+  expect(screen.container.querySelector("[data-astra-shield]")).toBeNull();
 });
