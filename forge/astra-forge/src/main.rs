@@ -631,6 +631,7 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     // body or the fetched engine. Stage it after the series so a fresh tree
     // gets the patch-created files and an existing tree is refreshed in place.
     stage_blocker(root, &engine)?;
+    stage_passkeys(root, &engine)?;
     // Sanity: the wiring targets must exist after overlay.
     for f in [
         "astra/moz.build",
@@ -645,6 +646,32 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     }
     render_branding(root)?;
     println!("overlay: done (chrome://astra/ + resource://astra/ staged)");
+    Ok(())
+}
+
+/// Copy `passkeys/engine/**` into the in-tree Rust component linked by
+/// `authrs_bridge` (ASTRA-0014). Derived artifact: edit `passkeys/` and re-run
+/// `forge overlay`.
+fn stage_passkeys(root: &Path, engine: &Path) -> Result<(), String> {
+    let src = root.join("passkeys/engine");
+    if !src.join("src/lib.rs").exists() {
+        return Err("passkeys/engine/src/lib.rs missing (source of truth)".into());
+    }
+    let dest = engine.join("toolkit/components/astra_passkeys");
+    if dest.exists() {
+        fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+    run(
+        "cp",
+        &[
+            "-a",
+            &format!("{}/.", src.to_string_lossy()),
+            &dest.to_string_lossy(),
+        ],
+        root,
+    )?;
+    println!("overlay: staged passkeys/engine -> toolkit/components/astra_passkeys");
     Ok(())
 }
 
