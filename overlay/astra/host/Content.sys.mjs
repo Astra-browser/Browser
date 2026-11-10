@@ -1021,12 +1021,19 @@ export const Content = {
     };
     const loadIn = (id, url, force = false) => {
       const tab = tabOf.get(id);
-      if (!tab || !isLoadableUrl(url)) return;
+      const blank = url === "about:blank";
+      if (!tab || (!isLoadableUrl(url) && !blank)) return;
       const browser = tab.linkedBrowser;
       try {
         allowGlobalHistory(browser);
         if (!force && browser?.currentURI?.spec === url) return;
-        browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
+        if (blank) {
+          // The New Tab is a real history place now: loading it is how Back
+          // reaches it when the engine has no earlier entry to traverse to.
+          browser?.loadURI("about:blank", { triggeringPrincipal: principal });
+        } else {
+          browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
+        }
       } catch {
         // A tab torn down mid-load.
       }

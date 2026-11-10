@@ -317,7 +317,9 @@ async function threeTabs() {
   if (fs.existsSync(assets)) {
     const bundle = fs
       .readdirSync(assets)
-      .filter((name) => /^browser-chrome-.*\.js$/u.test(name))
+      // The app is code-split: the tabs list is a lazy chunk, not part of the
+      // eager browser-chrome entry. The packed UI is every emitted script.
+      .filter((name) => name.endsWith(".js"))
       .map((name) => fs.readFileSync(path.join(assets, name), "utf8"))
       .join("\n");
     if (bundle !== "") {

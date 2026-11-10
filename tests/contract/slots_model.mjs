@@ -190,7 +190,10 @@ const B1 = "https://example.com/beta";
   check("pane 1 back -> A1", back.went_back === true && back.url === A1);
   const list = await Tabs.list({ request_id: "s-5" });
   const tabB = list.tabs.find((t) => t.astra_tab_id === t2.astra_tab_id);
-  check("pane 2 unaffected by pane 1 back", tabB && tabB.url === B1 && tabB.canGoBack === false);
+  check(
+    "pane 2 unaffected by pane 1 back",
+    tabB && tabB.url === B1 && tabB.canGoForward === false,
+  );
 
   const seqs = seen.map((e) => e.event_seq);
   const monotonic = seqs.every((s, i) => s === seqs[0] + i);

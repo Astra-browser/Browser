@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";import{Y as t}from"./chrome-shared-BWjstlw3.js";var n=((n={},r={})=>(r.locale??t(),e(1042,n)??`This content cannot be displayed safely or exceeds the view limits.`));export{n as t};
