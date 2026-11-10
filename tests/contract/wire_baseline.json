@@ -34,8 +34,6 @@
     "browser_passkey_authorization_request",
     "chrome_menu_popup",
     "default_browser_request",
-    "diagnostics_report",
-    "diagnostics_show_logs",
     "divider_drag",
     "divider_grab",
     "divider_release",
