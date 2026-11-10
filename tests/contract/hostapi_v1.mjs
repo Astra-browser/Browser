@@ -553,6 +553,18 @@ let tA, tB, tC;
   const titled = await Tabs.get({ request_id: "c-3", astra_tab_id: tabId });
   check("progress title updates model", titled.tab.title === "Clicked title");
 
+  // A load can stop without a commit (a bfcache traversal). The stop edge is
+  // how the host clears the cover and the history direction.
+  const stops = [];
+  const stopping = makeProgressListener({
+    tabIdOf: (b) => byBrowser.get(b) ?? null,
+    onStop: (id) => stops.push(id),
+  });
+  stopping.onStateChange(fakeBrowser, { isTopLevel: true }, null, 0x10);
+  stopping.onStateChange(fakeBrowser, { isTopLevel: true }, null, 0x08);
+  stopping.onStateChange(fakeBrowser, { isTopLevel: false }, null, 0x10);
+  check("a top-level stop reaches the host once", stops.length === 1 && stops[0] === tabId);
+
   // Untracked browser + garbage inputs are swallowed, never throw.
   let threw = false;
   try {

@@ -1395,6 +1395,11 @@
        and it follows the app's light/dark choice. */
     background: var(--shell-loading-ground);
   }
+  /* The slot is a surface, not a control. While it is the loading cover it
+     must never eat a click aimed at the page underneath. */
+  :global(.astra-content[data-loading="true"]) {
+    pointer-events: none;
+  }
 
   /* A page still arriving says what it is waiting for, quietly, in the middle
      of the stage. The spinner and the label are one layer above the content

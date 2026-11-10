@@ -266,6 +266,8 @@ export function allowGlobalHistory(browser) {
 // to its `astra_tab_id` (null when untracked).
 const ERROR_PAGE_FLAG =
   typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE : 0x2;
+const STATE_STOP_FLAG =
+  typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.STATE_STOP : 0x10;
 
 export function makeProgressListener({
   tabIdOf,
@@ -273,6 +275,7 @@ export function makeProgressListener({
   setTitle,
   onErrorPage,
   onCommit,
+  onStop,
 } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
@@ -315,7 +318,17 @@ export function makeProgressListener({
       }
     },
     onStatusChange() {},
-    onStateChange() {},
+    onStateChange(browser, progress, _request, stateFlags) {
+      try {
+        const stopFlag = STATE_STOP_FLAG;
+        if ((Number(stateFlags) & stopFlag) === 0) return;
+        if (progress && progress.isTopLevel === false) return;
+        const id = tabIdOf ? tabIdOf(browser) : null;
+        if (id && typeof onStop === "function") onStop(id, browser);
+      } catch {
+        // A torn-down listener must not break the browser.
+      }
+    },
     onSecurityChange() {},
   };
 }
@@ -1123,6 +1136,7 @@ export const Content = {
         __applyExternalUpdate(id, { loading: true });
       }
       if (changed.includes("busy") && !tab.hasAttribute("busy")) {
+        historyMoves.delete(id);
         __applyExternalUpdate(id, { loading: false });
         refreshIcon(id);
       }
@@ -1244,6 +1258,15 @@ export const Content = {
       },
       onCommit: (id, url) => {
         if (!isPrivateWindow(win)) noteTabVisit(id, url);
+      },
+      onStop: (id) => {
+        // A load can stop without a commit (a bfcache traversal, a cancelled
+        // request, a same-document move). Clear the history direction and the
+        // loading cover here so Back cannot leave an inert layer over the page
+        // and the next navigation is not mistaken for another traversal.
+        historyMoves.delete(id);
+        __applyExternalUpdate(id, { loading: false });
+        refreshIcon(id);
       },
       onErrorPage: ({ astra_tab_id, url, browser }) => {
         void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id });
