@@ -444,7 +444,23 @@ function makeNative(scope) {
       if (!download || !download.stopped || download.succeeded) return false;
       pausedIds.delete(id);
       try {
-        await download.start();
+        // Firefox's own pause/resume starts the Download without waiting for
+        // the whole transfer: the promise settles when it finishes, and a
+        // later failure arrives as state through downloads-changed. Awaiting
+        // it here would keep the host call (and the UI) busy for the entire
+        // download.
+        const attempt = download.start();
+        attempt?.catch?.(() => {
+          // Restarting a canceled transfer can lose its first attempt to the
+          // teardown of the canceled connection. The engine accepts the same
+          // start again once that attempt has failed; retry once so Resume
+          // does not leave a network failure in front of the person.
+          try {
+            download.start()?.catch?.(() => {});
+          } catch {
+            // The engine refused the retry; the failed state is honest.
+          }
+        });
       } catch {
         return false;
       }
