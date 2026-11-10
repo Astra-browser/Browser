@@ -720,6 +720,7 @@
     flex: none;
     flex-direction: column;
     align-items: center;
+    container-type: inline-size;
   }
 
   .sidebar-tool-utilities {
@@ -728,6 +729,7 @@
     align-items: center;
     padding: 4px 10px 3px;
     border-block-end: 1px solid var(--color-border);
+    container-type: inline-size;
   }
 
   .sidebar-tool-panel {

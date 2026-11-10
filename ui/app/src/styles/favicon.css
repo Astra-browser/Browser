@@ -85,6 +85,29 @@
   mask: radial-gradient(circle at 1px calc(100% - 1px), transparent 7.5px, black 8px);
 }
 
+/* A sleeping page keeps its site's mark, stepped back, with the same zzz the
+   rail uses: the row still says which site it is, and why it draws no
+   process, without borrowing the moon that means the window's appearance. */
+.favicon[data-sleeping] > :is(.favicon-plate, .favicon-fallback) {
+  opacity: 0.42;
+  filter: grayscale(0.55) saturate(0.6);
+}
+
+.favicon-sleep {
+  position: absolute;
+  inset-block-end: -3px;
+  inset-inline-end: -3px;
+  display: grid;
+  place-items: center;
+  inline-size: 11px;
+  block-size: 11px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-float);
+  box-shadow: var(--shadow-badge);
+  color: var(--color-label-secondary);
+  pointer-events: none;
+}
+
 /*
   Loading keeps the site's mark in view, stepped back, with a single arc
   travelling around it. The arc waits a moment before it appears, so a page
@@ -92,7 +115,7 @@
   alone, which the compositor runs without the page or the chrome laying
   anything out.
 */
-.favicon[data-loading="true"] > * {
+.favicon[data-loading="true"] > :is(.favicon-plate, .favicon-fallback) {
   opacity: 0.5;
   scale: 0.82;
 }
@@ -123,8 +146,12 @@
 
 /* Two selectors, not one :is(): WebKit does not restyle on hover through
    :has(:is(...)). */
-[data-audio-host]:has(button[data-audio-mark]:hover) .favicon > *,
-[data-audio-host]:has(button[data-audio-mark]:focus-visible) .favicon > * {
+[data-audio-host]:has(button[data-audio-mark]:hover)
+  .favicon
+  > :is(.favicon-plate, .favicon-fallback),
+[data-audio-host]:has(button[data-audio-mark]:focus-visible)
+  .favicon
+  > :is(.favicon-plate, .favicon-fallback) {
   opacity: 0;
   scale: 0.6;
 }

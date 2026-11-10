@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { ZzzIcon } from "@hugeicons/core-free-icons";
   import type { TabView } from "$shared/ipc/bindings";
+  import Icon from "$shared/ui/Icon";
 
   let {
     tab,
@@ -26,7 +28,7 @@
     }}
     onpointerdown={(event) => event.stopPropagation()}
     oncontextmenu={(event) => event.stopPropagation()}
-    ><span class="sleeping-dot" aria-hidden="true"></span><span>Sleeping</span></button
+    ><Icon icon={ZzzIcon} size={13} strokeWidth={2} /><span>Sleeping</span></button
   >
 {/if}
 
@@ -52,13 +54,5 @@
   .sleeping-badge:hover {
     background: var(--row-hover);
     color: var(--color-label-secondary);
-  }
-
-  .sleeping-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentcolor;
-    opacity: 0.7;
   }
 </style>

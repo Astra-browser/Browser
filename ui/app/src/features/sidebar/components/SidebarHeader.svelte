@@ -183,3 +183,11 @@
     <SiteShield />
   </header>
 {/if}
+
+<style>
+  /* The utility bar inside follows the header's own width, not the window's,
+     so dragging the column narrow rearranges the tools at the right moment. */
+  .sidebar-toolbar {
+    container-type: inline-size;
+  }
+</style>

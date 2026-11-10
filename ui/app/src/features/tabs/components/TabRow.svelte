@@ -145,6 +145,7 @@
       lit={active}
       {fallback}
       notched={!!tab.audio}
+      sleeping={tab.availability?.state === "sleeping"}
     />
     <span data-astra-tab-label class="tab-label">{tab.title}</span>
   </button>

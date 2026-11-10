@@ -5,15 +5,23 @@
     Moon02Icon,
     MusicNote01Icon,
     Note01Icon,
+    PuzzleIcon,
     SidebarLeftIcon,
+    Sun03Icon,
+    ZzzIcon,
   } from "@hugeicons/core-free-icons";
   import Icon from "$shared/ui/Icon";
   import Disclosure from "$shared/ui/Disclosure";
   import FavIcon from "$shared/ui/FavIcon";
+  import LazyView from "$shared/ui/LazyView";
+  import { loadExtensionHub } from "$features/extensions";
   import { RailSpaces } from "$features/tabs";
+  import { extensions } from "$domain/extensions";
   import { favicons } from "$domain/favicons";
   import { mediaPlayer } from "$domain/media-player";
+  import { preferences } from "$domain/preferences";
   import { tabs } from "$domain/tabs";
+  import { webext } from "$domain/webext";
   import * as tools from "$session/tools.svelte";
   import { mediaTabs, railToolActive, sleepingTabs } from "../lib/rail-model";
 
@@ -34,6 +42,28 @@
     mediaTabs(tabs.tabs(), privateWindow).filter((tab) => tab.id !== player?.tab_id),
   );
   const sleeping = $derived(sleepingTabs(tabs.tabs(), privateWindow));
+  const extensionActions = $derived(
+    extensions.activeActions(tabs.profile()?.id ?? null, tabs.activeId()),
+  );
+
+  // The quick switch follows the sun rather than the stored word: in System,
+  // the icon and the click say what the window is actually showing.
+  let systemDark = $state(window.matchMedia("(prefers-color-scheme: dark)").matches);
+  $effect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => (systemDark = media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  });
+  const appearance = $derived(preferences.value("appearance"));
+  const dark = $derived(appearance === "dark" || (appearance === "system" && systemDark));
+  // The hub and its menu machinery arrive the first time the door opens, not
+  // with the column's own startup.
+  let hubOpened = $state(false);
+
+  function toggleTheme() {
+    void preferences.set("appearance", dark ? "light" : "dark");
+  }
 
   function pick(kind: "downloads" | "notes") {
     if (tools.activeTool() === kind) tools.close();
@@ -168,7 +198,7 @@
       panelClass="bar-popover"
     >
       {#snippet trigger()}{#if sleeping.length > 0}<span class="rail-pip" aria-hidden="true"
-          ></span>{/if}<Icon icon={Moon02Icon} size={18} />{/snippet}
+          ></span>{/if}<Icon icon={ZzzIcon} size={18} strokeWidth={1.9} />{/snippet}
       {#if privateWindow}
         <p class="rail-empty" role="presentation">{m.rail_private_sleeping_tabs()}</p>
       {:else if sleeping.length === 0}
@@ -190,6 +220,7 @@
                 tone={favicons.tone(tab.icon)}
                 loading={tab.loading}
                 size={16}
+                sleeping
               /></span
             >
             <span class="rail-row-title">{tab.title || m.untitled_tab()}</span>
@@ -198,6 +229,44 @@
       {/if}
     </Disclosure>
   </div>
+
+  <div class="bar-cell" style:--step={ontoggle ? 6 : 5}>
+    <Disclosure
+      label={m.webext_page_title()}
+      triggerTitle={m.webext_page_title()}
+      triggerClass="rail-item"
+      panelClass="bar-popover extension-popover"
+      onopen={() => {
+        hubOpened = true;
+        void webext.refresh();
+      }}
+    >
+      {#snippet trigger()}{#if extensionActions.length > 0}<span class="rail-pip" aria-hidden="true"
+          ></span>{/if}<Icon icon={PuzzleIcon} size={18} />{/snippet}
+      {#if hubOpened}
+        <LazyView
+          loader={loadExtensionHub}
+          loadingLabel={m.surface_loading()}
+          failureLabel={m.surface_render_failed()}
+          retryLabel={m.surface_retry()}
+        >
+          {#snippet children(View)}<View />{/snippet}
+        </LazyView>
+      {/if}
+    </Disclosure>
+  </div>
+
+  <button
+    type="button"
+    class="rail-button"
+    style:--step={ontoggle ? 7 : 6}
+    title={dark ? m.command_theme_light() : m.command_theme_dark()}
+    aria-label={dark ? m.command_theme_light() : m.command_theme_dark()}
+    aria-pressed={dark}
+    onclick={toggleTheme}
+  >
+    <Icon icon={dark ? Sun03Icon : Moon02Icon} size={18} />
+  </button>
 </nav>
 
 <style>
@@ -333,6 +402,53 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     transform-origin: top left;
+  }
+
+  /* The extension hub needs room for names, switches and menus even when the
+     trigger sits in the 56px rail. It takes the column's width when that is
+     wider, and otherwise grows past the trigger toward the page, bounded by
+     the window rather than by the column. */
+  :global(.extension-popover.ui-disclosure-panel[data-align]) {
+    inset-inline-start: 0;
+    inline-size: min(max(100%, 296px), calc(100vw - 20px));
+    min-inline-size: min(280px, calc(100vw - 20px));
+    max-inline-size: none;
+    max-block-size: calc(100vh - 96px);
+    padding: 4px;
+    overflow: hidden auto;
+    transform-origin: top left;
+  }
+
+  /* The column can be dragged down to 180px. Below the width all seven plates
+     need, the row becomes a deliberate grid rather than a ragged flex wrap,
+     and the hairline that separates the shape toggle steps out of the way. */
+  @container (max-width: 236px) {
+    .utility-bar:not([data-compact]) {
+      display: grid;
+      flex: 1;
+      grid-template-columns: repeat(auto-fit, 26px);
+      justify-content: start;
+      gap: 2px;
+      min-inline-size: 0;
+    }
+
+    .utility-bar:not([data-compact]) .bar-rule {
+      display: none;
+    }
+  }
+
+  @container (max-width: 196px) {
+    .utility-bar:not([data-compact]) .rail-button,
+    .utility-bar:not([data-compact]) :global(.rail-item) {
+      inline-size: 24px;
+      block-size: 24px;
+    }
+
+    .utility-bar:not([data-compact]) .rail-button :global(svg),
+    .utility-bar:not([data-compact]) :global(.rail-item svg) {
+      inline-size: 16px;
+      block-size: 16px;
+    }
   }
 
   .rail-row {

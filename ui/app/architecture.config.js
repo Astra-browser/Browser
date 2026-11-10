@@ -48,10 +48,18 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "sidebar" } } },
             allow: { to: { element: { type: "features", captured: { module: "rail" } } } },
           },
-          // The rail opens the existing space switcher through its public API.
+          // The rail opens the existing space switcher and the extension hub
+          // through their public APIs.
           {
             from: { element: { type: "features", captured: { module: "rail" } } },
-            allow: { to: { element: { type: "features", captured: { module: "tabs" } } } },
+            allow: {
+              to: {
+                element: {
+                  type: "features",
+                  captured: { module: ["tabs", "extensions"] },
+                },
+              },
+            },
           },
           // The existing utility host composes real entity views through public APIs.
           {
