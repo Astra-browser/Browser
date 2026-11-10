@@ -364,7 +364,23 @@ const NATIVE = {
 
   "performance.sleep": {
     prefs: ["browser.tabs.unloadOnLowMemory"],
-    read: (prefs) => flag(boolPref(prefs, "browser.tabs.unloadOnLowMemory", false)),
+    read: (prefs) => {
+      // Firefox turns its low-memory unloader off by default on Linux, while
+      // Astra ships "put inactive tabs to sleep" on. A pref the person has
+      // never chosen therefore reads as Astra's default; an explicit choice
+      // (including off) always wins.
+      let chosen = true;
+      try {
+        chosen =
+          typeof prefs.prefHasUserValue === "function"
+            ? prefs.prefHasUserValue("browser.tabs.unloadOnLowMemory")
+            : true;
+      } catch {
+        chosen = false;
+      }
+      const stored = boolPref(prefs, "browser.tabs.unloadOnLowMemory", false);
+      return flag(chosen ? stored : true);
+    },
     write: (prefs, value) => {
       const enabled = parseFlag(value);
       if (enabled === null) return false;

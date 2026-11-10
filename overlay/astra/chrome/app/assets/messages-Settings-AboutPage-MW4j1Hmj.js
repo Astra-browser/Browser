@@ -1,0 +1,1 @@
+import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-MediaPlayer-NewTabSe-ifkvo627-CQJSnpLa.js";import{Y as t}from"./chrome-shared-BvjkpsMN.js";var n=((n={},r={})=>(r.locale??t(),e(296,n)??`Some settings could not be reset. Try again.`));export{n as t};

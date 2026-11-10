@@ -29,11 +29,12 @@ fi
 echo "== contracts"
 CONTRACTS=(
   hostapi_v1 shell_assembly frame_model tab_lifecycle stage_rect tabs_admission
-  dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert
+  dialogs_events dialogs_security dialog_prompts_auth dialog_prompts_cert diagnostics_model
   permissions_prompt operations_ledger metadata_restore page_source_model
   media_model media_selection webext_view wire_coverage containers_isolation settings_native
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
-  protected_content native_surfaces chrome_extensions
+  protected_content native_surfaces chrome_extensions native_file_picker
+  menu_layer telemetry_blocklist migration_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then
@@ -92,6 +93,8 @@ PROBES=(
   "search_theme:tools/marionette-probe/search-theme-probe.py"
   "window_radius:tools/marionette-probe/window-radius-probe.py"
   "native_surfaces:tools/marionette-probe/native-surfaces-probe.py"
+  "owner_report:tools/marionette-probe/owner-report-probe.py"
+  "sidebar_shield:tools/marionette-probe/sidebar-shield-probe.py"
   "surface_park:tools/marionette-probe/surface-park-probe.py"
   "chrome_ext:tools/perf/stress/chrome_ext_probe.py"
   "real_extensions:tools/perf/stress/real_extensions_probe.py"

@@ -266,6 +266,8 @@ export function allowGlobalHistory(browser) {
 // to its `astra_tab_id` (null when untracked).
 const ERROR_PAGE_FLAG =
   typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE : 0x2;
+const STATE_STOP_FLAG =
+  typeof Ci !== "undefined" ? Ci.nsIWebProgressListener.STATE_STOP : 0x10;
 
 export function makeProgressListener({
   tabIdOf,
@@ -273,6 +275,7 @@ export function makeProgressListener({
   setTitle,
   onErrorPage,
   onCommit,
+  onStop,
 } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
@@ -315,7 +318,17 @@ export function makeProgressListener({
       }
     },
     onStatusChange() {},
-    onStateChange() {},
+    onStateChange(browser, progress, _request, stateFlags) {
+      try {
+        const stopFlag = STATE_STOP_FLAG;
+        if ((Number(stateFlags) & stopFlag) === 0) return;
+        if (progress && progress.isTopLevel === false) return;
+        const id = tabIdOf ? tabIdOf(browser) : null;
+        if (id && typeof onStop === "function") onStop(id, browser);
+      } catch {
+        // A torn-down listener must not break the browser.
+      }
+    },
     onSecurityChange() {},
   };
 }
@@ -430,6 +443,27 @@ export const Content = {
     const idOfTab = (tab) => {
       if (!tab) return "";
       return idOf.get(tab) || tab.getAttribute("astra-tab-id") || "";
+    };
+    /**
+     * The URL a tab is for, including a lazily restored tab that has not been
+     * selected yet. A pending tab's `currentURI` is about:blank, but
+     * SessionStore already knows the saved URL; reading it here is what keeps
+     * "continue where you left off" from looking like an empty session.
+     */
+    const urlOfTab = (tab) => {
+      try {
+        if (tab?.hasAttribute?.("pending")) {
+          const lazy = win?.SessionStore?.getLazyTabValue?.(tab, "url");
+          if (typeof lazy === "string" && lazy !== "") return lazy;
+        }
+      } catch {
+        // SessionStore is not available in this window.
+      }
+      try {
+        return tab?.linkedBrowser?.currentURI?.spec || "";
+      } catch {
+        return "";
+      }
     };
     const bindTab = (id, tab) => {
       if (!id || !tab) return;
@@ -939,6 +973,11 @@ export const Content = {
         const wanted = contextFor(id);
         const free = [...gb.tabs].find((candidate) => {
           if (idOfTab(candidate)) return false;
+          // A pending/restored tab is a saved page, not a free bootstrap tab:
+          // its currentURI is still about:blank until it is first selected.
+          if (candidate.hasAttribute("pending") || candidate.hasAttribute("restored")) {
+            return false;
+          }
           try {
             const spec = candidate.linkedBrowser?.currentURI?.spec;
             const context = Number(candidate.getAttribute("usercontextid") || 0);
@@ -982,12 +1021,19 @@ export const Content = {
     };
     const loadIn = (id, url, force = false) => {
       const tab = tabOf.get(id);
-      if (!tab || !isLoadableUrl(url)) return;
+      const blank = url === "about:blank";
+      if (!tab || (!isLoadableUrl(url) && !blank)) return;
       const browser = tab.linkedBrowser;
       try {
         allowGlobalHistory(browser);
         if (!force && browser?.currentURI?.spec === url) return;
-        browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
+        if (blank) {
+          // The New Tab is a real history place now: loading it is how Back
+          // reaches it when the engine has no earlier entry to traverse to.
+          browser?.loadURI("about:blank", { triggeringPrincipal: principal });
+        } else {
+          browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
+        }
       } catch {
         // A tab torn down mid-load.
       }
@@ -1097,6 +1143,7 @@ export const Content = {
         __applyExternalUpdate(id, { loading: true });
       }
       if (changed.includes("busy") && !tab.hasAttribute("busy")) {
+        historyMoves.delete(id);
         __applyExternalUpdate(id, { loading: false });
         refreshIcon(id);
       }
@@ -1121,8 +1168,12 @@ export const Content = {
       }
     };
     gb.tabContainer.addEventListener("TabAttrModified", onAttr);
+    // A native close removes the tab and then selects the engine's own
+    // successor. While that settles, `tabs.after-close` is the authority, so
+    // the engine's selection must not overwrite the model's choice.
+    let nativeClosing = 0;
     const onSelect = () => {
-      if (applying) return;
+      if (applying || nativeClosing > 0) return;
       const id = idOfTab(gb.selectedTab);
       if (id) {
         const split = gb.selectedTab?.splitview;
@@ -1146,7 +1197,20 @@ export const Content = {
     const onClose = (event) => {
       if (applying) return;
       const id = idOfTab(event.target);
-      if (id) void Tabs.close({ astra_tab_id: id });
+      if (!id) return;
+      // The engine can select the successor before it reports TabClose. The
+      // model must still treat the tab being removed as the one in front, or
+      // `tabs.after-close` has no tab to step from.
+      if (__tabsState().selectedId !== id) {
+        void Tabs.select({ astra_tab_id: id });
+      }
+      nativeClosing += 1;
+      void Tabs.close({ astra_tab_id: id });
+      // Closing the last tab produces no successor selection; never leave the
+      // guard raised past the removal turn.
+      setTimeout(() => {
+        nativeClosing = 0;
+      }, 1000);
     };
     const onOpen = (event) => {
       if (applying) return;
@@ -1219,8 +1283,38 @@ export const Content = {
       onCommit: (id, url) => {
         if (!isPrivateWindow(win)) noteTabVisit(id, url);
       },
+      onStop: (id, browser) => {
+        // A load can stop without a commit (a bfcache traversal, a cancelled
+        // request, a same-document move). Clear the history direction and the
+        // loading cover here so Back cannot leave an inert layer over the page
+        // and the next navigation is not mistaken for another traversal.
+        historyMoves.delete(id);
+        __applyExternalUpdate(id, { loading: false });
+        refreshIcon(id);
+        // The engine's failed page is its own about:neterror document. Read
+        // the document that really landed so the app can draw Astra's page
+        // instead of the native one.
+        try {
+          const spec = browser?.documentURI?.spec ?? "";
+          if (spec.startsWith("about:neterror") || spec.startsWith("about:blocked")) {
+            DialogPrompts.netErrorFor({ failedURI: spec, tabId: id });
+          }
+        } catch {
+          // A browser torn down as the load stopped.
+        }
+      },
       onErrorPage: ({ astra_tab_id, url, browser }) => {
-        void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id });
+        void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id }).then(
+          (handled) => {
+            if (handled) return;
+            // The error document is committed in this same turn; set the
+            // app's failed page after that commit so Navigation does not
+            // clear it again.
+            setTimeout(() => {
+              DialogPrompts.netErrorFor({ failedURI: url, tabId: astra_tab_id });
+            }, 0);
+          },
+        );
       },
     });
     gb.addTabsProgressListener(progress);
@@ -1472,7 +1566,7 @@ export const Content = {
       let url = "about:blank";
       let title = "";
       try {
-        url = tab.linkedBrowser?.currentURI?.spec || url;
+        url = urlOfTab(tab) || url;
         title = tab.linkedBrowser?.contentTitle || "";
       } catch {
         // A tab that is still restoring.
@@ -1496,8 +1590,19 @@ export const Content = {
     try {
       const now = await Tabs.list({ request_id, window_id });
       const rows = now.tabs ?? [];
-      const blank = rows.find((t) => !t.url || t.url === "about:blank");
-      const restored = rows.filter((t) => t.url && t.url !== "about:blank");
+      // The bootstrap row is blank in the model *and* still blank natively.
+      // A lazily restored page also reads about:blank in the model, so the
+      // native URL (SessionStore's saved URL for a pending tab) decides.
+      const blank = rows.find((t) => {
+        if (t.url && t.url !== "about:blank") return false;
+        const spec = urlOfTab(tabOf.get(t.astra_tab_id));
+        return (
+          !spec ||
+          spec === "about:blank" ||
+          spec.startsWith("chrome://browser/content/blanktab")
+        );
+      });
+      const restored = rows.filter((t) => t !== blank);
       if (blank && restored.length > 0) {
         const chosen = restored.find((t) => t.selected) ?? restored[0];
         await Tabs.close({ astra_tab_id: blank.astra_tab_id });

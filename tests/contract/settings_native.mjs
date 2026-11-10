@@ -59,6 +59,7 @@ const prefs = {
     if (!values.delete(name)) return;
     notify(name);
   },
+  prefHasUserValue: (name) => values.has(name),
   addObserver: (_branch, observer) => observers.add(observer),
   removeObserver: (observer) => observers.delete(observer),
 };
@@ -101,6 +102,13 @@ check("default proxy is the system proxy", (await read("network.proxy")) === "sy
 check("default density is comfortable", (await read("ui.density")) === "comfortable");
 check("default camera permission is Ask", (await read("privacy.camera")) === "Ask");
 check("default default-zoom is 100%", (await read("zoom.default")) === "100");
+// Astra ships "put inactive tabs to sleep" on; Firefox's Linux default for
+// the backing pref is false, so an untouched pref must still read as on.
+check(
+  "inactive tabs sleep by default before any choice",
+  (await read("performance.sleep")) === "true",
+  String(await read("performance.sleep")),
+);
 
 // --- each mapped setting writes its pref and reads back ------------------
 const cases = [
@@ -128,6 +136,13 @@ for (const [key, value, pref, expected] of cases) {
   check(`${key}: writes ${pref}`, values.get(pref) === expected, String(values.get(pref)));
   check(`${key}: reads back "${value}"`, (await read(key)) === value, String(await read(key)));
 }
+await write("performance.sleep", "false");
+check(
+  "an explicit sleep-off choice is honoured",
+  (await read("performance.sleep")) === "false",
+  String(await read("performance.sleep")),
+);
+await write("performance.sleep", "true");
 
 // --- multi-pref settings -------------------------------------------------
 await write("privacy.smartscreen", "true");

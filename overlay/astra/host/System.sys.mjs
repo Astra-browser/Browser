@@ -171,6 +171,30 @@ function servicesForUse() {
   return null;
 }
 
+/** Where the profile's own logs live, or the profile directory itself. */
+function logsDirectory(services) {
+  try {
+    const file = services.dirsvc.get("ProfD", globalThis.Ci?.nsIFile);
+    const logs = file.clone();
+    logs.append("astra");
+    logs.append("logs");
+    return logs.exists() ? logs : file;
+  } catch {
+    return null;
+  }
+}
+
+/** Hide the home path in a report that may be pasted into a bug. */
+function redactPath(services, text) {
+  try {
+    const home = services.dirsvc.get("Home", globalThis.Ci?.nsIFile).path;
+    if (home && typeof text === "string") return text.split(home).join("~");
+  } catch {
+    // No home directory: the path stays as the profile reports it.
+  }
+  return text;
+}
+
 /** The chrome window's `Services.prefs`, or null outside a chrome process. */
 function systemPrefs() {
   if (injectedPrefs) return injectedPrefs;
@@ -325,6 +349,62 @@ export const System = {
     const arch = archName(services);
     if (!version || !os || !arch) return null;
     return { version, os, arch };
+  },
+
+  /**
+   * The real, redacted diagnostics text About copies or shows. Everything is
+   * read from this process or its profile; nothing is inferred and nothing
+   * leaves the machine. `null` outside chrome, which the page renders as its
+   * retry state instead of an empty report.
+   */
+  async diagnosticsReport() {
+    const services = servicesForUse();
+    if (!services) return null;
+    try {
+      const app = services.appinfo ?? {};
+      const prefs = services.prefs;
+      let lists = 0;
+      try {
+        const raw = prefs?.getStringPref("astra.blocker.installed", "{}") ?? "{}";
+        const parsed = JSON.parse(raw);
+        const source = parsed?.lists ?? parsed;
+        if (source && typeof source === "object") lists = Object.keys(source).length;
+      } catch {
+        lists = 0;
+      }
+      const logs = logsDirectory(services);
+      const lines = [
+        "Astra diagnostics",
+        `Generated: ${new Date().toISOString()}`,
+        `Astra: ${astraVersion(services) ?? "unknown"} (build ${String(app.buildID ?? "unknown")})`,
+        `Engine: Firefox ${String(app.version ?? "unknown")}`,
+        `Platform: ${String(app.OS ?? "")} ${String(app.XPCOMABI ?? "")}`.trim(),
+        `System build: ${String(services.sysinfo?.getProperty?.("build") ?? "unknown")}`,
+        `Locale: ${String(services.locale?.appLocales?.[0] ?? "unknown")}`,
+        `Profile: ${String(services.dirsvc?.get?.("ProfD", globalThis.Ci?.nsIFile)?.path ?? "unknown")}`,
+        `Logs: ${String(logs?.path ?? "unknown")}`,
+        `Theme: ${String(Settings.current("appearance") ?? "unknown")}`,
+        `Default zoom: ${String(Settings.current("zoom.default") ?? "100")}%`,
+        `Inactive tab sleeping: ${String(Settings.current("performance.sleep") ?? "unknown")}`,
+        `Blocker lists installed: ${lists}`,
+      ];
+      return redactPath(services, lines.join("\n"));
+    } catch {
+      return null;
+    }
+  },
+
+  /** Reveal the profile's log folder; false when no folder is reachable. */
+  async diagnosticsShowLogs() {
+    const services = servicesForUse();
+    const directory = services ? logsDirectory(services) : null;
+    if (!directory) return false;
+    try {
+      directory.reveal();
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   // `boolean | null`: the OS clock's own hour cycle, as this process sees it.

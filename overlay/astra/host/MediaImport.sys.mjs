@@ -33,7 +33,7 @@ const MAX_FILE_BYTES = 32 * 1024 * 1024;
 const MAX_DIMENSION = 8192;
 const MAX_NAME_BYTES = 255;
 
-const PROFILE = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+const PROFILE = /^(?:default|[0-9A-HJKMNP-TV-Z]{26})$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
 
 const WIDTH = /^[1-9][0-9]{0,4}$/u;
@@ -372,7 +372,11 @@ async function pickWithFilePicker() {
   const { cc, ci, services } = chrome;
   const picker = cc["@mozilla.org/filepicker;1"].createInstance(ci.nsIFilePicker);
   const win = services.wm.getMostRecentWindow("navigator:browser");
-  picker.init(win, "Choose a file", ci.nsIFilePicker.modeOpen);
+  // The engine's nsIFilePicker wants a BrowsingContext; a window proxy throws
+  // before the dialog opens.
+  const context = win?.browsingContext ?? null;
+  if (!context) return null;
+  picker.init(context, "Choose a file", ci.nsIFilePicker.modeOpen);
   // Images first for the New Tab background; All files keeps the same native
   // command usable for Work documents.
   picker.appendFilter("Images", "*.png;*.jpg;*.jpeg;*.webp;*.gif");

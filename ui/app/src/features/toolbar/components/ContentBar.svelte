@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { ArrowLeft02Icon, ArrowRight02Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+  import {
+    ArrowLeft02Icon,
+    ArrowRight02Icon,
+    Home01Icon,
+    Refresh01Icon,
+  } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
   import { commands } from "$shared/ipc/bindings";
   import IconButton from "$shared/ui/IconButton";
@@ -52,6 +57,15 @@
       size={16}
       disabled={active === undefined}
       onclick={tabs.reloadActive}
+    />
+    <IconButton
+      icon={Home01Icon}
+      label={m.command_nav_home()}
+      shape="rounded"
+      buttonSize={28}
+      size={16}
+      disabled={active === undefined}
+      onclick={() => void commands.runCommand("nav.home").catch(() => {})}
     />
   </div>
   <div class="content-bar-field">{@render field()}</div>

@@ -468,7 +468,10 @@ function autoStart() {
   let tries = 0;
   autoRetry = setInterval(() => {
     tries += 1;
-    if (driverOwned() || Performance.start() || tries >= 20) {
+    // `gBrowser` can arrive late behind a first-paint gate or a restored
+    // window. Keep trying for two minutes instead of twenty seconds; one
+    // timer, cleared on the first success.
+    if (driverOwned() || Performance.start() || tries >= 120) {
       clearInterval(autoRetry);
       autoRetry = null;
     }

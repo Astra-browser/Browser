@@ -562,8 +562,9 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
       return { accepted: !created.error };
     }
     case "window.showPrivate":
+    case "window.togglePrivate":
     case "window.showRegular": {
-      const wantPrivate = id === "window.showPrivate";
+      const wantPrivate = id !== "window.showRegular";
       const list = await host.Windows.list({ request_id: `win-${Date.now()}` });
       const found = (list.windows ?? []).find((w) => w.private === wantPrivate);
       if (found) {
@@ -578,6 +579,16 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
         private: wantPrivate,
       });
       return { accepted: !created.error };
+    }
+    case "window.closePrivate": {
+      const list = await host.Windows.list({ request_id: `win-${Date.now()}` });
+      const found = (list.windows ?? []).find((w) => w.private === true);
+      if (!found) return { accepted: false };
+      const closed = await host.Windows.close({
+        request_id: `win-${Date.now()}`,
+        window_id: found.window_id,
+      });
+      return { accepted: !closed.error };
     }
     case "window.fullscreen": {
       const id = host.__bindCurrentWindow?.(win) || "win-1";

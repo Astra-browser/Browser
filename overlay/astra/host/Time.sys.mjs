@@ -407,8 +407,12 @@ function startTracking(profile) {
       return;
     }
     if (!TRACK_EVENTS.has(event.type)) return;
-    recordActivity(clock());
+    const at = clock();
+    recordActivity(at);
     persist(false);
+    // A navigation can move the page in front onto (or off) the Focus shut
+    // list without the session clock changing; republish so the cover follows.
+    if (session !== null) publish(at);
   });
   if (typeof globalThis.window !== "undefined") {
     persistTimer = setInterval(() => {
@@ -868,6 +872,27 @@ function snapshot(at) {
   };
 }
 
+/** The last cover site announced, so a repeated publish is silent. */
+let lastCover = "";
+
+/**
+ * The site Focus is holding behind Astra's shut page, or "".
+ *
+ * A blank/empty selection keeps the current cover: the show path navigates the
+ * tab to about:blank once the cover is raised, and clearing on that null would
+ * immediately drop the cover and let the site back in.
+ */
+function coverSite(status) {
+  if (status.session?.phase !== "focus") return "";
+  const current = selection();
+  if (!current) return lastCover;
+  const site = current.site;
+  const blocked = status.shut.some(
+    (row) => site === row.site || site.endsWith(`.${row.site}`),
+  );
+  return blocked ? site : "";
+}
+
 /**
  * Reconciles the clock, then announces the projection if it changed (or if
  * `force`, as every admitted control does). Returns the projection.
@@ -880,6 +905,14 @@ function publish(at, force = false) {
   if (force || key !== lastPublished) {
     lastPublished = key;
     emit("focus-changed", status);
+  }
+  // The cover follows the selected page, which can change without the session
+  // status changing at all (navigating to a shut site), so this runs on every
+  // publish, not only when FocusStatus changed.
+  const cover = coverSite(status);
+  if (cover !== lastCover) {
+    lastCover = cover;
+    emit("ui-command", cover === "" ? "focus.cover=" : `focus.cover=${cover}`);
   }
   return status;
 }
@@ -1072,6 +1105,7 @@ export function __resetTimeForTests() {
   activeProfile = "";
   allowances = [];
   lastPublished = null;
+  lastCover = "";
   lastObservation = null;
   lastSite = "";
   store = null;

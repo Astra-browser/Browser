@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./ui-core-BtSVXPC0.css","./CodeBlock-b9io8ecE.css"])))=>i.map(i=>d[i]);
-import{Yn as e}from"./chrome-shared-CZI7G5DT.js";var t=()=>e(()=>import(`./CodeBlock-B0ulEFxo.js`),__vite__mapDeps([0,1]),import.meta.url);export{t};

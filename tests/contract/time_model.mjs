@@ -710,8 +710,28 @@ reset();
   const allowed = Time.status();
   check("an allow removes that exact shut site", allowed.shut.length === 1 && allowed.shut[0].site === "news.example");
 
+  // The selected page on the shut list raises the app's cover; the shell
+  // navigates that tab to its New Tab so the site is off the stage.
+  const blockedTab = (await Tabs.create({ request_id: "focus-tab", url: "https://news.example/story" })).astra_tab_id;
+  await Tabs.select({ request_id: "focus-select", astra_tab_id: blockedTab });
+  Time.status();
+  const covers = announced
+    .filter((event) => event.type === "ui-command")
+    .map((event) => String(event.data))
+    .filter((command) => command.startsWith("focus.cover="));
+  check(
+    "a shut site raises the Focus cover",
+    covers.at(-1) === "focus.cover=news.example",
+    covers.at(-1),
+  );
+
   now += 50 * MINUTE;
   check("a break shuts nothing", Time.status().shut.length === 0);
+  const afterBreak = announced
+    .filter((event) => event.type === "ui-command")
+    .map((event) => String(event.data))
+    .filter((command) => command.startsWith("focus.cover="));
+  check("a break clears the Focus cover", afterBreak.at(-1) === "focus.cover=", afterBreak.at(-1));
 }
 
 // === A round started before the app named its profile still counts ========

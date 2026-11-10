@@ -180,6 +180,68 @@ function levelsOf(res) {
   );
   check("reset all keeps the global default zoom", Math.abs(contentPrefs.global - 1.25) < 0.0001);
 
+  // Removing the store entry is not enough: FullZoom keeps the value it has
+  // already applied to a live page, so the page must be reset through the
+  // window's own FullZoom or "Reset all" looks dead until a reload.
+  {
+    const resets = [];
+    const tab = (spec) => ({ linkedBrowser: { currentURI: { spec } } });
+    const win = {
+      gBrowser: {
+        tabs: [tab("https://github.com/a"), tab("https://other.example/b")],
+      },
+      FullZoom: {
+        reset(browser) {
+          resets.push(browser.currentURI.spec);
+        },
+      },
+    };
+    const previousServices = globalThis.Services;
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          let index = 0;
+          return {
+            hasMoreElements: () => index < 1,
+            getNext: () => {
+              index += 1;
+              return win;
+            },
+          };
+        },
+      },
+    };
+    try {
+      zoomStore.set("github.com", 0.8);
+      zoomStore.set("other.example", 1.1);
+      contentPrefs.global = 1.25;
+      const forgottenLive = await Zoom.call({
+        request_id: "z-live-1",
+        expected_profile: "default",
+        call: { kind: "forget", site: "github.com" },
+      });
+      check(
+        "forget resets the live page for that site only",
+        forgottenLive?.kind === "levels" &&
+          resets.length === 1 &&
+          resets[0].includes("github.com"),
+        JSON.stringify(resets),
+      );
+      const allLive = await Zoom.call({
+        request_id: "z-live-2",
+        expected_profile: "default",
+        call: { kind: "forget_all" },
+      });
+      check(
+        "reset all resets every live page",
+        allLive?.kind === "levels" && resets.length === 3,
+        JSON.stringify(resets),
+      );
+    } finally {
+      globalThis.Services = previousServices;
+    }
+  }
+
   zoomStore.set("kept.example", 1.5);
   const privateRead = await Zoom.call({
     request_id: "z-5",

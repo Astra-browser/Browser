@@ -45,6 +45,7 @@ export interface HostModules {
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Migration: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -186,6 +187,13 @@ const ROUTES: Record<string, Route> = {
   // closed-tab/forget kinds to the Places-backed HistoryCall module.
   history_call: ["SpaceHistory", "call"],
   about_info: ["System", "aboutInfo"],
+  diagnostics_report: ["System", "diagnosticsReport"],
+  diagnostics_show_logs: ["System", "diagnosticsShowLogs"],
+  import_sources: ["Migration", "importSources"],
+  import_start: ["Migration", "importStart"],
+  import_cancel: ["Migration", "importCancel"],
+  import_open_permission: ["Migration", "importOpenPermission"],
+  export_browser_data: ["Migration", "exportBrowserData"],
   system_clock_24h: ["System", "systemClock24h"],
   update_status: ["System", "updateStatus"],
   update_check: ["System", "updateCheck"],

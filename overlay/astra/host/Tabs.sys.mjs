@@ -826,6 +826,9 @@ export const Tabs = {
         last_active_ms: Date.now(),
       });
       _order.push(astra_tab_id);
+      // The New Tab is the first place in the tab's own history: Back from the
+      // first page returns here instead of stopping at the first search.
+      __pushHistory(astra_tab_id, "about:blank");
       _selectedId = astra_tab_id;
       touchMru(astra_tab_id);
     }
@@ -833,13 +836,38 @@ export const Tabs = {
     return ok(request_id, { bootstrapped: true, selected_tab_id: _selectedId });
   },
 
-  async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1 } = {}) {
+  async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1, dedupe = true } = {}) {
     if (typeof url !== "string" || url === "") {
       return err(request_id, "invalid_url", "url must be a non-empty string");
     }
     url = safeTabUrl(url);
-    const astra_tab_id = `tab-${_nextId++}`;
     const space_id = _activeSpaceId;
+    // "Switch to an existing tab": opening a page that is already open in this
+    // window and space selects that row instead of making a second copy. The
+    // setting had a UI but no host reader at all.
+    if (dedupe && url !== "about:blank" && Settings.current("tabs.switch-to-open") !== "false") {
+      const existing = activeOrder()
+        .map((id) => _tabs.get(id))
+        .find(
+          (tab) =>
+            tab &&
+            tab.window_id === window_id &&
+            tab.space_id === space_id &&
+            tab.private !== true &&
+            tab.url === url,
+        );
+      if (existing) {
+        if (!background || _selectedId === "") selectInternal(existing.astra_tab_id);
+        emitItemsChanged();
+        return admitted(request_id, {
+          astra_tab_id: existing.astra_tab_id,
+          url,
+          window_id,
+          existing: true,
+        });
+      }
+    }
+    const astra_tab_id = `tab-${_nextId++}`;
     _tabs.set(astra_tab_id, {
       astra_tab_id,
       url,
@@ -856,7 +884,10 @@ export const Tabs = {
     });
     const at = insertionIndexFor({ index, window_id, space_id });
     _order.splice(at, 0, astra_tab_id);
-    __pushHistory(astra_tab_id, url);
+    // Seed the New Tab, then the page: a tab opened straight at a URL can
+    // still step Back to the blank place it started from.
+    __pushHistory(astra_tab_id, "about:blank");
+    if (url !== "about:blank") __pushHistory(astra_tab_id, url);
     emit("tab.created", {
       astra_tab_id,
       url,
@@ -1224,6 +1255,8 @@ export const Tabs = {
       background: true,
       window_id: src.window_id,
       index: _order.indexOf(astra_tab_id) + 1,
+      // Duplicate is an explicit "make a copy"; it is never the dedupe path.
+      dedupe: false,
     });
     if (created.error) {
       return created;

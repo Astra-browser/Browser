@@ -357,10 +357,10 @@ let tA, tB, tC;
   void before;
 }
 
-// === Navigation history: the New Tab is not a Back entry ===
-// Owner-reported: Back on the sidebar landed on the empty New Tab because
-// `Tabs.create` seeds the stack with `about:blank` and the first real page was
-// pushed on top of it. A fresh tab's first load must replace that head.
+// === Navigation history: the New Tab is the first Back entry ===
+// Owner-reported: Back stopped at the first search instead of the empty New
+// Tab it started on. A fresh tab's stack starts at about:blank and the first
+// real page is pushed above it, so Back can reach the New Tab again.
 {
   const hist = (id) => TabsMod.__historyFor(id);
   const create = async (rid) =>
@@ -373,24 +373,34 @@ let tA, tB, tC;
   const first = await Navigation.loadURL({ request_id: "nh-1", astra_tab_id: fresh, url: "https://a.example/" });
   checkEnv("first load into a fresh tab", first, "nh-1");
   const afterFirst = await Tabs.get({ request_id: "nh-2", astra_tab_id: fresh });
-  check("first real load replaces the New Tab (Back disabled)", afterFirst.tab.canGoBack === false);
-  check("first real load keeps one entry at index 0",
-    hist(fresh).entries.length === 1
-    && hist(fresh).index === 0
-    && hist(fresh).entries[0] === "https://a.example/");
+  check("first real load leaves the New Tab behind (Back enabled)", afterFirst.tab.canGoBack === true);
+  check("first real load pushes above the New Tab",
+    hist(fresh).entries.length === 2
+    && hist(fresh).index === 1
+    && hist(fresh).entries[0] === "about:blank"
+    && hist(fresh).entries[1] === "https://a.example/");
 
-  await Navigation.loadURL({ request_id: "nh-3", astra_tab_id: fresh, url: "https://b.example/" });
-  const backA = await Navigation.goBack({ request_id: "nh-4", astra_tab_id: fresh });
-  checkEnv("Back from B", backA, "nh-4");
+  const backBlank = await Navigation.goBack({ request_id: "nh-3", astra_tab_id: fresh });
+  checkEnv("Back from the first page", backBlank, "nh-3");
+  check("Back reaches the New Tab the tab started on",
+    backBlank.went_back === true && backBlank.url === "about:blank");
+  const atBlank = await Tabs.get({ request_id: "nh-4", astra_tab_id: fresh });
+  check("the New Tab has nothing behind it and the page ahead",
+    atBlank.tab.canGoBack === false && atBlank.tab.canGoForward === true);
+
+  await Navigation.goForward({ request_id: "nh-5", astra_tab_id: fresh });
+  await Navigation.loadURL({ request_id: "nh-6", astra_tab_id: fresh, url: "https://b.example/" });
+  const backA = await Navigation.goBack({ request_id: "nh-7", astra_tab_id: fresh });
+  checkEnv("Back from B", backA, "nh-7");
   check("Back from B lands on A", backA.went_back === true && backA.url === "https://a.example/");
-  const atA = await Tabs.get({ request_id: "nh-5", astra_tab_id: fresh });
-  check("Back to A enables Forward (Back disabled)",
-    atA.tab.canGoBack === false && atA.tab.canGoForward === true);
+  const atA = await Tabs.get({ request_id: "nh-8", astra_tab_id: fresh });
+  check("Back to A keeps the New Tab behind it and B ahead",
+    atA.tab.canGoBack === true && atA.tab.canGoForward === true);
 
-  const fwdB = await Navigation.goForward({ request_id: "nh-6", astra_tab_id: fresh });
-  checkEnv("Forward from A", fwdB, "nh-6");
+  const fwdB = await Navigation.goForward({ request_id: "nh-9", astra_tab_id: fresh });
+  checkEnv("Forward from A", fwdB, "nh-9");
   check("Forward returns to B", fwdB.went_forward === true && fwdB.url === "https://b.example/");
-  const atB = await Tabs.get({ request_id: "nh-7", astra_tab_id: fresh });
+  const atB = await Tabs.get({ request_id: "nh-10", astra_tab_id: fresh });
   check("Forward lands on the last entry",
     atB.tab.canGoBack === true && atB.tab.canGoForward === false);
 
@@ -400,14 +410,15 @@ let tA, tB, tC;
   check("same-url external commit stays at the head", hist(fresh).entries[hist(fresh).index] === "https://b.example/");
 
   // Shell adoption: an external load into a fresh tab takes the same path.
-  const adopted = await create("nh-8");
+  const adopted = await create("nh-11");
   __commitExternal(adopted, "https://adopted.example/");
-  check("external first load replaces the New Tab (Back disabled)",
-    hist(adopted).entries.length === 1
-    && hist(adopted).index === 0
-    && hist(adopted).entries[0] === "https://adopted.example/");
-  const adoptedTab = await Tabs.get({ request_id: "nh-9", astra_tab_id: adopted });
-  check("adopted tab has nothing behind it", adoptedTab.tab.canGoBack === false);
+  check("external first load keeps the New Tab behind it",
+    hist(adopted).entries.length === 2
+    && hist(adopted).index === 1
+    && hist(adopted).entries[0] === "about:blank"
+    && hist(adopted).entries[1] === "https://adopted.example/");
+  const adoptedTab = await Tabs.get({ request_id: "nh-12", astra_tab_id: adopted });
+  check("adopted tab can step back to the New Tab", adoptedTab.tab.canGoBack === true);
 }
 
 // === Back/Forward traverse the engine's history, not a fresh URL load ===
@@ -450,10 +461,10 @@ let tA, tB, tC;
   const skipCount = hist(skip).entries.length;
   await Navigation.goBack({ request_id: "bh-9", astra_tab_id: skip });
   __commitExternal(skip, "https://skip-a.example/", { history: "back", loading: false });
-  check("Back follows a skipped native entry", hist(skip).index === 0 && hist(skip).entries.length === skipCount);
+  check("Back follows a skipped native entry", hist(skip).index === 1 && hist(skip).entries.length === skipCount);
   const skipped = await Tabs.get({ request_id: "bh-10", astra_tab_id: skip });
   check("Skipped back still leaves Forward available",
-    skipped.tab.canGoBack === false && skipped.tab.canGoForward === true);
+    skipped.tab.canGoBack === true && skipped.tab.canGoForward === true);
 }
 
 // === Panes v1 ===
@@ -552,6 +563,18 @@ let tA, tB, tC;
   listener.onTitleChange(fakeBrowser, "Clicked title");
   const titled = await Tabs.get({ request_id: "c-3", astra_tab_id: tabId });
   check("progress title updates model", titled.tab.title === "Clicked title");
+
+  // A load can stop without a commit (a bfcache traversal). The stop edge is
+  // how the host clears the cover and the history direction.
+  const stops = [];
+  const stopping = makeProgressListener({
+    tabIdOf: (b) => byBrowser.get(b) ?? null,
+    onStop: (id) => stops.push(id),
+  });
+  stopping.onStateChange(fakeBrowser, { isTopLevel: true }, null, 0x10);
+  stopping.onStateChange(fakeBrowser, { isTopLevel: true }, null, 0x08);
+  stopping.onStateChange(fakeBrowser, { isTopLevel: false }, null, 0x10);
+  check("a top-level stop reaches the host once", stops.length === 1 && stops[0] === tabId);
 
   // Untracked browser + garbage inputs are swallowed, never throw.
   let threw = false;

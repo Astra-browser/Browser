@@ -88,12 +88,15 @@ let tabId;
 
   const back2 = await Navigation.goBack({ request_id: "n-5", astra_tab_id: tabId });
   check("goBack again to A", back2.went_back === true && back2.url === A);
-  const stuck = await Navigation.goBack({ request_id: "n-6", astra_tab_id: tabId });
+  const backBlank = await Navigation.goBack({ request_id: "n-6", astra_tab_id: tabId });
+  check("goBack reaches the New Tab the tab started on",
+    backBlank.went_back === true && backBlank.url === "about:blank");
+  const stuck = await Navigation.goBack({ request_id: "n-6b", astra_tab_id: tabId });
   check("goBack at bottom stays + went_back false",
-    stuck.went_back === false && stuck.url === A);
+    stuck.went_back === false && stuck.url === "about:blank");
 
   const rel = await Navigation.reload({ request_id: "n-7", astra_tab_id: tabId });
-  check("reload echoes url A", rel.reloaded === true && rel.url === A);
+  check("reload echoes url A", rel.reloaded === true && rel.url === "about:blank");
 }
 
 // --- Select / second tab / close ---

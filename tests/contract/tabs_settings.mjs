@@ -317,7 +317,9 @@ async function threeTabs() {
   if (fs.existsSync(assets)) {
     const bundle = fs
       .readdirSync(assets)
-      .filter((name) => /^browser-chrome-.*\.js$/u.test(name))
+      // The app is code-split: the tabs list is a lazy chunk, not part of the
+      // eager browser-chrome entry. The packed UI is every emitted script.
+      .filter((name) => name.endsWith(".js"))
       .map((name) => fs.readFileSync(path.join(assets, name), "utf8"))
       .join("\n");
     if (bundle !== "") {
@@ -325,6 +327,26 @@ async function threeTabs() {
       check("the packed UI keeps the close-button binding reactive", bundle.includes("tabs.close-button"));
     }
   }
+}
+
+// === tabs.switch-to-open ==================================================
+{
+  reset();
+  await Tabs.bootstrap({ request_id: "boot" });
+  const url = "https://dup.example/";
+  const first = await Tabs.create({ request_id: "d-1", url, background: true });
+  const count = (await list()).length;
+  const again = await Tabs.create({ request_id: "d-2", url, background: true });
+  check(
+    "a URL already open in this space reuses its tab",
+    again.astra_tab_id === first.astra_tab_id && again.existing === true,
+    JSON.stringify(again),
+  );
+  check("no second tab is created", (await list()).length === count);
+
+  await Settings.set({ key: "tabs.switch-to-open", value: "false" });
+  const fresh = await Tabs.create({ request_id: "d-3", url, background: true });
+  check("off opens a second copy", fresh.astra_tab_id !== first.astra_tab_id);
 }
 
 // === tabs.archive ========================================================
