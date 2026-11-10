@@ -1,5 +1,11 @@
 # Dev setup — Linux (P0-T01, first facts 2026-11-01)
 
+> Fresh clone? Run `./setup.sh` from the repo root — it asks for the sudo
+> password once, installs system packages for your distro (Ubuntu/Debian,
+> Fedora/RHEL, openSUSE, Arch), fetches upstream, builds the UI + engine
+> and packages. `./setup.sh --check` verifies a packaged build runs.
+> `tools/bootstrap.sh` remains for no-sudo environments (deps preinstalled).
+
 ## Machine
 
 - CPU: 16 threads · RAM: 31 GiB · Disk: 158 GiB free on `/home` — adequate for
