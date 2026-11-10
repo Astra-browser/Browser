@@ -49,6 +49,7 @@ export interface HostModules {
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  TabHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   BrowsingData: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -132,6 +133,10 @@ const ROUTES: Record<string, Route> = {
   tabs_navigate: ["Navigation", "loadURL", { ...TAB_ARG, input: "url" }],
   tabs_back: ["Navigation", "goBack", TAB_ARG],
   tabs_forward: ["Navigation", "goForward", TAB_ARG],
+  // The Back/Forward menu reads the engine's session history and jumps to the
+  // exact entry the row names; a native `history_menu_popup` has no route.
+  tabs_history: ["TabHistory", "list", TAB_ARG],
+  tabs_history_go: ["Navigation", "goToHistory", TAB_ARG],
   tabs_reload: ["Navigation", "reload", TAB_ARG],
   panel_hide: ["Panes", "hide"],
   panel_ready: ["Panes", "list"],

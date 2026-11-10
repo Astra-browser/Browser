@@ -81,6 +81,22 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "bookmarks" } } },
             allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
           },
+          // The sidebar's options button opens that same shared app menu.
+          {
+            from: { element: { type: "features", captured: { module: "sidebar" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
+          // The tool shelf's right-click menu is the app menu too.
+          {
+            from: { element: { type: "features", captured: { module: "dock" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
+          // The content bar's Back/Forward history menu is the same shared
+          // presenter: its rows are drawn by the app, not a native popup.
+          {
+            from: { element: { type: "features", captured: { module: "toolbar" } } },
+            allow: { to: { element: { type: "features", captured: { module: "menus" } } } },
+          },
           // Settings edits the sites focus shuts with the same control as Time.
           {
             from: { element: { type: "features", captured: { module: "settings" } } },

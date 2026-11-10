@@ -30,6 +30,7 @@ import {
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
+import { setDriver as setTabHistoryDriver } from "./TabHistory.sys.mjs";
 import { Favicons, __setFaviconEventSink } from "./Favicons.sys.mjs";
 import { Media } from "./Media.sys.mjs";
 import { chooseMedia } from "./MediaSelection.sys.mjs";
@@ -341,6 +342,50 @@ function browserWindow(browser) {
   }
 }
 
+// Windows with a live content mount, so TabHistory can find the native tab
+// behind an Astra id. The module itself stays pure: the driver below is the
+// only place that reads the engine. One entry per window; mountNative adds it
+// and detach removes it, so a closed window leaves no tab behind.
+const historyWindows = new Map(); // window -> Map(astra_tab_id -> native tab)
+
+/** The engine's own session history for one native tab, or null. Never throws. */
+function sessionHistoryOf(win, tab) {
+  try {
+    const history = win?.SessionStore?.getSessionHistory?.(tab);
+    if (!history || !Array.isArray(history.entries)) return null;
+    return {
+      index: Number.isInteger(history.index) ? history.index : history.entries.length - 1,
+      entries: history.entries.map((entry) => ({
+        url: typeof entry?.url === "string" ? entry.url : "",
+        // Entries the engine kept without a title still have an address, and
+        // that is the only label the menu can show for them.
+        title:
+          typeof entry?.title === "string" && entry.title !== ""
+            ? entry.title
+            : typeof entry?.url === "string"
+              ? entry.url
+              : "",
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function listTabHistory(astra_tab_id) {
+  for (const [win, tabs] of historyWindows) {
+    const tab = tabs.get(astra_tab_id);
+    if (!tab) continue;
+    return sessionHistoryOf(win, tab);
+  }
+  return null;
+}
+
+/** Point TabHistory at the live windows, or clear it when none is mounted. */
+function refreshTabHistoryDriver() {
+  setTabHistoryDriver(historyWindows.size === 0 ? null : { list: listTabHistory });
+}
+
 /** Live zoom for one browser. Returns false when no ZoomManager is reachable. */
 export function applyZoomToBrowser(browser, zoom) {
   try {
@@ -434,6 +479,8 @@ export const Content = {
     const principal = systemPrincipalOf(container);
     const tabOf = new Map(); // astra_tab_id -> native tab
     const idOf = new WeakMap(); // native tab -> astra_tab_id
+    historyWindows.set(win, tabOf);
+    refreshTabHistoryDriver();
     const browsers = new Map(); // astra_tab_id -> { browser, tab }
     const pending = new Map(); // astra_tab_id -> URL to load on first activation
     const historyMoves = new Map(); // astra_tab_id -> "back" | "forward" still settling
@@ -1478,18 +1525,27 @@ export const Content = {
         const tab = tabOf.get(id);
         const browser = tab?.linkedBrowser;
         const direction = event.data.history === "forward" ? "forward" : "back";
+        const target = event.data.history_index;
         let moved = false;
         if (browser) {
           historyMoves.set(id, direction);
           try {
-            const can =
-              direction === "back"
-                ? browser.canGoBackIgnoringUserInteraction === true
-                : browser.canGoForward === true;
-            if (can) {
-              if (direction === "back") browser.goBack(false);
-              else browser.goForward(false);
+            if (Number.isInteger(target)) {
+              // A row in the history menu names an exact entry, so jump to it
+              // instead of stepping: the engine may have skipped entries the
+              // model still lists, and one Back would land in the wrong place.
+              browser.gotoIndex(target);
               moved = true;
+            } else {
+              const can =
+                direction === "back"
+                  ? browser.canGoBackIgnoringUserInteraction === true
+                  : browser.canGoForward === true;
+              if (can) {
+                if (direction === "back") browser.goBack(false);
+                else browser.goForward(false);
+                moved = true;
+              }
             }
           } catch {
             moved = false;
@@ -1659,6 +1715,8 @@ export const Content = {
           try { win.removeEventListener(type, projectGroups); } catch {}
         }
         try { gb.removeTabsProgressListener(progress); } catch {}
+        historyWindows.delete(win);
+        refreshTabHistoryDriver();
         for (const id of [...tabOf.keys()]) forgetTab(id);
       },
     };
