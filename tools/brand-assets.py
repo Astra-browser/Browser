@@ -212,6 +212,8 @@ def main() -> None:
             out = os.path.join(tmp, f"web-{size}.png")
             render(tile_svg, size, out, back)
             tiles[size] = out
+    for size in (16, 32, 48):
+        copy_plain(tiles[size], os.path.join(PUBLIC, f"favicon-{size}.png"))
     copy_plain(tiles[180], os.path.join(PUBLIC, "apple-touch-icon.png"))
     copy_plain(tiles[192], os.path.join(PUBLIC, "icon-192.png"))
     copy_plain(tiles[512], os.path.join(PUBLIC, "icon-512.png"))
@@ -224,7 +226,8 @@ def main() -> None:
     print("                          astra-logo.svg, astra.ico, astra.icns")
     print("  overlay/astra/branding/content: about-logo.{svg,png,@2x.png}")
     print("  ui/app/public: astra-{icon.svg,icon.png,icon@2x.png,wordmark.svg,symbol.svg},")
-    print("                 favicon.{svg,ico}, apple-touch-icon.png, icon-{192,512}.png")
+    print("                 favicon.{svg,ico}, favicon-{16,32,48}.png,")
+    print("                 apple-touch-icon.png, icon-{192,512}.png")
 
 
 if __name__ == "__main__":
