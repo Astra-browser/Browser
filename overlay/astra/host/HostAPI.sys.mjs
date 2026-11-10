@@ -72,6 +72,7 @@ import { Resources } from "./Resources.sys.mjs";
 import { Search } from "./Search.sys.mjs";
 import { Permissions } from "./Permissions.sys.mjs";
 import { BrowsingData, __resetBrowsingDataForTests } from "./BrowsingData.sys.mjs";
+import { Migration } from "./Migration.sys.mjs";
 import { Blocker, __resetBlockerForTests } from "./Blocker.sys.mjs";
 import { Privacy, __resetPrivacyForTests } from "./Privacy.sys.mjs";
 import { Metadata } from "./Metadata.sys.mjs";
@@ -121,6 +122,7 @@ export {
   HistoryCall,
   Favicons,
   System,
+  Migration,
   Resources,
   Search,
   Permissions,

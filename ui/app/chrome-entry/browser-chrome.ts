@@ -197,6 +197,7 @@ try {
     "profiles-changed": "astra:profiles",
     "notes-changed": "astra:notes-changed",
     "keymap-changed": "astra:keymap-changed",
+    "import-progress": "astra:import-progress",
     "work-changed": "astra:work-changed",
     "work-environment-changed": "astra:work-environment-changed",
     "media-player-changed": "astra:media-player",
