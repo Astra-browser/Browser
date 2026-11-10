@@ -157,3 +157,16 @@ export function acceleratorFrom(event: KeyboardEvent, mac: boolean): string | nu
   parts.push(event.code);
   return parts.join("+");
 }
+
+/** The auxiliary mouse buttons a shortcut may use: back (3), forward (4) and
+ *  the first extra button (5). Middle-click (1) stays the browser's own. */
+export function mouseAccelerator(event: MouseEvent, mac: boolean): string | null {
+  if (event.button < 3 || event.button > 5) return null;
+  const parts: string[] = [];
+  if (event.ctrlKey) parts.push("Ctrl");
+  if (event.altKey) parts.push("Alt");
+  if (event.shiftKey) parts.push("Shift");
+  if (event.metaKey) parts.push(mac ? "Cmd" : "Super");
+  parts.push(`Mouse${event.button}`);
+  return parts.join("+");
+}

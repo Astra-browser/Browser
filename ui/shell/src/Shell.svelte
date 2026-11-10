@@ -427,19 +427,23 @@
       return [...mods, normalKey(event.key ?? "")].join("+");
     };
     const globalKeys = new Map();
-    try {
-      for (const entry of await host.Keymap.entries({})) {
-        if (!entry?.accelerator) continue;
-        const key = canonicalKey(entry.accelerator);
-        if (key) globalKeys.set(key, KEY_ALIAS[entry.id] ?? entry.id);
+    const loadGlobalKeys = async () => {
+      globalKeys.clear();
+      try {
+        for (const entry of await host.Keymap.entries({})) {
+          if (!entry?.accelerator) continue;
+          const key = canonicalKey(entry.accelerator);
+          if (key) globalKeys.set(key, KEY_ALIAS[entry.id] ?? entry.id);
+        }
+      } catch {
+        // No keymap: the native keys stay as they are and the app still works.
       }
-    } catch {
-      // No keymap: the native keys stay as they are and the app still works.
-    }
-    // Function keys the native keyset owns but the registry names differently.
-    globalKeys.set("F5", "nav.reload");
-    globalKeys.set("F11", "window.fullscreen");
-    globalKeys.set("F12", "page.devtools");
+      // Function keys the native keyset owns but the registry names differently.
+      globalKeys.set("F5", "nav.reload");
+      globalKeys.set("F11", "window.fullscreen");
+      globalKeys.set("F12", "page.devtools");
+    };
+    await loadGlobalKeys();
     const disableNativeKeys = () => {
       for (const id of NATIVE_KEYS) {
         try {
@@ -471,6 +475,29 @@
       void host.Commands.run({ id });
     };
     win.addEventListener("keydown", onGlobalKey, true);
+    // Auxiliary mouse buttons are shortcuts too (back / forward / extra).
+    // With no binding the engine's own button behaviour is untouched.
+    const onGlobalMouse = (event) => {
+      if (event.defaultPrevented || event.button < 3 || event.button > 5) return;
+      let fromApp = false;
+      try {
+        fromApp = !!appApi?.element && event.target?.ownerDocument === appApi.element.contentDocument;
+      } catch {
+        fromApp = false;
+      }
+      if (fromApp) return;
+      const mods = [];
+      if (event.ctrlKey) mods.push("Ctrl");
+      if (event.altKey) mods.push("Alt");
+      if (event.shiftKey) mods.push("Shift");
+      if (event.metaKey) mods.push("Meta");
+      const id = globalKeys.get([...mods, `Mouse${event.button}`].join("+"));
+      if (!id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void host.Commands.run({ id });
+    };
+    win.addEventListener("mousedown", onGlobalMouse, true);
     // A page's fullscreen request can be refused by the engine for reasons
     // outside the stage's control (the content not yet focused on a first
     // click). The chrome document's fullscreen element is the stage browser
@@ -759,7 +786,11 @@
       } catch {
         // Best-effort diagnostics only.
       }
-      if (event.type === "window.fullscreen-changed") {
+      if (event.type === "keymap-changed") {
+        // A rebind applies to the page and chrome keys immediately, not only
+        // after the window is reopened.
+        void loadGlobalKeys();
+      } else if (event.type === "window.fullscreen-changed") {
         if (event.data?.window_id === ownWindowId) {
           mirrorFullscreen(event.data?.fullscreen === true);
         }

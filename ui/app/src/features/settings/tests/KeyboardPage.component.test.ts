@@ -73,8 +73,13 @@ test("records a shortcut, names a conflict, and takes the keys when asked", asyn
   expect(native.record).toHaveBeenLastCalledWith(true);
   await userEvent.keyboard("{Meta>}w{/Meta}");
   const pressed = IS_MAC ? "Cmd+KeyW" : "Super+KeyW";
-  await vi.waitFor(() => expect(native.bind).toHaveBeenLastCalledWith("tab.new", pressed, false));
+  // A captured chord waits for Save: 15 seconds to confirm, then it reverts.
+  expect(native.bind).not.toHaveBeenCalled();
+  await expect.element(screen.getByRole("timer")).toHaveTextContent("Save in 15s");
   expect(native.record).toHaveBeenLastCalledWith(false);
+
+  await screen.getByRole("button", { name: "Save" }).click();
+  await vi.waitFor(() => expect(native.bind).toHaveBeenLastCalledWith("tab.new", pressed, false));
   await expect.element(screen.getByText("Already used by Close tab.")).toBeVisible();
 
   await screen.getByRole("button", { name: "Use here" }).click();
