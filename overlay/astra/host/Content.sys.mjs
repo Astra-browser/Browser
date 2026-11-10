@@ -1168,8 +1168,12 @@ export const Content = {
       }
     };
     gb.tabContainer.addEventListener("TabAttrModified", onAttr);
+    // A native close removes the tab and then selects the engine's own
+    // successor. While that settles, `tabs.after-close` is the authority, so
+    // the engine's selection must not overwrite the model's choice.
+    let nativeClosing = 0;
     const onSelect = () => {
-      if (applying) return;
+      if (applying || nativeClosing > 0) return;
       const id = idOfTab(gb.selectedTab);
       if (id) {
         const split = gb.selectedTab?.splitview;
@@ -1193,7 +1197,30 @@ export const Content = {
     const onClose = (event) => {
       if (applying) return;
       const id = idOfTab(event.target);
-      if (id) void Tabs.close({ astra_tab_id: id });
+      if (!id) return;
+      nativeClosing += 1;
+      void (async () => {
+        try {
+          await Tabs.close({ astra_tab_id: id });
+        } finally {
+          // Let the engine finish its own successor selection, then apply the
+          // person's choice to the native deck as well as the model.
+          setTimeout(() => {
+            nativeClosing = Math.max(0, nativeClosing - 1);
+            const wanted = __tabsState().selectedId;
+            const target = wanted ? tabOf.get(wanted) : null;
+            if (!target || target.selected) return;
+            applying = true;
+            try {
+              gb.selectedTab = target;
+            } catch {
+              // The window may be closing with its last tab.
+            } finally {
+              applying = false;
+            }
+          }, 0);
+        }
+      })();
     };
     const onOpen = (event) => {
       if (applying) return;
