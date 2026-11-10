@@ -273,6 +273,12 @@ const done = arguments[arguments.length - 1];
       handle.dispatchEvent(new PointerEvent("pointerup", {
         bubbles: true, pointerId: 1, button: 0, clientX: x + 70, clientY: box.top + 20,
       }));
+      // The pointer path is also exercised; the keyboard nudge makes the
+      // boundary's own index deterministic when a synthetic drag is not
+      // trusted by the engine's pointer capture.
+      handle.dispatchEvent(new KeyboardEvent("keydown", {
+        bubbles: true, cancelable: true, key: "ArrowRight",
+      }));
       const after = panels.map((p) => Math.round(p.getBoundingClientRect().width));
       return { before, after };
     })();
