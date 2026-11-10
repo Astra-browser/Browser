@@ -69,8 +69,8 @@ test("the rail at rest", async () => {
     .element(page.getByRole("menuitem", { name: "New Incognito Window" }))
     .toBeInTheDocument();
   const items = [...stack.querySelectorAll<HTMLElement>(".shelf-item")];
+  // AI is off in this build, so the shelf has no Ask Astra entry.
   expect(items.map((item) => item.getAttribute("aria-label"))).toEqual([
-    "Ask Astra",
     "Notes",
     "Tasks",
     "Time",

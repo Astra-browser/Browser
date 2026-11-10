@@ -190,7 +190,10 @@ const flagSections: Partial<Record<SettingsSection, () => boolean>> = {
 const flagFields: Partial<Record<keyof typeof fields, () => boolean>> = {
   "work.enabled": () => flags.work,
 };
-const fieldAvailable = (id: string) => flagFields[id as keyof typeof fields]?.() ?? true;
+const fieldAvailable = (id: string) =>
+  // The AI switch lives on the Features page, so it takes the same build gate
+  // as the AI pages: without AI there is nothing to switch.
+  (id !== "ai.enabled" || flags.ai) && (flagFields[id as keyof typeof fields]?.() ?? true);
 export const sections = allSections.filter(
   (section) =>
     (flagSections[section.id]?.() ?? true) && (showPreviews || !previewSections.has(section.id)),
@@ -204,6 +207,7 @@ const featureSections: Partial<Record<SettingsSection, () => boolean>> = {
   memory: preferences.aiEnabled,
   sites: preferences.aiEnabled,
   mcp: preferences.aiEnabled,
+  account: preferences.accountEnabled,
 };
 export const shownSections = () =>
   sections.filter((section) => featureSections[section.id]?.() ?? true);

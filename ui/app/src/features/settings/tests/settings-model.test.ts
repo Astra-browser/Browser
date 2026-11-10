@@ -14,31 +14,43 @@ describe("settings discovery", () => {
   });
 });
 
-it("finds the agent destinations without exposing unimplemented controls", async () => {
-  const { searchSettings, searchSections, sections } = await import("../lib/settings-model");
+it("keeps AI and account out of a build that carries neither", async () => {
+  const { searchSettings, searchSections, sections, shownSections } =
+    await import("../lib/settings-model");
   expect(sections.some((section) => String(section.id) === "plugins")).toBe(false);
-  expect(searchSections("models").some((section) => section.id === "ai")).toBe(true);
-  expect(searchSections("site access").some((section) => section.id === "sites")).toBe(true);
-  expect(searchSections("MCP").some((section) => section.id === "mcp")).toBe(true);
-  for (const query of ["API key", "Jev", "TypeSafe"]) {
-    expect(searchSettings(query).map(({ section, target }) => ({ section, target }))).toEqual([
-      { section: "ai", target: "work.decisions.key" },
-    ]);
+  const offered = shownSections().map((section) => String(section.id));
+  for (const id of ["ai", "skills", "memory", "sites", "mcp", "account"]) {
+    expect(offered).not.toContain(id);
   }
-  expect(searchSettings("Decisions").some((result) => result.section === "work")).toBe(false);
+  const aiSections = new Set(["ai", "skills", "memory", "sites", "mcp", "account"]);
+  for (const query of ["models", "MCP", "account"]) {
+    expect(searchSections(query).map((section) => String(section.id))).not.toContain(...aiSections);
+    expect(searchSections(query).some((section) => aiSections.has(String(section.id)))).toBe(false);
+  }
+  for (const query of ["API key", "Jev", "TypeSafe"]) {
+    expect(
+      searchSettings(query).filter((result) => aiSections.has(String(result.section))),
+    ).toEqual([]);
+  }
   expect(searchSettings("reset settings").some((result) => result.target === "about.reset")).toBe(
     true,
   );
 });
 
-it("offers Account through the identity card and search, outside the groups", async () => {
-  const { groups, sections, searchSettings } = await import("../lib/settings-model");
-  const account = sections.find((section) => String(section.id) === "account");
-  expect(account).toBeDefined();
-  expect(groups.some((group) => String(group.id) === account!.group)).toBe(false);
+it("offers AI and Account in search when their build flags are on", async () => {
+  vi.stubEnv("VITE_ASTRA_AI", "true");
+  vi.stubEnv("VITE_ASTRA_ACCOUNT", "true");
+  vi.resetModules();
+  const { searchSettings, searchSections, shownSections } = await import("../lib/settings-model");
+  expect(shownSections().map((section) => String(section.id))).toEqual(
+    expect.arrayContaining(["ai", "mcp", "account"]),
+  );
+  expect(searchSections("models").some((section) => section.id === "ai")).toBe(true);
   expect(searchSettings("account").some((result) => String(result.section) === "account")).toBe(
     true,
   );
+  vi.unstubAllEnvs();
+  vi.resetModules();
 });
 
 it("groups sections as Browser, Work and App with stable ids", async () => {
@@ -86,6 +98,7 @@ it("finds the page zoom options", async () => {
 
 it("takes each feature's pages out of navigation and search while its switch is off", async () => {
   const off = new Set<string>();
+  vi.stubEnv("VITE_ASTRA_AI", "true");
   vi.resetModules();
   vi.doMock("$domain/preferences", async (actual) => {
     const real = (await actual()) as typeof import("$domain/preferences");
@@ -113,6 +126,7 @@ it("takes each feature's pages out of navigation and search while its switch is 
   expect(shown()).not.toContain("focus");
   expect(searchSettings("AI").map((result) => result.target)).toContain("ai.enabled");
   vi.doUnmock("$domain/preferences");
+  vi.unstubAllEnvs();
 });
 
 it("offers SmartScreen search results only on Windows", async () => {
