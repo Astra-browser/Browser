@@ -267,10 +267,11 @@ describe("history", () => {
     await Navigation.loadURL({ request_id: "n2", astra_tab_id: id, url: "https://a.example/" });
 
     const back = await Navigation.goBack({ request_id: "n3", astra_tab_id: id });
-    // One entry, not two: Back has nowhere to go rather than landing on the
-    // same address (which is the "Back does nothing" bug).
-    assert.equal(back.went_back, false);
-    assert.equal(back.url, "https://a.example/");
+    // One entry, not two: the second load reloads in place, so Back steps off
+    // the first page onto the New Tab the tab started on (owner report #9)
+    // instead of landing on a second copy of the same address.
+    assert.equal(back.went_back, true);
+    assert.equal(back.url, "about:blank");
     const tab = (await Tabs.get({ request_id: "g1", astra_tab_id: id })).tab;
     assert.equal(tab.canGoBack, false);
   });
