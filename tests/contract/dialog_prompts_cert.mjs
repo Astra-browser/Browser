@@ -13,7 +13,9 @@ import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const { DialogPrompts, isLocalHost } = await import(path.join(HOST, "DialogPrompts.sys.mjs"));
+const { DialogPrompts, isLocalHost, netErrorReason } = await import(
+  path.join(HOST, "DialogPrompts.sys.mjs"),
+);
 const { Operations, __resetOperationsForTests } = await import(
   path.join(HOST, "Operations.sys.mjs")
 );
@@ -66,6 +68,30 @@ const stale = await DialogPrompts.answerCert({ astra_tab_id: "tab-1", decision: 
 check("an answer with no challenge is refused", (await disposition(stale)).reason === "invalid_scope");
 const bad = await DialogPrompts.answerCert({ astra_tab_id: "tab-1", decision: "always" });
 check("an unknown decision is refused", (await disposition(bad)).reason === "invalid_scope");
+
+// The engine's about:neterror codes map onto the app's own failed page.
+for (const [code, reason] of [
+  ["dnsNotFound", "host_not_found"],
+  ["netTimeout", "timed_out"],
+  ["offline", "offline"],
+  ["connectionFailure", "unreachable"],
+  ["netInterrupt", "unreachable"],
+  ["proxyConnectFailure", "unreachable"],
+  ["somethingElse", "other"],
+]) {
+  check(`${code} maps to ${reason}`, netErrorReason(code) === reason);
+}
+check(
+  "an error page with no tab is refused",
+  DialogPrompts.netErrorFor({
+    failedURI: "about:neterror?e=dnsNotFound&u=https%3A%2F%2Fmissing.example%2F",
+    tabId: "",
+  }) === false,
+);
+check(
+  "a normal address is not an error page",
+  DialogPrompts.netErrorFor({ failedURI: "https://example.com/", tabId: "tab-1" }) === false,
+);
 
 // No chrome services in Node: raising an error is a fail-closed false.
 const raised = await DialogPrompts.certErrorFor({

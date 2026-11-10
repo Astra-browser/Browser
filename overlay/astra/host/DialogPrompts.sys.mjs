@@ -191,6 +191,29 @@ function cancelPending(request, { notifyEngine = true } = {}) {
   return true;
 }
 
+/** Engine `about:neterror` code -> the app's TabFailure reason. */
+export function netErrorReason(code) {
+  switch (String(code)) {
+    case "dnsNotFound":
+    case "dnsNotFound2":
+      return "host_not_found";
+    case "netTimeout":
+      return "timed_out";
+    case "offline":
+    case "offlineNoCache":
+      return "offline";
+    case "connectionFailure":
+    case "netInterrupt":
+    case "netReset":
+    case "netAbort":
+    case "proxyConnectFailure":
+    case "proxyResolveFailure":
+      return "unreachable";
+    default:
+      return "other";
+  }
+}
+
 export const DialogPrompts = {
   /** One process-wide wrapper; this window joins the routing registry. */
   async install({ window: win = null } = {}) {
@@ -509,6 +532,43 @@ export const DialogPrompts = {
     });
     __setCertificateException(tabId, false);
     return true;
+  },
+
+  /**
+   * A failed top-level navigation (DNS, refused, timeout, offline) is the
+   * engine's about:neterror document. The app already has Astra's own failed
+   * page for every reason; this maps the engine's `e=` code onto it so the
+   * native page never shows through.
+   *
+   * Returns the failure it set, or false when the URI is not an error page.
+   */
+  netErrorFor({ failedURI = "", tabId = "" } = {}) {
+    if (typeof failedURI !== "string" || typeof tabId !== "string" || tabId === "") {
+      return false;
+    }
+    let failed = "";
+    let code = "";
+    try {
+      const url = new URL(failedURI);
+      if (url.protocol !== "about:") return false;
+      if (url.pathname === "blocked") {
+        failed = url.searchParams.get("url") ?? "";
+        code = "blocked";
+      } else if (url.pathname === "neterror") {
+        failed = url.searchParams.get("u") ?? "";
+        code = url.searchParams.get("e") ?? "";
+      } else {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+    if (failed === "") return false;
+    return __setFailure(tabId, {
+      url: failed,
+      reason: netErrorReason(code),
+      covers_page: true,
+    });
   },
 
   /** Route target for `tabs_continue_past_certificate`. */
