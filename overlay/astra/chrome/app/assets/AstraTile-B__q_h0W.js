@@ -1,0 +1,1 @@
+import"./ui-core-3YQJF1EX.js";import{Kt as e,Wt as t,dn as n,ot as r,yt as i}from"./chrome-shared-BCUmjBxz.js";var a=e(`<img class="astra-tile svelte-17tp8df" src="astra-icon.svg" alt="" aria-hidden="true" draggable="false"/>`);function o(e,o){let s=r(o,`size`,3,16);var c=a();n(()=>{i(c,`width`,s()),i(c,`height`,s())}),t(e,c)}export{o as t};

@@ -1,0 +1,1 @@
+import{Q as e}from"./chrome-shared-BCUmjBxz.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(2303,n)??`Paused while the window is hidden`)),r=((n={},r={})=>(r.locale??e(),t(2308,n)??`Review`));export{n,r as t};

@@ -1,0 +1,1 @@
+import{Q as e}from"./chrome-shared-BCUmjBxz.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(256,n)??`Zoom in`)),r=((n={},r={})=>(r.locale??e(),t(257,n)??`Zoom out`));export{n,r as t};
