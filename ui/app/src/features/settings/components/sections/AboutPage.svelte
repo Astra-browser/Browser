@@ -283,6 +283,8 @@
   </SettingsRow>
 </SettingsGroup>
 
+<p class="credit">{m.about_credit()}</p>
+
 <style>
   .hero {
     gap: 20px;
@@ -358,5 +360,13 @@
   .report textarea:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+  }
+
+  .credit {
+    margin: 0;
+    padding-block: 24px 6px;
+    color: var(--color-muted);
+    font-size: var(--text-caption);
+    text-align: center;
   }
 </style>
