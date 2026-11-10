@@ -60,3 +60,8 @@ ui_inspiration/
 
 # Extracted release tarball (local install/test artifact)
 /Astra/
+
+# Generated chrome bundle (rebuilt by `bun run --filter @astra/frame build:chrome`;
+# the 14 static files from ui/app/public stay tracked, hashed build output does not)
+/overlay/astra/chrome/app/assets/
+/overlay/astra/chrome/app/browser-chrome.html

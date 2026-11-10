@@ -1,1 +1,0 @@
-import{Q as e}from"./chrome-shared-CQTgntcI.js";import{n as t}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";var n=((n={},r={})=>(r.locale??e(),t(1135,n)??`Today`)),r=((n={},r={})=>(r.locale??e(),t(1136,n)??`Upcoming`));export{n,r as t};

@@ -1,1 +1,0 @@
-import{n as e}from"./messages-browser-chrome-PageRequestCard-SiteDetailsBody-ProtectionMenu-ExtensionHub-MediaPl-bx29rhk4-CQJSnpLa.js";import{Q as t}from"./chrome-shared-CQTgntcI.js";var n=((n={},r={})=>(r.locale??t(),e(1993,n)??`Result`));export{n as t};
