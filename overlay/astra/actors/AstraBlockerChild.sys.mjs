@@ -10,6 +10,8 @@
 
 const STYLE_ID = "astra-blocker-style";
 const MAX_SELECTORS = 4096;
+const MAX_SEEN = 512;
+const MAX_PROCEDURAL = 256;
 const DEBOUNCE_MS = 500;
 
 export class AstraBlockerChild extends JSWindowActorChild {
@@ -20,6 +22,7 @@ export class AstraBlockerChild extends JSWindowActorChild {
   #started = false;
   #seenClasses = new Set();
   #seenIds = new Set();
+  #procedural = [];
   #scriptInjected = false;
   #request = 0;
   #refreshed = false;
@@ -62,8 +65,8 @@ export class AstraBlockerChild extends JSWindowActorChild {
     this.#started = true;
 
     const observed = collectObserved(doc);
-    this.#seenClasses = new Set(observed.classes);
-    this.#seenIds = new Set(observed.ids);
+    for (const name of observed.classes) this.#remember(this.#seenClasses, name);
+    for (const name of observed.ids) this.#remember(this.#seenIds, name);
     const reply = await this.#ask([], []);
     if (!this.#started || !this.document) return;
     if (reply?.enabled === false) {
@@ -85,35 +88,60 @@ export class AstraBlockerChild extends JSWindowActorChild {
         attributeFilter: ["class", "id"],
       });
     }
-    // `observed` seeds the generic lookup after the first paint without
-    // making the first query wait for a full DOM walk.
+    // The first walk already seeded the sets; reuse it instead of walking
+    // the document a second time before the first generic query.
     if (observed.classes.length || observed.ids.length) {
-      void this.#refresh(doc);
+      void this.#refresh(doc, observed);
     }
   }
 
   #schedule(doc) {
     if (this.#timer !== null) return;
-    this.#timer = this.contentWindow.setTimeout(() => {
+    const timer = this.contentWindow?.setTimeout(() => {
       this.#timer = null;
+      if (!this.#started) return;
       void this.#refresh(doc);
     }, DEBOUNCE_MS);
+    if (timer !== undefined) this.#timer = timer;
   }
 
-  async #refresh(doc) {
+  async #refresh(doc, preObserved = null) {
     if (!doc || !this.#started) return;
-    const observed = collectObserved(doc);
-    const fresh =
-      observed.classes.some((name) => !this.#seenClasses.has(name)) ||
-      observed.ids.some((name) => !this.#seenIds.has(name));
-    for (const name of observed.classes) this.#seenClasses.add(name);
-    for (const name of observed.ids) this.#seenIds.add(name);
-    if (!fresh && this.#refreshed) return;
+    const observed = preObserved ?? collectObserved(doc);
+    let fresh = false;
+    for (const name of observed.classes) {
+      if (this.#remember(this.#seenClasses, name)) fresh = true;
+    }
+    for (const name of observed.ids) {
+      if (this.#remember(this.#seenIds, name)) fresh = true;
+    }
+    if (!fresh && this.#refreshed) {
+      // Static CSS and scriptlets are already installed. Procedural actions
+      // depend on the live DOM (`:has-text`, `:style`, `:remove`), so re-run
+      // the cached set without another parent round-trip.
+      this.#applyProcedural(doc);
+      return;
+    }
     if (this.#seenClasses.size === 0 && this.#seenIds.size === 0) return;
     this.#refreshed = true;
     const reply = await this.#ask([...this.#seenClasses], [...this.#seenIds]);
     if (!this.#started || !this.document) return;
     this.#apply(doc, reply);
+  }
+
+  /** Add one name to a bounded insertion-ordered set; true when new. */
+  #remember(set, name) {
+    if (!name || set.has(name)) return false;
+    set.add(name);
+    if (set.size > MAX_SEEN) {
+      const oldest = set.values().next().value;
+      set.delete(oldest);
+    }
+    return true;
+  }
+
+  #applyProcedural(doc) {
+    for (const action of this.#procedural) runProcedural(doc, action);
   }
 
   async #ask(classes, ids) {
@@ -160,10 +188,11 @@ export class AstraBlockerChild extends JSWindowActorChild {
       injectScriptlet(this.contentWindow, reply.script, this.#url);
     }
     if (Array.isArray(reply.procedural) && reply.procedural.length > 0) {
-      for (const action of reply.procedural.slice(0, 256)) {
-        runProcedural(doc, action);
-      }
+      this.#procedural = reply.procedural.slice(0, MAX_PROCEDURAL);
+    } else {
+      this.#procedural = [];
     }
+    this.#applyProcedural(doc);
   }
 }
 
@@ -172,21 +201,24 @@ function collectObserved(doc) {
   const classes = new Set();
   const ids = new Set();
   let count = 0;
+  const remember = (set, value) => {
+    if (!value || set.has(value)) return;
+    set.add(value);
+    if (set.size > MAX_SEEN) set.delete(set.values().next().value);
+  };
   const walk = (root) => {
     if (!root || count > 20000) return;
-    const elements = root.querySelectorAll?.("*") ?? [];
+    // Only elements that can contribute a name; avoids allocating a NodeList
+    // for every element on the page.
+    const elements = root.querySelectorAll?.("[id],[class]") ?? [];
     for (const element of elements) {
       count += 1;
       if (count > 20000) break;
-      if (element.id) ids.add(element.id);
+      if (element.id) remember(ids, element.id);
       const className = element.getAttribute?.("class");
       if (className) {
-        for (const name of className.split(/\s+/u)) {
-          if (name) classes.add(name);
-        }
+        for (const name of className.split(/\s+/u)) remember(classes, name);
       }
-      if (classes.size > 4096) classes.clear();
-      if (ids.size > 4096) ids.clear();
       if (element.shadowRoot) walk(element.shadowRoot);
     }
   };

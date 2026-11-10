@@ -302,7 +302,13 @@ function applySiteFingerprints() {
   );
   for (const [host, mode] of Object.entries(sites)) {
     if (mode === "aggressive") {
-      merged.push({ firstPartyDomain: host, overrides: "+AllTargets" });
+      // `+AllTargets` includes ReduceTimerPrecision, whose 16.667 ms clamp
+      // breaks performance.now() (Speedometer's 0-time check, animation
+      // timing). The global sets leave it out; the per-site set must too.
+      merged.push({
+        firstPartyDomain: host,
+        overrides: "+AllTargets,-ReduceTimerPrecision",
+      });
     } else if (mode === "standard") {
       merged.push({ firstPartyDomain: host, overrides: FP_STANDARD });
     } else if (mode === "off") {

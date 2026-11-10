@@ -11,6 +11,25 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Review follow-ups: shield pause, procedural ads, timer target (2026-11-10)
+
+A review of the blocker/FPP batch found five issues; all are fixed on
+`fix/blocker-review-followups`:
+
+| Finding | Fix | File |
+|---|---|---|
+| Per-site **Aggressive** used `+AllTargets`, which re-adds `ReduceTimerPrecision` and brings the 16.667 ms timer clamp back on that site | `+AllTargets,-ReduceTimerPrecision`; the contract rejects a bare `+AllTargets` | `overlay/astra/host/Privacy.sys.mjs` |
+| The query skip also skipped **procedural** actions (`:has-text`, `:style`, `:remove`) for later nodes | the last procedural set is cached and re-run on each debounced batch, without a parent round-trip | `AstraBlockerChild.sys.mjs` |
+| `#seenClasses`/`#seenIds` grew without bound and sent more names than the parent accepts | both are bounded to the parent's 512-name window; the initial walk is reused instead of walking twice | `AstraBlockerChild.sys.mjs` |
+| Pausing shields stopped Astra's engine but not native ETP, so Disconnect-listed hosts stayed blocked while the shield read "off" | pause writes `trackingprotection` / `trackingprotection-pb` permissions on the site principal, and removes them on resume; applied at startup too | `overlay/astra/host/Blocker.sys.mjs` |
+| Docs still listed `ReduceTimerPrecision` and said native ETP was not set | both corrected | `FINGERPRINTING.md`, `PRIVACY_PREFS.md` |
+
+**Verification:** `blocker_coverage` 16/16; blocker-probe PASS; sidebar-shield
+10/10; superadblock 482/482, headline 100; Speedometer 3.1 20.0 ±0.95 (10
+iterations). The ETP permission path is contract-checked and follows
+Firefox's own permission model; it is not live-probed against a real
+Disconnect host in this pass.
+
 ## Owner report: Speedometer 3.0/3.1 — why it was low and what changed (2026-11-10)
 
 The benchmark was failing outright, not just scoring low. FPP's
