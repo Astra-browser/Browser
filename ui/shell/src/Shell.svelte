@@ -103,8 +103,12 @@
     "page.save",
     "page.selectAll",
     "page.viewSource",
+    "window.closePrivate",
+    "window.new",
+    "window.newPrivate",
     "window.showPrivate",
     "window.showRegular",
+    "window.togglePrivate",
     "window.fullscreen",
   ]);
 

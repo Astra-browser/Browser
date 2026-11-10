@@ -79,6 +79,20 @@ for (const page of PAGES) {
   check("an unported command announces nothing", seen.length === 0);
 }
 
+// The dock's private-window control and the private bar's close control run
+// these ids. They were absent from the allowlist, so the click was silently
+// refused (the incognito icon did nothing).
+for (const id of [
+  "window.new",
+  "window.newPrivate",
+  "window.togglePrivate",
+  "window.closePrivate",
+]) {
+  const { seen, result } = await capture(() => Commands.run({ id }));
+  check(`${id} is admitted`, result.accepted === true);
+  check(`${id} is announced to the chrome`, seen.length === 1 && seen[0] === id);
+}
+
 {
   const { result } = await capture(() => Commands.run({ id: "" }));
   check("an empty id is refused", result.accepted === false);
