@@ -63,6 +63,15 @@ let _liveBackendPromise = null;
 const _sourceCache = new Map();
 const _sourceInflight = new Map();
 const SOURCE_CACHE_MS = 5 * 60 * 1000;
+const SOURCE_CACHE_CAP = 256;
+
+function rememberSource(origin, source) {
+  if (_sourceCache.size >= SOURCE_CACHE_CAP) {
+    const oldest = _sourceCache.keys().next().value;
+    if (oldest !== undefined) _sourceCache.delete(oldest);
+  }
+  _sourceCache.set(origin, { at: Date.now(), source });
+}
 
 // Replacement backend; returns a reset function so a suite can undo it.
 export function __setFaviconBackend(backend) {
@@ -395,7 +404,7 @@ function createPlacesBackend(PlacesUtils) {
       let pending = origin ? _sourceInflight.get(origin) : null;
       if (!pending) {
         pending = fetchIconSource(doc, url).then((source) => {
-          if (origin) _sourceCache.set(origin, { at: Date.now(), source });
+          if (origin) rememberSource(origin, source);
           return source;
         });
         if (origin) {

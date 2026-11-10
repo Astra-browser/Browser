@@ -318,8 +318,15 @@ export const Metadata = {
     // and it must not change the normal window's store state.
     if (isPrivate === true) return { state: "private" };
     _private = false;
-    _windowId = typeof windowId === "string" ? windowId : "";
+    const requested = typeof windowId === "string" ? windowId : "";
     _owner = claimOwner();
+    // A second window shares this process-wide store. It must not reload the
+    // snapshot over the owner's copy or take the writer slot; the owner's
+    // snapshot already includes both windows' tabs.
+    if (!_owner && (_off !== null || _available || _snapshot !== null)) {
+      return { state: "secondary" };
+    }
+    _windowId = requested;
     const reply = await Boot.coreCall({
       request_id: "metadata-load",
       name: "session.load",
@@ -482,10 +489,11 @@ export const Metadata = {
     // A private window owns no organisation: it neither subscribes nor
     // claims the writer slot, and must not flip the normal window's flag.
     if (isPrivate === true) return;
+    // A second window never steals the owner's subscription or identity.
+    if (_off !== null) return;
     _private = false;
     _windowId = typeof windowId === "string" ? windowId : _windowId;
     _owner = claimOwner();
-    if (_off !== null) return;
     _off = addEventListener((event) => {
       if (typeof event?.type !== "string") return;
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
@@ -496,8 +504,10 @@ export const Metadata = {
     scheduleSave();
   },
 
-  /** Give up the writer slot so another window can persist. */
-  releaseOwner() {
+  /** Give up the writer slot so another window can persist. Only the window
+   *  that prepared the store may release it. */
+  releaseOwner({ window_id = "" } = {}) {
+    if (window_id && _windowId && window_id !== _windowId) return false;
     const shared = sharedServices();
     try {
       if (shared && shared.astraOrgOwner === _token) delete shared.astraOrgOwner;
@@ -505,9 +515,11 @@ export const Metadata = {
       // A frozen Services object is not worth failing teardown over.
     }
     _owner = false;
+    return true;
   },
 
-  dispose() {
+  dispose({ window_id = "" } = {}) {
+    if (window_id && _windowId && window_id !== _windowId) return false;
     resetTimer();
     _off?.();
     _off = null;
@@ -526,6 +538,7 @@ export const Metadata = {
     _lastSavedAt = null;
     _lastError = null;
     _lastSnapshot = null;
+    return true;
   },
 
   status() {
