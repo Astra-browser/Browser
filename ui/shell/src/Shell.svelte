@@ -621,6 +621,25 @@
         if (moduleName === "History" && methodName === "visit") {
           return { payload: { mirrored: false, private: true } };
         }
+        // Durable stores the app can reach from a browser page. A private
+        // window reads and writes none of them.
+        if (moduleName === "Notes" && methodName === "call") {
+          return {
+            payload: {
+              profile: "incognito",
+              response: { kind: "error", error: "unavailable" },
+            },
+          };
+        }
+        if (moduleName === "MediaImport" && methodName === "import") {
+          return { payload: { kind: "refused", error: "unavailable" } };
+        }
+        if (moduleName === "Migration" && methodName === "importStart") {
+          return { payload: false };
+        }
+        if (moduleName === "Migration" && methodName === "exportBrowserData") {
+          return { payload: "failed" };
+        }
         return null;
       },
     });
