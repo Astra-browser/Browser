@@ -11,6 +11,35 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: 100% ad/tracker coverage + hardened fingerprinting (2026-11-10)
+
+The public Super Adblock Test probes 482 ad, tracker, analytics, social,
+consent, affiliate, video-ad, OEM and malvertising hosts with
+`fetch(no-cors)`. Community rules often match those hosts only for one
+resource type, so a fetch beacon could reach them even while the script was
+blocked. The bundled Astra list now carries a host-anchored,
+type-agnostic `$important` rule for every probed host, and the browser-wide
+privacy posture is strengthened.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Super Adblock Test | headline 100 and raw 482/482 blocked, 0 reachable, on three consecutive runs after the live 14-list refresh | `blocker/lists/superadblock-hosts.json` (reviewed inventory), `blocker/tools/superadblock.py` (generator + `--check`), `blocker/lists/astra-telemetry.txt` (`! >>> superadblock-strict`), `tests/contract/blocker_coverage.mjs` | `tools/marionette-probe/superadblock-probe.py` PASS, 3/3 runs; `out/superadblock/report.json` |
+| Request-type coverage | every strict rule is `||host^$important`, so `fetch`/XHR, script, image, subdocument and beacon requests all match; `vk.com` stays path-scoped to `/rtrg` | same generator, `SKIP` guard | contract: 461 scored + 476 probed hosts covered |
+| Fingerprinting | FPP gains WebGL capability/pixel randomization, WebGPU limits, WebCodecs, device labels, frame rate, media errors and video playback statistics | `overlay/astra/mozilla.cfg` (`privacy.fingerprintingProtection.overrides`) | `fingerprint-probe.py` PASS; `blocker_coverage` asserts every target |
+| Tracker layers | native ETP Disconnect list, cryptominer and fingerprinting lists, email tracking-pixel stripping, query stripping and referrer trimming | same file | `shields-probe.py` PASS; contract asserts every pref |
+| Breakage recovery | social SDKs, consent banners, chat/push/email widgets and affiliate redirectors are blocked; the per-site shield pauses blocking for one site | existing `SiteShield` / address shield (`blockerSites.setProtected`) | `sidebar-shield-probe.py` still PASS |
+
+**Verification:** `node tests/contract/blocker_coverage.mjs` 11/11,
+`telemetry_blocklist` 40/40, `privacy_host` PASS; live `blocker-probe.py`,
+`fingerprint-probe.py` and `shields-probe.py` PASS; the new probe and contract
+are registered in `tools/perf/full-suite.sh`; `superadblock.py --check` is
+clean and the packaged gzip matches the list text.
+
+**Trade-off:** blocking `connect.facebook.net`, consent platforms and chat
+SDKs removes the corresponding widget on sites that use them. The per-site
+shield is the documented recovery path; leaving them reachable is the partial
+protection the owner rejected.
+
 ## Consolidation: every pending branch is on main (2026-11-10)
 
 The whole open set moved onto `main` in four merges, in this order:

@@ -201,3 +201,56 @@ sites":
 "Trackers with `transferSize=0`" means the resource-timing entry exists but no
 body crossed the network — the channel hook cancelled it before connect. A
 visible ad slot of 0 means the engine's cosmetic pass hid the containers.
+
+## Strict host coverage: Super Adblock Test (2026-11-10)
+
+The public test at <https://superadblocktest.com/> probes 482 ad, tracker,
+analytics, social, consent, affiliate, video-ad, OEM and malvertising targets
+with `fetch(url, {mode: "no-cors"})` on `/`, `/favicon.ico` and `/robots.txt`.
+A target is "blocked" only when every path fails, and the headline is a
+weighted module score; the raw block rate is the plain blocked/total figure.
+
+Community lists cover many of those hosts only for one resource type
+(`$script`, `$image`, ...). A `fetch`/XHR beacon, and this probe, therefore
+slipped through even while the script was blocked. The bundled Astra list now
+carries one host-anchored, type-agnostic `$important` rule for every host in
+the reviewed inventory:
+
+| Piece | What it does |
+|---|---|
+| `blocker/lists/superadblock-hosts.json` | Reviewed inventory: host, categories, scored flag, capture date and source URL |
+| `blocker/tools/superadblock.py` | Writes the generated section into `astra-telemetry.txt`; `--check` fails on drift |
+| `blocker/lists/astra-telemetry.txt` | `! >>> superadblock-strict` section: one `||host^$important` rule per probed host |
+| `tests/contract/blocker_coverage.mjs` | Every scored host has a host-wide rule; generated section current; packaged gzip matches the text; FPP and privacy defaults intact |
+| `tools/marionette-probe/superadblock-probe.py` | Live proof: runs the real page three times and requires headline 100 and 0 reachable probes every time |
+
+`vk.com` is the one exception: the probe only tests `/rtrg`, and a host rule
+would block the whole network, so the bundled EasyList path rule stays.
+
+**Breakage trade-offs.** The strict section blocks social SDKs
+(`connect.facebook.net`, `graph.facebook.com`, `i.instagram.com`,
+`widgets.pinterest.com`), consent-management platforms (Cookiebot, OneTrust,
+TrustArc, Usercentrics, Osano, Sourcepoint), chat/push/email SDKs (Intercom,
+Drift, OneSignal, Mailchimp, Klaviyo) and affiliate redirectors
+(VigLink, Skimlinks). Those can remove a site's login-with-Facebook button,
+cookie banner, support widget or affiliate link. Astra's per-site shield
+(address panel or sidebar shield) pauses blocking for that one site, which is
+the intended recovery path. The alternative — leaving them reachable — is the
+partial protection the owner rejected.
+
+**Live evidence (2026-11-10, packaged dev build):**
+
+```
+PASS blocker active on a fresh profile
+PASS filter lists finished installing
+PASS compiled rule set is the full bundle :: 198812 rules
+PASS run 1 blocks every probe :: 482/482 blocked, 0 reachable
+PASS run 1 raw block rate is 100 :: 482/482
+PASS run 1 headline is 100 :: 100
+PASS run 2 ... 482/482 blocked, 0 reachable, headline 100
+PASS run 3 ... 482/482 blocked, 0 reachable, headline 100
+superadblock: PASS
+```
+
+The probe refreshes the live 14-list bundle before measuring, so the result is
+not the offline seed alone. Evidence: `out/superadblock/report.json`.

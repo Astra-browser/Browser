@@ -61,6 +61,24 @@ engine's own prompt stays out of the way. The CDM update host is a signed-off
 
 L1 and 4K are not available on Linux (see `KNOWN_LIMITS.md`).
 
+### Tracker, fingerprint and referrer hardening (2026-11-10)
+
+| Pref | Value | Why |
+|---|---|---|
+| `privacy.fingerprintingProtection` (+ `.pbmode`) | `true` | FPP on in normal and private windows |
+| `privacy.fingerprintingProtection.overrides` | see `FINGERPRINTING.md` | Canvas/WebGL/audio/WebGPU/WebCodecs/media/display targets; UA, timezone and screen stay real |
+| `privacy.trackingprotection.enabled` (+ `.pbmode`) | `true` | ETP's Disconnect list as a second tracker layer |
+| `privacy.trackingprotection.cryptomining.enabled` | `true` | Cryptominer list |
+| `privacy.trackingprotection.fingerprinting.enabled` | `true` | Disconnect fingerprinting list |
+| `privacy.trackingprotection.emailtracking.enabled` (+ `.pbmode`) | `true` | Strips known tracking pixels in webmail |
+| `privacy.query_stripping.enabled` (+ `.pbmode`, `.strip_on_share`) | `true` | Removes known tracking parameters before the request and on share |
+| `network.http.referer.trimmingPolicy` | `2` | Same-origin Referer drops the path |
+| `network.http.referer.XOriginTrimmingPolicy` | `2` | Cross-origin Referer sends only the origin |
+
+These are `defaultPref()` values, so a person's own choice still wins. The
+contract gate is `tests/contract/blocker_coverage.mjs`; live gates are
+`fingerprint-probe.py`, `shields-probe.py` and `superadblock-probe.py`.
+
 ## Deliberate omissions (not oversights)
 
 - **`DisablePocket`**: in the schema but **no implementation** in the pinned

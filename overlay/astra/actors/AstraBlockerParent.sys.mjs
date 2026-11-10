@@ -10,16 +10,18 @@
 export class AstraBlockerParent extends JSWindowActorParent {
   async receiveMessage(message) {
     if (message.name !== "astra-blocker-cosmetic") return null;
+    let enabled = true;
     let cosmetic = true;
     let scriptlets = true;
     try {
+      enabled = Services.prefs.getBoolPref("astra.blocker.enabled", true);
       cosmetic = Services.prefs.getBoolPref("astra.blocker.cosmetic", true);
       scriptlets = Services.prefs.getBoolPref("astra.blocker.scriptlets", true);
     } catch {
       // Defaults are on.
     }
-    if (!cosmetic && !scriptlets) {
-      return { selectors: [], script: "", procedural: [] };
+    if (!enabled || (!cosmetic && !scriptlets)) {
+      return { selectors: [], script: "", procedural: [], enabled: false };
     }
 
     const data = message.data ?? {};
