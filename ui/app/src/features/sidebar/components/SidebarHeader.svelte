@@ -15,6 +15,7 @@
   import IconButton from "$shared/ui/IconButton";
   import ModeTabs from "./ModeTabs.svelte";
   import SidebarSearch from "./SidebarSearch.svelte";
+  import SiteShield from "./SiteShield.svelte";
 
   let {
     compact,
@@ -121,6 +122,7 @@
           onclick={openSidebarMenu}
         />{/if}
       <SidebarSearch small />
+      <SiteShield />
     </div>
     <span class="mt-[6px] mb-[7px] h-px w-[22px] rounded-full bg-border" aria-hidden="true"></span>
   </header>
@@ -133,5 +135,6 @@
     aria-label={m.ui_navigation()}
   >
     {#if utilities}{@render utilities()}{/if}
+    <SiteShield />
   </header>
 {/if}
