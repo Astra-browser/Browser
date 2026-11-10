@@ -98,6 +98,8 @@ export const Media = {
       _engines.set(key, engine);
     } else {
       _engines.delete(key);
+      // The window is going away; its card must not outlive the engine.
+      _views.delete(key);
     }
   },
 
