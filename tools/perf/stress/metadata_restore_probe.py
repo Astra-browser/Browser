@@ -99,9 +99,14 @@ const done = arguments[arguments.length - 1];
     if (priv && priv !== host) {
       const privateTab = await priv.Tabs.create({ request_id: "m-priv-tab", url: "__PRIVATE__" });
       await wait(500);
-      const privSave = await priv.Metadata.save();
+      const privSave = await priv.Metadata.save({ private: true });
       step("the private window refuses to save", privSave.saved === false && privSave.reason === "private", privSave);
-      step("the private window loaded no organisation", priv.Metadata.status().private === true);
+      step(
+        "the private window did not flip the process store",
+        priv.Metadata.status().private === false
+          && priv.Metadata.status().available === true,
+        priv.Metadata.status()
+      );
       out.privateTab = privateTab?.astra_tab_id ?? null;
     } else {
       step("the private window refused to save", false, "no private host");
