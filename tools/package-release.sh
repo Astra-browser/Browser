@@ -108,7 +108,7 @@ mkdir -p "$APP/package/icons"
 for size in 16 32 48 64 128; do
   cp "$BRAND/default${size}.png" "$APP/package/icons/astra-${size}.png"
 done
-cp "$BRAND/PLACEHOLDER-icon-512.png" "$APP/package/icons/astra-512.png"
+cp "$BRAND/astra-icon-512.png" "$APP/package/icons/astra-512.png"
 
 cat > "$APP/package/astra" <<'WRAPPER'
 #!/bin/sh

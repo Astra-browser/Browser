@@ -10,8 +10,9 @@ to file/dir names *and* contents, with `--dry-run` diff report first.
   `folder_context/` (reference snapshot stays pristine).
 - Skips allow-list: `LICENSE`, `NOTICE`, `docs/astra/PROVENANCE.md`, MPL
   header/copyright lines of derived files.
-- Placeholder assets (`PLACEHOLDER-*`) fail release builds until the owner
-  supplies finals (see `branding/astra.toml` + `OWNER_QUESTIONS.md` Q1).
+- Brand assets are real as of D-38 (`branding/assets/` masters, generated
+  `overlay/astra/branding/*`); the release gate still fails on any remaining
+  `OWNER_DECISION` (see `branding/astra.toml` + `OWNER_QUESTIONS.md`).
 - Every run ends with `tools/brand-lint.sh` green; CI enforces it (§3.4).
 
 ## Implementation (scheduled with P3-T01, when `ui/` + `crates/` exist)

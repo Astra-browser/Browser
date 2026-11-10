@@ -13,7 +13,7 @@ here blocks dev builds; everything here blocks a public release.
 | R-03 | `homepage`, `support_url`, `docs_url` | `branding/astra.toml` | `OWNER_DECISION` (not yet rendered anywhere) | Public builds |
 | R-04 | `update_host` + MAR signing setup | `branding/astra.toml` | `OWNER_DECISION` → builds use `https://localhost:0/placeholder-astra-update` | Updater E2E (P8) |
 | R-05 | Signing certificates | Owner-held, never committed | — | Installers: Windows Authenticode, macOS Developer ID (deferred platform), Linux deb-repo key |
-| R-06 | Final logo + icons (SVG, PNG, `icns`, `ico`) + brand fonts? | `overlay/astra/branding/` (replaces `PLACEHOLDER-*`) | Generated geometric "A" placeholders | Release packaging (P8) |
+| R-06 | Final logo + icons (SVG, PNG, `icns`, `ico`) + brand fonts? | `branding/assets/` (masters) → `overlay/astra/branding/` | **PROVIDED (D-38)** — sail mark, all sizes generated | Release packaging (P8) |
 | R-07 | Crash-report policy: self-hosted opt-in vs diagnostics-bundle-only | Decision → P8 wiring | Undecided (P1-T02/P8) | Privacy posture sign-off |
 | R-08 | Password/autofill: keep Firefox login-manager vs extensions-only | Decision → P4-T09 | Undecided | P4 scope |
 | R-09 | Golden threshold: accept ≤ 1.5% per-screen pixel diff? | Decision → P3-T11 | Undecided | Visual-parity gate |
