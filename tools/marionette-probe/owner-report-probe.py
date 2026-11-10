@@ -268,6 +268,95 @@ check("tlauncher is not left blank by a cancelled document",
       launcher.get("url", "").startswith("https://tlauncher.org"),
       json.dumps(launcher))
 
+# --- sleeping tabs driver -------------------------------------------------
+perf = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  return { sleep: await host.Settings.get({ key: "performance.sleep" }),
+           status: host.Performance.status() };
+})();
+""")
+check("inactive-tab sleeping is on by default", perf.get("sleep") == "true", json.dumps(perf))
+check("the sleeping-tabs driver is running", perf.get("status", {}).get("running") is True,
+      json.dumps(perf.get("status")))
+
+# --- externally handed link ----------------------------------------------
+subprocess.run([FIREFOX, "-profile", profile, "-url", site + "/external-link"],
+               cwd=os.path.join(ROOT, "engine/obj-astra-linux/dist/bin"),
+               capture_output=True, timeout=30)
+time.sleep(4)
+handoff = m.script("""
+return (async () => {
+  const list = await Services.astraHost.Tabs.list({ request_id: "probe-handoff" });
+  return list.tabs.map((t) => t.url);
+})();
+""")
+check("a link from another app opens a tab", any(u.endswith("/external-link") for u in handoff),
+      json.dumps(handoff))
+
+# --- native close honours after-close ------------------------------------
+closing = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  await host.Settings.set({ key: "tabs.after-close", value: "previous" });
+  const a = await host.Tabs.create({ request_id: "probe-ac-1", url: arguments[0] + "/ac-a", background: true });
+  const b = await host.Tabs.create({ request_id: "probe-ac-2", url: arguments[0] + "/ac-b", background: true });
+  const c = await host.Tabs.create({ request_id: "probe-ac-3", url: arguments[0] + "/ac-c", background: true });
+  await host.Tabs.select({ request_id: "probe-ac-sel", astra_tab_id: b.astra_tab_id });
+  await new Promise((r) => setTimeout(r, 300));
+  const native = [...window.gBrowser.tabs].find((t) => t.getAttribute("astra-tab-id") === b.astra_tab_id);
+  window.gBrowser.removeTab(native);
+  await new Promise((r) => setTimeout(r, 900));
+  const list = await host.Tabs.list({ request_id: "probe-ac-list" });
+  const setting = await host.Settings.get({ key: "tabs.after-close" });
+  return { model: list.selected_tab_id, native: window.gBrowser.selectedTab?.getAttribute("astra-tab-id") ?? "",
+           a: a.astra_tab_id, b: b.astra_tab_id, c: c.astra_tab_id, setting,
+           ids: list.tabs.map((t) => t.astra_tab_id),
+           nativeIds: [...window.gBrowser.tabs].map((t) => t.getAttribute("astra-tab-id")) };
+})();
+""", [site])
+check("a native close returns to the previous tab in the model",
+      closing.get("model") == closing.get("a"), json.dumps(closing))
+check("the native deck follows after-close",
+      closing.get("native") == closing.get("a"), json.dumps(closing))
+
+# --- reset all zoom applies to the live page ------------------------------
+zoom = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  const list = await host.Tabs.list({ request_id: "probe-zoom" });
+  const selected = list.tabs.find((t) => t.selected) || list.tabs[0];
+  await host.Navigation.loadURL({ request_id: "probe-zoom-nav", astra_tab_id: selected.astra_tab_id, url: arguments[0] + "/zoom" });
+  await new Promise((r) => setTimeout(r, 800));
+  window.gBrowser.selectedBrowser.fullZoom = 1.5;
+  await new Promise((r) => setTimeout(r, 200));
+  const before = window.gBrowser.selectedBrowser.fullZoom;
+  await host.Zoom.call({ expected_profile: "default", call: { kind: "forget_all" } });
+  await new Promise((r) => setTimeout(r, 400));
+  return { before, after: window.gBrowser.selectedBrowser.fullZoom };
+})();
+""", [site])
+check("reset all returns the live page to 100%",
+      abs(float(zoom.get("after", 0)) - 1.0) < 0.01, json.dumps(zoom))
+
+# --- focus shuts a listed site -------------------------------------------
+focus = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  await host.Settings.set({ key: "focus.blocked", value: "127.0.0.1" });
+  await host.Time.focus({ control: { kind: "start" } });
+  const list = await host.Tabs.list({ request_id: "probe-focus" });
+  const selected = list.tabs.find((t) => t.selected) || list.tabs[0];
+  await host.Navigation.loadURL({ request_id: "probe-focus-nav", astra_tab_id: selected.astra_tab_id, url: arguments[0] + "/shut" });
+  await new Promise((r) => setTimeout(r, 2000));
+  const after = await host.Tabs.list({ request_id: "probe-focus-after" });
+  const tab = after.tabs.find((t) => t.astra_tab_id === selected.astra_tab_id);
+  return { url: tab?.url ?? "", stage: document.querySelector('[data-astra-app]')?.dataset?.surface ?? "" };
+})();
+""", [site])
+check("a shut site is taken off the stage", focus.get("url") in ("about:blank", ""), json.dumps(focus))
+m.script("return (async () => await Services.astraHost.Time.focus({ control: { kind: 'stop' } }))();")
+
 # --- private window command ----------------------------------------------
 private = m.script("""
 return (async () => {
