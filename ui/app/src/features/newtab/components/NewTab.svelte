@@ -379,21 +379,12 @@
   <!-- The name, drawn only as large as itself. -->
   {#if showWordmark}<svg class="mark" role="img" aria-label="Astra" style={at(page.mark)}>
       <defs>
-        <!-- Typographic wordmark (P3-T20): the owner has not supplied final
-             art yet, so the mark reads "ASTRA" in the UI face at the same
-             geometry the placeholder rect used. -->
-        <text
-          id={`${id}-letters`}
-          transform={letters}
-          x={WORDMARK.x}
-          y={WORDMARK.y + WORDMARK.height * 0.78}
-          font-family="Inter, system-ui, sans-serif"
-          font-size={WORDMARK.height * 0.92}
-          font-weight="500"
-          letter-spacing={WORDMARK.height * 0.26}
-          textLength={WORDMARK.width}
-          lengthAdjust="spacing">ASTRA</text
-        >
+        <!-- Astra wordmark, v1 (D-38): the real outlined art rather than live
+             text, so the name is identical at every size and the glint can
+             reuse the same geometry. -->
+        <g id={`${id}-letters`} transform={letters}>
+          <path d={WORDMARK.d} />
+        </g>
         {#if glint && useSky}<linearGradient
             id={`${id}-glint`}
             gradientUnits="userSpaceOnUse"

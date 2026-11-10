@@ -1,14 +1,12 @@
 <script lang="ts">
-  /** Astra's app icon itself, its own squircle and shadow included, the
-   *  same in either theme. */
+  /** Astra's app icon itself, its own paper ground included, the same in
+   *  either theme. Drawn from the SVG master so it stays sharp at any size. */
   let { size = 16 }: { size?: number } = $props();
 </script>
 
 <img
   class="astra-tile"
-  src="astra-icon.png"
-  srcset="astra-icon.png 128w, astra-icon@2x.png 256w"
-  sizes={`${size}px`}
+  src="astra-icon.svg"
   width={size}
   height={size}
   alt=""
