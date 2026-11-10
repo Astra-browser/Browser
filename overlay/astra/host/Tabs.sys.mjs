@@ -528,6 +528,42 @@ export function __historyFor(id) {
   return _history.get(id) ?? null;
 }
 
+/** Fill a model history from the engine's restored session history. A tab
+ *  restored by SessionStore already has its real entries; without this the
+ *  model said "one entry" and Back/Forward were dead on every restored tab. */
+export function __syncHistory(id, history) {
+  const entries = Array.isArray(history?.entries)
+    ? history.entries
+        .map((entry) => (typeof entry === "string" ? entry : entry?.url))
+        .filter((url) => typeof url === "string" && url !== "")
+    : [];
+  if (entries.length === 0) return false;
+  const index =
+    Number.isInteger(history?.index) && history.index >= 0 && history.index < entries.length
+      ? history.index
+      : entries.length - 1;
+  _history.set(id, { entries, index });
+  return true;
+}
+
+/** Put a tab back in front without touching the MRU stack or activity clock.
+ *  The engine selects the successor before it reports TabClose; restoring the
+ *  closing tab this way lets `tabs.after-close=recent` step from the tab the
+ *  person was really on instead of the engine's neighbour. */
+export function __restoreSelection(id) {
+  const target = _tabs.get(id);
+  if (!target) return false;
+  for (const tab of _tabs.values()) {
+    if (tab.window_id === target.window_id) {
+      tab.selected = tab.astra_tab_id === id;
+    }
+  }
+  _selectedId = id;
+  _selectedByWindow.set(target.window_id, id);
+  _selectedBySpace.set(target.space_id, id);
+  return true;
+}
+
 // --- Projection for the product UI (P3-T20) -------------------------------
 // The ported app renders from `items-changed` snapshots (ItemsState), not
 // from `tab.created`/`tab.updated` deltas. Until astra-core owns this

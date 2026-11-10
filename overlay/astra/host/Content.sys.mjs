@@ -28,6 +28,9 @@ import {
   __spaceUserContextId,
   __tabsState,
   __selectedInWindow,
+  __syncHistory,
+  __restoreSelection,
+  __itemsSnapshot,
   emitItemsChanged,
 } from "./Tabs.sys.mjs";
 import { Navigation, __commitExternal } from "./Navigation.sys.mjs";
@@ -529,6 +532,14 @@ export const Content = {
       __markPrivate(id, isPrivateWindow(win));
       tabOf.set(id, tab);
       idOf.set(tab, id);
+      // A restored tab arrives with the engine's own session history. Seed
+      // the model so Back/Forward project and act on the real entries.
+      try {
+        const restored = sessionHistoryOf(win, tab);
+        if (restored && restored.entries.length > 1) __syncHistory(id, restored);
+      } catch {
+        // A tab still being restored keeps the model's New Tab entry.
+      }
       const browser = tab.linkedBrowser ?? null;
       if (browser) {
         browsers.set(id, { browser, tab });
@@ -1068,6 +1079,9 @@ export const Content = {
       return tab;
     };
     const loadIn = (id, url, force = false) => {
+      // A fresh model navigation cancels any traversal still settling: its
+      // commit must not be rewritten as the Back/Forward that came before.
+      historyMoves.delete(id);
       const tab = tabOf.get(id);
       const blank = url === "about:blank";
       if (!tab || (!isLoadableUrl(url) && !blank)) return;
@@ -1250,7 +1264,10 @@ export const Content = {
       // model must still treat the tab being removed as the one in front, or
       // `tabs.after-close` has no tab to step from.
       if (__selectedInWindow(window_id) !== id) {
-        void Tabs.select({ astra_tab_id: id });
+        // Restore the closing tab as the model's selection without touching
+        // MRU, so after-close=recent steps from the tab that was really in
+        // front rather than the successor the engine selected first.
+        __restoreSelection(id);
       }
       nativeClosing += 1;
       void Tabs.close({ astra_tab_id: id });
@@ -1380,6 +1397,24 @@ export const Content = {
       }
       if (event.type === "tab.created" && id) {
         ensureTab(id, event.data.url, event.data.index);
+        return;
+      }
+      if (event.type === "tab.moved") {
+        // The sidebar order is the product order; the hidden native strip must
+        // agree, or SessionStore restores the old order and a later
+        // window.open lands beside stale neighbours.
+        const view = __itemsSnapshot(window_id);
+        applying = true;
+        try {
+          for (const [index, entry] of view.tabs.entries()) {
+            const native = tabOf.get(entry.id);
+            if (native) gb.moveTabTo(native, { tabIndex: index });
+          }
+        } catch {
+          // Grouped or split tabs keep their engine placement.
+        } finally {
+          applying = false;
+        }
         return;
       }
       if (event.type === "tab.closed" && id) {
