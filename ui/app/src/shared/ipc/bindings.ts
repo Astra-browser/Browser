@@ -320,7 +320,7 @@ export const commands = {
 	 *  click on it arrives as `zephium:web-extension-store-click`.
 	 */
 	webExtensionStoreButton: (tabId: string, extensionId: string, state: WebExtensionStoreButtonState, label: string) => __TAURI_INVOKE<boolean>("web_extension_store_button", { tabId, extensionId, state, label }),
-	webExtensionConfirm: (id: string, reviewId: string) => typedError<null, string>(__TAURI_INVOKE("web_extension_confirm", { id, reviewId })),
+	webExtensionConfirm: (id: string, reviewId: string, privateWindows?: boolean, technicalData?: boolean) => typedError<null, string>(__TAURI_INVOKE("web_extension_confirm", { id, reviewId, privateWindows, technicalData })),
 	webExtensionCancel: (reviewId: string) => __TAURI_INVOKE<void>("web_extension_cancel", { reviewId }),
 	webExtensionList: () => typedError<WebExtensionView[], string>(__TAURI_INVOKE("web_extension_list")),
 	webExtensionSetEnabled: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("web_extension_set_enabled", { id, enabled })),
@@ -334,6 +334,8 @@ export const commands = {
 	 *  kept for the next launch.
 	 */
 	webExtensionAnswerAccess: (request: WebExtensionAccessRequestView, allowed: boolean) => typedError<null, string>(__TAURI_INVOKE("web_extension_answer_access", { request, allowed })),
+	/**  Answers the engine's install/update permission prompt in Astra's own sheet. */
+	webExtensionAnswerPrompt: (promptId: string, accept: boolean, privateWindows: boolean, technicalData: boolean) => typedError<null, string>(__TAURI_INVOKE("web_extension_answer_prompt", { promptId, accept, privateWindows, technicalData })),
 	/**
 	 *  Chooses which sites an extension may use: `all` it asked for, only on
 	 *  `click`, or the listed `sites`.
@@ -728,6 +730,7 @@ export const events = {
 	tabChanged: makeEvent<TabChanged>("tab-changed"),
 	uiCommand: makeEvent<UiCommand>("ui-command"),
 	webExtensionAccessRequested: makeEvent<WebExtensionAccessRequested>("web-extension-access-requested"),
+	webExtensionPromptChanged: makeEvent<WebExtensionPromptChanged>("web-extension-prompt-changed"),
 	webExtensionStoreClicked: makeEvent<WebExtensionStoreClicked>("web-extension-store-clicked"),
 	workChanged: makeEvent<WorkChanged>("work-changed"),
 	workEnvironmentChanged: makeEvent<WorkEnvironmentChanged>("work-environment-changed"),
@@ -1591,6 +1594,8 @@ export type ExtensionActionView = {
 	label: string,
 	badge: string,
 	icon_rgba_base64: string | null,
+	/**  The action's own icon URL, for rendering without a raw-pixel copy. */
+	icon_url?: string | null,
 	enabled: boolean,
 	presents_popup: boolean,
 	unread_badge: boolean,
@@ -3642,6 +3647,32 @@ export type WebExtensionSecurity = {
 	findings: WebExtensionSecurityFinding[],
 };
 
+/**
+ *  One install/update permission prompt raised by the engine. Astra owns the
+ *  sheet; `accept_text`/`cancel_text` are the engine's own localized labels.
+ */
+export type WebExtensionPromptView = {
+	prompt_id: string,
+	/**  `install`, `update` or `sideload`. */
+	kind: string,
+	name: string,
+	header: string,
+	messages: string[],
+	data_collection: string | null,
+	icon: string | null,
+	unsigned: boolean,
+	accept_text: string,
+	cancel_text: string,
+	show_private: boolean,
+	private_allowed: boolean,
+	show_technical: boolean,
+	technical_allowed: boolean,
+};
+
+export type WebExtensionPromptChanged = {
+	prompt: WebExtensionPromptView | null,
+};
+
 export type WebExtensionReview = {
 	/**  Identifies the package/profile shown by this particular review. */
 	review_id: string,
@@ -3668,6 +3699,14 @@ export type WebExtensionReview = {
 	manifest_version?: number,
 	permissions?: string[],
 	host_permissions?: string[],
+	/**  The engine's data-collection disclosure, when the package declares one. */
+	data_collection?: string | null,
+	/**  Whether the install prompt offers the private-windows choice. */
+	show_private?: boolean,
+	private_allowed?: boolean,
+	/**  Whether the install prompt offers the technical/interaction-data choice. */
+	show_technical?: boolean,
+	technical_allowed?: boolean,
 };
 
 export type WebExtensionStoreButtonState = "add" | "adding" | "remove";

@@ -35,7 +35,7 @@ const review: Review = {
 test("approval sends the nonce of the displayed review", async () => {
   render(WebExtensionReview, { review });
   await userEvent.click(page.getByRole("button", { name: "Add", exact: true }));
-  expect(actions.confirm).toHaveBeenCalledExactlyOnceWith("displayed-review");
+  expect(actions.confirm).toHaveBeenCalledExactlyOnceWith("displayed-review", false, true);
 });
 
 test("Escape cancels only the displayed review", async () => {

@@ -4,7 +4,7 @@
 
 # `astra-proto` — versioned JSON protocol (P2-T02)
 
-Single source of truth: `docs/astra/ipc-surface.md` (267 commands + 35 events).
+Single source of truth: `docs/astra/ipc-surface.md` (276 commands + 36 events).
 `crates/astra-proto/codegen/generate.py` parses it and emits everything else:
 
 | Output | Source |

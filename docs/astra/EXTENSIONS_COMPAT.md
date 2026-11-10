@@ -8,6 +8,23 @@
 > `tools/perf/stress/chrome_ext_probe.py` 55/55, real packages 57/57,
 > benchmark `out/extension-bench/result.json`.
 
+## Astra owns the extension UI
+
+The engine's install permission doorhanger is replaced at the window seam:
+`WebExtensions.install({window})` takes `PopupNotifications.show` for
+`addon-webext-permissions`, publishes the prompt to the app and resolves the
+engine promise from Astra's sheet. The sheet carries the engine's own
+permission strings, unsigned warning and optional private-window/data-collection
+choices. If Astra's review already listed those permissions, the prompt is
+answered with the review's choices without a second confirmation.
+
+The manager page is reachable from the sidebar's Extensions control. It lists
+the engine's real add-ons, toggles them, pins browser actions, opens an action
+popup in an Astra panel anchored to the app (never the native unified
+extensions panel), opens options/settings and removes the add-on. Browser
+actions are projected as `extension-actions-changed`; the action invocation
+path is `extension_action_invoke` -> `WebExtensions.invokeAction`.
+
 ## What this is
 
 Astra installs and runs extensions through **Gecko's own extension

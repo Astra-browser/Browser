@@ -4,6 +4,7 @@
   import type { WebExtensionReview } from "$shared/ipc/bindings";
   import { webext } from "$domain/webext";
   import Button from "$shared/ui/Button";
+  import Checkbox from "$shared/ui/Checkbox";
   import Icon from "$shared/ui/Icon";
   import PromptSheet from "./PromptSheet.svelte";
   import * as m from "$shared/i18n/messages";
@@ -13,6 +14,12 @@
   let busy = $derived(webext.isConfirming());
   let failure = $derived(webext.error());
   let detailed = $state(false);
+  let privateWindows = $state(false);
+  let technicalData = $state(true);
+  $effect(() => {
+    privateWindows = review.private_allowed === true;
+    technicalData = review.technical_allowed !== false;
+  });
   let limited = $state(false);
   let evidence = $state(false);
   let sourceLabel = $derived(
@@ -177,6 +184,30 @@
       {/if}
     {/if}
     {#if review.from_file}<p class="warning">{m.webext_from_file()}</p>{/if}
+    {#if review.data_collection || review.show_private || review.show_technical}
+      <div class="optional">
+        <h2>{m.webext_prompt_optional()}</h2>
+        {#if review.data_collection}
+          <p class="collect">{m.webext_prompt_data()}: {review.data_collection}</p>
+        {/if}
+        {#if review.show_private}
+          <Checkbox
+            label={m.webext_prompt_private()}
+            checked={privateWindows}
+            disabled={busy}
+            onchange={(checked) => (privateWindows = checked)}
+          />
+        {/if}
+        {#if review.show_technical}
+          <Checkbox
+            label={m.webext_prompt_technical()}
+            checked={technicalData}
+            disabled={busy}
+            onchange={(checked) => (technicalData = checked)}
+          />
+        {/if}
+      </div>
+    {/if}
     {#if persistenceLabel !== null}<p class="persistence">{persistenceLabel}</p>{/if}
   </div>
 
@@ -189,7 +220,10 @@
       disabled={busy}
       onclick={() => webext.cancel(review.review_id)}>{m.webext_review_cancel()}</Button
     >
-    <Button variant="primary" pending={busy} onclick={() => void webext.confirm(review.review_id)}
+    <Button
+      variant="primary"
+      pending={busy}
+      onclick={() => void webext.confirm(review.review_id, privateWindows, technicalData)}
       >{review.update ? m.webext_review_update() : m.webext_review_add()}</Button
     >
   </div>
@@ -257,6 +291,26 @@
     margin: 6px 0 0;
     padding-inline-start: 16px;
     color: var(--color-muted);
+  }
+
+  .optional {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-block-start: 14px;
+  }
+
+  .optional h2 {
+    margin: 0;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-muted);
+  }
+
+  .collect {
+    margin: 0;
+    line-height: 1.4;
   }
 
   .limits {

@@ -12,9 +12,14 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+const ROOT = path.dirname(
+  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
+);
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const { WebExtensions, viewForAddon } = await import(path.join(HOST, "WebExtensions.sys.mjs"));
+const { WebExtensions, viewForAddon } = await import(
+  path.join(HOST, "WebExtensions.sys.mjs")
+);
+const { addEventListener } = await import(path.join(HOST, "Events.sys.mjs"));
 
 let passed = 0;
 let failed = 0;
@@ -45,7 +50,10 @@ const running = viewForAddon({
 check("the id is the native addon id", running.id === "probe@astra.test");
 check("install_id equals the id", running.install_id === running.id);
 check("the profile is default", running.profile_id === "default");
-check("a running addon is enabled", running.enabled === true && running.state === "running");
+check(
+  "a running addon is enabled",
+  running.enabled === true && running.state === "running",
+);
 check("the version survives", running.version === "1.2.3");
 check("the icon survives", running.icon === "moz-extension://x/icon.png");
 check("options are reported", running.has_options === true);
@@ -62,9 +70,15 @@ const disabled = viewForAddon({
   isActive: false,
   userPermissions: null,
 });
-check("a user-disabled addon is off", disabled.enabled === false && disabled.state === "off");
+check(
+  "a user-disabled addon is off",
+  disabled.enabled === false && disabled.state === "off",
+);
 check("no site access without permissions", disabled.site_scoped === false);
-check("site access keeps the list empty", Array.isArray(disabled.sites) && disabled.sites.length === 0);
+check(
+  "site access keeps the list empty",
+  Array.isArray(disabled.sites) && disabled.sites.length === 0,
+);
 
 const failedAddon = viewForAddon({
   id: "bad@astra.test",
@@ -77,7 +91,10 @@ check("an app-disabled addon is failed", failedAddon.state === "failed");
 check("a missing addon maps to null", viewForAddon(null) === null);
 
 const listed = await WebExtensions.list();
-check("without chrome the list is empty", Array.isArray(listed) && listed.length === 0);
+check(
+  "without chrome the list is empty",
+  Array.isArray(listed) && listed.length === 0,
+);
 let refused = false;
 try {
   await WebExtensions.setEnabled({ id: "probe@astra.test", enabled: false });
@@ -85,6 +102,95 @@ try {
   refused = true;
 }
 check("without chrome an action fails instead of pretending", refused === true);
+
+// --- install prompt bridge (engine panel -> Astra sheet) ------------------
+const seen = [];
+const off = addEventListener((event) => seen.push(event));
+let accepted = false;
+let cancelled = false;
+let privateChoice = null;
+let technicalChoice = null;
+const fakeWindow = {
+  closed: false,
+  addEventListener() {},
+  PopupNotifications: { show() {} },
+};
+check(
+  "install hooks a window",
+  WebExtensions.install({ window: fakeWindow }) === true,
+);
+const notification = fakeWindow.PopupNotifications.show(
+  null,
+  "addon-webext-permissions",
+  "Add Probe",
+  null,
+  { callback: () => (accepted = true) },
+  [{ callback: () => (cancelled = true) }],
+  {
+    name: "Probe",
+    popupIconURL: null,
+    customElementOptions: {
+      strings: {
+        header: "Add Probe",
+        msgs: ["Read and change your data on probe.test"],
+        addonName: "Probe",
+      },
+      showIncognitoCheckbox: true,
+      grantPrivateBrowsingAllowed: false,
+      onPrivateBrowsingAllowedChanged: (value) => (privateChoice = value),
+      showTechnicalAndInteractionCheckbox: true,
+      grantTechnicalAndInteractionDataCollection: true,
+      onTechnicalAndInteractionDataChanged: (value) =>
+        (technicalChoice = value),
+    },
+  },
+);
+check("the native panel is held", typeof notification?.remove === "function");
+const promptEvent = seen.find(
+  (event) => event.type === "web-extension-prompt-changed",
+);
+check("the prompt reaches Astra", promptEvent?.data?.prompt?.name === "Probe");
+check(
+  "its permissions survive",
+  promptEvent?.data?.prompt?.messages?.[0] ===
+    "Read and change your data on probe.test",
+);
+check(
+  "both optional choices are offered",
+  promptEvent?.data?.prompt?.show_private === true &&
+    promptEvent?.data?.prompt?.show_technical === true,
+);
+if (promptEvent?.data?.prompt?.prompt_id) {
+  await WebExtensions.answerPrompt({
+    prompt_id: promptEvent.data.prompt.prompt_id,
+    accept: true,
+    private_windows: true,
+    technical_data: false,
+  });
+}
+check(
+  "accept resolves the engine prompt",
+  accepted === true && cancelled === false,
+);
+check("the private-window choice reaches the engine", privateChoice === true);
+check(
+  "the technical-data choice reaches the engine",
+  technicalChoice === false,
+);
+check(
+  "the sheet is told to close",
+  seen.some(
+    (event) =>
+      event.type === "web-extension-prompt-changed" &&
+      event.data?.prompt === null,
+  ),
+);
+WebExtensions.uninstall({ window: fakeWindow });
+check(
+  "uninstall restores the native show",
+  fakeWindow.PopupNotifications.show !== undefined,
+);
+off();
 
 console.log(
   `\nwebext view contract: ${failed === 0 ? "PASS" : "FAIL"} (${passed} checks, ${failed} failed)`,

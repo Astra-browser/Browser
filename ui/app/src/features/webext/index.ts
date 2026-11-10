@@ -1,5 +1,6 @@
 export const loadWebExtensionManager = () => import("./components/WebExtensionManager.svelte");
 export { default as WebExtensionReview } from "./components/WebExtensionReview.svelte";
+export { default as WebExtensionInstallPrompt } from "./components/WebExtensionInstallPrompt.svelte";
 export { default as WebExtensionAccessPrompt } from "./components/WebExtensionAccessPrompt.svelte";
 export { default as StoreInstallRail } from "./components/StoreInstallRail.svelte";
 export { default as StoreInstallBanner } from "./components/StoreInstallBanner.svelte";

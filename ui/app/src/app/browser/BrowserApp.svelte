@@ -2,7 +2,11 @@
   import { installCloseService } from "$shared/lib/close";
   import "$styles/global.css";
   import { onMount, untrack } from "svelte";
-  import { WebExtensionAccessPrompt, WebExtensionReview } from "$features/webext";
+  import {
+    WebExtensionAccessPrompt,
+    WebExtensionInstallPrompt,
+    WebExtensionReview,
+  } from "$features/webext";
   import { PeekLayer, peek } from "$features/peek";
   import { webext } from "$domain/webext";
   import { PagePermissionPrompt } from "$features/permissions";
@@ -97,7 +101,10 @@
     pagePermissions.prompt()?.in_sidebar === false ? pagePermissions.prompt() : null,
   );
   let consentActive = $derived(
-    pagePermissionSheet !== null || webext.review() !== null || webext.accessRequest() !== null,
+    pagePermissionSheet !== null ||
+      webext.review() !== null ||
+      webext.prompt() !== null ||
+      webext.accessRequest() !== null,
   );
 
   // Page keystrokes are matched natively (menu bar, engine key tables, the
@@ -165,6 +172,7 @@
     const extensionsReady = extensions.init();
     void webext.refresh();
     const stopAccess = webext.listenForAccess();
+    const stopPrompt = webext.listenForPrompt();
     const stopStoreClicks = webext.listenForStoreClicks();
     const stopDrops = webext.listenForDrops(() => browserPage.currentPage() !== "work");
     const pagePermissionsReady = pagePermissions.init();
@@ -237,6 +245,7 @@
       webext.dispose();
       pagePermissions.dispose();
       void stopAccess.then((stop) => stop());
+      void stopPrompt.then((stop) => stop());
       void stopStoreClicks.then((stop) => stop());
       void stopDrops.then((stop) => stop());
       favicons.dispose();
@@ -263,6 +272,8 @@
 </div>
 {#if webext.review() !== null}
   <WebExtensionReview review={webext.review()!} />
+{:else if webext.prompt() !== null}
+  <WebExtensionInstallPrompt prompt={webext.prompt()!} />
 {:else if webext.accessRequest() !== null}
   {#key webext.accessRequest()!.request}
     <WebExtensionAccessPrompt request={webext.accessRequest()!} />

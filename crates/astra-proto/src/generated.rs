@@ -6,10 +6,10 @@
 //! Source of truth: docs/astra/ipc-surface.md via schemas/*.json.
 //! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.
 
-/// Number of commands in the v1 surface (ipc-surface.md: 275).
-pub const COMMAND_COUNT: usize = 275;
-/// Number of event channels in the v1 surface (ipc-surface.md: 35).
-pub const EVENT_COUNT: usize = 35;
+/// Number of commands in the v1 surface (ipc-surface.md: 276).
+pub const COMMAND_COUNT: usize = 276;
+/// Number of event channels in the v1 surface (ipc-surface.md: 36).
+pub const EVENT_COUNT: usize = 36;
 
 /// Every command wire name (snake_case, stable).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -219,6 +219,7 @@ pub enum CommandName {
     VoiceStatus,
     VoiceStop,
     WebExtensionAnswerAccess,
+    WebExtensionAnswerPrompt,
     WebExtensionCancel,
     WebExtensionChooseFile,
     WebExtensionConfirm,
@@ -316,6 +317,7 @@ pub enum EventChannel {
     EvtTabChanged,
     EvtUiCommand,
     EvtWebExtensionAccessRequested,
+    EvtWebExtensionPromptChanged,
     EvtWebExtensionStoreClicked,
     EvtWorkChanged,
     EvtWorkEnvironmentChanged,
@@ -538,6 +540,7 @@ pub const COMMANDS: &[&str] = &[
     "voice_status",
     "voice_stop",
     "web_extension_answer_access",
+    "web_extension_answer_prompt",
     "web_extension_cancel",
     "web_extension_choose_file",
     "web_extension_confirm",
@@ -633,6 +636,7 @@ pub const EVENTS: &[&str] = &[
     "tab-changed",
     "ui-command",
     "web-extension-access-requested",
+    "web-extension-prompt-changed",
     "web-extension-store-clicked",
     "work-changed",
     "work-environment-changed",
@@ -857,6 +861,7 @@ impl CommandName {
             CommandName::VoiceStatus => "voice_status",
             CommandName::VoiceStop => "voice_stop",
             CommandName::WebExtensionAnswerAccess => "web_extension_answer_access",
+            CommandName::WebExtensionAnswerPrompt => "web_extension_answer_prompt",
             CommandName::WebExtensionCancel => "web_extension_cancel",
             CommandName::WebExtensionChooseFile => "web_extension_choose_file",
             CommandName::WebExtensionConfirm => "web_extension_confirm",
@@ -1137,6 +1142,7 @@ impl CommandName {
             "voice_status" => Some(CommandName::VoiceStatus),
             "voice_stop" => Some(CommandName::VoiceStop),
             "web_extension_answer_access" => Some(CommandName::WebExtensionAnswerAccess),
+            "web_extension_answer_prompt" => Some(CommandName::WebExtensionAnswerPrompt),
             "web_extension_cancel" => Some(CommandName::WebExtensionCancel),
             "web_extension_choose_file" => Some(CommandName::WebExtensionChooseFile),
             "web_extension_confirm" => Some(CommandName::WebExtensionConfirm),
@@ -1238,6 +1244,7 @@ impl EventChannel {
             EventChannel::EvtTabChanged => "tab-changed",
             EventChannel::EvtUiCommand => "ui-command",
             EventChannel::EvtWebExtensionAccessRequested => "web-extension-access-requested",
+            EventChannel::EvtWebExtensionPromptChanged => "web-extension-prompt-changed",
             EventChannel::EvtWebExtensionStoreClicked => "web-extension-store-clicked",
             EventChannel::EvtWorkChanged => "work-changed",
             EventChannel::EvtWorkEnvironmentChanged => "work-environment-changed",

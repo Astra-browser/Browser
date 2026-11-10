@@ -459,6 +459,50 @@ the Astra face is still checkable but the floater assertion is a reasoned SKIP.
 `window.resizeTo` from the opener is ignored by the player (upstream behavior);
 resizing is the native window's own edge/margin path, unchanged.
 
+## Owner report: Astra extension manager and install prompt (2026-11-10, latest)
+
+**What changed:** the engine's "Add <extension>" doorhanger is gone. The shell
+hooks the window's `PopupNotifications.show` for `addon-webext-permissions`
+and publishes the same prompt to Astra's sheet, including the required
+permission list, the unsigned warning and the optional private-window and
+technical/interaction-data choices. `web_extension_answer_prompt` resolves the
+engine promise. Astra's own review answers the prompt silently when it already
+listed the permissions, so an install stays one confirmation.
+
+The sidebar's utility bar now carries an Extensions control at the top. Its
+menu offers Manage extensions, the Chrome Web Store, Firefox Add-ons and
+install-from-file; the manager page offers the two stores side by side, and gives every installed extension its
+on/off switch, pin, site access, options and an Open control. The Open control
+(and a pinned button) runs the extension's own action: browser actions are
+projected as `extension-actions-changed`, and `extension_action_invoke` opens
+the popup in an Astra panel anchored at the app button, never the native
+unified-extensions panel.
+
+| Surface | What works | Wiring / files | Live evidence |
+|---|---|---|---|
+| Install prompt | AMO/engine install prompt appears in Astra's sheet with permissions and optional choices; native doorhanger stays absent; Add installs through `AddonManager` | `overlay/astra/host/WebExtensions.sys.mjs` (`install`, `permissionPrompt`, `answerPrompt`), `ui/shell/src/Shell.svelte`, `WebExtensionInstallPrompt.svelte`, new `web-extension-prompt-changed` / `web_extension_answer_prompt` | `tools/perf/stress/webext_prompt_probe.py`: sheet rendered, 2 permission rows, native notification absent, Add installed `prompt-probe@astra.test` |
+| Manager entry | top-of-sidebar Extensions control opens the page; page offers both stores | `UtilityBar.svelte`, `WebExtensionManager.svelte`, `bindings.ts` | `tools/perf/stress/webext_ui_probe.py`: Extensions button present, `.library-shell` in front, both store labels |
+| Row controls | on/off, pin, open, options, site access, remove | `ExtensionRow.svelte`, `ExtensionManager`, `webext.svelte.ts` | same probe: row, switch, pin (`aria-pressed=true`), extension popup opened |
+| Action projection | browser actions reach the app with label/badge/icon/popup flag; pinned button also invokes | `WebExtensions.sys.mjs` (`actionsForWindow`, `invokeAction`, `openActionPopup`), `chrome-entry/browser-chrome.ts`, `domain/extensions` | `tools/perf/stress/webext_action_probe.py`: action projected, popup loaded `moz-extension://…/popup.html`, native panel closed, panel released |
+
+**Verification:** `bun run --filter @astra/frame check` (typecheck, eslint,
+stylelint, prettier, knip, 1249 unit tests / 2 environment skips); component
+suites 33/33; `webext_view` 28/28, `chrome_extensions` 39/39, `wire_coverage`
+50/50, `hostapi_v1` 341, `native_surfaces` 125/125, `settings_native` 105;
+`crates/astra-proto/check-drift.sh` clean (276 commands / 36 events); live
+`webext_prompt_probe.py`, `webext_action_probe.py` and `webext_ui_probe.py`
+PASS on the packaged dev build; `webext_probe.py` still PASS (install, list,
+disable/enable, options, uninstall).
+
+**Teardown:** the shell restores the original `PopupNotifications.show` and
+removes the window from the action set on unload; unresolved prompts answer
+cancel; action popups destroy their temporary panel and browser on hide.
+
+**Deferred:** update/sideload permission prompts still originate from the
+engine's app-menu notification path; they are not opened by any Astra surface
+today. Page actions are not projected (browser actions are). A private-window
+action is projected only for the window that owns it.
+
 ## Owner report: top bar utilities — extensions, appearance, sleeping (2026-11-09)
 
 **What changed:** the column head now carries every utility in one row: media,

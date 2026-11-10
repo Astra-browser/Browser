@@ -20,8 +20,10 @@
   import { favicons } from "$domain/favicons";
   import { mediaPlayer } from "$domain/media-player";
   import { preferences } from "$domain/preferences";
+  import { surface as browserPage } from "$domain/surface";
   import { tabs } from "$domain/tabs";
   import { webext } from "$domain/webext";
+  import { commands } from "$shared/ipc/bindings";
   import * as tools from "$session/tools.svelte";
   import { mediaTabs, railToolActive, sleepingTabs } from "../lib/rail-model";
 
@@ -94,6 +96,55 @@
     </button>
   {/if}
   {#if ontoggle && !compact}<span class="bar-rule" aria-hidden="true"></span>{/if}
+
+  <div class="bar-cell" style:--step={ontoggle ? 2 : 1}>
+    <Disclosure
+      label={m.webext_page_title()}
+      triggerTitle={m.webext_page_title()}
+      menu
+      align="start"
+      triggerClass="rail-item"
+      panelClass="bar-popover"
+    >
+      {#snippet trigger()}<Icon icon={PuzzleIcon} size={18} />{/snippet}
+      <button
+        type="button"
+        role="menuitem"
+        class="ui-menu-item rail-row"
+        style:--row={0}
+        onclick={() => void browserPage.open("extensions")}
+      >
+        {m.webext_manage()}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        class="ui-menu-item rail-row"
+        style:--row={1}
+        onclick={() => void commands.browserOpenUrl("https://chromewebstore.google.com/", true)}
+      >
+        {m.webext_open_store()}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        class="ui-menu-item rail-row"
+        style:--row={2}
+        onclick={() => void commands.browserOpenUrl("https://addons.mozilla.org/firefox/", true)}
+      >
+        {m.webext_open_firefox_store()}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        class="ui-menu-item rail-row"
+        style:--row={3}
+        onclick={() => void webext.chooseFile(false)}
+      >
+        {m.webext_install_file()}
+      </button>
+    </Disclosure>
+  </div>
 
   <div class="bar-cell" style:--step={ontoggle ? 1 : 0}>
     <Disclosure

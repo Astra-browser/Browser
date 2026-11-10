@@ -103,6 +103,20 @@ install/enable/disable/permission flow per gallery entry.
 
 ## UI
 
+The sidebar's utility bar carries the Extensions control: its menu offers
+Manage extensions, the Chrome Web Store, Firefox Add-ons and install-from-file.
+The manager page offers the two stores side by side, install-from-file, the installed list with its on/off switch,
+pin, site access, extension settings and an Open control that runs the
+extension's own action popup. Nothing in that path opens Firefox's add-ons
+manager or settings.
+
+When the engine raises an install permission prompt (for example from an AMO
+listing), Astra replaces the engine doorhanger with its own sheet: the same
+required permissions, the data-collection disclosure and the two optional
+install choices, answered through `web_extension_answer_prompt`. A review that
+already listed the package's permissions answers the engine prompt silently
+with the choices made in the review.
+
 - Domain: `ui/app/src/domain/extensions/gallery.ts` (types + helpers),
   `gallery-data.ts` (mirrored data), `extension-permissions.ts` (prompt
   queue fed by `permission.requested` events), each with unit tests.
@@ -111,9 +125,12 @@ install/enable/disable/permission flow per gallery entry.
   `GalleryDetail` (mapping note + install), `GalleryPermissionPrompt`
   (renders one pending prompt; Allow/Deny only calls back — the host
   forwards the decision via `Dialogs.decidePermission`).
-- Enable/disable of installed extensions stays in the existing
-  `ExtensionRow` switch; the gallery handles discovery + install.
+- Enable/disable, pin, open, options and site access live on the manager's
+  `ExtensionRow`; the gallery handles discovery + install.
+- `WebExtensionManager` remains the install page. Its review lists the real
+  package permissions and optional choices; a package whose engine prompt
+  arrives without advance details is confirmed in
+  `WebExtensionInstallPrompt` instead.
 
-Existing `webext` install flows (`WebExtensionManager`, review/confirm,
-site access) are unchanged; gallery buttons open the AMO listing (or the
-Chrome listing for `none` entries) in a tab.
+Gallery buttons open the AMO listing (or the Chrome listing for `none`
+entries) in a tab.

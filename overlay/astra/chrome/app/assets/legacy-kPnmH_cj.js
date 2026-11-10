@@ -1,0 +1,1 @@
+import{Vn as e}from"./chrome-shared-RuwxJ6Z2.js";e();

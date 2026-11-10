@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import * as attention from "$session/attention.svelte";
-import { holdWhilePopupOpen } from "../lib/popup-hold";
+import { holdWhilePopupOpen } from "$session/attention.svelte";
 
 afterEach(() => vi.useRealTimers());
 

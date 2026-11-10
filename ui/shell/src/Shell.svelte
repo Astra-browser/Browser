@@ -235,6 +235,14 @@
     } catch {
       // No dialog bridge: the engine keeps its own prompt.
     }
+    // Add-on install/update prompts are Astra's sheet too; the engine's
+    // doorhanger never answers an extension install.
+    try {
+      await host.WebExtensions?.install?.({ window: win });
+    } catch {
+      // Without the bridge the engine keeps its own prompt; nothing is
+      // silently granted because of this failure.
+    }
     // Shields: install the process-wide observers (CNAME/CSP/forget-on-close)
     // once at boot, not only when Settings or the shield menu is opened.
     try {
@@ -1118,6 +1126,11 @@
       }
       try {
         void host.DialogPrompts?.uninstall?.({ window: win });
+      } catch {
+        // Already gone with the window.
+      }
+      try {
+        void host.WebExtensions?.uninstall?.({ window: win });
       } catch {
         // Already gone with the window.
       }

@@ -5,8 +5,14 @@
   const RGBA_BYTES = 32 * 32 * 4;
   const BASE64_BYTES = 5_464;
 
-  let { rgba }: { rgba: string | null } = $props();
+  let { rgba, url = null }: { rgba: string | null; url?: string | null } = $props();
   let canvas = $state<HTMLCanvasElement>();
+  let failed = $state(false);
+
+  $effect(() => {
+    void url;
+    failed = false;
+  });
 
   function decode(value: string | null): Uint8ClampedArray<ArrayBuffer> | null {
     if (value === null || value.length !== BASE64_BYTES) return null;
@@ -30,9 +36,19 @@
   });
 </script>
 
-{#if pixels === null}
+{#if pixels === null && url && !failed}
+  <img src={url} alt="" aria-hidden="true" onerror={() => (failed = true)} />
+{:else if pixels === null}
   <Icon icon={PuzzleIcon} size={16} />
 {:else}
   <canvas bind:this={canvas} width="32" height="32" class="h-[18px] w-[18px]" aria-hidden="true"
   ></canvas>
 {/if}
+
+<style>
+  img {
+    inline-size: 18px;
+    block-size: 18px;
+    object-fit: contain;
+  }
+</style>

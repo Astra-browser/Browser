@@ -1,6 +1,7 @@
 import {
   commands,
   type WebExtensionAccessRequestView,
+  type WebExtensionPromptView,
   type WebExtensionReview,
   type WebExtensionStoreButtonState,
   type WebExtensionView,
@@ -10,6 +11,8 @@ import { events } from "$shared/ipc/native-events";
 let available = $state<boolean | null>(null);
 let installed = $state<WebExtensionView[]>([]);
 let pendingReview = $state<WebExtensionReview | null>(null);
+let installPrompt = $state<WebExtensionPromptView | null>(null);
+let answeringPrompt = $state(false);
 let preparing = $state(false);
 let confirming = $state(false);
 // The extension just added, until it has started.
@@ -27,6 +30,8 @@ let removalTimer: ReturnType<typeof setTimeout> | undefined;
 export const isAvailable = () => available === true;
 export const list = () => installed;
 export const review = () => pendingReview;
+export const prompt = () => installPrompt;
+export const isAnsweringPrompt = () => answeringPrompt;
 export const isPreparing = () => preparing;
 export const isConfirming = () => confirming;
 export const isInstalling = () => preparing || confirming || settling !== null;
@@ -74,6 +79,41 @@ export function listenForAccess(): Promise<() => void> {
     accessQueue = [...accessQueue, event.payload];
     if (named(event.payload.extension_id) === null) void refresh();
   });
+}
+
+export function listenForPrompt(): Promise<() => void> {
+  return events.webExtensionPromptChanged.listen((event) => {
+    installPrompt = event.payload.prompt;
+    if (installPrompt === null) answeringPrompt = false;
+    // The engine's prompt carries the package's real permissions; it
+    // replaces the pre-install sheet instead of stacking over it.
+    else pendingReview = null;
+  });
+}
+
+export async function answerPrompt(
+  accept: boolean,
+  privateWindows = false,
+  technicalData = true,
+): Promise<void> {
+  const current = installPrompt;
+  if (current === null || answeringPrompt) return;
+  answeringPrompt = true;
+  try {
+    const result = await commands.webExtensionAnswerPrompt(
+      current.prompt_id,
+      accept,
+      privateWindows,
+      technicalData,
+    );
+    if (result.status !== "ok") failure = result.error;
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (installPrompt?.prompt_id === current.prompt_id) installPrompt = null;
+    answeringPrompt = false;
+    await refresh();
+  }
 }
 
 export async function answerAccess(allowed: boolean): Promise<void> {
@@ -147,12 +187,21 @@ export function listenForDrops(accept: () => boolean = () => true): Promise<() =
   });
 }
 
-export async function confirm(reviewId: string): Promise<void> {
+export async function confirm(
+  reviewId: string,
+  privateWindows = false,
+  technicalData = true,
+): Promise<void> {
   const current = pendingReview;
   if (current === null || current.review_id !== reviewId || confirming) return;
   confirming = true;
   try {
-    const result = await commands.webExtensionConfirm(current.id, current.review_id);
+    const result = await commands.webExtensionConfirm(
+      current.id,
+      current.review_id,
+      privateWindows,
+      technicalData,
+    );
     if (result.status === "ok") {
       if (pendingReview?.review_id === current.review_id) {
         pendingReview = null;
@@ -233,6 +282,8 @@ export function dispose(): void {
   answering = false;
   settling = null;
   pendingReview = null;
+  installPrompt = null;
+  answeringPrompt = false;
   failure = null;
   available = null;
   installed = [];

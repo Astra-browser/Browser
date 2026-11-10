@@ -154,6 +154,8 @@ const ROUTES: Record<string, Route> = {
   web_extension_set_access: ["WebExtensions", "setAccess"],
   web_extension_set_pinned: ["WebExtensions", "setPinned"],
   web_extension_answer_access: ["WebExtensions", "answerAccess"],
+  web_extension_answer_prompt: ["WebExtensions", "answerPrompt"],
+  extension_action_invoke: ["WebExtensions", "invokeAction"],
   web_extension_store_button: ["WebExtensions", "storeButton"],
   web_extension_choose_file: ["WebExtensions", "chooseFile"],
   web_extension_prepare_file: ["WebExtensions", "prepareFile"],

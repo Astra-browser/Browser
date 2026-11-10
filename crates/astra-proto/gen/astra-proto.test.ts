@@ -4,7 +4,7 @@
 
 // P2-T02 TS tests (run: `bun test gen/` from crates/astra-proto).
 // Mirrors the Rust unit tests: envelope version gate, unknown-field
-// tolerance, and registry completeness (270 commands + 35 events).
+// tolerance, and registry completeness (276 commands + 36 events).
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -56,16 +56,16 @@ describe("envelope round trip", () => {
 });
 
 describe("registry completeness", () => {
-  test("270 commands", () => {
-    expect(COMMANDS.length).toBe(270);
-    expect(new Set(COMMANDS).size).toBe(270);
+  test("276 commands", () => {
+    expect(COMMANDS.length).toBe(276);
+    expect(new Set(COMMANDS).size).toBe(276);
     expect(COMMANDS).toContain("tabs_navigate");
     expect(COMMANDS).toContain("work_call");
   });
 
-  test("35 events, renames applied", () => {
-    expect(EVENTS.length).toBe(35);
-    expect(new Set(EVENTS).size).toBe(35);
+  test("36 events, renames applied", () => {
+    expect(EVENTS.length).toBe(36);
+    expect(new Set(EVENTS).size).toBe(36);
     expect(EVENTS).toContain("tab-changed");
     expect(EVENTS).toContain("astra:account-changed");
     expect(EVENTS.find((e) => e.startsWith("prev:"))).toBeUndefined();

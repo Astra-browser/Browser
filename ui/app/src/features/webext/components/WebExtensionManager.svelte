@@ -2,6 +2,8 @@
   import { ArrowLeft02Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
   import { onMount } from "svelte";
   import { surface as browser } from "$domain/surface";
+  import { extensions } from "$domain/extensions";
+  import { tabs } from "$domain/tabs";
   import { webext } from "$domain/webext";
   import { commands } from "$shared/ipc/bindings";
   import { IS_WINDOWS } from "$shared/platform";
@@ -14,9 +16,14 @@
   import CatalogCard from "./CatalogCard.svelte";
   import ExtensionRow from "./ExtensionRow.svelte";
 
-  let extensions = $derived(webext.list());
+  let installed = $derived(webext.list());
   let failure = $derived(webext.error());
-  let installedIds = $derived(new Set(extensions.map((extension) => extension.id)));
+  let installedIds = $derived(new Set(installed.map((extension) => extension.id)));
+  let profileId = $derived(tabs.profile()?.id ?? null);
+  let tabId = $derived(tabs.activeId());
+  let actions = $derived(extensions.activeActions(profileId, tabId));
+  const actionFor = (installId: string) =>
+    actions.find((action) => action.runtime.install_id === installId) ?? null;
 
   onMount(() => void webext.refresh());
 
@@ -46,8 +53,14 @@
     <button
       type="button"
       class="toolbar-action"
-      onclick={() => openInTab("https://addons.mozilla.org/firefox/")}
+      onclick={() => openInTab("https://chromewebstore.google.com/")}
       >{m.webext_open_store()}</button
+    >
+    <button
+      type="button"
+      class="toolbar-action"
+      onclick={() => openInTab("https://addons.mozilla.org/firefox/")}
+      >{m.webext_open_firefox_store()}</button
     >
   </header>
 
@@ -56,7 +69,7 @@
       <p class="failure" role="alert">{failure}</p>
     {/if}
 
-    {#if extensions.length === 0}
+    {#if installed.length === 0}
       <div class="empty">
         <EmptyState title={m.webext_empty_title()} description={m.webext_empty_help()}>
           {#snippet icon()}<Icon icon={PuzzleIcon} size={28} />{/snippet}
@@ -64,11 +77,11 @@
       </div>
     {:else}
       <h2 class="heading">
-        {m.webext_installed()} <span class="count">{extensions.length}</span>
+        {m.webext_installed()} <span class="count">{installed.length}</span>
       </h2>
       <ul class="group">
-        {#each extensions as extension (extension.id)}
-          <ExtensionRow {extension} />
+        {#each installed as extension (extension.id)}
+          <ExtensionRow {extension} action={actionFor(extension.install_id)} {profileId} {tabId} />
         {/each}
       </ul>
     {/if}
