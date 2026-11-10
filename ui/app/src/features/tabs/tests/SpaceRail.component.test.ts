@@ -7,6 +7,7 @@ import { revision, spaceFixture, tabFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { uiCommands } from "$domain/ui-commands";
 import { surface } from "$domain/surface";
+import { preferences } from "$domain/preferences";
 import * as sidebar from "$session/sidebar-mode.svelte";
 import TabRail from "../components/TabRail.svelte";
 import * as requests from "../lib/space-requests.svelte";
@@ -70,6 +71,17 @@ test("the spaces button leads the rail and the new tab button follows the last t
   const rows = [...screen.container.querySelectorAll(".rail-list > li")];
   expect(rows.at(-1)!.querySelector(".rail-new")).not.toBeNull();
   expect(rows).toHaveLength(2);
+});
+
+test("the close-button setting reaches the compact rail", async () => {
+  const screen = await rail();
+  await preferences.init();
+  const list = () => screen.container.querySelector(".rail-list");
+  expect(list()?.getAttribute("data-close-buttons")).toBe("hover");
+  emitNativeEvent("uiCommand", "preference.tabs.close-button=always");
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  expect(list()?.getAttribute("data-close-buttons")).toBe("always");
+  preferences.dispose();
 });
 
 test("the spaces button opens a stack beside the rail and switching happens there", async () => {
