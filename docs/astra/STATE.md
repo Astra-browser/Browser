@@ -11,6 +11,40 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Consolidation: every pending branch is on main (2026-11-10)
+
+The whole open set moved onto `main` in four merges, in this order:
+
+| # | Merged | Commits | What it carried |
+|---|---|---|---|
+| 1 | `fix/media-popup-now-playing` | 61 | the 25-item owner batch, the sidebar shield, and the 29 per-issue branches merged under it |
+| 2 | `integration/menus` | 3 | the back/forward, sidebar-options and tool-shelf menus drawn in the app (`TabHistory`) |
+| 3 | `fix/tab-drag-ghost-stuck` | 1 | a tab drag the row never saw released |
+| 4 | `feat/topbar-customization` | 1 | top bar utilities: extension hub, appearance switch, sleeping marks |
+
+Conflicts were three, all additive: two in this file (owner-report sections,
+kept newest first) and two in `System.sys.mjs` (`logsDirectory`/`redactPath`
+and `diagnosticsReport`, absent from `main`). Nothing was dropped: the merged
+tree matches the batch branch, and `main`'s own four commits were already
+carried by the duplicated 0.1.742 lineage the branch grew from.
+
+**One stale test was corrected, not silenced.** `ui/shell/src/host-model.test.mjs`
+still asserted the pre-batch history contract (the first page replaces the New
+Tab). The batch reversed that on purpose and `tests/contract/hostapi_v1.mjs`
+already proves it, so the shell test now asserts the same contract while
+keeping its own point: two loads of one address add a single entry.
+
+**Verification:** `bun run --filter @astra/frame check` green (typecheck 0,
+eslint/stylelint/prettier clean, knip clean, 1249 unit tests); the 34 contract
+suites in `tools/perf/full-suite.sh` PASS; `node --test ui/shell/src` 74/74;
+`forge lint` 13/13; `state-check` and `brand-lint` clean; `build:chrome` green
+(781 files staged, CSP audit clean), so the startup-asset budget the top-bar
+lane reported is no longer exceeded. The ten component suites the merges
+touched pass (63/63) in Chromium; the full component project was not driven to
+the end — it runs every file sequentially in a real browser, and files this
+merge never touched (e.g. `SpacesLook`, `OnboardingApp`, `PageRequestCard`)
+time out at ~15 s under load.
+
 ## Dev/alpha version 0.1.742 (2026-11-10)
 
 The first build handed to dev/alpha testers carries Astra's **own** product
