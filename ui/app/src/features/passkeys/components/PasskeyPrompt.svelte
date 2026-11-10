@@ -135,7 +135,6 @@
     inset: 0;
     z-index: 60;
     background: var(--overlay-scrim);
-    backdrop-filter: blur(2px);
   }
 
   .sheet {
@@ -158,25 +157,25 @@
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--color-text);
   }
 
   .origin {
     margin: 4px 0 12px;
     font-size: 13px;
-    color: var(--text-secondary);
+    color: var(--color-muted);
   }
 
   .copy {
     margin: 0 0 12px;
     font-size: 14px;
-    color: var(--text-primary);
+    color: var(--color-text);
   }
 
   .warning {
     margin: 0 0 10px;
     font-size: 13px;
-    color: var(--danger-text);
+    color: var(--color-danger);
   }
 
   .field {
@@ -184,23 +183,23 @@
     gap: 6px;
     margin-bottom: 16px;
     font-size: 13px;
-    color: var(--text-secondary);
+    color: var(--color-muted);
   }
 
   .field input {
     box-sizing: border-box;
     width: 100%;
     padding: 9px 10px;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--color-field-ring);
     border-radius: var(--radius-control);
-    background: var(--field-ground);
-    color: var(--text-primary);
+    background: var(--color-field);
+    color: var(--color-text);
     font: inherit;
     letter-spacing: 0.12em;
   }
 
   .field input:focus-visible {
-    outline: 2px solid var(--focus-ring);
+    outline: 2px solid var(--color-ring);
     outline-offset: 1px;
   }
 

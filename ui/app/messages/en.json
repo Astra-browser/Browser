@@ -4041,5 +4041,9 @@
   "passkey_error_unavailable": "Passkeys are unavailable.",
   "passkey_error_locked": "Too many attempts. Try again later.",
   "passkey_never": "Never",
-  "passkey_added": "Added {date}"
+  "passkey_added": "Added {date}",
+  "passkey_device": "Passkeys on this device",
+  "passkey_saved_count": "{count} saved",
+  "passkey_manage": "Manage passkeys",
+  "passkey_manage_help": "Change the PIN or remove every passkey saved here."
 }

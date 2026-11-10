@@ -52,11 +52,11 @@
 <SettingsGroup title={m.passkey_title()} description={m.passkey_intro()}>
   {#if status !== null}
     <SettingsRow
-      title={m.passkey_title()}
+      title={m.passkey_device()}
       description={passkeyStateLabel(status.enabled, status.exists, status.unlocked)}
     >
       <Switch
-        label={m.passkey_title()}
+        label={m.passkey_device()}
         labelHidden
         checked={status.enabled}
         disabled={busy}
@@ -89,7 +89,7 @@
             onchange={(checked) => (systemUnlock = checked)}
           />
         </SettingsRow>
-        <div class="actions">
+        <div class="form-actions">
           <Button
             variant="primary"
             pending={busy}
@@ -118,7 +118,12 @@
       {/if}
 
       {#if status.unlocked}
-        <SettingsRow title={m.passkey_credentials()} description={m.passkey_intro()}>
+        <SettingsRow
+          title={m.passkey_credentials()}
+          description={credentials.length === 0
+            ? m.passkey_no_credentials()
+            : m.passkey_saved_count({ count: credentials.length })}
+        >
           <Button
             size="compact"
             variant="ghost"
@@ -126,11 +131,7 @@
             onclick={() => void run({ kind: "lock" })}>{m.passkey_lock()}</Button
           >
         </SettingsRow>
-        {#if credentials.length === 0}
-          <SettingsRow title={m.passkey_no_credentials()}>
-            <span></span>
-          </SettingsRow>
-        {:else}
+        {#if credentials.length > 0}
           {#each credentials as credential (credential.id)}
             <SettingsRow
               title={credential.rp_id}
@@ -145,7 +146,16 @@
               >
             </SettingsRow>
           {/each}
-          <div class="actions">
+        {/if}
+
+        <SettingsRow title={m.passkey_manage()} description={m.passkey_manage_help()}>
+          <div class="row-actions">
+            <Button
+              size="compact"
+              variant="secondary"
+              disabled={busy}
+              onclick={() => (changing = !changing)}>{m.passkey_change_pin()}</Button
+            >
             {#if confirmingRemoveAll}
               <Button
                 size="compact"
@@ -166,12 +176,12 @@
               <Button
                 size="compact"
                 variant="ghost"
-                disabled={busy}
+                disabled={busy || credentials.length === 0}
                 onclick={() => (confirmingRemoveAll = true)}>{m.passkey_remove_all()}</Button
               >
             {/if}
           </div>
-        {/if}
+        </SettingsRow>
 
         {#if changing}
           <div class="form">
@@ -191,7 +201,7 @@
               bind:value={newPin}
               disabled={busy}
             />
-            <div class="actions">
+            <div class="form-actions">
               <Button
                 size="compact"
                 variant="ghost"
@@ -208,15 +218,6 @@
               >
             </div>
           </div>
-        {:else}
-          <div class="actions">
-            <Button
-              size="compact"
-              variant="secondary"
-              disabled={busy}
-              onclick={() => (changing = true)}>{m.passkey_change_pin()}</Button
-            >
-          </div>
         {/if}
       {:else}
         <div class="form">
@@ -229,7 +230,7 @@
             bind:value={pin}
             disabled={busy || status.locked_for_secs > 0}
           />
-          <div class="actions">
+          <div class="form-actions">
             <Button
               variant="primary"
               pending={busy}
@@ -254,16 +255,21 @@
     padding: 14px 18px 18px;
   }
 
-  .actions {
+  /* The form's own padding ends the card; an action row inside it must not
+     add a second one, or the buttons float off the rounded edge. */
+  .form-actions,
+  .row-actions {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .error {
     margin: 0;
     padding: 0 18px 16px;
     font-size: 13px;
-    color: var(--danger-text);
+    color: var(--color-danger);
   }
 </style>

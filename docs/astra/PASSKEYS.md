@@ -70,7 +70,10 @@ authentication is `<ProfD>/astra/passkeys/vault.device` (0600).
   labels.
 - **Vault key wrapping**: the vault key is a random 32-byte key wrapped under a
   PIN-derived key (PBKDF2-HMAC-SHA256, 600,000 iterations, 16-byte salt) and,
-  when enabled, under a random device key (PBKDF2, 20,000 iterations).
+  when enabled, under a random device key (PBKDF2, 20,000 iterations). The KDF
+  uses the in-crate RFC 2104 HMAC over `sha2`; NSS's PKCS#11 HMAC imports a key
+  and creates a context per call, which made the same derivation take 1.8 s.
+  On this build an unlock is ~100 ms, and the seal's MAC stays on NSS.
 - **PIN**: never stored. The CTAP2 client PIN protocol transmits only
   `SHA-256(PIN)[..16]` (`pinHashEnc`); that same 16-byte value is the PBKDF2
   input, so the WebAuthn path and the Settings path unlock the same vault
@@ -106,9 +109,9 @@ Known limits, stated rather than hidden:
   unlocked key while a transaction is in flight. This is the same boundary as
   every browser password store.
 - `fprintd` is best-effort: no device or a failed read falls back to the PIN.
-- The JS Settings service does its PBKDF2 on the main thread (one unlock costs
-  a visible pause of a few hundred milliseconds). Moving it to a background
-  task is a follow-up; the WebAuthn path already runs off-main-thread.
+- The JS Settings service does its PBKDF2 on the main thread (~100 ms here);
+  the surface paints its pending state first. Moving it to a background task
+  is a follow-up; the WebAuthn path already runs off-main-thread.
 - Conditional mediation (passkey autofill in a username field) is not wired;
   the modal WebAuthn flow is. A provider constant for the autofill list would
   be needed in `nsIWebAuthnService.idl`.

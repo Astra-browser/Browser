@@ -34,6 +34,9 @@ export async function call(request: PasskeyCall): Promise<PasskeyResponse | null
   if (busy) return null;
   busy = true;
   try {
+    // The vault KDF runs on the main thread in the settings service; let the
+    // pending state paint before the call takes it.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     return apply(await commands.passkeyCall(request));
   } catch {
     failure = "unavailable";
