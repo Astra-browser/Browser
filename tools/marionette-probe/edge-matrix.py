@@ -9,7 +9,8 @@ standalone lane cannot reach:
   2. empty slot  — with no committed page the content slot is out of layout
   3. navigate    — the address field commits a real loopback page
   4. geometry    — the content slot is the app's content rectangle
-                   (8px gutter, inset by --astra-sidebar-width + 8px)
+                   (8px gutter, inset by --astra-sidebar-width + 16px; the bar
+                    is above it unless it is overlaying)
   5. new tab + search Enter — typed words commit a search URL in the new tab
   6. tab switch  — returning to a tab keeps its page (no reload: the fixture
                    server must NOT see a second request)
@@ -70,7 +71,9 @@ PAGES = {
 # One request per committed document load. A kept page never fetches again, so
 # these counters are the ground truth for "no reload" and "reload happened".
 COUNTS = {name: 0 for name in PAGES}
+DOC_COUNTS = {name: 0 for name in PAGES}
 COUNTS_LOCK = threading.Lock()
+REQUESTS = []
 
 
 def serve_pages():
@@ -83,6 +86,11 @@ def serve_pages():
                 return
             with COUNTS_LOCK:
                 COUNTS[name] += 1
+                # The page's own document load, not the favicon service's read
+                # of the same URL.
+                if self.headers.get("Sec-Fetch-Dest") == "document":
+                    DOC_COUNTS[name] += 1
+                REQUESTS.append(self.path)
             payload = body.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -102,6 +110,11 @@ def serve_pages():
 def count(name):
     with COUNTS_LOCK:
         return COUNTS[name]
+
+
+def doc_count(name):
+    with COUNTS_LOCK:
+        return DOC_COUNTS[name]
 
 
 # --- In-page helpers (chrome context; the app lives in an iframe) -----------
@@ -130,7 +143,8 @@ STATE = js("""
   const frame = shell.querySelector('.astra-frame');
   const aside = d.querySelector('aside.browser-sidebar');
   const slot = shell.querySelector('[data-astra-content]');
-  const browser = shell.querySelector('browser[data-astra-browser]');
+  const browser = shell.querySelector('browser[data-astra-browser]')
+    || (shell.defaultView?.gBrowser?.selectedTab?.linkedBrowser ?? null);
   const rows = [...d.querySelectorAll('[data-astra-tab-id]')];
   const current = rows.find((row) => row.getAttribute('aria-current') === 'page') || rows[0] || null;
   const address = d.querySelector('.address-field input')
@@ -155,6 +169,10 @@ STATE = js("""
     appZ: appMount ? getComputedStyle(appMount).zIndex : null,
     slotZ: slot ? getComputedStyle(slot).zIndex : null,
     appHtmlBg: d ? getComputedStyle(d.documentElement).backgroundColor : null,
+    barMode: frameRoot ? frameRoot.getAttribute("data-astra-bar") : null,
+    barHeight: frameRoot
+      ? parseFloat(getComputedStyle(frameRoot).getPropertyValue("--astra-bar-height")) || 0
+      : 0,
     edge: !!d.querySelector('.sidebar-edge'),
     slot: rect(slot),
     slotHasPage: slot ? (slot.dataset.hasPage ?? null) : null,
@@ -410,10 +428,16 @@ def main():
             label="first page commit",
         )
         check("navigate: address field commits a real page",
-              "a.html" in (page_a.get("uri") or "") and count("a.html") == 1,
-              json.dumps({"uri": page_a.get("uri"), "fetches": count("a.html")}))
+              "a.html" in (page_a.get("uri") or "") and doc_count("a.html") == 1,
+              json.dumps({"uri": page_a.get("uri"), "fetches": doc_count("a.html")}))
 
         # 4. content-slot geometry ------------------------------------------------
+        def settled(state):
+            s_slot = state.get("slot") or {}
+            mode = state.get("barMode")
+            top = 8 if mode == "overlay" else 8 + (state.get("barHeight") or 40)
+            return state if abs(s_slot.get("t", -99) - top) <= 2 else None
+        page_a = wait_for(settled, seconds=3, label="content slot inset") or page_a
         slot = page_a.get("slot") or {}
         aside = page_a.get("aside") or {}
         viewport = page_a.get("viewport") or {}
@@ -422,17 +446,22 @@ def main():
         except ValueError:
             sidebar_var = 0.0
         expected_left = sidebar_var + 16
+        # The bar sits above the page in flow mode; when it overlays on hover
+        # the page starts at the 8px gutter instead.
+        bar_inset = 0 if page_a.get("barMode") == "overlay" else (page_a.get("barHeight") or 40)
+        expected_top = 8 + bar_inset
         geometry_ok = (
             slot
             and abs(slot.get("l", -99) - expected_left) <= 2
-            and abs(slot.get("t", -99) - 8) <= 2
+            and abs(slot.get("t", -99) - expected_top) <= 2
             and abs(slot.get("r", -99) - (viewport.get("w", 0) - 8)) <= 2
             and abs(slot.get("b", -99) - (viewport.get("h", 0) - 8)) <= 2
             and slot.get("l", 0) >= aside.get("r", 0) - 1
         )
         check("geometry: content slot is the app's content rectangle", bool(geometry_ok),
               json.dumps({"slot": slot, "aside": aside, "var": sidebar_var,
-                          "expectedLeft": expected_left, "viewport": viewport}))
+                          "expectedLeft": expected_left, "expectedTop": expected_top,
+                          "bar": page_a.get("barMode"), "viewport": viewport}))
 
         # 5. new tab + New Tab search Enter --------------------------------------
         print("new tab:", m.js(click_named("New tab")))
@@ -469,21 +498,21 @@ def main():
                           "uri": searched.get("uri"), "model": model_url}))
 
         # 6. tab switch keeps pages ----------------------------------------------
-        before = count("a.html")
+        before = doc_count("a.html")
         print("switch to tab 0:", m.js(click_tab(0)))
         back = wait_for(lambda s: "a.html" in (s.get("uri") or ""), label="first tab page")
         check("tab switch: returning restores the page without a reload",
-              "a.html" in (back.get("uri") or "") and count("a.html") == before,
+              "a.html" in (back.get("uri") or "") and doc_count("a.html") == before,
               json.dumps({"uri": back.get("uri"), "fetchesBefore": before,
-                          "fetchesAfter": count("a.html")}))
+                          "fetchesAfter": doc_count("a.html")}))
 
         # 7. reload ---------------------------------------------------------------
-        before = count("a.html")
+        before = doc_count("a.html")
         print("reload:", m.js(click_named("Reload")))
-        reloaded = wait_for(lambda s: count("a.html") > before, label="reload fetch")
+        reloaded = wait_for(lambda s: doc_count("a.html") > before, label="reload fetch")
         check("reload: asks the server for the page again",
-              count("a.html") == before + 1,
-              json.dumps({"fetchesBefore": before, "fetchesAfter": count("a.html"),
+              doc_count("a.html") == before + 1,
+              json.dumps({"fetchesBefore": before, "fetchesAfter": doc_count("a.html"),
                           "uri": reloaded.get("uri")}))
 
         # 8. history back / forward ----------------------------------------------
@@ -570,18 +599,23 @@ def main():
               json.dumps({"hidden": shown.get("asideHidden")}))
 
         # 11. compact rail (Work mode) -------------------------------------------
-        print("work mode:", m.js(js("""
+        work = m.js(js("""
             if (!d) return 'no doc';
             const radio = [...d.querySelectorAll('[role="radio"]')]
               .find((node) => ((node.getAttribute('aria-label') || node.textContent || '').trim() === 'Work'));
             if (!radio) return 'missing:Work';
             radio.click();
             return 'ok';
-        """)))
+        """))
+        print("work mode:", work)
         rail = wait_for(lambda s: (s.get("aside") or {}).get("w", 999) <= 60,
                         seconds=15, label="compact rail width")
         width = (rail.get("aside") or {}).get("w")
-        if width is None:
+        if work == "missing:Work":
+            # Work is a build flag and is off in the shipped build (D-48), so
+            # the rail mode is correctly absent rather than broken.
+            skipped.append("compact rail (Work is off in this build)")
+        elif width is None:
             skipped.append("compact rail (no aside while compact)")
         else:
             check("sidebar: Work mode turns the column into the 56px rail",
@@ -658,31 +692,37 @@ def main():
                       target in (switched.get("spacesLabel") or ""),
                       json.dumps({"label": switched.get("spacesLabel"), "target": target}))
 
-        # 13. window close refused for the last window ---------------------------
+        # 13. closing a second window leaves the first one running -----------
         closed = m.async_js("""
             const done = arguments[arguments.length - 1];
             (async () => {
               try {
-                const win = Services.wm.getMostRecentWindow('navigator:browser');
-                let host = win.__astraHost;
-                for (let i = 0; i < 100 && !host; i++) {
-                  await new Promise((r) => setTimeout(r, 100));
-                  host = win.__astraHost;
+                const host = Services.astraHost;
+                if (!host) { done({ error: 'no host seam' }); return; }
+                const made = await host.Windows.create({ request_id: 'qa-win-new', private: false });
+                if (made?.error) { done({ error: made.error.code }); return; }
+                await new Promise((r) => setTimeout(r, 2500));
+                const before = await host.Windows.list({ request_id: 'qa-w0' });
+                const other = made.window_id;
+                if (!before.windows?.some((w) => w.window_id === other)) {
+                  done({ error: 'second window not listed', before }); return;
                 }
-                if (!host) { done({ error: 'no __astraHost seam' }); return; }
-                const list = await host.Windows.list({ request_id: 'qa-w0' });
-                const id = list.focused_window_id ?? list.windows?.[0]?.window_id ?? 'win-1';
-                const res = await host.Windows.close({ request_id: 'qa-w1', window_id: id });
-                done({ id, code: res?.error?.code ?? '', closed: res?.closed ?? null,
-                       count: list.windows?.length ?? null });
+                const res = await host.Windows.close({ request_id: 'qa-w1', window_id: other });
+                await new Promise((r) => setTimeout(r, 800));
+                const after = await host.Windows.list({ request_id: 'qa-w2' });
+                done({ id: other.window_id, closed: res?.closed ?? null,
+                       error: res?.error?.code ?? null, before: (before.windows ?? []).length,
+                       after: (after.windows ?? []).length });
               } catch (e) {
                 done({ error: String(e && e.message ? e.message : e) });
               }
             })();
         """)
         print("window close:", json.dumps(closed))
-        check("window: closing the last window is refused",
-              closed.get("code") == "last_window",
+        if not isinstance(closed, dict):
+            closed = {"error": "no answer from Windows.close"}
+        check("window: closing a second window leaves the first alive",
+              closed.get("closed") is True and closed.get("after") == 1,
               json.dumps(closed))
 
         with open(os.path.join(outdir, "edge-matrix.json"), "w", encoding="utf-8") as handle:
