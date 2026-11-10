@@ -1,17 +1,17 @@
-# Astra — logo exploration (staged, not wired)
+# Astra — logo exploration and rationale
 
-Design exploration for the Astra product mark. **Nothing here is referenced by
-the build yet** — `branding/astra.toml` still points at the placeholder artwork,
-and wiring these files in is an owner decision (see `docs/astra/OWNER_QUESTIONS.md`).
+Design record for the Astra product mark. The shipped artwork lives in
+`branding/assets/` (masters) and `overlay/astra/branding/` + `ui/app/public/`
+(generated); this folder keeps the reasoning, the alternative directions and the
+usage rules.
 
 ## What this is
 
-- `svg/` — the finished masters (SVG, paths only, no text, no filters).
-- `web/` — favicon `.ico`, PNG icon set, `site.webmanifest`, `<head>` snippet.
-- `png/` — PNG exports for slides and quick review.
 - `sheets/` — the concept exploration sheet, the identity board, and a browser-context board.
 - `explorations/` — the six explored concepts, as built (not for production use).
 - `GUIDELINES.md` — idea, construction, clear space, sizes, colour, misuse.
+- Production masters: `branding/assets/`; regenerate rasters with
+  `python3 tools/brand-assets.py`.
 
 ## The six concepts and the choice
 
@@ -30,10 +30,9 @@ and carries a story that is not a description of the product.
 
 ## Rebuild
 
-The generated files come from scripts that live outside this folder, in the
-design workspace used for the exploration (`bin/kit.py`, `bin/build.py`). If you
-need to change geometry, do it there rather than editing paths by hand — the
-mark's ratios are load-bearing.
+Edit `branding/assets/*.svg`, then run `python3 tools/brand-assets.py`. Do not
+hand-edit the generated PNG/ICO/ICNS — the mark's ratios are load-bearing and
+every size is derived from the same masters.
 
 ## Status
 
