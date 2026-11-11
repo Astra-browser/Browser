@@ -65,40 +65,40 @@ renders.
 Everything below works in the running browser and is covered by contract tests
 plus live Marionette probes against the packaged dev build.
 
-### A new tab worth opening
+### 🌅 A new tab worth opening
 
 A greeting that knows the time of day, a live clock, your focus streak, today's
 tasks and how many trackers died trying — on a sky that shifts with the hour.
 No news feed, no sponsored tiles, no noise.
 
-### Browse your way
+### 🧭 Browse your way
 
 | Area | What you get |
 |---|---|
-| Shell | Custom window frame, vertical tab strip with pinned tabs, folders, drag-and-drop and context menus, tab reorder + MRU + duplicate + switch-to-open, split view with layout persistence, hover peek cards, DOM fullscreen stage |
-| Omnibox | Ranked suggestions, local search engines (Google default), private-window aware |
-| Spaces | Separate lives via containers + profiles, tab groups, per-window isolated models, space icons/themes saved with live favicon previews |
-| Never lose anything | Session snapshot/restore, history + bookmarks mirrored into Places with favicons, downloads manager with PDF viewer, importers for Chromium, Firefox and Zen |
-| Fast by default | Tab sleeping policy, instant first paint (271 ms reveal gate), incremental `--faster` rebuilds |
+| 🧭 Shell | Custom window frame, vertical tab strip with pinned tabs, folders, drag-and-drop and context menus, tab reorder + MRU + duplicate + switch-to-open, split view with layout persistence, hover peek cards, DOM fullscreen stage |
+| 🔍 Omnibox | Ranked suggestions, local search engines (Google default), private-window aware |
+| 🪟 Spaces | Separate lives via containers + profiles, tab groups, per-window isolated models, space icons/themes saved with live favicon previews |
+| 💾 Never lose anything | Session snapshot/restore, history + bookmarks mirrored into Places with favicons, downloads manager with PDF viewer, importers for Chromium, Firefox and Zen |
+| ⚡ Fast by default | Tab sleeping policy, instant first paint (271 ms reveal gate), incremental `--faster` rebuilds |
 
 ![Browsing in Astra](assets/readme/browsing.png)
 
-### Privacy built into the walls
+### 🛡️ Privacy built into the walls
 
 | Area | What you get |
 |---|---|
-| Blocker | In-tree ad/tracker blocking (Super Adblock 482/482), cosmetic filtering + click-to-hide, fingerprinting protection, tracker query + referrer trimming, email pixel stripping, per-site shield |
-| Passkeys | Linux platform authenticator built in — create and sign in with resident-key credentials, Astra PIN sheet, encrypted vault (AES-256 + PBKDF2-600k), private-window safe |
-| Isolation | No accounts, no sync, no telemetry; private windows persist nothing; per-site permissions with Astra's own prompts (geo, camera, mic); 15 verified policies, audited network endpoints |
+| 🛡️ Blocker | In-tree ad/tracker blocking (Super Adblock 482/482), cosmetic filtering + click-to-hide, fingerprinting protection, tracker query + referrer trimming, email pixel stripping, per-site shield |
+| 🔑 Passkeys | Linux platform authenticator built in — create and sign in with resident-key credentials, Astra PIN sheet, encrypted vault (AES-256 + PBKDF2-600k), private-window safe |
+| 🔒 Isolation | No accounts, no sync, no telemetry; private windows persist nothing; per-site permissions with Astra's own prompts (geo, camera, mic); 15 verified policies, audited network endpoints |
 
-### A browser that works around you
+### ✨ A browser that works around you
 
 | Area | What you get |
 |---|---|
-| Tasks and notes | Task lists with priorities and natural-language parsing, Markdown notes with watcher, per-site time tracking with focus mode, JSON/Markdown export |
-| Media | Now-playing pop-out, picture-in-picture, per-site media controls |
-| Extensions | Manager with curated gallery, manifest adaptation (MV3 worker → event page, sidebar → sidebar action), 55-package corpus support |
-| Craft | Full keymap with customizable shortcuts, command palette, welcome/onboarding flow, Astra-owned context menus, light/dark themes that reach page content, loading skeletons, accessibility pass |
+| ✅ Tasks and notes | Task lists with priorities and natural-language parsing, Markdown notes with watcher, per-site time tracking with focus mode, JSON/Markdown export |
+| 🎬 Media | Now-playing pop-out, picture-in-picture, per-site media controls |
+| 🧩 Extensions | Firefox Add-ons **and** Chrome Web Store packages install side by side — CRX3 signature-verified, manifests auto-adapted (MV3 workers become event pages) — with a curated 45-extension gallery |
+| ⌨️ Craft | Full keymap with customizable shortcuts, command palette, welcome/onboarding flow, Astra-owned context menus, light/dark themes that reach page content, loading skeletons, accessibility pass |
 
 > In the lab, off by default: agent Work surfaces, the Ask Astra AI assistant
 > (local + BYO providers, skills, memory, MCP tools) and account sync exist
@@ -119,7 +119,7 @@ products for all of them.
 | Fingerprinting resistance | Built-in (FPP + overrides) | FPP optional | Minimal | Built-in |
 | Passkeys on Linux | Built-in platform authenticator | Via OS/desktop | Via OS/desktop | Via OS/desktop |
 | Telemetry / account | None exists | Opt-out / optional | Account-tied | Optional, crypto-adjacent |
-| Extension ecosystem | Firefox-compatible, adapted | Full AMO | Full Web Store | Full Web Store |
+| Extension ecosystem | Firefox Add-ons + Chrome Web Store | Full AMO | Full Web Store | Full Web Store |
 | Sync | Not yet (out of scope) | Yes | Yes | Yes |
 | Status | Beta, verified per-surface | Stable | Stable | Stable |
 
