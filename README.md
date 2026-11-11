@@ -1,7 +1,7 @@
 # Astra
 
 <p align="center">
-  <img src="branding/assets/astra-lockup-stacked.svg" alt="Astra" width="220" />
+  <img src="assets/readme/astra-logo-on-white.svg" alt="Astra" width="280" />
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
   <a href="https://gitlab.com/kyoiske/astra">Repository</a>
 </p>
 
-![Astra shell](tests/golden/baseline/shell-dark.png)
+![Astra new tab](assets/readme/new-tab.png)
 
 ## What is Astra?
 
@@ -65,18 +65,45 @@ renders.
 Everything below works in the running browser and is covered by contract tests
 plus live Marionette probes against the packaged dev build.
 
+### A new tab worth opening
+
+A greeting that knows the time of day, a live clock, your focus streak, today's
+tasks and how many trackers died trying — on a sky that shifts with the hour.
+No news feed, no sponsored tiles, no noise.
+
+### Browse your way
+
 | Area | What you get |
 |---|---|
-| 🧭 Shell | Custom window frame, tab strip with reorder/MRU/duplicate/switch-to-open, address bar, sidebar, dock, split view, peek |
-| 🛡️ Blocker | In-tree ad/tracker blocking (Super Adblock 482/482), cosmetic filtering, fingerprinting protection, tracker query + referrer stripping, email pixel stripping, per-site shield |
-| 🔑 Passkeys | Linux platform authenticator built in — create and sign in with resident-key credentials, Astra PIN sheet, encrypted vault (AES-256 + PBKDF2-600k), private-window safe |
-| 🪟 Spaces | Separate lives via containers + profiles, tab groups, per-window isolated models |
-| 🕘 Continuity | Session snapshot/restore, history mirrored into Places, downloads, bookmarks, notes, tasks, time tracking, media pop-out + now playing |
-| 🧩 Extensions | Manifest adaptation (MV3 worker → event page, sidebar → sidebar_action), 55-package corpus support |
-| 🔒 Privacy | No accounts, no sync, no telemetry; strict normal/private isolation; per-site permissions with Astra's own prompts (geo, camera, mic) |
-| ⌨️ Craft | Full keymap with customizable shortcuts, command palette, responsive light/dark themes |
+| Shell | Custom window frame, vertical tab strip with pinned tabs, folders, drag-and-drop and context menus, tab reorder + MRU + duplicate + switch-to-open, split view with layout persistence, hover peek cards, DOM fullscreen stage |
+| Omnibox | Ranked suggestions, local search engines (Google default), private-window aware |
+| Spaces | Separate lives via containers + profiles, tab groups, per-window isolated models, space icons/themes saved with live favicon previews |
+| Never lose anything | Session snapshot/restore, history + bookmarks mirrored into Places with favicons, downloads manager with PDF viewer, importers for Chromium, Firefox and Zen |
+| Fast by default | Tab sleeping policy, instant first paint (271 ms reveal gate), incremental `--faster` rebuilds |
 
-![Astra new tab](tests/golden/baseline/newtab-dark.png)
+![Browsing in Astra](assets/readme/browsing.png)
+
+### Privacy built into the walls
+
+| Area | What you get |
+|---|---|
+| Blocker | In-tree ad/tracker blocking (Super Adblock 482/482), cosmetic filtering + click-to-hide, fingerprinting protection, tracker query + referrer trimming, email pixel stripping, per-site shield |
+| Passkeys | Linux platform authenticator built in — create and sign in with resident-key credentials, Astra PIN sheet, encrypted vault (AES-256 + PBKDF2-600k), private-window safe |
+| Isolation | No accounts, no sync, no telemetry; private windows persist nothing; per-site permissions with Astra's own prompts (geo, camera, mic); 15 verified policies, audited network endpoints |
+
+### A browser that works around you
+
+| Area | What you get |
+|---|---|
+| Tasks and notes | Task lists with priorities and natural-language parsing, Markdown notes with watcher, per-site time tracking with focus mode, JSON/Markdown export |
+| Media | Now-playing pop-out, picture-in-picture, per-site media controls |
+| Extensions | Manager with curated gallery, manifest adaptation (MV3 worker → event page, sidebar → sidebar action), 55-package corpus support |
+| Craft | Full keymap with customizable shortcuts, command palette, welcome/onboarding flow, Astra-owned context menus, light/dark themes that reach page content, loading skeletons, accessibility pass |
+
+> In the lab, off by default: agent Work surfaces, the Ask Astra AI assistant
+> (local + BYO providers, skills, memory, MCP tools) and account sync exist
+> behind build flags. They ship off in Beta 1 until each surface passes the
+> same live verification as everything above.
 
 ## How Astra compares
 
