@@ -1,0 +1,37 @@
+# Astra alpha package — openSUSE (Leap 15.6+, Tumbleweed).
+name: "astra"
+arch: "amd64"
+platform: "linux"
+version: "0.1.745"
+release: "0.1.alpha1"
+maintainer: "Astra"
+description: |-
+  Astra web browser (alpha channel).
+  Full product build: ad/tracker blocking, spaces, split view, PiP, notes,
+  extensions and the Astra interface. Work is off in this build (Beta 1 rule).
+  Profile lives in ~/.mozilla/astra (override with ASTRA_PROFILE).
+vendor: "Astra"
+license: "MPL-2.0"
+depends:
+  - gtk3
+  - dbus-1
+  - alsa
+  - libXcomposite1
+  - libXdamage1
+  - libXfixes3
+  - libXrandr2
+  - mesa-libgbm
+  - pango
+  - cairo
+  - fontconfig
+  - liberation-fonts
+  - pipewire-pulseaudio
+contents:
+  - src: out/distro-payload
+    dst: /
+    type: tree
+scripts:
+  postinstall: tools/distro-packages/scripts/postinstall.sh
+  postremove: tools/distro-packages/scripts/postremove.sh
+rpm:
+  summary: "Astra web browser (alpha channel)"

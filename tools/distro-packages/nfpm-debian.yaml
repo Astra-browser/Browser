@@ -1,0 +1,37 @@
+# Astra alpha package — Debian family (Debian 12+, Ubuntu 22.04/24.04, Mint, Pop!_OS).
+name: "astra"
+arch: "amd64"
+platform: "linux"
+version: "0.1.745-alpha1"
+section: "web"
+priority: "optional"
+maintainer: "Astra"
+description: |-
+  Astra web browser (alpha channel).
+  Full product build: ad/tracker blocking, spaces, split view, PiP, notes,
+  extensions and the Astra interface. Work is off in this build (Beta 1 rule).
+  Profile lives in ~/.mozilla/astra (override with ASTRA_PROFILE).
+vendor: "Astra"
+license: "MPL-2.0"
+depends:
+  - libgtk-3-0
+  - libdbus-1-3
+  - libasound2
+  - libxcomposite1
+  - libxdamage1
+  - libxfixes3
+  - libxrandr2
+  - libgbm1
+  - libpango-1.0-0
+  - libcairo2
+  - libfontconfig1
+  - fonts-liberation
+recommends:
+  - pipewire-pulse
+contents:
+  - src: out/distro-payload
+    dst: /
+    type: tree
+scripts:
+  postinstall: tools/distro-packages/scripts/postinstall.sh
+  postremove: tools/distro-packages/scripts/postremove.sh

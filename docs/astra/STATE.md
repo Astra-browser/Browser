@@ -11,6 +11,25 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner release: alpha 0.1.745 distro packages (2026-11-11)
+
+Owner override of the SCOPE packaging exclusion (P8+): alpha channel ships now
+for all four supported families, built rootless with `nfpm` 2.48 from the one
+staged 0.1.745 build (`tools/package-alpha.sh`, configs in
+`tools/distro-packages/`). Same bits everywhere; only deps/hooks differ.
+
+| Artifact | Family | Verified |
+|---|---|---|
+| `release/astra_0.1.745~alpha1_amd64.deb` | Debian/Ubuntu/Mint/Pop | control (Version, 12 Depends, Recommends), symlink + desktop + icons + AppArmor in data, extracted `firefox --version` 153.6.0esr via launcher and binary |
+| `release/astra-0.1.745-0.1.alpha1-fedora.x86_64.rpm` | Fedora/RHEL/Rocky/Alma | header (13 Requires), postin/postun, byte-exact extract incl. symlink |
+| `release/astra-0.1.745-0.1.alpha1-opensuse.x86_64.rpm` | openSUSE Leap/Tumbleweed | header (13 suse Requires), postin/postun, byte-exact extract incl. symlink |
+| `release/astra-0.1.745.alpha1-1-x86_64.pkg.tar.zst` | Arch/CachyOS/Manjaro | `pacman -Qip` clean, new-format `.PKGINFO` (`pkgver` carries release), `.MTREE`+`.INSTALL` |
+| `release/Astra-0.1.745-linux-x86_64.tar.xz` | portable fallback | pre-existing staged tarball, `sha256sum -c SHA256SUMS` 5/5 |
+
+`release/` (556 MB) is committed for the manual release handoff; `release/README-alpha.md`
+holds the install matrix. Not installed system-wide here (no sudo) — install
+paths are layout-verified from extracted trees, not live-installed.
+
 ## Owner report: passkeys on Linux — Astra's platform authenticator (2026-11-11)
 
 **Surface:** a person can create a passkey on a site and sign in with it, with

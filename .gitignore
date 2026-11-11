@@ -67,3 +67,8 @@ ui_inspiration/
 # the 14 static files from ui/app/public stay tracked, hashed build output does not)
 /overlay/astra/chrome/app/assets/
 /overlay/astra/chrome/app/browser-chrome.html
+
+# Alpha release bundles (large, machine-local; assembled for manual upload).
+# Only the build notes stay tracked.
+/release/*
+!/release/README-alpha.md
