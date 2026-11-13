@@ -438,9 +438,16 @@ fn render_branding(root: &Path) -> Result<(), String> {
 
 // Render config/mozconfig.<os> into out/mozconfig.<os> (P1-T02).
 // Substitutes @ASTRA_*@ placeholders from branding/astra.toml.
+// Windows is a scaffold: the template mirrors linux and carries explicit
+// TODO(windows-port) markers for flags still unverified on a real toolchain.
 fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
-    if os != "linux" {
-        return Err(format!("os {os}: only linux yet (windows P9, macos P10)"));
+    match os {
+        "linux" | "windows" => {}
+        _ => {
+            return Err(format!(
+                "os {os}: only linux|windows yet (macos P10)"
+            ));
+        }
     }
     let template_path = root.join(format!("config/mozconfig.{os}"));
     if !template_path.exists() {
@@ -1759,7 +1766,7 @@ fn cmd_test(root: &Path, mode: &str) -> Result<(), String> {
 
 fn usage() -> ! {
     eprintln!(
-        "usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>"
+        "usage: astra-forge <fetch|doctor|config [--os linux|windows] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>"
     );
     std::process::exit(2);
 }
