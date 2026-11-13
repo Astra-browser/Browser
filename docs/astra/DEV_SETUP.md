@@ -144,6 +144,20 @@ hashed bundle and the app boots to "app frame timed out".
 
 ## Drive the running browser (Marionette)
 
+Repo Python scripts (`tools/state-check.py`, `tools/contract-runner/run.py`,
+`tools/marionette-probe/*.py`, `tools/perf/**/*.py`) are stdlib-only. Shell
+entry points (`setup.sh`, `tools/bootstrap.sh`, `tools/package-release.sh`,
+`tools/blocker-wiring-check.sh`, `tools/perf/full-suite.sh`) resolve the
+interpreter via `tools/venv-python.sh`: `$ROOT/.venv` when present
+(`.venv/bin/python` on Linux, `.venv/Scripts/python.exe` on Windows
+Git-Bash), else system `python3`/`python`. Create it with
+`python -m venv .venv`, then activate for direct probe runs:
+
+```sh
+source .venv/bin/activate          # Linux
+.\.venv\Scripts\Activate.ps1       # Windows PowerShell
+```
+
 Playwright cannot attach to this build (it needs `-juggler-pipe`; our ESR
 build does not speak it). Use the in-tree harnesses:
 

@@ -8,6 +8,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 ROOT="$PWD"
+# Repo venv python when present (.venv/bin/python on Linux,
+# .venv/Scripts/python.exe on Windows Git-Bash), else system python3/python.
+PYTHON="$(bash "$ROOT/tools/venv-python.sh" 2>/dev/null || true)"
+[ -n "$PYTHON" ] || PYTHON="python3"
 fail=0
 skip=0
 
@@ -116,7 +120,7 @@ for entry in "${PROBES[@]}"; do
   name="${entry%%:*}"
   path="${entry#*:}"
   start=$SECONDS
-  ASTRA_METADATA_AUTODETECT=1 timeout 420 tools/perf/hidden-display.sh python3 "$path" \
+  ASTRA_METADATA_AUTODETECT=1 timeout 420 tools/perf/hidden-display.sh "$PYTHON" "$path" \
     >"/tmp/full-$name.json" 2>"/tmp/full-$name.err"
   rc=$?
   if [ "$rc" -eq 2 ]; then
@@ -132,13 +136,13 @@ done
 
 if [ "$skip_perf" -eq 0 ]; then
   echo "== performance benches"
-  if ! python3 tools/perf/run_all.py --runs 1 --out "$ROOT/out/perf-full-suite" 2>&1 | tee /tmp/full-perf.log | tail -12; then
+  if ! "$PYTHON" tools/perf/run_all.py --runs 1 --out "$ROOT/out/perf-full-suite" 2>&1 | tee /tmp/full-perf.log | tail -12; then
     echo "WARN performance benches reported a failure (see /tmp/full-perf.log)"
   fi
 fi
 
 echo "== lint/state"
-python3 tools/state-check.py || fail=1
+"$PYTHON" tools/state-check.py || fail=1
 bash tools/brand-lint.sh || fail=1
 
 if [ "$fail" -ne 0 ]; then

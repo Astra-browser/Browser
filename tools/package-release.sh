@@ -19,6 +19,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo venv python when present (.venv/bin/python on Linux,
+# .venv/Scripts/python.exe on Windows Git-Bash), else system python3/python.
+PYTHON="$(bash "$ROOT/tools/venv-python.sh" 2>/dev/null || true)"
+[ -n "$PYTHON" ] || PYTHON="python3"
 FORGE="$ROOT/forge/astra-forge/target/release/astra-forge"
 if [ ! -x "$FORGE" ]; then
   FORGE="$ROOT/forge/astra-forge/target/debug/astra-forge"
@@ -56,7 +60,7 @@ fi
 }
 
 echo "== packaging manifest fixes"
-python3 - "$ROOT" <<'PY'
+"$PYTHON" - "$ROOT" <<'PY'
 import sys
 from pathlib import Path
 
