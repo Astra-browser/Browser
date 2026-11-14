@@ -261,7 +261,7 @@ def _windows_for_pid(pid, title_hint="Astra"):
             "caption": bool(style & 0x00C00000),
             "title": text,
             "ours": owner.value == pid,
-            "browser": image.lower() == "firefox.exe",
+            "browser": image.lower() in ("firefox.exe", "astra.exe"),
             "hinted": bool(title_hint) and title_hint.lower() in text.lower(),
         })
         return True

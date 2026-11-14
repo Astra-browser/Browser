@@ -1,0 +1,39 @@
+Patch-Id: ASTRA-0018
+Title: Paint the Astra ground on the browser window before the first stylesheet
+Tier: P2
+Upstream-Files: browser/base/content/browser.xhtml
+Intent: The Windows window is created before the chrome stylesheets apply and paints the platform default white. Astra's ground is part of the window element itself, so the first XUL paint is already the product colour.
+Risk: low (a root inline background; the theme and page surfaces still paint over it)
+Test: forge lint, forge import --check; startup capture shows no white frame between the pre-XUL skeleton and the first Astra frame
+Verified-On: 153.6.0
+Removal-Plan: none anticipated
+---
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index 661a815519..06bf547b63 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -6,6 +6,7 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ <html id="main-window"
++        style="background-color:#1c1b22"
+         xmlns:html="http://www.w3.org/1999/xhtml"
+         xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+         xmlns="http://www.w3.org/1999/xhtml"
+@@ -136,6 +137,16 @@
+ 
+ #include navigator-toolbox.inc.xhtml
+ 
++<!-- ASTRA-0002: Astra shell mount (P1-T08). The Svelte UI in #astra-root is
++   the only visible chrome; Firefox toolbox/tabbox hidden by shell-chrome.css.
++   resource:// URLs: proven to load in chrome context (chrome:// content
++   fetch is unreliable in this build config); html: prefixes because the
++   document default namespace is XUL. -->
++<html:link rel="stylesheet" href="resource://astra/shell-chrome.css"/>
++<html:link rel="stylesheet" href="resource://astra/shell/shell.css"/>
++<html:div id="astra-root"/>
++<html:script type="module" src="resource://astra/shell/shell.mjs"/>
++
+ #include browser-box.inc.xhtml
+ 
+   <html:template id="customizationPanel">

@@ -269,8 +269,8 @@
   {#if !IS_MAC}
     <Dividers />
   {/if}
-  {#if !IS_MAC && !IS_WINDOWS}
-    <WindowControlsOverlay />
+  {#if !IS_MAC}
+    <WindowControlsOverlay always={IS_WINDOWS} />
   {/if}
 </div>
 {#if webext.review() !== null}
