@@ -1493,8 +1493,32 @@ fn cmd_import(root: &Path, check_only: bool, os: &str) -> Result<(), String> {
     // own crates can block vendoring while our deps are fine (P4-T02);
     // the build fails fast with a missing-crate error if anything needed
     // is actually absent.
-    {
-        use std::process::Command;
+    let vendor = if os == "windows" {
+        let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
+        if !shell.exists() {
+            Err("C:\\mozilla-build\\start-shell.bat absent".to_string())
+        } else {
+            let mozconfig = env::var("MOZCONFIG")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| root.join("out/mozconfig.windows"));
+            let script = format!(
+                "cd {} && export MOZCONFIG={} && ./mach vendor rust --ignore-modified",
+                to_msys_path(&engine),
+                to_msys_path(&mozconfig)
+            );
+            Command::new("cmd")
+                .args([
+                    "/C",
+                    "C:\\mozilla-build\\start-shell.bat",
+                    "-no-start",
+                    "-defterm",
+                    "-c",
+                ])
+                .arg(script)
+                .output()
+                .map_err(|e| format!("spawn MozillaBuild: {e}"))
+        }
+    } else {
         let mut cmd = Command::new("./mach");
         cmd.args(["vendor", "rust", "--ignore-modified"])
             .current_dir(&engine);
@@ -1504,18 +1528,19 @@ fn cmd_import(root: &Path, check_only: bool, os: &str) -> Result<(), String> {
                 cmd.env("MOZCONFIG", &rendered);
             }
         }
-        match cmd.output().map_err(|e| format!("spawn mach: {e}")) {
-            Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
-            Ok(o) => println!(
-                "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
-                String::from_utf8_lossy(&o.stderr)
-                    .trim()
-                    .lines()
-                    .last()
-                    .unwrap_or("")
-            ),
-            Err(e) => println!("import: WARNING vendor skipped ({e})"),
-        }
+        cmd.output().map_err(|e| format!("spawn mach: {e}"))
+    };
+    match vendor {
+        Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
+        Ok(o) => println!(
+            "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
+            String::from_utf8_lossy(&o.stderr)
+                .trim()
+                .lines()
+                .last()
+                .unwrap_or("")
+        ),
+        Err(e) => println!("import: WARNING vendor skipped ({e})"),
     }
     println!(
         "import: done ({} patch(es), health in out/patch-health.json)",
