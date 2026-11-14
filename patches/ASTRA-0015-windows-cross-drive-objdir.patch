@@ -1,0 +1,91 @@
+Patch-Id: ASTRA-0015
+Title: Keep Windows build tooling usable when the objdir is on another drive
+Tier: P2
+Upstream-Files: python/mozbuild/mozbuild/backend/visualstudio.py, gfx/layers/d3d11/genshaders.py
+Intent: the supported Windows layout keeps the source on E: and the objdir on D:. Two build-time helpers call os.path.relpath between those trees: the Visual Studio backend (topsrcdir versus topobjdir) and the D3D11 shader generator (shader source under topsrcdir versus the objdir cwd). Both raise ValueError across drives and abort `mach configure` / the first build. Emit an absolute MSYS path for the VS backend and an absolute Windows path for fxc; same-drive output is unchanged.
+Risk: low (the new branches only run on the cross-drive ValueError that previously aborted the build; same-drive relative paths are byte-identical)
+Test: `forge lint`; `mach configure` with topsrcdir E: and objdir D: (junction) completes and writes msvc/mach.bat plus msvc/mach.ps1; `mach build --jobs 2` passes the D3D11 shader-generation step; Linux same-drive path unaffected
+Verified-On: 153.6.0
+Removal-Plan: drop when upstream handles a cross-drive objdir itself; re-check with `git -C engine diff FETCH_HEAD -- python/mozbuild/mozbuild/backend/visualstudio.py gfx/layers/d3d11/genshaders.py`
+---
+diff --git a/python/mozbuild/mozbuild/backend/visualstudio.py b/python/mozbuild/mozbuild/backend/visualstudio.py
+index c7907b52aa..0a6cc4a31b 100644
+--- a/python/mozbuild/mozbuild/backend/visualstudio.py
++++ b/python/mozbuild/mozbuild/backend/visualstudio.py
+@@ -500,9 +500,16 @@ class VisualStudioBackend(CommonBackend):
+         for k, v in self._relevant_environment_variables():
+             fh.write(b'$env:%s = "%s"\r\n' % (k.encode("utf-8"), v.encode("utf-8")))
+ 
+-        relpath = os.path.relpath(
+-            self.environment.topsrcdir, self.environment.topobjdir
+-        ).replace("\\", "/")
++        try:
++            relpath = os.path.relpath(
++                self.environment.topsrcdir, self.environment.topobjdir
++            )
++        except ValueError:
++            # Source and object directories are on different Windows drives.
++            # MSYS accepts an absolute /<drive>/... path in that case.
++            drive, tail = os.path.splitdrive(self.environment.topsrcdir)
++            relpath = "/%s%s" % (drive[0].lower(), tail)
++        relpath = relpath.replace("\\", "/")
+ 
+         fh.write(
+             b'$bashargs = "%s/mach", "--log-no-times"\r\n' % relpath.encode("utf-8")
+@@ -539,9 +546,16 @@ class VisualStudioBackend(CommonBackend):
+         # We need to convert Windows-native paths to msys paths. Easiest way is
+         # relative paths, since munging c:\ to /c/ is slightly more
+         # complicated.
+-        relpath = os.path.relpath(
+-            self.environment.topsrcdir, self.environment.topobjdir
+-        ).replace("\\", "/")
++        try:
++            relpath = os.path.relpath(
++                self.environment.topsrcdir, self.environment.topobjdir
++            )
++        except ValueError:
++            # Source and object directories are on different Windows drives.
++            # MSYS accepts an absolute /<drive>/... path in that case.
++            drive, tail = os.path.splitdrive(self.environment.topsrcdir)
++            relpath = "/%s%s" % (drive[0].lower(), tail)
++        relpath = relpath.replace("\\", "/")
+ 
+         if (Path(os.environ["MOZILLABUILD"]) / "msys2").exists():
+             bash_path = rb"msys2\usr\bin\bash"
+diff --git a/gfx/layers/d3d11/genshaders.py b/gfx/layers/d3d11/genshaders.py
+index be7705db1e..67bac4098e 100644
+--- a/gfx/layers/d3d11/genshaders.py
++++ b/gfx/layers/d3d11/genshaders.py
+@@ -72,6 +72,14 @@ def process_manifest(output_fp, manifest_filename):
+     return deps
+ 
+ 
++def _rel_or_abs(path):
++    try:
++        return os.path.relpath(path)
++    except ValueError:
++        # Source and object directories are on different Windows drives.
++        return os.path.abspath(path)
++
++
+ def run_fxc(shader_model, shader_file, shader_name, output_fp):
+     fxc_location = buildconfig.substs["FXC"]
+ 
+@@ -79,7 +87,7 @@ def run_fxc(shader_model, shader_file, shader_name, output_fp):
+         fxc_location,
+         "-nologo",
+         f"-T{shader_model}",
+-        os.path.relpath(shader_file),
++        _rel_or_abs(shader_file),
+         f"-E{shader_name}",
+         f"-Vn{shader_name}",
+         "-Vi",
+@@ -100,7 +108,7 @@ def run_fxc(shader_model, shader_file, shader_name, output_fp):
+ 
+     deps = None
+     with ScopedTempFilename() as temp_filename:
+-        argv += [f"-Fh{os.path.relpath(temp_filename)}"]
++        argv += [f"-Fh{_rel_or_abs(temp_filename)}"]
+ 
+         sys.stdout.write("{}\n".format(" ".join(argv)))
+         sys.stdout.flush()

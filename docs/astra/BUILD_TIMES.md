@@ -55,3 +55,24 @@ Mozconfig: `out/mozconfig.linux` (unofficial branding) + `--enable-release`,
 - `forge build [--faster] [--jobs N]` (defaults MOZCONFIG/SCCACHE_DIR when unset)
 - `forge doctor` (flags vs pinned source) · `forge lint` (patch headers)
 - Watch a build: `tail -n 20 out/build-p1t04.log`
+
+## Windows 11 x64 baseline (W0, started 2026-11-14)
+
+Machine: 16 threads · 31.7 GiB RAM · source `E:\Astra`, objdir
+`D:\astra-build\obj-astra-windows` exposed through the
+`E:\Astra\engine\obj-astra-windows` junction. Toolchain: MozillaBuild 4.2.1,
+VS2022 17.14 + MSVC 14.44 + SDK 10.0.26100 + ATL/MFC, clang-cl 23.1.5, GNU
+make 4.4.1, NASM 3.02, cbindgen 0.29.4, sccache 0.19.0.
+Mozconfig: local `out/mozconfig.windows.local` (unofficial branding,
+`--enable-release`, `--with-ccache=sccache`, `--jobs 2`; baseline only uses
+`--without-wasm-sandboxed-libraries` until a WASI sysroot is installed).
+
+| Step | Result |
+|---|---|
+| `mach configure` | PASS, 37 s; RecursiveMake + FasterMake + VisualStudio + Clangd backends written |
+| first `mach build --jobs 2` | stopped after 25 s at `gfx/layers/d3d11/genshaders.py` cross-drive `os.path.relpath`; fixed in ASTRA-0015 |
+| resumed build | started 2026-11-14 07:00; result pending |
+
+Warnings already known: `dxcompiler.dll` missing (WebGPU disabled), WASI
+sandboxed libraries disabled in the baseline config. Both must be resolved
+before a product build is claimed.
