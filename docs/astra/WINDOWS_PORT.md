@@ -131,6 +131,21 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   browser.
 - `mach build faster` after an overlay is **10-13 s**.
 
+### Headed visual probe (2026-11-14)
+
+`tools/marionette-probe/headed-probe.py` is OS-aware now: it picks
+`engine/obj-astra-windows/dist/bin/firefox.exe` on Windows, launches a visible
+window, waits for the app frame, and captures the real top-level window through
+Win32 `PrintWindow` (GDI, stdlib only) in addition to Marionette's own
+screenshot. Linux keeps the Hyprland `grim` path and the
+`obj-astra-linux` default; `--binary`, `--port` and `--keep-open` are explicit.
+
+Live run on the Windows build: **10/10 PASS**. `appReady=host`, shell relay 132
+messages with no error, frame 1266x853, sidebar 240x837, address field and tab
+row present, zero real console errors; capture 1600x1075 at 125% DPI
+(2201 colours, 31.6% locally varied pixels). Evidence in
+`out/headed-windows/` (`window.png`, `shot.png`, `snap.json`).
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
