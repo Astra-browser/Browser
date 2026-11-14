@@ -98,8 +98,14 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
 - The baseline mozconfig uses `--without-wasm-sandboxed-libraries` because the
   pinned tree's WASI sysroot is not installed yet. **A product build must not
   use this line**; W0.4/W1 must add a WASI sysroot and remove it.
-- `dxcompiler.dll` is not present, so configure warns that WebGPU is disabled.
-  Add the SDK's DXC redistributable before claiming WebGPU support.
+- `dxcompiler.dll` is not picked up by `bootstrap_path`, so configure warns that
+  WebGPU is disabled. The DLL exists in the installed SDK at
+  `C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxcompiler.dll`;
+  staging the `dxc-x86_64-pc-windows-msvc` toolchain (or a reviewed equivalent)
+  is required before claiming WebGPU support.
+- The WASI sysroot is staged at `D:\astra-build\wasi\wasi-sysroot` (20.0).
+  Product builds set `WASI_SYSROOT` and remove the baseline-only
+  `--without-wasm-sandboxed-libraries` line.
 
 ## What remains UNVERIFIED (intentionally left for later)
 
