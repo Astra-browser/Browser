@@ -1,8 +1,13 @@
-# Windows engine-build port (scaffold, UNVERIFIED)
+# Windows engine-build port
 
-Status: scaffold only. No Windows Firefox build has been attempted in this
-repo. Linux remains the only verified path. Everything below is additive;
-Linux behaviour is byte-identical when `--os linux` is used.
+Status: **W0 toolchain verified; first native build in progress (2026-11-14).**
+MozillaBuild, the VS2022 C++/ATL/MFC components, clang-cl, NASM, GNU make,
+cbindgen, the Windows App SDK 2.2 redistributable and the `windows` 0.62.2 crate
+source are staged. `mach configure` completes with the objdir on `D:`.
+Linux remains the reference platform; every Windows-only change is additive or
+guarded by `--os windows` / `cfg(windows)`.
+
+> Plan and owner decisions: `docs/astra/WINDOWS_MASTER_PLAN.md` (D-51).
 
 ## Prerequisites (to install, not yet verified here)
 
@@ -29,6 +34,60 @@ Template: `config/mozconfig.windows` (mirrors `config/mozconfig.linux`
 with `TODO(windows-port)` markers for every flag that still needs
 confirmation on a real Windows toolchain: objdir name, backgroundtasks,
 sccache, sandbox/crashreporter/updater defaults).
+
+## W0 verified toolchain (2026-11-14)
+
+| Tool | Version / path |
+|---|---|
+| Windows | 11 Home Single Language, build 26300, x64 |
+| Visual Studio | Community 17.14.45, MSVC 14.44.35207, Windows SDK 10.0.26100 |
+| ATL/MFC | `Microsoft.VisualStudio.Component.VC.ATLMFC` + `VC.ATL`, installed 2026-11-14 |
+| clang-cl | LLVM 23.1.5 at `C:\Program Files\LLVM\bin\clang-cl.exe` |
+| MozillaBuild | 4.2.1 at `C:\mozilla-build` (MSYS2 `msys2/usr/bin`) |
+| GNU make | 4.4.1 (winget `ezwinports.make`; MozillaBuild 4.2.1 does not bundle it) |
+| Python | 3.12.10 (MozillaBuild `C:\mozilla-build\python3`) |
+| NASM | 3.02 at `C:\tools\nasm` |
+| cbindgen | 0.29.4 (`cargo install cbindgen --locked`) |
+| sccache | 0.19.0, cache at `D:\astra-build\sccache` |
+| Windows App SDK | 2.2.0 redistributable, SHA-256 pinned by the tree; DLLs staged at `D:\astra-build\windowsappsdk\winappsdk-x86_64-pc-windows-msvc` |
+| `windows` crate | 0.62.2 source at `D:\astra-build\windows-rs\windows-0.62.2` |
+| Defender exclusions | `C:\mozilla-build`, `E:\Astra`, `D:\astra-build`, `C:\Users\Rem\.mozbuild` |
+| Git | `core.longpaths=true`, repo/engine `core.autocrlf=false`, `*.patch` pinned to LF |
+
+### Configure recipe (verified)
+
+`mach configure` must run inside MozillaBuild so its MSYS `sh`, `make`, `perl`
+and Python are on PATH. The objdir lives on `D:`. Because the source is on `E:`,
+the objdir is exposed as an `E:` junction
+(`E:\Astra\engine\obj-astra-windows` -> `D:\astra-build\obj-astra-windows`) and
+`patches/ASTRA-0015-windows-cross-drive-objdir.patch` makes the Visual Studio
+backend emit an absolute MSYS path when `os.path.relpath` crosses drives.
+
+Environment used:
+
+```sh
+export PATH="/c/Users/Rem/AppData/Local/Microsoft/WinGet/Packages/ezwinports.make_Microsoft.Winget.Source_8wekyb3d8bbwe/bin:/c/Program Files/LLVM/bin:/c/tools/nasm:$PATH"
+export MOZCONFIG=/e/Astra/out/mozconfig.windows.local
+export SCCACHE_DIR=/d/astra-build/sccache
+export MOZ_WINDOWS_APP_SDK_DIR=/d/astra-build/windowsappsdk/winappsdk-x86_64-pc-windows-msvc
+export MOZ_WINDOWS_RS_DIR=/d/astra-build/windows-rs/windows-0.62.2
+cd /e/Astra/engine && ./mach configure
+```
+
+Result: `Configure complete!` after 37 s. The generated backends are
+`RecursiveMake`, `FasterMake`, `VisualStudio` and `Clangd`; the VS solution is
+written under the D: objdir.
+
+### Baseline build state
+
+- First unpatched baseline build started **2026-11-14 06:54** with
+  `./mach build --jobs 2` (the standing OOM rule). Result is recorded in
+  `docs/astra/BUILD_TIMES.md` when it completes.
+- The baseline mozconfig uses `--without-wasm-sandboxed-libraries` because the
+  pinned tree's WASI sysroot is not installed yet. **A product build must not
+  use this line**; W0.4/W1 must add a WASI sysroot and remove it.
+- `dxcompiler.dll` is not present, so configure warns that WebGPU is disabled.
+  Add the SDK's DXC redistributable before claiming WebGPU support.
 
 ## What remains UNVERIFIED (intentionally left for later)
 
