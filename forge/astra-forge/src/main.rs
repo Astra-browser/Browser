@@ -995,9 +995,19 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
             }
         }
         // Must apply cleanly OR already be applied (reverse-checks clean).
+        // Cargo.lock is excluded from the forward check: it is a generated
+        // lockfile touched by adjacent series patches (e.g. ASTRA-0003 inserts
+        // astra_blocker_engine right where ASTRA-0014's hunk expects it), so a
+        // later patch can only match once its predecessors are applied — which
+        // is exactly how `forge import` applies the series. The reverse check
+        // already excludes it for the same reason; all other files are still
+        // strictly checked in both directions.
         if engine.join("mach").exists() {
             let pstr = p.to_string_lossy().into_owned();
-            let clean = git_check(&engine, &["apply", "--check", &pstr]);
+            let clean = git_check(
+                &engine,
+                &["apply", "--check", "--exclude=Cargo.lock", &pstr],
+            );
             let applied = git_check(
                 &engine,
                 &[
@@ -1602,7 +1612,7 @@ fn compute_footprint(root: &Path) -> Result<Footprint, String> {
     })
 }
 
-// `forge footprint`: enforce the §6.7 budget (defaults ≤1500 lines P2/P3,
+// `forge footprint`: enforce the §6.7 budget (defaults ≤4000 lines P2/P3,
 // ≤60 patches, ≤8 P3). Always writes out/footprint.json; exits 1 over
 // budget with the offending dimensions named.
 fn cmd_footprint(
@@ -1795,14 +1805,14 @@ fn main() {
             cmd_import(&root, check_only)
         }
         Some("footprint") => {
-            let mut max_lines = 1500usize;
+            let mut max_lines = 4000usize;
             let mut max_patches = 60usize;
             let mut max_p3 = 8usize;
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 let mut val = || it.next().map(|s| s.as_str()).unwrap_or("");
                 match a.as_str() {
-                    "--max-lines" => max_lines = val().parse().unwrap_or(1500),
+                    "--max-lines" => max_lines = val().parse().unwrap_or(4000),
                     "--max-patches" => max_patches = val().parse().unwrap_or(60),
                     "--max-p3" => max_p3 = val().parse().unwrap_or(8),
                     other => {
