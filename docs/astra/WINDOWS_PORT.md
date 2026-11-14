@@ -169,16 +169,16 @@ the `obj-astra-linux` default.
 The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
 `brand-lint` does not scan a duplicate browser tree:
 
-- `Astra-0.1.745-windows-x86_64.zip` - 135,267,806 bytes
-  (`sha256 a295080b9ef6f7af658cba196ec8d9449251ea506fcd73b0099dbc9cd0311e16`).
+- `Astra-0.1.745-windows-x86_64.zip` - 135,270,222 bytes
+  (`sha256 1bb75c336cea38c937101320a94ee90ded5d4126c140d48bbe48b040c5155e69`).
   It carries the full product tree, `astra-core.exe`, `astra.exe` (the engine
   launcher under the product name), `astra.cmd` (profile in `%APPDATA%\Astra`),
   `README.md`, `BUILD.txt` and the overlay files. Extracted on a clean
   directory, `version-probe.py` reports **8/8 PASS** on the extracted
   `astra.exe`; `firefox.exe` stays beside it for compatibility and never
   shares Windows' stock-Firefox application identity.
-- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,043,759 bytes
-  (`sha256 e33300031fa4cd780c1330a25a78ce750f4c661e8651ef7a31a042210e848e0b`),
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,054,787 bytes
+  (`sha256 4c9faf0c6e01ebc8db8020deae6c0cf2dac91e2f5571638a56503ffc9a6a067f`),
   NSIS 3.13, per-user
   (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
   and no machine-wide registry writes. It creates Start Menu and desktop
