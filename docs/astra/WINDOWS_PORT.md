@@ -21,19 +21,25 @@ guarded by `--os windows` / `cfg(windows)`.
 ## New commands
 
 ```sh
-# render the Windows mozconfig scaffold
-cargo run -q -p astra-forge -- config --os windows --branding astra
+# render the Windows mozconfig (objdir defaults to @TOPSRCDIR@/obj-astra-windows)
+cargo run -q -p astra-forge -- config --os windows --branding astra \
+  --objdir E:/Astra/engine/obj-astra-windows
 # output: out/mozconfig.windows
+
+# patch series / overlay / build with the Windows platform selected
+cargo run -q -p astra-forge -- import --os windows
+cargo run -q -p astra-forge -- overlay --os windows
+cargo run -q -p astra-forge -- build --os windows --jobs 2
 
 # linux path unchanged
 cargo run -q -p astra-forge -- config --os linux --branding astra
 # output: out/mozconfig.linux (byte-identical to before)
 ```
 
-Template: `config/mozconfig.windows` (mirrors `config/mozconfig.linux`
-with `TODO(windows-port)` markers for every flag that still needs
-confirmation on a real Windows toolchain: objdir name, backgroundtasks,
-sccache, sandbox/crashreporter/updater defaults).
+Template: `config/mozconfig.windows` mirrors `config/mozconfig.linux`.
+The remaining unverified flags are tracked in the section below; `OS: linux`
+patches (ASTRA-0014) are skipped by `import`/`overlay --os windows`, and
+`OS: windows` patches (ASTRA-0016) are skipped on Linux.
 
 ## W0 verified toolchain (2026-11-14)
 
@@ -78,6 +84,12 @@ Result: `Configure complete!` after 37 s. The generated backends are
 `RecursiveMake`, `FasterMake`, `VisualStudio` and `Clangd`; the VS solution is
 written under the D: objdir.
 
+`forge doctor --os windows` is green: curl, tar, gpg, git, rustc, Python, Bun,
+clang-cl, NASM, sccache, MozillaBuild, make and all 12 Windows mozconfig lines
+pass. `forge import --check --os windows` classifies the 15 patches and skips
+`ASTRA-0014` (`OS: linux`); `ASTRA-0015`/`ASTRA-0016` are the Windows-only
+fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
+
 ### Baseline build state
 
 - First unpatched baseline build started **2026-11-14 06:54** with
@@ -86,8 +98,14 @@ written under the D: objdir.
 - The baseline mozconfig uses `--without-wasm-sandboxed-libraries` because the
   pinned tree's WASI sysroot is not installed yet. **A product build must not
   use this line**; W0.4/W1 must add a WASI sysroot and remove it.
-- `dxcompiler.dll` is not present, so configure warns that WebGPU is disabled.
-  Add the SDK's DXC redistributable before claiming WebGPU support.
+- `dxcompiler.dll` is not picked up by `bootstrap_path`, so configure warns that
+  WebGPU is disabled. The DLL exists in the installed SDK at
+  `C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxcompiler.dll`;
+  staging the `dxc-x86_64-pc-windows-msvc` toolchain (or a reviewed equivalent)
+  is required before claiming WebGPU support.
+- The WASI sysroot is staged at `D:\astra-build\wasi\wasi-sysroot` (20.0).
+  Product builds set `WASI_SYSROOT` and remove the baseline-only
+  `--without-wasm-sandboxed-libraries` line.
 
 ## What remains UNVERIFIED (intentionally left for later)
 
