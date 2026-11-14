@@ -1,4 +1,4 @@
-<script>
+﻿<script>
   import { onDestroy, onMount } from "svelte";
   import Hello from "./Hello.svelte";
   import { loadHost, newRequestId } from "./host.js";
@@ -37,7 +37,7 @@
   // content browser + host relay). The interim mounts stay wired as the
   // fallback: hidden once the app boots in host mode (P3-T16), shown with
   // appError/slotError whenever the app is unavailable. The interim content
-  // slot is NEVER hidden — it is the only web-page surface (the app drives
+  // slot is NEVER hidden â€” it is the only web-page surface (the app drives
   // it through Host navigation events); the titlebar stays for window
   // controls and dragging.
   let appMount;
@@ -52,6 +52,7 @@
   // person sees is the product UI, never the fallback chrome (P3-T21).
   let appBooted = $state(null);
   let appApi = null;
+  let dragEdges = [];
   // The page covers the app frame, so the top-edge strip belongs to the shell
   // while the bar is away. It forwards hover to the app, which owns the bar's
   // own reveal delay.
@@ -83,8 +84,8 @@
   ];
   const TOOLBAR_ACTIONS = [
     { id: "new-tab", label: "+" },
-    { id: "split", label: "◫" },
-    { id: "toggle-fullscreen", label: "⛶" },
+    { id: "split", label: "â—«" },
+    { id: "toggle-fullscreen", label: "â›¶" },
   ];
   const TOOLBAR_LABELS = {
     "new-tab": "New tab",
@@ -114,11 +115,11 @@
 
   /** What the stage names while a page is on its way. */
   function labelFor(url) {
-    if (typeof url !== "string" || url === "" || url === "about:blank") return "Loading…";
+    if (typeof url !== "string" || url === "" || url === "about:blank") return "Loadingâ€¦";
     try {
-      return `Loading ${new URL(url).host}…`;
+      return `Loading ${new URL(url).host}â€¦`;
     } catch {
-      return "Loading…";
+      return "Loadingâ€¦";
     }
   }
 
@@ -225,6 +226,28 @@
     }
     const doc = frameRoot.ownerDocument;
     const win = doc.defaultView ?? null;
+    // A native drag region has to be a XUL box in this chrome document; an
+    // HTML element with the same CSS is ignored by the Windows widget.
+    const dragGeometry = {
+      top: "inset:0 0 auto 0;height:16px",
+      bottom: "inset:auto 0 0 0;height:8px",
+      left: "inset:16px auto 8px 0;width:8px",
+      right: "inset:16px 0 8px auto;width:8px",
+    };
+    for (const [edge, geometry] of Object.entries(dragGeometry)) {
+      const box = doc.createElementNS(
+        "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+        "box",
+      );
+      box.setAttribute(
+        "style",
+        `position:fixed;z-index:200;background:transparent;` +
+          `-moz-window-dragging:drag;${geometry}`,
+      );
+      box.setAttribute("aria-hidden", "true");
+      frameRoot.append(box);
+      dragEdges.push(box);
+    }
     // Bind this exact chrome window to win-1 before any Host API call. A
     // lazy Services/getMostRecentWindow can otherwise bind win-1 to a newly
     // opened window and make fullscreen/close hit the wrong one.
@@ -788,7 +811,7 @@
           snaps.map((t) => ({ id: t.astra_tab_id, title: t.title, url: t.url })),
         );
         const active = snaps.find((t) => t.selected) ?? snaps[0];
-        titlebar.setTitle(active && active.title ? `Astra — ${active.title}` : "Astra");
+        titlebar.setTitle(active && active.title ? `Astra â€” ${active.title}` : "Astra");
       } catch {
         // Window teardown: leave the last painted state.
       }
@@ -887,7 +910,7 @@
       } else if (event.type === "ui-command") {
         // Work, Settings, Tasks, Notes and Time are the app's own pages: the
         // real page surface must get out of their way. This command is only
-        // the first word — the app's `surface` message above is the
+        // the first word â€” the app's `surface` message above is the
         // authority, because choosing a web tab parks the page without
         // emitting a host command at all.
         const command = typeof event.data === "string" ? event.data : "";
@@ -901,8 +924,8 @@
         }
       } else {
         // The stage's two flags (a real page in front, and whether it is still
-        // arriving) are derived in `content/slot-state.js` so every path —
-        // nav.started, nav.committed, a projection with no active tab — agrees.
+        // arriving) are derived in `content/slot-state.js` so every path â€”
+        // nav.started, nav.committed, a projection with no active tab â€” agrees.
         // The projection names the tab in front, so a background tab's
         // navigation cannot take the stage over.
         if (event.type === "items-changed") {
@@ -1219,6 +1242,8 @@
       tabstrip.destroy();
       splitApi.destroy();
       titlebar.destroy();
+      for (const edge of dragEdges) edge.remove();
+      dragEdges = [];
       sidebar.destroy();
       toolbar.destroy();
       mounted?.detach();
@@ -1228,7 +1253,13 @@
   });
 </script>
 
-<div class="astra-shell astra-frame" data-astra-frame="" data-astra-theme="light" data-astra-fullscreen="false" data-app-booted={appBooted === null ? "pending" : appBooted ? "true" : "false"} bind:this={frameRoot}>
+<div class="astra-shell astra-frame" data-astra-frame="" data-astra-theme="dark" data-astra-fullscreen="false" data-app-booted={appBooted === null ? "pending" : appBooted ? "true" : "false"} bind:this={frameRoot}>
+  {#if appBooted === null}
+    <div class="astra-boot" role="status" aria-label="Starting Astra">
+      <span class="astra-boot-mark" aria-hidden="true">astra</span>
+      <span class="astra-boot-line" aria-hidden="true"></span>
+    </div>
+  {/if}
   <div class="astra-titlebar-mount" bind:this={titleMount}></div>
   <div class="astra-toolbar-mount" hidden={appBooted !== false} bind:this={toolMount}></div>
   <div class="astra-frame-body">
@@ -1286,17 +1317,65 @@
 </div>
 
 <style>
+  .astra-boot {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 18px;
+    background: #1c1b22;
+    color: #f4f4f6;
+    font-family: system-ui, sans-serif;
+  }
+  .astra-boot-mark {
+    font-size: 42px;
+    font-weight: 650;
+    letter-spacing: -0.055em;
+  }
+  .astra-boot-line {
+    inline-size: 92px;
+    block-size: 2px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: #ffffff1f;
+  }
+  .astra-boot-line::after {
+    content: "";
+    display: block;
+    inline-size: 38%;
+    block-size: 100%;
+    border-radius: inherit;
+    background: #f4f4f6;
+    animation: astra-boot-sweep 1.1s ease-in-out infinite;
+  }
+  @keyframes astra-boot-sweep {
+    from {
+      translate: -110% 0;
+    }
+    to {
+      translate: 300% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .astra-boot-line::after {
+      animation: none;
+      inline-size: 100%;
+    }
+  }
+
   .astra-shell {
-    /* The shell paints the ground a page is still arriving on, and the
-       skeleton in front of it. The app announces its theme as soon as it
-       mounts; until then the shipped light default is the right guess. */
-    --shell-loading-ground: #f1f1f3;
-    --shell-loading-raised: #fffdf9;
-    --shell-loading-fill: #e8e6e2;
-    --shell-loading-fill-hi: #f7f5f2;
-    --shell-loading-text: #1c1c1f;
-    --shell-loading-border: rgb(24 24 27 / 0.12);
-    --shell-loading-border-strong: rgb(24 24 27 / 0.18);
+    /* The first frame is Astra's own ground, not the system's white. The app
+       announces a light theme once it owns the window; until then the boot
+       splash stays on the product's dark ground. */
+    --shell-loading-ground: #1c1b22;
+    --shell-loading-raised: #2b2a33;
+    --shell-loading-fill: #3a3a44;
+    --shell-loading-fill-hi: #4a4a55;
+    --shell-loading-text: #f4f4f6;
+    --shell-loading-border: rgb(255 255 255 / 0.12);
+    --shell-loading-border-strong: rgb(255 255 255 / 0.18);
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -1305,15 +1384,16 @@
     color: var(--shell-loading-text);
   }
   /* The attribute is set from the app's theme message, so the ancestor is
-     global; a scoped selector here is pruned as unreachable. */
-  :global(.astra-frame[data-astra-theme="dark"]) {
-    --shell-loading-ground: #1c1b22;
-    --shell-loading-raised: #2b2a33;
-    --shell-loading-fill: #3a3a44;
-    --shell-loading-fill-hi: #4a4a55;
-    --shell-loading-text: #f4f4f6;
-    --shell-loading-border: rgb(255 255 255 / 0.12);
-    --shell-loading-border-strong: rgb(255 255 255 / 0.18);
+     global; a scoped selector here is pruned as unreachable. The light
+     palette waits until the app is actually in front. */
+  :global(.astra-frame[data-astra-theme="light"][data-app-booted="true"]) {
+    --shell-loading-ground: #f1f1f3;
+    --shell-loading-raised: #fffdf9;
+    --shell-loading-fill: #e8e6e2;
+    --shell-loading-fill-hi: #f7f5f2;
+    --shell-loading-text: #1c1c1f;
+    --shell-loading-border: rgb(24 24 27 / 0.12);
+    --shell-loading-border-strong: rgb(24 24 27 / 0.18);
   }
   .astra-frame-body {
     flex: 1 1 auto;
@@ -1368,7 +1448,7 @@
   :global(.astra-toolbar[hidden]) {
     display: none;
   }
-  /* P3-T20: once the app owns the window it *is* the chrome — the interim
+  /* P3-T20: once the app owns the window it *is* the chrome â€” the interim
      titlebar/toolbar/sidebar/split/diagnostic strip must not claim space, or
      the window shows two nested chromes (and 81px of dead strip). The
      titlebar/toolbar are built by frame.js and replace their mounts, so the
@@ -1397,7 +1477,7 @@
   /* The app fills the window. The content slot is only a surface for real
      pages: empty (no committed page) it takes no space at all; with a page it
      overlays the app's stage, inset by the sidebar width the app publishes
-     (`sidebar_set_width` → `--astra-sidebar-width`). */
+     (`sidebar_set_width` â†’ `--astra-sidebar-width`). */
   .astra-frame[data-app-booted="true"] .astra-content,
   .astra-frame[data-app-booted="pending"] .astra-content {
     position: absolute;

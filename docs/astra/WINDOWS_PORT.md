@@ -169,16 +169,16 @@ the `obj-astra-linux` default.
 The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
 `brand-lint` does not scan a duplicate browser tree:
 
-- `Astra-0.1.745-windows-x86_64.zip` - 135,270,222 bytes
-  (`sha256 1bb75c336cea38c937101320a94ee90ded5d4126c140d48bbe48b040c5155e69`).
+- `Astra-0.1.745-windows-x86_64.zip` - 135,269,929 bytes
+  (`sha256 0523d75658a085d7c4daaf89ff42ad8180955fec57f65b472ca3b22e424d4264`).
   It carries the full product tree, `astra-core.exe`, `astra.exe` (the engine
   launcher under the product name), `astra.cmd` (profile in `%APPDATA%\Astra`),
   `README.md`, `BUILD.txt` and the overlay files. Extracted on a clean
   directory, `version-probe.py` reports **8/8 PASS** on the extracted
   `astra.exe`; `firefox.exe` stays beside it for compatibility and never
   shares Windows' stock-Firefox application identity.
-- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,054,787 bytes
-  (`sha256 4c9faf0c6e01ebc8db8020deae6c0cf2dac91e2f5571638a56503ffc9a6a067f`),
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,048,959 bytes
+  (`sha256 a8febfd385c822aa8e7c9cf18b805d44ff9bd48f0beb1890961f5c18bb937c51`),
   NSIS 3.13, per-user
   (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
   and no machine-wide registry writes. It creates Start Menu and desktop
@@ -227,6 +227,34 @@ accepted with `--settings`.
 imports now use `pathToFileURL(...).href`, so **63 of 64** contract suites pass
 on Windows. The remaining `sidecar_spike.mjs` needs the separate
 `out/sidecar-stub` binary it always required; it is not a Windows regression.
+
+### Window frame, first paint and capture helper (2026-11-15)
+
+The installed build had no Windows caption controls and no effective drag
+region: the shell titlebar is retired when the app owns the window, the app's
+`WindowControlsOverlay` was excluded on Windows, and `-moz-window-dragging` on
+HTML elements in the shell document is ignored by the Windows widget.
+
+| Surface | What changed | Evidence |
+|---|---|---|
+| Caption controls | `WindowControlsOverlay` renders on Windows and stays visible (`always`); the top offset clears the drag strip | live `frame-probe.py`: 3 controls at `y=16`, 26x26 each |
+| Window drag | four **XUL** `box` edges are created in the shell document with inline `-moz-window-dragging: drag`; HTML elements do not create a region | `WM_NCHITTEST` on the installed window: `HTCAPTION` (2) at `y=8..15`, `HTCLIENT` from `y=16` |
+| Control actions | maximize/restore through the existing `Frame.dispatchWindowControl` seam | live clicks: `window.windowState` 3 -> 1 -> 3 |
+| First frame | `ASTRA-0017` flattens the pre-XUL Firefox skeleton to the Astra ground; `ASTRA-0018` puts the ground on the window element; `ASTRA-0019` clears a new Windows window to `#1c1b22`; the shell shows an Astra boot mark until the app announces ready | installed startup capture: dark ground at 1.28 s, boot mark 1.69-2.59 s, UI at 2.99 s; no Firefox toolbar silhouette and no white frame |
+
+`tools/windows/frame-probe.py` is the live frame check (controls, drag edges,
+geometry, optional drag). `tools/windows/window-shot.py` is the window-only
+capture helper: it finds the Astra top-level window and copies it with Win32
+`PrintWindow`, never the desktop, and never raises or focuses it. Use
+`--list` or `--count N --interval S` for a frame sequence.
+
+**Verification:** `bun run --filter @astra/frame typecheck` 0 errors/0
+warnings, `lint`, `stylelint` and `format:check` clean; `node --test
+ui/shell/src` 76/76; shell/content-slot contracts PASS; `forge lint` 19/19 and
+`import --check` clean; footprint 3,989 P2/P3 lines (budget 4,000). The full UI
+unit run is 1,249/1,252 with one known Windows timezone failure in
+`notes/tests/sections.test.ts` (pre-existing, listed in §4.4 of the master
+plan).
 
 ### sccache (verified 2026-11-14)
 

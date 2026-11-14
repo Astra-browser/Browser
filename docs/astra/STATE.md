@@ -26,6 +26,7 @@ probes. Task rows are added here when each task starts.
 | W1 surface probes | `win/w1-surface-probes` | platform build selection for blocker/tabs/settings probes; tabs reads `gBrowser.selectedBrowser` | blocker 21/21, tabs PASS, settings-native 50/50 on Windows |
 | W4 package/installer | `win/w4-portable-installer` | `package-windows.ps1` portable zip + NSIS per-user setup; `installer-test.ps1`; ships `astra.exe` as the product launcher | zip extracts and version-probes 8/8; installer 31/31 including live probe and clean uninstall |
 | W3 system routes | `win/w3-system-windows` | real Windows default-browser, login-item, SmartScreen-policy and diagnostics routes; General/Privacy rows wired; contract imports are file URLs on Windows | system_model 120/120, wire 51/51, live system-probe 15/15; 63/64 contract suites pass on Windows |
+| W1 window frame | `fix/windows-window-frame` | visible Windows caption controls, XUL window-drag edges, Astra boot mark and dark first paint; window-only capture helper | frame-probe 7/7, `WM_NCHITTEST` HTCAPTION at top gutter, controls 3→1→3, startup dark at 1.28 s / UI 2.99 s |
 
 ## Owner release: alpha 0.1.745 distro packages (2026-11-11)
 

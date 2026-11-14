@@ -896,6 +896,7 @@
       role="toolbar"
       tabindex="-1"
       aria-label={m.ui_navigation()}
+      data-drag-region
       data-hidden={!barVisible}
       data-mode={barMode}
       bind:this={barElement}
