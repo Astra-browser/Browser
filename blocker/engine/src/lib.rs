@@ -350,14 +350,15 @@ fn install_rules(rules: &str) -> InstallReport {
     };
 
     if rules.trim().is_empty() {
-        return with_slot(|slot| report(false, "empty_rules", slot))
-            .unwrap_or_else(|| InstallReport {
+        return with_slot(|slot| report(false, "empty_rules", slot)).unwrap_or_else(|| {
+            InstallReport {
                 ok: false,
                 failure: "main_thread_required".into(),
                 rules: 0,
                 resources: 0,
                 adblock: ADBLOCK_VERSION,
-            });
+            }
+        });
     }
 
     let outcome = catch_unwind(AssertUnwindSafe(|| {
@@ -384,14 +385,15 @@ fn install_rules(rules: &str) -> InstallReport {
             resources: 0,
             adblock: ADBLOCK_VERSION,
         }),
-        Err(_) => with_slot(|slot| report(false, "compile_panic", slot))
-            .unwrap_or_else(|| InstallReport {
+        Err(_) => with_slot(|slot| report(false, "compile_panic", slot)).unwrap_or_else(|| {
+            InstallReport {
                 ok: false,
                 failure: "compile_panic".into(),
                 rules: 0,
                 resources: 0,
                 adblock: ADBLOCK_VERSION,
-            }),
+            }
+        }),
     }
 }
 
@@ -443,13 +445,7 @@ fn clear() {
 
 /// The single native decision point used by both the channel hook and the
 /// management service (classifyHost/classifyBounce). Always fail-open.
-fn decide(
-    url: &str,
-    source_url: &str,
-    request_type: &str,
-    flags: u32,
-    record: bool,
-) -> Verdict {
+fn decide(url: &str, source_url: &str, request_type: &str, flags: u32, record: bool) -> Verdict {
     if record {
         record_decision();
     }
@@ -769,16 +765,19 @@ fn classify_host(host: &str) -> ClassifyView {
 // libresolv is not on libxul's link line on every build configuration, so the
 // CNAME fallback resolves `res_query` at runtime from the system library. The
 // handle is opened once and kept for the process lifetime.
-type ResQueryFn =
-    unsafe extern "C" fn(*const c_char, c_int, c_int, *mut c_uchar, c_int) -> c_int;
+#[cfg(target_os = "linux")]
+type ResQueryFn = unsafe extern "C" fn(*const c_char, c_int, c_int, *mut c_uchar, c_int) -> c_int;
 
+#[cfg(target_os = "linux")]
 static RES_QUERY: OnceLock<Option<ResQueryFn>> = OnceLock::new();
 
+#[cfg(target_os = "linux")]
 extern "C" {
     fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
 }
 
+#[cfg(target_os = "linux")]
 fn res_query_fn() -> Option<ResQueryFn> {
     *RES_QUERY.get_or_init(|| unsafe {
         let name = CString::new("libresolv.so.2").ok()?;
@@ -797,6 +796,7 @@ fn res_query_fn() -> Option<ResQueryFn> {
 const DNS_C_IN: c_int = 1;
 const DNS_T_CNAME: c_int = 5;
 
+#[cfg(target_os = "linux")]
 fn dns_read_name(buf: &[u8], start: usize) -> Option<(String, usize)> {
     let mut labels: Vec<String> = Vec::new();
     let mut offset = start;
@@ -840,6 +840,7 @@ fn dns_read_name(buf: &[u8], start: usize) -> Option<(String, usize)> {
 }
 
 /// Every CNAME target in a DNS answer, in response order.
+#[cfg(target_os = "linux")]
 fn cname_targets(host: &str) -> Vec<String> {
     let key = normalize_host(host);
     if key.is_empty() {
@@ -904,6 +905,94 @@ fn cname_targets(host: &str) -> Vec<String> {
     targets
 }
 
+/// Windows DNS record layout for `DnsQuery_W` (CNAME records only).
+#[cfg(windows)]
+#[repr(C)]
+struct DnsRecordW {
+    p_next: *mut DnsRecordW,
+    p_name: *mut u16,
+    w_type: u16,
+    w_data_length: u16,
+    flags: u32,
+    dw_ttl: u32,
+    dw_reserved: u32,
+    /// `DNS_RECORDW::Data.CnameName` for a CNAME record.
+    data: *mut u16,
+}
+
+#[cfg(windows)]
+#[link(name = "dnsapi")]
+extern "system" {
+    fn DnsQuery_W(
+        psz_name: *const u16,
+        w_type: u16,
+        options: u32,
+        p_extra: *mut c_void,
+        pp_query_results: *mut *mut DnsRecordW,
+        p_reserved: *mut *mut c_void,
+    ) -> i32;
+    fn DnsRecordListFree(p_record_list: *mut DnsRecordW, free_type: u32);
+}
+
+#[cfg(windows)]
+unsafe fn dns_pwstr_to_string(ptr: *const u16) -> String {
+    let mut len = 0usize;
+    while *ptr.add(len) != 0 {
+        len += 1;
+    }
+    String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len))
+}
+
+/// Windows twin of the Linux `res_query` path: `DnsQuery_W` returns the CNAME
+/// record list directly, so no DNS wire parsing or POSIX `dlopen` is needed.
+#[cfg(windows)]
+fn cname_targets(host: &str) -> Vec<String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    const DNS_TYPE_CNAME: u16 = 5;
+    const DNS_QUERY_STANDARD: u32 = 0;
+    const DNS_FREE_RECORD_LIST: u32 = 0;
+
+    let key = normalize_host(host);
+    if key.is_empty() {
+        return vec![];
+    }
+    let name: Vec<u16> = std::ffi::OsStr::new(&key)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let mut records: *mut DnsRecordW = std::ptr::null_mut();
+    let status = unsafe {
+        DnsQuery_W(
+            name.as_ptr(),
+            DNS_TYPE_CNAME,
+            DNS_QUERY_STANDARD,
+            std::ptr::null_mut(),
+            &mut records,
+            std::ptr::null_mut(),
+        )
+    };
+    if status != 0 || records.is_null() {
+        return vec![];
+    }
+    let mut targets = Vec::new();
+    let mut current = records;
+    while !current.is_null() {
+        let record = unsafe { &*current };
+        if record.w_type == DNS_TYPE_CNAME && !record.data.is_null() {
+            let target = normalize_host(&unsafe { dns_pwstr_to_string(record.data) });
+            if !target.is_empty() && target != key {
+                targets.push(target);
+            }
+        }
+        current = record.p_next;
+    }
+    unsafe { DnsRecordListFree(records, DNS_FREE_RECORD_LIST) };
+    targets.sort();
+    targets.dedup();
+    targets
+}
+
 #[derive(Serialize)]
 struct CnameView {
     host: String,
@@ -916,7 +1005,6 @@ fn cname_view(host: &str) -> CnameView {
         chain: cname_targets(host),
     }
 }
-
 
 #[derive(Serialize)]
 struct CosmeticView {
@@ -1108,10 +1196,7 @@ pub extern "C" fn astra_blocker_set_site_enabled(
 }
 
 #[no_mangle]
-pub extern "C" fn astra_blocker_is_site_enabled(
-    host: *const c_char,
-    host_len: usize,
-) -> bool {
+pub extern "C" fn astra_blocker_is_site_enabled(host: *const c_char, host_len: usize) -> bool {
     site_policy(&read_str(host, host_len)).enabled
 }
 
@@ -1149,7 +1234,10 @@ pub extern "C" fn astra_blocker_set_site_policy(
 }
 
 #[no_mangle]
-pub extern "C" fn astra_blocker_site_policy_json(host: *const c_char, host_len: usize) -> *mut c_char {
+pub extern "C" fn astra_blocker_site_policy_json(
+    host: *const c_char,
+    host_len: usize,
+) -> *mut c_char {
     let key = normalize_host(&read_str(host, host_len));
     let policy = site_policy(&key);
     #[derive(Serialize)]
@@ -1252,10 +1340,7 @@ pub extern "C" fn astra_blocker_classify_bounce_json(
 }
 
 #[no_mangle]
-pub extern "C" fn astra_blocker_cname_json(
-    host: *const c_char,
-    host_len: usize,
-) -> *mut c_char {
+pub extern "C" fn astra_blocker_cname_json(host: *const c_char, host_len: usize) -> *mut c_char {
     json_ptr(&cname_view(&read_str(host, host_len)))
 }
 
