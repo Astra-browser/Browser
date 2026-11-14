@@ -165,15 +165,19 @@ the `obj-astra-linux` default.
 ### Windows package and per-user installer (2026-11-14)
 
 `tools/package-windows.ps1` builds the portable archive from a finished
-`engine/obj-astra-windows/dist/bin` without rebuilding or mutating `engine/`:
+`engine/obj-astra-windows/dist/bin` without rebuilding or mutating `engine/`.
+The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
+`brand-lint` does not scan a duplicate browser tree:
 
-- `Astra-0.1.745-windows-x86_64.zip` — 134,817,635 bytes
-  (`sha256 115f71ec1ef0408538fc167ff35ea3c8c94e95402317c2265e86c606d89cb7f3`).
+- `Astra-0.1.745-windows-x86_64.zip` - 134,817,640 bytes
+  (`sha256 7845323998c4e96f210ddcc4a78c20df07f9bef1c20f0aa1a2919902a875dfd8`).
   It carries the full product tree, `astra-core.exe`, `astra.cmd` (profile in
   `%APPDATA%\Astra`), `README.md`, `BUILD.txt` and the overlay files. Extracted
   on a clean directory, `version-probe.py` reports **8/8 PASS** on the
   extracted `firefox.exe`.
-- `Astra-0.1.745-windows-x86_64-setup.exe` — NSIS 3.13, per-user
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,041,102 bytes
+  (`sha256 254376333b48c181353f630b49310a7eebb500705935cfbc91ed7183a88538b6`),
+  NSIS 3.13, per-user
   (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
   and no machine-wide registry writes. It creates Start Menu and desktop
   shortcuts, an uninstaller, an install record, an Astra ProgId for HTML and
