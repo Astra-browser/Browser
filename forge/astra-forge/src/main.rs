@@ -268,26 +268,52 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_doctor(root: &Path) -> Result<(), String> {
+fn cmd_doctor(root: &Path, os: &str) -> Result<(), String> {
     let mut ok = true;
-    for (prog, why) in [
+    let python = if os == "windows" { "python" } else { "python3" };
+    let mut tools: Vec<(&str, &str)> = vec![
         ("curl", "downloads"),
         ("tar", "extraction"),
         ("gpg", "signatures"),
         ("git", "patch baseline"),
         ("rustc", "forge itself"),
-        ("python3", "state-check"),
+        (python, "state-check"),
         ("bun", "UI workspace (P3)"),
-    ] {
-        match run(prog, &["--version"], root) {
+    ];
+    if os == "windows" {
+        tools.extend([
+            ("clang-cl", "target C/C++ compiler"),
+            ("nasm", "assembly"),
+            ("sccache", "compiler cache"),
+        ]);
+    }
+    for (prog, why) in tools {
+        let version_arg = if prog == "nasm" { "-v" } else { "--version" };
+        match run(prog, &[version_arg], root) {
             Ok(first) => println!(
-                "doctor: {prog:8} OK ({}) — {why}",
+                "doctor: {prog:10} OK ({}) — {why}",
                 first.lines().next().unwrap_or("")
             ),
             Err(e) => {
-                println!("doctor: {prog:8} MISSING ({e}) — {why}");
+                println!("doctor: {prog:10} MISSING ({e}) — {why}");
                 ok = false;
             }
+        }
+    }
+    if os == "windows" {
+        let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
+        if shell.exists() {
+            println!("doctor: MozillaBuild OK ({})", shell.display());
+        } else {
+            println!("doctor: MozillaBuild MISSING (C:\\mozilla-build\\start-shell.bat)");
+            ok = false;
+        }
+        let make = Path::new("C:\\mozilla-build\\msys2\\usr\\bin\\make.exe");
+        if make.exists() {
+            println!("doctor: make OK ({})", make.display());
+        } else {
+            println!("doctor: make MISSING (install ezwinports.make into MozillaBuild)");
+            ok = false;
         }
     }
     let up = read_upstream(root);
@@ -300,7 +326,7 @@ fn cmd_doctor(root: &Path) -> Result<(), String> {
             }
         }
     }
-    if let Err(e) = cmd_doctor_mozconfig(root) {
+    if let Err(e) = cmd_doctor_mozconfig(root, os) {
         println!("doctor: mozconfig: {e}");
         ok = false;
     }
@@ -328,32 +354,29 @@ fn configure_files(engine: &Path) -> Vec<String> {
 }
 
 fn configure_has(engine: &Path, needle: &str) -> bool {
-    let files = configure_files(engine);
-    let mut cmd = Command::new("grep");
-    cmd.args(["-rq", "--", needle]);
-    for f in &files {
-        cmd.arg(f);
-    }
-    match cmd.output() {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
-    }
+    configure_files(engine).iter().any(|f| {
+        fs::read_to_string(f)
+            .map(|text| text.contains(needle))
+            .unwrap_or(false)
+    })
 }
 
-// Validate config/mozconfig.linux flags against the pinned source (P1-T02).
-fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
-    let template = root.join("config/mozconfig.linux");
+// Validate config/mozconfig.<os> flags against the pinned source (P1-T02).
+fn cmd_doctor_mozconfig(root: &Path, os: &str) -> Result<(), String> {
+    let template = root.join(format!("config/mozconfig.{os}"));
     if !template.exists() {
-        return Err("config/mozconfig.linux missing".into());
+        return Err(format!("config/mozconfig.{os} missing"));
     }
     let engine = root.join("engine");
     if !engine.join("toolkit/moz.configure").exists() {
         return Err("engine/ source absent (run `forge fetch` first)".into());
     }
-    // The template carries one placeholder in --with-branding; only the
-    // option *name* is validated, so substitute a dummy value first.
+    // The template carries placeholders in --with-branding and the objdir;
+    // only the option *name* is validated, so substitute dummy values first.
     let text = fs::read_to_string(&template).map_err(|e| e.to_string())?;
-    let text = text.replace("@ASTRA_BRANDING_DIR@", "astra/branding");
+    let text = text
+        .replace("@ASTRA_BRANDING_DIR@", "astra/branding")
+        .replace("@ASTRA_OBJDIR@", "@TOPSRCDIR@/obj-astra-test");
     let mut checked = 0;
     let mut bad: Vec<String> = Vec::new();
     for raw in text.lines() {
@@ -1928,7 +1951,20 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let res = match args.first().map(|s| s.as_str()) {
         Some("fetch") => cmd_fetch(&root),
-        Some("doctor") => cmd_doctor(&root),
+        Some("doctor") => {
+            let mut os = host_os();
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
+                    other => {
+                        eprintln!("astra-forge: error: unknown doctor flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_doctor(&root, os)
+        }
         Some("overlay") => {
             let mut os = host_os();
             let mut it = args.iter().skip(1);

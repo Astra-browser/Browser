@@ -84,6 +84,12 @@ Result: `Configure complete!` after 37 s. The generated backends are
 `RecursiveMake`, `FasterMake`, `VisualStudio` and `Clangd`; the VS solution is
 written under the D: objdir.
 
+`forge doctor --os windows` is green: curl, tar, gpg, git, rustc, Python, Bun,
+clang-cl, NASM, sccache, MozillaBuild, make and all 12 Windows mozconfig lines
+pass. `forge import --check --os windows` classifies the 15 patches and skips
+`ASTRA-0014` (`OS: linux`); `ASTRA-0015`/`ASTRA-0016` are the Windows-only
+fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
+
 ### Baseline build state
 
 - First unpatched baseline build started **2026-11-14 06:54** with
