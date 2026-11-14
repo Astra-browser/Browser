@@ -93,9 +93,13 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
 
 ### Baseline build state
 
-- First unpatched baseline build started **2026-11-14 06:54** with
-  `./mach build --jobs 2` (the standing OOM rule). Result is recorded in
-  `docs/astra/BUILD_TIMES.md` when it completes.
+- **PASS 2026-11-14 10:35**: unpatched baseline `firefox.exe` (779,264 bytes)
+  and `xul.dll` (180,012,544 bytes); `firefox.exe --version` reports
+  `Mozilla Firefox 153.6.0esr`. The final run used `-j20`, wall time 48:49
+  (2928 s). Full history and sccache numbers: `docs/astra/BUILD_TIMES.md`.
+- The path to that build required three Windows fixes: cross-drive objdir
+  (`ASTRA-0015`), NSPR clang-23 casts (`ASTRA-0016`), and NASM 2.16.03 instead
+  of 3.02 for libvpx.
 - The baseline mozconfig uses `--without-wasm-sandboxed-libraries` because the
   pinned tree's WASI sysroot is not installed yet. **A product build must not
   use this line**; W0.4/W1 must add a WASI sysroot and remove it.
