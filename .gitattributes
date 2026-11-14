@@ -3,6 +3,7 @@
 *.sh text eol=lf
 *.py text eol=lf
 *.patch text eol=lf
+*.rs text eol=lf
 
 # NOTE: Unix exec bits (100755) are stored in the git index, not in this file
 # (gitattributes has no exec-bit directive). On Windows (no exec bit),
