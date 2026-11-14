@@ -1850,7 +1850,8 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
         script.push_str(&format!(
             "export MOZCONFIG={} && export SCCACHE_DIR={} && \
              export SCCACHE_LOG=warn && export SCCACHE_ERROR_LOG={} && \
-             export SCCACHE_IDLE_TIMEOUT=0; sccache --start-server >/dev/null 2>&1 || true; ",
+             export SCCACHE_IDLE_TIMEOUT=0; \
+             sccache --show-stats >/dev/null 2>&1 || sccache --start-server >/dev/null 2>&1 || true; ",
             to_msys_path(&mozconfig),
             to_msys_path(&sccache),
             to_msys_path(&sccache.join("error.log"))
