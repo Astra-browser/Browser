@@ -1821,10 +1821,14 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
             "export PATH=\"/c/Program Files/LLVM/bin:{}:$PATH\" && ",
             to_msys_path(Path::new(&nasm_dir))
         );
+        let _ = fs::create_dir_all(&sccache);
         script.push_str(&format!(
-            "export MOZCONFIG={} && export SCCACHE_DIR={} && ",
+            "export MOZCONFIG={} && export SCCACHE_DIR={} && \
+             export SCCACHE_LOG=warn && export SCCACHE_ERROR_LOG={} && \
+             export SCCACHE_IDLE_TIMEOUT=0; sccache --start-server >/dev/null 2>&1 || true; ",
             to_msys_path(&mozconfig),
-            to_msys_path(&sccache)
+            to_msys_path(&sccache),
+            to_msys_path(&sccache.join("error.log"))
         ));
         for key in ["MOZ_WINDOWS_APP_SDK_DIR", "MOZ_WINDOWS_RS_DIR"] {
             if let Ok(value) = std::env::var(key) {
