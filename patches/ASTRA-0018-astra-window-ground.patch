@@ -20,20 +20,3 @@ index 661a815519..06bf547b63 100644
          xmlns:html="http://www.w3.org/1999/xhtml"
          xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
          xmlns="http://www.w3.org/1999/xhtml"
-@@ -136,6 +137,16 @@
- 
- #include navigator-toolbox.inc.xhtml
- 
-+<!-- ASTRA-0002: Astra shell mount (P1-T08). The Svelte UI in #astra-root is
-+   the only visible chrome; Firefox toolbox/tabbox hidden by shell-chrome.css.
-+   resource:// URLs: proven to load in chrome context (chrome:// content
-+   fetch is unreliable in this build config); html: prefixes because the
-+   document default namespace is XUL. -->
-+<html:link rel="stylesheet" href="resource://astra/shell-chrome.css"/>
-+<html:link rel="stylesheet" href="resource://astra/shell/shell.css"/>
-+<html:div id="astra-root"/>
-+<html:script type="module" src="resource://astra/shell/shell.mjs"/>
-+
- #include browser-box.inc.xhtml
- 
-   <html:template id="customizationPanel">
