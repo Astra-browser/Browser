@@ -44,6 +44,17 @@ It runs `engine/obj-astra-linux/dist/bin/firefox` with `-no-remote` and a
 profile in `out/dev-profile`, and prints the build command if the binary is
 missing.
 
+Windows uses the sibling PowerShell launcher (the Linux script is unchanged):
+
+```powershell
+.\tools\run-dev.ps1              # reuse out\dev-profile
+.\tools\run-dev.ps1 -Fresh       # empty profile
+.\tools\run-dev.ps1 -- -new-window
+```
+
+It runs `engine\obj-astra-windows\dist\bin\firefox.exe` and prints the
+`forge build --os windows --jobs 2` command if the binary is missing.
+
 ## Versioning the dev/alpha build
 
 Astra's own version lives in `branding/astra.toml`; the Firefox pin in
