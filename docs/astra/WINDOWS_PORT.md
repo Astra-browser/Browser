@@ -129,6 +129,21 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   build-tree stop also killed the server. Do not `taskkill /T` the sccache
   server; `forge build` now starts it detached and keeps it idle-alive.
 
+### Dev Rust LTO (thin)
+
+The first patched `gkrust` with fat LTO crashed at 97:43 with
+`0xC0000409` (STATUS_STACK_BUFFER_OVERRUN) after reaching ~11.6 GB. Dev builds
+use thin LTO instead:
+
+```powershell
+.\tools\windows\thin-lto.ps1            # dev: -Clto=thin
+.\tools\windows\thin-lto.ps1 -Revert    # release: -Clto (fat)
+```
+
+The helper edits only `engine/config/makefiles/rust.mk`. `forge fetch` replaces
+the engine tree, so re-run it after a fetch. Thin LTO shortens the `gkrust`
+link and keeps its peak near 6 GB; release builds must stay on fat LTO.
+
 ## What remains UNVERIFIED (intentionally left for later)
 
 See the blocker list in the port report; summary:
