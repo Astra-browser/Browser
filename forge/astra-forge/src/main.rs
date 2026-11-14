@@ -301,6 +301,15 @@ fn cmd_doctor(root: &Path, os: &str) -> Result<(), String> {
         }
     }
     if os == "windows" {
+        if let Ok(version) = run("nasm", &["-v"], root) {
+            if version.contains("NASM version 3.") {
+                println!(
+                    "doctor: nasm 3.x crashes the pinned libvpx assembly; set ASTRA_NASM_DIR to a NASM 2.16.x directory ({})",
+                    version.lines().next().unwrap_or("")
+                );
+                ok = false;
+            }
+        }
         let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
         if shell.exists() {
             println!("doctor: MozillaBuild OK ({})", shell.display());
@@ -1807,8 +1816,11 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
                 "build: C:\\mozilla-build\\start-shell.bat absent (install MozillaBuild)".into(),
             );
         }
-        let mut script =
-            String::from("export PATH=\"/c/Program Files/LLVM/bin:/c/tools/nasm:$PATH\" && ");
+        let nasm_dir = std::env::var("ASTRA_NASM_DIR").unwrap_or_else(|_| "C:\\tools\\nasm".into());
+        let mut script = format!(
+            "export PATH=\"/c/Program Files/LLVM/bin:{}:$PATH\" && ",
+            to_msys_path(Path::new(&nasm_dir))
+        );
         script.push_str(&format!(
             "export MOZCONFIG={} && export SCCACHE_DIR={} && ",
             to_msys_path(&mozconfig),

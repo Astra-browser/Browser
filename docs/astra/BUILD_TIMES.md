@@ -62,7 +62,8 @@ Machine: 16 threads · 31.7 GiB RAM · source `E:\Astra`, objdir
 `D:\astra-build\obj-astra-windows` exposed through the
 `E:\Astra\engine\obj-astra-windows` junction. Toolchain: MozillaBuild 4.2.1,
 VS2022 17.14 + MSVC 14.44 + SDK 10.0.26100 + ATL/MFC, clang-cl 23.1.5, GNU
-make 4.4.1, NASM 3.02, cbindgen 0.29.4, sccache 0.19.0.
+make 4.4.1, NASM 2.16.03 (3.02 crashes libvpx assembly), cbindgen 0.29.4,
+sccache 0.19.0.
 Mozconfig: local `out/mozconfig.windows.local` (unofficial branding,
 `--enable-release`, `--with-ccache=sccache`, `--jobs 2`; baseline only uses
 `--without-wasm-sandboxed-libraries` until a WASI sysroot is installed).
@@ -72,7 +73,9 @@ Mozconfig: local `out/mozconfig.windows.local` (unofficial branding,
 | `mach configure` | PASS, 37 s; RecursiveMake + FasterMake + VisualStudio + Clangd backends written |
 | first `mach build --jobs 2` | stopped after 25 s at `gfx/layers/d3d11/genshaders.py` cross-drive `os.path.relpath`; fixed in ASTRA-0015 |
 | second build | stopped after 4 min 42 s: NSPR `w95sock.c` pointer types under clang 23 (fixed in ASTRA-0016) and an sccache server connection reset (server restarted) |
-| third build | started 2026-11-14 07:10; result pending |
+| third build | reached `gkrust` fat-LTO completion in ~78 min, then stopped on `prsocket.c`/`ntmisc.c`/`w95io.c` NSPR casts; fixed in ASTRA-0016 |
+| fourth build | reached C++ `browser/components` and `media/libvpx`, then NASM 3.02 crashed `dequantize_mmx.asm` with `0xC0000005`; reconfigured with NASM 2.16.03 |
+| fifth build | started 2026-11-14 09:00; result pending |
 
 Warnings already known: `dxcompiler.dll` missing (WebGPU disabled), WASI
 sandboxed libraries disabled in the baseline config. Both must be resolved
