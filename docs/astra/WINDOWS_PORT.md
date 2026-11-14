@@ -131,6 +131,38 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   browser.
 - `mach build faster` after an overlay is **10-13 s**.
 
+### Windows package and per-user installer (2026-11-14)
+
+`tools/package-windows.ps1` builds the portable archive from a finished
+`engine/obj-astra-windows/dist/bin` without rebuilding or mutating `engine/`:
+
+- `Astra-0.1.745-windows-x86_64.zip` — 134,817,635 bytes
+  (`sha256 115f71ec1ef0408538fc167ff35ea3c8c94e95402317c2265e86c606d89cb7f3`).
+  It carries the full product tree, `astra-core.exe`, `astra.cmd` (profile in
+  `%APPDATA%\Astra`), `README.md`, `BUILD.txt` and the overlay files. Extracted
+  on a clean directory, `version-probe.py` reports **8/8 PASS** on the
+  extracted `firefox.exe`.
+- `Astra-0.1.745-windows-x86_64-setup.exe` — NSIS 3.13, per-user
+  (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
+  and no machine-wide registry writes. It creates Start Menu and desktop
+  shortcuts, an uninstaller, an install record, an Astra ProgId for HTML and
+  URL handling, `RegisteredApplications` + `Capabilities` for Windows Default
+  apps, `OpenWithProgids` entries (never a forced default) and an
+  `AppUserModelID` (`Astra.Browser`).
+
+`tools/windows/installer-test.ps1 -Setup ... -RunProbe` installs to a throwaway
+directory, checks the payload, shortcuts, profile directory and registry
+contract, runs the live version probe against the installed binary, then
+silently uninstalls and verifies that files, shortcuts and registry keys are
+gone. Live result: **29/29 PASS** (13 install checks + 8 live probe checks +
+8 uninstall checks).
+
+Limits: the artifacts are unsigned (no Authenticode certificate on this
+machine); Windows owns the default-browser choice, so the installer registers
+Astra and links to `ms-settings:defaultapps` instead of forcing it; the
+installer leaves `%APPDATA%\Astra` intact on uninstall; the updater remains
+off (U-09). NSIS is installed through `winget` (`NSIS.NSIS` 3.13).
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent

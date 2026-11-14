@@ -20,6 +20,12 @@ objdir/caches on `D:\astra-build`, Windows 11 x64, Windows Hello passkeys,
 per-task branches, stock-first RAM budget, Linux paths unchanged, headed live
 probes. Task rows are added here when each task starts.
 
+| Task | Branch | What | Verified |
+|---|---|---|---|
+| W1 visual boot | `win/w1-headed-visual-probe` | OS-aware `headed-probe.py`: visible Windows launch, app-frame/relay/chrome assertions, Win32 `PrintWindow` capture | 10/10 PASS on the packaged Windows build (1600x1075 at 125% DPI) |
+| W1 surface probes | `win/w1-surface-probes` | platform build selection for blocker/tabs/settings probes; tabs reads `gBrowser.selectedBrowser` | blocker 21/21, tabs PASS, settings-native 50/50 on Windows |
+| W4 package/installer | `win/w4-portable-installer` | `package-windows.ps1` portable zip + NSIS per-user setup; `installer-test.ps1` | zip extracts and version-probes 8/8; installer 29/29 including live probe and clean uninstall |
+
 ## Owner release: alpha 0.1.745 distro packages (2026-11-11)
 
 Owner override of the SCOPE packaging exclusion (P8+): alpha channel ships now
