@@ -4,13 +4,18 @@ Usage: python3 tools/marionette-probe/tabs-probe.py <profile-dir> <out-dir>
 """
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
 import time
 
 HOST, PORT = "127.0.0.1", 2828
-FIREFOX = "engine/obj-astra-linux/dist/bin/firefox"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
+BINARY = "firefox.exe" if os.name == "nt" else "firefox"
+FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
+    ROOT, "engine", OBJDIR, "dist", "bin", BINARY)
 APP = "const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;"
 
 
@@ -75,7 +80,7 @@ NEWTAB_SEARCH = js("""
   return 'ok';
 """)
 
-NEWTAB_ROW = js("""
+NEWTAB_ROW = js(r"""
   if (!d) return null;
   const list = d.querySelector('#newtab-search-results');
   return list ? (list.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100) : null;
@@ -98,7 +103,13 @@ NEWTAB_ERROR = js("""
 
 BROWSER = """return JSON.stringify((() => {
   const slot = document.querySelector('[data-astra-content]');
-  const b = document.querySelector('browser[data-astra-browser]');
+  // The selected native tab is the authority; the slot marker only exists on
+  // the Linux slot path. Fall back to the first browser for a plain build.
+  let b = null;
+  try { b = gBrowser?.selectedBrowser; } catch (e) {}
+  if (!b) b = document.querySelector('browser[data-astra-browser]')
+    || document.querySelector('.astra-content browser')
+    || document.querySelector('browser');
   const read = (fn) => { try { return fn(); } catch (e) { return 'ERR'; } };
   return {
     hasPage: slot ? slot.dataset.hasPage ?? null : null,
@@ -147,13 +158,13 @@ class M:
 def main():
     profile, outdir = sys.argv[1], sys.argv[2]
     os.makedirs(outdir, exist_ok=True)
-    subprocess.run(["rm", "-rf", profile], check=True)
+    shutil.rmtree(profile, ignore_errors=True)
     os.makedirs(profile, exist_ok=True)
     log = open(os.path.join(outdir, "stderr.log"), "wb")
     proc = subprocess.Popen(
         [os.path.abspath(FIREFOX), "-profile", os.path.abspath(profile),
          "-no-remote", "-remote-allow-system-access", "--marionette", "about:blank"],
-        cwd=os.path.join(os.getcwd(), "engine/obj-astra-linux/dist/bin"),
+        cwd=os.path.dirname(os.path.abspath(FIREFOX)),
         stdout=log, stderr=subprocess.STDOUT)
     m = None
     for _ in range(60):

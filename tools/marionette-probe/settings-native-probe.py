@@ -21,7 +21,11 @@ import tempfile
 import time
 
 HOST, PORT = "127.0.0.1", 2833
-FIREFOX = os.path.abspath("engine/obj-astra-linux/dist/bin/firefox")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
+BINARY = "firefox.exe" if os.name == "nt" else "firefox"
+FIREFOX = os.path.abspath(os.environ.get("ASTRA_BINARY") or os.path.join(
+    ROOT, "engine", OBJDIR, "dist", "bin", BINARY))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "out/settings-native"
 
 APP = "const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;"
