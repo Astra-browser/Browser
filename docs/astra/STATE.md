@@ -11,6 +11,15 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Windows 11 x64 port (D-51, from 2026-11-14)
+
+Plan: `docs/astra/WINDOWS_MASTER_PLAN.md`. Integration branch `windows-port`;
+every task gets `win/<phase>-<slug>`, merges `--no-ff`, and is pushed to both
+GitLab and GitHub. Locked owner decisions: full native build + all surfaces,
+objdir/caches on `D:\astra-build`, Windows 11 x64, Windows Hello passkeys,
+per-task branches, stock-first RAM budget, Linux paths unchanged, headed live
+probes. Task rows are added here when each task starts.
+
 ## Owner release: alpha 0.1.745 distro packages (2026-11-11)
 
 Owner override of the SCOPE packaging exclusion (P8+): alpha channel ships now
