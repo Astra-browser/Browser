@@ -22,7 +22,8 @@ param(
     [string]$Out = '',
     [string]$Version = '',
     [switch]$Installer,
-    [switch]$SkipZip
+    [switch]$SkipZip,
+    [switch]$KeepStage
 )
 
 $ErrorActionPreference = 'Stop'
@@ -191,9 +192,14 @@ $manifest = [ordered]@{
     git = "$gitBranch@$gitCommit"
     built = (Get-Date).ToUniversalTime().ToString('o')
     dist = $Dist
-    stage = $app
+    stage = if ($KeepStage) { $app } else { $null }
     zip = if ($SkipZip) { $null } else { "$name.zip" }
     installer = if ($Installer) { "$name-setup.exe" } else { $null }
 }
 $manifest | ConvertTo-Json | Set-Content -Path (Join-Path $Out 'windows-package.json') -Encoding UTF8
+if (-not $KeepStage) {
+    # Keep `out/` free of a duplicate 337 MiB browser tree; brand-lint and
+    # accidental packaging of a stale stage both get simpler.
+    Remove-Item $stageRoot -Recurse -Force
+}
 Write-Host "== package $name in $Out"
