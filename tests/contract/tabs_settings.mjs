@@ -19,7 +19,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
@@ -39,13 +39,9 @@ const {
   __startArchiveScheduler,
   __stopArchiveScheduler,
   resolveExternalPosition,
-} = await import(path.join(HOST, "Tabs.sys.mjs"));
-const { Settings, __resetSettingsForTests } = await import(
-  path.join(HOST, "Settings.sys.mjs")
-);
-const { addEventListener, __resetEventsForTests } = await import(
-  path.join(HOST, "Events.sys.mjs")
-);
+} = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const { Settings, __resetSettingsForTests } = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

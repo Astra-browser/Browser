@@ -8,17 +8,13 @@
 //
 // Usage: node tests/contract/dialog_prompts_cert.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const { DialogPrompts, isLocalHost, netErrorReason } = await import(
-  path.join(HOST, "DialogPrompts.sys.mjs"),
-);
-const { Operations, __resetOperationsForTests } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
+const { DialogPrompts, isLocalHost, netErrorReason } = await import(pathToFileURL(path.join(HOST, "DialogPrompts.sys.mjs"),).href);
+const { Operations, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

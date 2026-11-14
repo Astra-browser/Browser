@@ -13,7 +13,7 @@
 // Usage: node tests/contract/media_import_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
@@ -27,7 +27,7 @@ const {
   sniffImage,
   __setMediaImportHooksForTests,
   __resetMediaImportForTests,
-} = await import(path.join(HOST, "MediaImport.sys.mjs"));
+} = await import(pathToFileURL(path.join(HOST, "MediaImport.sys.mjs")).href);
 
 const PROFILE = "01M3CTWDG20GFZPACD7905RSRJ";
 // A 1x1 transparent PNG, valid enough for the byte sniff and dimension check.

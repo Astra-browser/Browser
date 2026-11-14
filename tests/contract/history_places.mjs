@@ -12,7 +12,7 @@
 //
 // Usage: node tests/contract/history_places.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -20,9 +20,7 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { HistoryCall, __setHistoryCallBackend } = await import(
-  path.join(HOST, "HistoryCall.sys.mjs")
-);
+const { HistoryCall, __setHistoryCallBackend } = await import(pathToFileURL(path.join(HOST, "HistoryCall.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

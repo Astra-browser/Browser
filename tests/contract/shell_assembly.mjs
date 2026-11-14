@@ -19,36 +19,24 @@
 import { strict as assert } from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(
   path.dirname(path.dirname(fileURLToPath(import.meta.url))),
 );
 const SHELL_SRC = path.join(ROOT, "ui", "shell", "src", "Shell.svelte");
 
-const Frame = await import(
-  path.join(ROOT, "overlay", "astra", "chrome", "frame", "Frame.sys.mjs")
-);
+const Frame = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "chrome", "frame", "Frame.sys.mjs")).href);
 const {
   createTitlebar,
   createSidebar,
   createToolbar,
-} = await import(path.join(ROOT, "ui", "shell", "src", "frame", "frame.js"));
-const { mountTabStrip } = await import(
-  path.join(ROOT, "ui", "shell", "src", "tabs", "tab-strip.js")
-);
-const { mountSplit } = await import(
-  path.join(ROOT, "ui", "shell", "src", "split", "split.js")
-);
-const { mountUrlBar } = await import(
-  path.join(ROOT, "ui", "shell", "src", "urlbar.js")
-);
-const { Windows, __resetWindowsForTests } = await import(
-  path.join(ROOT, "overlay", "astra", "host", "Windows.sys.mjs")
-);
-const { addEventListener, __resetEventsForTests } = await import(
-  path.join(ROOT, "overlay", "astra", "host", "Events.sys.mjs")
-);
+} = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "frame", "frame.js")).href);
+const { mountTabStrip } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "tabs", "tab-strip.js")).href);
+const { mountSplit } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "split", "split.js")).href);
+const { mountUrlBar } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "urlbar.js")).href);
+const { Windows, __resetWindowsForTests } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Windows.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Events.sys.mjs")).href);
 
 let failures = 0;
 function check(name, cond) {

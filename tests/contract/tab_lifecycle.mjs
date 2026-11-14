@@ -10,11 +10,11 @@
 // Usage: node tests/contract/tab_lifecycle.mjs
 import assert from "node:assert/strict";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const { docshellState, applyBrowserActivation, applyTabActivation, isPictureInPictureSource } =
-  await import(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs"));
+  await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")).href);
 
 let passed = 0;
 function check(name, actual, expected) {

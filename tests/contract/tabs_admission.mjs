@@ -6,13 +6,13 @@
 //
 // Usage: node tests/contract/tabs_admission.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Tabs, __resetTabsForTests, __setCertificateException, __applyExternalUpdate } =
-  await import(path.join(HOST, "Tabs.sys.mjs"));
+  await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

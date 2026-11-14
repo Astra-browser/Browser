@@ -11,19 +11,15 @@
 //
 // Usage: node tests/contract/site_permissions_host.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Permissions, SITE_KINDS, __setSitePermissionsBackend } = await import(
-  path.join(HOST, "Permissions.sys.mjs")
-);
-const { Operations, __resetOperationsForTests } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { Permissions, SITE_KINDS, __setSitePermissionsBackend } = await import(pathToFileURL(path.join(HOST, "Permissions.sys.mjs")).href);
+const { Operations, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

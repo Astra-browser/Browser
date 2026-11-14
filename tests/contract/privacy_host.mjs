@@ -4,7 +4,7 @@
 //
 // Usage: node tests/contract/privacy_host.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
@@ -138,7 +138,7 @@ globalThis.Ci = {
   nsIClearDataService: { CLEAR_FORGET_ABOUT_SITE: 0x80000000 },
 };
 
-const { Privacy, install, uninstall } = await import(path.join(HOST, "Privacy.sys.mjs"));
+const { Privacy, install, uninstall } = await import(pathToFileURL(path.join(HOST, "Privacy.sys.mjs")).href);
 
 // --- defaults ---------------------------------------------------------------
 const initial = await Privacy.state();

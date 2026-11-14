@@ -169,16 +169,16 @@ the `obj-astra-linux` default.
 The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
 `brand-lint` does not scan a duplicate browser tree:
 
-- `Astra-0.1.745-windows-x86_64.zip` - 135,267,806 bytes
-  (`sha256 a295080b9ef6f7af658cba196ec8d9449251ea506fcd73b0099dbc9cd0311e16`).
+- `Astra-0.1.745-windows-x86_64.zip` - 135,270,222 bytes
+  (`sha256 1bb75c336cea38c937101320a94ee90ded5d4126c140d48bbe48b040c5155e69`).
   It carries the full product tree, `astra-core.exe`, `astra.exe` (the engine
   launcher under the product name), `astra.cmd` (profile in `%APPDATA%\Astra`),
   `README.md`, `BUILD.txt` and the overlay files. Extracted on a clean
   directory, `version-probe.py` reports **8/8 PASS** on the extracted
   `astra.exe`; `firefox.exe` stays beside it for compatibility and never
   shares Windows' stock-Firefox application identity.
-- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,043,759 bytes
-  (`sha256 e33300031fa4cd780c1330a25a78ce750f4c661e8651ef7a31a042210e848e0b`),
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,054,787 bytes
+  (`sha256 4c9faf0c6e01ebc8db8020deae6c0cf2dac91e2f5571638a56503ffc9a6a067f`),
   NSIS 3.13, per-user
   (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
   and no machine-wide registry writes. It creates Start Menu and desktop
@@ -199,6 +199,34 @@ machine); Windows owns the default-browser choice, so the installer registers
 Astra and links to `ms-settings:defaultapps` instead of forcing it; the
 installer leaves `%APPDATA%\Astra` intact on uninstall; the updater remains
 off (U-09). NSIS is installed through `winget` (`NSIS.NSIS` 3.13).
+
+### System routes: default browser, login item, Windows privacy (2026-11-15)
+
+The Settings rows that would otherwise answer `unknown_command` now have real
+Windows Host API methods in `overlay/astra/host/System.sys.mjs`:
+
+| Route | What it does | UI |
+|---|---|---|
+| `default_browser_status` | reads `HKCU\...\UrlAssociations\http\UserChoice\ProgId`; Astra is default only for `AstraURL`; `can_request` is true for an installed build | General shows **Set as default** and reads the answer again on window focus |
+| `default_browser_request` | opens `ms-settings:defaultapps`; Windows keeps the final choice | the button is wired; no false claim is made |
+| `login_item_status` / `login_item_set` | reads and writes `HKCU\...\CurrentVersion\Run\Astra` with the real exe and profile; development trees answer `supported: false` | General login row appears only when the build can register |
+| `login_item_open_settings` | opens `ms-settings:startupapps` | the approval button is wired |
+| `windows_reputation_managed` | reads SmartScreen policy values; `null` where no registry is reachable | Privacy card shows managed or its honest fallback instead of an error |
+| `windows_diagnostics_settings` | opens `ms-settings:privacy-feedback` | the diagnostics button is wired |
+
+**Verification:** `node tests/contract/system_model.mjs` **120/120** (including
+Windows registry doubles and dev-vs-packaged behavior); `wire_coverage` **51/51**
+(160 routes); live `tools/windows/system-probe.py` **15/15** against the
+installed build: default-browser answer false/`can_request` true, login item
+written and removed, General callout rendered with **Set as default**, Privacy
+group rendered with no route error. The three `ms-settings:` launches were
+accepted with `--settings`.
+
+**Windows contract harness:** 56 contract suites imported host modules through
+`path.join()`; Node treats `E:\...` as a URL scheme and refused the import. The
+imports now use `pathToFileURL(...).href`, so **63 of 64** contract suites pass
+on Windows. The remaining `sidecar_spike.mjs` needs the separate
+`out/sidecar-stub` binary it always required; it is not a Windows regression.
 
 ### sccache (verified 2026-11-14)
 

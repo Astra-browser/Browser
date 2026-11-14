@@ -10,18 +10,14 @@
 //
 // Usage: node tests/contract/metadata_restore.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows } = await import(
-  path.join(HOST, "Metadata.sys.mjs")
-);
-const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(
-  path.join(HOST, "Tabs.sys.mjs")
-);
+const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows } = await import(pathToFileURL(path.join(HOST, "Metadata.sys.mjs")).href);
+const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

@@ -9,7 +9,7 @@
 // Usage: node tests/contract/diagnostics_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(
   path.dirname(path.dirname(fileURLToPath(import.meta.url))),
@@ -82,7 +82,7 @@ globalThis.Services = {
   },
 };
 
-const { System } = await import(path.join(HOST, "System.sys.mjs"));
+const { System } = await import(pathToFileURL(path.join(HOST, "System.sys.mjs")).href);
 const report = await System.diagnosticsReport();
 
 check("a report is returned", typeof report === "string" && report.length > 0);

@@ -9,14 +9,16 @@
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const UI = path.join(ROOT, "ui");
 
-const host = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const host = await import(
+  pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
+);
 const transport = await readFile(
   path.join(UI, "packages", "bridge", "src", "host-transport.ts"),
   "utf8",

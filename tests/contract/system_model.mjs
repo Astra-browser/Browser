@@ -17,10 +17,12 @@
 //   - `update_status` and `update_check` answer `unavailable`: no updater is
 //     connected, no version is named, and a check never reports `checking`,
 //     `upToDate` or `ready` for work it did not do
-//   - `default_browser_status` answers `null`: neither "Astra is the default"
-//     nor "Astra is not" can be read from the host
-//   - `login_item_status` answers `supported: false` with `enabled` and
-//     `needs_approval` false: the row is hidden, never shown as on
+//   - `default_browser_status`, `default_browser_request`, `login_item_status`,
+//     `login_item_set` and `login_item_open_settings` read and write Windows'
+//     own `UserChoice`/`Run` state; off Windows they answer `null` or
+//     `supported: false`, so the UI claims nothing it cannot hold
+//   - `windows_reputation_managed` and `windows_diagnostics_settings` answer
+//     real policy/settings state instead of `unknown_command`
 //   - `set_content_color_scheme` maps light/dark/system to Firefox's
 //     content color-scheme pref (1/0/2), rejects anything that is not a
 //     boolean or null with `invalid_light`, and answers `applied: false`
@@ -30,7 +32,7 @@
 //
 // Usage: node tests/contract/system_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -38,10 +40,15 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { System, __setContentPrefForTests } = await import(
-  path.join(HOST, "System.sys.mjs")
+const {
+  System,
+  __setContentPrefForTests,
+  __setWindowsForTests,
+  __resetSystemForTests,
+} = await import(pathToFileURL(path.join(HOST, "System.sys.mjs")).href);
+const { Boot } = await import(
+  pathToFileURL(path.join(HOST, "Boot.sys.mjs")).href
 );
-const { Boot } = await import(path.join(HOST, "Boot.sys.mjs"));
 
 /** The pref Firefox reads a content document's `prefers-color-scheme` from. */
 const CONTENT_COLOR_SCHEME_PREF =
@@ -66,7 +73,12 @@ const COMMANDS = {
   update_status: "updateStatus",
   update_check: "updateCheck",
   default_browser_status: "defaultBrowserStatus",
+  default_browser_request: "defaultBrowserRequest",
   login_item_status: "loginItemStatus",
+  login_item_set: "loginItemSet",
+  login_item_open_settings: "loginItemOpenSettings",
+  windows_reputation_managed: "windowsReputationManaged",
+  windows_diagnostics_settings: "windowsDiagnosticsSettings",
   set_content_color_scheme: "setContentColorScheme",
   ui_info: "uiInfo",
 };
@@ -318,6 +330,140 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
   check(
     "login_item_status hands out a fresh object each call",
     again !== answer,
+  );
+}
+
+// === Windows state: UserChoice, Run and policy are real reads ==============
+{
+  const values = new Map();
+  const opened = [];
+  const fake = {
+    packaged: () => true,
+    readString(root, path, name) {
+      return values.get(`${root}|${path}|${name}`) ?? null;
+    },
+    readInt(root, path, name) {
+      return values.get(`${root}|${path}|${name}`) ?? null;
+    },
+    exists(root, path) {
+      return [...values.keys()].some((key) =>
+        key.startsWith(`${root}|${path}|`),
+      );
+    },
+    writeString(root, path, name, value) {
+      values.set(`${root}|${path}|${name}`, String(value));
+      return true;
+    },
+    removeValue(root, path, name) {
+      return values.delete(`${root}|${path}|${name}`);
+    },
+    removeKey() {
+      return true;
+    },
+    exePath: () =>
+      "C:\\Users\\Test\\AppData\\Local\\Programs\\Astra\\astra.exe",
+    profilePath: () =>
+      "C:\\Users\\Test\\AppData\\Roaming\\Astra\\Profiles\\default",
+    openSettings(uri) {
+      opened.push(uri);
+      return true;
+    },
+  };
+  __setWindowsForTests(fake);
+
+  const chromeDefault = await System.defaultBrowserStatus();
+  check(
+    "default_browser_status reads a non-Astra ProgId as not default",
+    chromeDefault.is_default === false && chromeDefault.can_request === true,
+  );
+  values.set(
+    "HKCU|Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice|ProgId",
+    "AstraURL",
+  );
+  const astraDefault = await System.defaultBrowserStatus();
+  check(
+    "default_browser_status reads AstraURL as Astra",
+    astraDefault.is_default === true,
+  );
+  const requested = await System.defaultBrowserRequest();
+  check(
+    "default_browser_request opens Windows default apps",
+    opened.includes("ms-settings:defaultapps"),
+  );
+  check(
+    "default_browser_request reports the current answer",
+    requested.is_default === true && requested.can_request === true,
+  );
+
+  const loginOff = await System.loginItemStatus();
+  check(
+    "login_item_status is supported on a packaged Windows build",
+    loginOff.supported === true && loginOff.enabled === false,
+  );
+  const loginOn = await System.loginItemSet({ enabled: true });
+  check(
+    "login_item_set writes the per-user Run value",
+    loginOn.supported === true && loginOn.enabled === true,
+  );
+  const command = values.get(
+    "HKCU|Software\\Microsoft\\Windows\\CurrentVersion\\Run|Astra",
+  );
+  check(
+    "the Run value launches the installed exe with its profile",
+    typeof command === "string" &&
+      command.includes("Programs\\Astra\\astra.exe") &&
+      command.includes("-profile") &&
+      command.includes("Profiles\\default"),
+  );
+  const loginAgain = await System.loginItemSet({ enabled: false });
+  check(
+    "login_item_set(false) removes the Run value",
+    loginAgain.supported === true && loginAgain.enabled === false,
+  );
+  check(
+    "login_item_open_settings opens Windows Startup Apps",
+    (await System.loginItemOpenSettings()) === true &&
+      opened.includes("ms-settings:startupapps"),
+  );
+
+  check(
+    "windows_reputation_managed answers false with no policy",
+    (await System.windowsReputationManaged()) === false,
+  );
+  values.set(
+    "HKLM|Software\\Policies\\Microsoft\\Windows\\System|EnableSmartScreen",
+    1,
+  );
+  check(
+    "windows_reputation_managed reads the SmartScreen policy",
+    (await System.windowsReputationManaged()) === true,
+  );
+  check(
+    "windows_diagnostics_settings opens Windows feedback privacy",
+    (await System.windowsDiagnosticsSettings()) === true &&
+      opened.includes("ms-settings:privacy-feedback"),
+  );
+
+  // A development build cannot register; the UI must not offer the request.
+  __setWindowsForTests({ ...fake, packaged: () => false });
+  const devDefault = await System.defaultBrowserStatus();
+  check(
+    "a development build reports can_request false",
+    devDefault.can_request === false,
+  );
+  check(
+    "a development build hides the login item",
+    (await System.loginItemStatus()).supported === false,
+  );
+
+  __resetSystemForTests();
+  check(
+    "off Windows default_browser_status returns to null",
+    (await System.defaultBrowserStatus()) === null,
+  );
+  check(
+    "off Windows windows_reputation_managed answers null",
+    (await System.windowsReputationManaged()) === null,
   );
 }
 

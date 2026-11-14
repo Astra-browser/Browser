@@ -19,7 +19,7 @@
 // Usage: node tests/contract/profiles_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -27,10 +27,10 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Mod = await import(path.join(HOST, "Profiles.sys.mjs"));
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
-const Operations = await import(path.join(HOST, "Operations.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
+const Mod = await import(pathToFileURL(path.join(HOST, "Profiles.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
+const Operations = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 
 const { Profiles, __resetProfilesForTests, __setProfilesBackend } = Mod;
 const { Tabs, __spacesState, __resetTabsForTests } = TabsMod;

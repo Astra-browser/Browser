@@ -7,7 +7,7 @@
 //
 // Usage: node tests/contract/keymap_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -15,12 +15,8 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Keymap, __resetKeymapForTests, __keymapRecording, featureOf } = await import(
-  path.join(HOST, "Keymap.sys.mjs")
-);
-const { addEventListener, __resetEventsForTests } = await import(
-  path.join(HOST, "Events.sys.mjs")
-);
+const { Keymap, __resetKeymapForTests, __keymapRecording, featureOf } = await import(pathToFileURL(path.join(HOST, "Keymap.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

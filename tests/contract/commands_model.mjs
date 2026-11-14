@@ -13,13 +13,13 @@
 // Usage: node tests/contract/commands_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Commands, addEventListener, __resetForTests } = HostAPI;
 
 let passed = 0;
