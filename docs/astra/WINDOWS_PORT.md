@@ -146,6 +146,22 @@ row present, zero real console errors; capture 1600x1075 at 125% DPI
 (2201 colours, 31.6% locally varied pixels). Evidence in
 `out/headed-windows/` (`window.png`, `shot.png`, `snap.json`).
 
+### Blocker, tabs and Settings surface probes (2026-11-14)
+
+The core surface probes now choose the platform build and work from the
+repository root on either OS:
+
+| Probe | Windows result | What it proves |
+|---|---|---|
+| `tools/marionette-probe/blocker-probe.py` | **21/21 PASS** | seed install reaches `active` (200,392 rules, 81 lists), catalog/configure round-trip, the native hook cancels the ad image on a loopback page, the actor hides the cosmetic element, counters/reset work, and the Settings blocker section renders |
+| `tools/marionette-probe/tabs-probe.py` | **PASS** | address search loads in tab 1, a new tab starts blank, tab 2 takes its own address, the model has both rows, and switching back restores tab 1's live page |
+| `tools/marionette-probe/settings-native-probe.py` | **50/50 PASS** | every mapped preference writes through the Host API, reads back, reaches the app, and does not invent Firefox prefs for Astra-only settings |
+
+The tabs probe now reads the selected native tab (`gBrowser.selectedBrowser`)
+instead of relying on the Linux slot marker, and the scripts use
+`shutil.rmtree` plus the platform binary name. Linux keeps the same checks and
+the `obj-astra-linux` default.
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
