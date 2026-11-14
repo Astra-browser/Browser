@@ -154,7 +154,9 @@
       if (command === "" && services && ifile) {
         try {
           const beside = services.dirsvc.get("GreD", ifile).clone();
-          beside.append("astra-core");
+          beside.append(
+            services.appinfo?.OS === "WINNT" ? "astra-core.exe" : "astra-core",
+          );
           if (beside.exists()) command = beside.path;
         } catch {
           command = "";
@@ -166,7 +168,12 @@
       if (command !== "" && database === "") {
         try {
           const file = ifile ? services.dirsvc.get("ProfD", ifile) : null;
-          database = file?.path ? `${file.path}/astra/core.sqlite` : "";
+          const store = file?.clone();
+          if (store) {
+            store.append("astra");
+            store.append("core.sqlite");
+            database = store.path;
+          }
         } catch {
           database = "";
         }
@@ -174,12 +181,21 @@
       // P5b: the sidecar must be up before the organisation snapshot is read.
       // A missing binary is an honest unavailable; the browser still boots.
       if (command !== "" && database !== "") {
-        await host.Boot.launchCore({
-          request_id: "shell-boot",
-          command,
-          arguments: ["--db", database],
-        });
+        try {
+          const launched = await host.Boot.launchCore({
+            request_id: "shell-boot",
+            command,
+            arguments: ["--db", database],
+          });
+          frameRoot.dataset.core = launched?.state ?? "started";
+        } catch (e) {
+          frameRoot.dataset.core = `error:${String(e).slice(0, 160)}`;
+        }
+      } else {
+        frameRoot.dataset.core = command === "" ? "no-command" : "no-database";
       }
+      frameRoot.dataset.coreCommand = command;
+      frameRoot.dataset.coreDb = database;
     } catch {
       // No Services in a preview DOM.
     }
