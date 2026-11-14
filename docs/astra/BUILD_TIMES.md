@@ -71,7 +71,8 @@ Mozconfig: local `out/mozconfig.windows.local` (unofficial branding,
 |---|---|
 | `mach configure` | PASS, 37 s; RecursiveMake + FasterMake + VisualStudio + Clangd backends written |
 | first `mach build --jobs 2` | stopped after 25 s at `gfx/layers/d3d11/genshaders.py` cross-drive `os.path.relpath`; fixed in ASTRA-0015 |
-| resumed build | started 2026-11-14 07:00; result pending |
+| second build | stopped after 4 min 42 s: NSPR `w95sock.c` pointer types under clang 23 (fixed in ASTRA-0016) and an sccache server connection reset (server restarted) |
+| third build | started 2026-11-14 07:10; result pending |
 
 Warnings already known: `dxcompiler.dll` missing (WebGPU disabled), WASI
 sandboxed libraries disabled in the baseline config. Both must be resolved

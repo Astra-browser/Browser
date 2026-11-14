@@ -12,9 +12,9 @@
 # (placeholders @VAR@ filled from branding/astra.toml).
 # Branding: @ASTRA_BRANDING_DIR@ (display: @ASTRA_DISPLAY_NAME@).
 
-# TODO(windows-port): confirm MOZ_OBJDIR convention on Windows
-# (currently mirrors the linux objdir name; likely obj-astra-windows).
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-astra-windows
+# Rendered by `forge config --os windows [--objdir PATH]`; the default is
+# @TOPSRCDIR@/obj-astra-windows. A local D: objdir is selected with --objdir.
+mk_add_options MOZ_OBJDIR=@ASTRA_OBJDIR@
 
 ac_add_options --enable-project=browser
 ac_add_options --with-branding=@ASTRA_BRANDING_DIR@

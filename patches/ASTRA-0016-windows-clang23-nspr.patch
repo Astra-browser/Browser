@@ -1,0 +1,40 @@
+Patch-Id: ASTRA-0016
+Title: Fix NSPR Windows socket casts for clang 23
+Tier: P2
+OS: windows
+Upstream-Files: nsprpub/pr/src/md/windows/w95sock.c
+Intent: clang 23 promotes -Wincompatible-pointer-types to an error. NSPR passes a PRInt32* to ioctlsocket, which takes a u_long*, and a PRInt32* to WSAIoctl, which takes an LPDWORD. Use the Windows types and cast the FIONREAD value back to PRInt32. The Windows-only file keeps the same values and width.
+Risk: low (PRInt32 is 32-bit and u_long/DWORD are 32-bit on Windows; the cast only restores the declared return type)
+Test: `forge lint`; `mach build --jobs 2` on Windows gets past config/external/nspr/pr
+Verified-On: 153.6.0
+Removal-Plan: drop when upstream NSPR uses u_long/DWORD here; re-check after a base bump with `git -C engine diff FETCH_HEAD -- nsprpub/pr/src/md/windows/w95sock.c`
+---
+diff --git a/nsprpub/pr/src/md/windows/w95sock.c b/nsprpub/pr/src/md/windows/w95sock.c
+index a07b1b9b46..dc194960d4 100644
+--- a/nsprpub/pr/src/md/windows/w95sock.c
++++ b/nsprpub/pr/src/md/windows/w95sock.c
+@@ -95,13 +95,13 @@ PRInt32 _MD_CloseSocket(PROsfd osfd) {
+ }
+ 
+ PRInt32 _MD_SocketAvailable(PRFileDesc* fd) {
+-  PRInt32 result;
++  u_long result;
+ 
+   if (ioctlsocket(fd->secret->md.osfd, FIONREAD, &result) < 0) {
+     PR_SetError(PR_BAD_DESCRIPTOR_ERROR, WSAGetLastError());
+     return -1;
+   }
+-  return result;
++  return (PRInt32)result;
+ }
+ 
+ PROsfd _MD_Accept(PRFileDesc* fd, PRNetAddr* raddr, PRUint32* rlen,
+@@ -302,7 +302,7 @@ static _pr_win_connectex_ptr _pr_win_connectex = NULL;
+ static PRStatus PR_CALLBACK _pr_set_connectex(void) {
+   _pr_win_connectex = NULL;
+   SOCKET sock;
+-  PRInt32 dwBytes;
++  DWORD dwBytes;
+   int rc;
+ 
+   /* Dummy socket needed for WSAIoctl */

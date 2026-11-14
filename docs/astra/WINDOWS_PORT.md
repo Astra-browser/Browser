@@ -21,19 +21,25 @@ guarded by `--os windows` / `cfg(windows)`.
 ## New commands
 
 ```sh
-# render the Windows mozconfig scaffold
-cargo run -q -p astra-forge -- config --os windows --branding astra
+# render the Windows mozconfig (objdir defaults to @TOPSRCDIR@/obj-astra-windows)
+cargo run -q -p astra-forge -- config --os windows --branding astra \
+  --objdir E:/Astra/engine/obj-astra-windows
 # output: out/mozconfig.windows
+
+# patch series / overlay / build with the Windows platform selected
+cargo run -q -p astra-forge -- import --os windows
+cargo run -q -p astra-forge -- overlay --os windows
+cargo run -q -p astra-forge -- build --os windows --jobs 2
 
 # linux path unchanged
 cargo run -q -p astra-forge -- config --os linux --branding astra
 # output: out/mozconfig.linux (byte-identical to before)
 ```
 
-Template: `config/mozconfig.windows` (mirrors `config/mozconfig.linux`
-with `TODO(windows-port)` markers for every flag that still needs
-confirmation on a real Windows toolchain: objdir name, backgroundtasks,
-sccache, sandbox/crashreporter/updater defaults).
+Template: `config/mozconfig.windows` mirrors `config/mozconfig.linux`.
+The remaining unverified flags are tracked in the section below; `OS: linux`
+patches (ASTRA-0014) are skipped by `import`/`overlay --os windows`, and
+`OS: windows` patches (ASTRA-0016) are skipped on Linux.
 
 ## W0 verified toolchain (2026-11-14)
 
