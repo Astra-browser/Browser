@@ -200,6 +200,34 @@ Astra and links to `ms-settings:defaultapps` instead of forcing it; the
 installer leaves `%APPDATA%\Astra` intact on uninstall; the updater remains
 off (U-09). NSIS is installed through `winget` (`NSIS.NSIS` 3.13).
 
+### System routes: default browser, login item, Windows privacy (2026-11-15)
+
+The Settings rows that would otherwise answer `unknown_command` now have real
+Windows Host API methods in `overlay/astra/host/System.sys.mjs`:
+
+| Route | What it does | UI |
+|---|---|---|
+| `default_browser_status` | reads `HKCU\...\UrlAssociations\http\UserChoice\ProgId`; Astra is default only for `AstraURL`; `can_request` is true for an installed build | General shows **Set as default** and reads the answer again on window focus |
+| `default_browser_request` | opens `ms-settings:defaultapps`; Windows keeps the final choice | the button is wired; no false claim is made |
+| `login_item_status` / `login_item_set` | reads and writes `HKCU\...\CurrentVersion\Run\Astra` with the real exe and profile; development trees answer `supported: false` | General login row appears only when the build can register |
+| `login_item_open_settings` | opens `ms-settings:startupapps` | the approval button is wired |
+| `windows_reputation_managed` | reads SmartScreen policy values; `null` where no registry is reachable | Privacy card shows managed or its honest fallback instead of an error |
+| `windows_diagnostics_settings` | opens `ms-settings:privacy-feedback` | the diagnostics button is wired |
+
+**Verification:** `node tests/contract/system_model.mjs` **120/120** (including
+Windows registry doubles and dev-vs-packaged behavior); `wire_coverage` **51/51**
+(160 routes); live `tools/windows/system-probe.py` **15/15** against the
+installed build: default-browser answer false/`can_request` true, login item
+written and removed, General callout rendered with **Set as default**, Privacy
+group rendered with no route error. The three `ms-settings:` launches were
+accepted with `--settings`.
+
+**Windows contract harness:** 56 contract suites imported host modules through
+`path.join()`; Node treats `E:\...` as a URL scheme and refused the import. The
+imports now use `pathToFileURL(...).href`, so **63 of 64** contract suites pass
+on Windows. The remaining `sidecar_spike.mjs` needs the separate
+`out/sidecar-stub` binary it always required; it is not a Windows regression.
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
