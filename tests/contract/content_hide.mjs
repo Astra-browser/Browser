@@ -11,7 +11,7 @@
 // Usage: node tests/contract/content_hide.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -19,7 +19,7 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Hide = await import(path.join(HOST, "ContentHide.sys.mjs"));
+const Hide = await import(pathToFileURL(path.join(HOST, "ContentHide.sys.mjs")).href);
 
 // --- Minimal fake DOM ----------------------------------------------------
 // Supports tag, #id, .class, "*" and comma lists — enough for the hiding
@@ -277,7 +277,7 @@ Hide.ContentHide.setCosmeticProvider({
 // 9. LIVE wiring (P4-T11): stylesheet injection, MutationObserver re-pass,
 // Blocker provider adapter, override store adapter, Content actor binding.
 {
-  const ContentMod = await import(path.join(HOST, "Content.sys.mjs"));
+  const ContentMod = await import(pathToFileURL(path.join(HOST, "Content.sys.mjs")).href);
   const { Content } = ContentMod;
   check("live: Content actor exposes ContentHide", Content.ContentHide === Hide.ContentHide);
   check("live: Content exposes attachHiding", typeof Content.attachHiding === "function");

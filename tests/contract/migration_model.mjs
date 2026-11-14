@@ -10,7 +10,7 @@
 // Usage: node tests/contract/migration_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(
   path.dirname(path.dirname(fileURLToPath(import.meta.url))),
@@ -111,10 +111,8 @@ globalThis.Cc = {
   "@mozilla.org/filepicker;1": { createInstance: () => picker },
 };
 
-const { Migration } = await import(path.join(HOST, "Migration.sys.mjs"));
-const { addEventListener, __resetEventsForTests } = await import(
-  path.join(HOST, "Events.sys.mjs"),
-);
+const { Migration } = await import(pathToFileURL(path.join(HOST, "Migration.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs"),).href);
 __resetEventsForTests();
 const jobs = [];
 const off = addEventListener((event) => {

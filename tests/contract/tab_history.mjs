@@ -11,15 +11,13 @@
 // Usage: node tests/contract/tab_history.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
-const { TabHistory, __resetTabHistoryForTests } = await import(
-  path.join(HOST, "TabHistory.sys.mjs")
-);
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
+const { TabHistory, __resetTabHistoryForTests } = await import(pathToFileURL(path.join(HOST, "TabHistory.sys.mjs")).href);
 const { Tabs, Navigation, addEventListener, __resetForTests } = HostAPI;
 
 let passed = 0;

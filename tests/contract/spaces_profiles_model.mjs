@@ -15,7 +15,7 @@
 //
 // Usage: node tests/contract/spaces_profiles_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -23,13 +23,13 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const ProfilesMod = await import(path.join(HOST, "Profiles.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
-const Operations = await import(path.join(HOST, "Operations.sys.mjs"));
-const BookmarksMod = await import(path.join(HOST, "Bookmarks.sys.mjs"));
-const BrowsingDataMod = await import(path.join(HOST, "BrowsingData.sys.mjs"));
-const MetadataMod = await import(path.join(HOST, "Metadata.sys.mjs"));
+const ProfilesMod = await import(pathToFileURL(path.join(HOST, "Profiles.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
+const Operations = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const BookmarksMod = await import(pathToFileURL(path.join(HOST, "Bookmarks.sys.mjs")).href);
+const BrowsingDataMod = await import(pathToFileURL(path.join(HOST, "BrowsingData.sys.mjs")).href);
+const MetadataMod = await import(pathToFileURL(path.join(HOST, "Metadata.sys.mjs")).href);
 
 const { Profiles, __resetProfilesForTests, __setProfilesBackend } = ProfilesMod;
 const {

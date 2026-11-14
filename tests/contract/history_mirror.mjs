@@ -13,7 +13,7 @@
 // Usage: node tests/contract/history_mirror.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -21,7 +21,7 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const mod = await import(path.join(HOST, "History.sys.mjs"));
+const mod = await import(pathToFileURL(path.join(HOST, "History.sys.mjs")).href);
 const { History, __setHistoryEventSink, __resetHistoryForTests } = mod;
 
 let passed = 0;

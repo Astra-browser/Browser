@@ -11,16 +11,14 @@
 //
 // Usage: node tests/contract/operations_ledger.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Operations, admit, refuse, retainedCount, __resetOperationsForTests } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { Operations, admit, refuse, retainedCount, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 const HEX16 = /^[0-9a-f]{16}$/u;
 

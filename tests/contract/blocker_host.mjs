@@ -11,19 +11,15 @@
 //
 // Usage: node tests/contract/blocker_host.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Blocker, __setBlockerBackend, __resetBlockerForTests } = await import(
-  path.join(HOST, "Blocker.sys.mjs")
-);
-const { Operations, __resetOperationsForTests } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { Blocker, __setBlockerBackend, __resetBlockerForTests } = await import(pathToFileURL(path.join(HOST, "Blocker.sys.mjs")).href);
+const { Operations, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

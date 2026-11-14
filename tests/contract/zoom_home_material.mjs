@@ -13,18 +13,18 @@
 //
 // Usage: node tests/contract/zoom_home_material.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Tabs, Navigation, Commands, Zoom, Settings, System } = HostAPI;
-const ZoomMod = await import(path.join(HOST, "Zoom.sys.mjs"));
-const SystemMod = await import(path.join(HOST, "System.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const { __setPrefsForTests } = await import(path.join(HOST, "Settings.sys.mjs"));
+const ZoomMod = await import(pathToFileURL(path.join(HOST, "Zoom.sys.mjs")).href);
+const SystemMod = await import(pathToFileURL(path.join(HOST, "System.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const { __setPrefsForTests } = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

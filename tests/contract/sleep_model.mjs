@@ -17,16 +17,16 @@
 //
 // Usage: node tests/contract/sleep_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const SettingsMod = await import(path.join(HOST, "Settings.sys.mjs"));
-const PerfMod = await import(path.join(HOST, "Performance.sys.mjs"));
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const SettingsMod = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
+const PerfMod = await import(pathToFileURL(path.join(HOST, "Performance.sys.mjs")).href);
 
 const { Tabs } = TabsMod;
 const { Settings, __resetSettingsForTests } = SettingsMod;

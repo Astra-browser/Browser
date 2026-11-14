@@ -11,7 +11,7 @@
 // Usage: node tests/contract/content_slot.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -19,7 +19,7 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Tabs, Navigation, Panes, Boot, addEventListener, __resetForTests } = HostAPI;
 
 let passed = 0;

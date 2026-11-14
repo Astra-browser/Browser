@@ -3,13 +3,11 @@
 // Pure policy: Content supplies live flags and play/active generations.
 //
 // Usage: node tests/contract/media_selection.mjs
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { chooseMedia } = await import(
-  path.join(ROOT, "overlay", "astra", "host", "MediaSelection.sys.mjs")
-);
+const { chooseMedia } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "MediaSelection.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

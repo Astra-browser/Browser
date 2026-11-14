@@ -25,7 +25,7 @@
 //
 // Usage: node tests/contract/time_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -33,12 +33,10 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Time, __setClockForTests, __resetTimeForTests } = await import(
-  path.join(HOST, "Time.sys.mjs"),
-);
-const TimeMod = await import(path.join(HOST, "Time.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const SettingsMod = await import(path.join(HOST, "Settings.sys.mjs"));
+const { Time, __setClockForTests, __resetTimeForTests } = await import(pathToFileURL(path.join(HOST, "Time.sys.mjs"),).href);
+const TimeMod = await import(pathToFileURL(path.join(HOST, "Time.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const SettingsMod = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { Tabs } = TabsMod;
 const { Settings, __resetSettingsForTests } = SettingsMod;
 
@@ -296,7 +294,7 @@ for (const kind of ["page", "clear", "entries", "focus", "time", ""]) {
 // The clock is injected so a whole session can be walked without waiting.
 // Enforcement is still deferred: `shut` stays empty and no test claims a
 // site is blocked.
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 Events.__resetEventsForTests();
 
 const announced = [];
