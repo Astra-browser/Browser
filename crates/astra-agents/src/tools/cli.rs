@@ -253,14 +253,19 @@ mod tests {
                 .as_nanos()
         ));
         std::fs::create_dir_all(&dir).expect("mock dir");
+        #[cfg(windows)]
+        let bin = dir.join("gh.cmd");
+        #[cfg(unix)]
         let bin = dir.join("gh");
-        std::fs::write(
-            &bin,
-            "#!/bin/sh\nprintf 'mock-gh:'; printf ' %s' \"$@\"; printf '\\n'",
-        )
-        .expect("mock gh");
+        #[cfg(windows)]
+        std::fs::write(&bin, "@echo off\r\necho mock-gh: %*\r\n").expect("mock gh");
         #[cfg(unix)]
         {
+            std::fs::write(
+                &bin,
+                "#!/bin/sh\nprintf 'mock-gh:'; printf ' %s' \"$@\"; printf '\\n'",
+            )
+            .expect("mock gh");
             use std::os::unix::fs::PermissionsExt;
             let mut perms = std::fs::metadata(&bin).expect("meta").permissions();
             perms.set_mode(0o755);

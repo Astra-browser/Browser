@@ -4,7 +4,8 @@
 
 //! Mocked-binary hand-off tests (P6-T09).
 //!
-//! Shell-script fakes stand in for the `claude` / `codex` binaries: each
+//! Platform fakes (.cmd on Windows) stand in for the `claude` / `codex`
+//! binaries: each
 //! fake records its argv, working directory, and `HANDOFF_TARGET` env next
 //! to itself, prints canned stdout/stderr lines, and exits. No network,
 //! no real CLIs, no `PATH` lookups — the runner only ever spawns the
@@ -19,8 +20,9 @@ use astra_agents::handoff::{
     ScopedGrant, StreamKind,
 };
 
-/// One fake-binary sandbox: `<root>/bin/fake` (executable shell script),
-/// `<root>/work` (granted workdir), plus assertion artifacts.
+/// One fake-binary sandbox: `<root>/bin/fake` (shell script) or
+/// `<root>/bin/fake.cmd` on Windows, `<root>/work` (granted workdir), plus
+/// assertion artifacts.
 struct FakeSandbox {
     root: PathBuf,
     bin: PathBuf,
@@ -40,10 +42,15 @@ impl FakeSandbox {
         let bin_dir = root.join("bin");
         std::fs::create_dir_all(&bin_dir).expect("sandbox bin dir");
         std::fs::create_dir_all(root.join("work")).expect("sandbox work dir");
+        #[cfg(windows)]
+        let bin = bin_dir.join("fake.cmd");
+        #[cfg(unix)]
         let bin = bin_dir.join("fake");
-        std::fs::write(&bin, script).expect("fake script");
+        #[cfg(windows)]
+        std::fs::write(&bin, script.replace('\n', "\r\n")).expect("fake script");
         #[cfg(unix)]
         {
+            std::fs::write(&bin, script).expect("fake script");
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
                 .expect("fake executable");
@@ -76,6 +83,7 @@ impl Drop for FakeSandbox {
 
 /// Fake `claude`: records argv/cwd/target, emits two stdout lines and one
 /// stderr line, exits 0.
+#[cfg(unix)]
 const CLAUDE_FAKE: &str = r#"#!/bin/sh
 here="$(dirname "$0")/.."
 printf '%s\n' "$@" > "$here/argv.record"
@@ -87,7 +95,23 @@ printf 'err-line-1\n' >&2
 exit 0
 "#;
 
+/// Windows twin: a batch file avoids a POSIX shell and still records argv,
+/// cwd and the hand-off target.
+#[cfg(windows)]
+const CLAUDE_FAKE: &str = r#"@echo off
+set "here=%~dp0.."
+echo %* > "%here%\argv.record"
+cd > "%here%\cwd.record"
+echo %HANDOFF_TARGET% > "%here%\target.record"
+type nul > "%here%\spawned.marker"
+echo out-line-1
+echo out-line-2
+1>&2 echo err-line-1
+exit /b 0
+"#;
+
 /// Fake `codex`: read-only probe, exits 0 with one line per stream.
+#[cfg(unix)]
 const CODEX_FAKE: &str = r#"#!/bin/sh
 here="$(dirname "$0")/.."
 printf '%s\n' "$@" > "$here/argv.record"
@@ -99,10 +123,29 @@ printf 'codex-warn\n' >&2
 exit 3
 "#;
 
+/// Windows twin for the codex probe.
+#[cfg(windows)]
+const CODEX_FAKE: &str = r#"@echo off
+set "here=%~dp0.."
+echo %* > "%here%\argv.record"
+cd > "%here%\cwd.record"
+echo %HANDOFF_TARGET% > "%here%\target.record"
+type nul > "%here%\spawned.marker"
+echo codex-done
+1>&2 echo codex-warn
+exit /b 3
+"#;
+
 /// Fake sleeper: blocks past any test timeout. `exec` replaces the shell
 /// so the timeout kill terminates the sleeper itself (no orphaned
 /// grandchild holding the pipe open).
+#[cfg(unix)]
 const SLEEP_FAKE: &str = "#!/bin/sh\nexec sleep 30\n";
+
+/// Windows twin: the busy loop stays inside cmd.exe, so killing the child
+/// closes the pipes without leaving a grandchild alive.
+#[cfg(windows)]
+const SLEEP_FAKE: &str = "@echo off\nfor /l %%i in (1,1,1000000000) do @rem\n";
 
 fn runner_for(bin: &Path, target: HandoffTarget, timeout_ms: u64) -> HandoffRunner {
     let (claude, codex) = match target {

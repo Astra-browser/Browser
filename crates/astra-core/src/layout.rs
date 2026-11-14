@@ -341,13 +341,12 @@ mod tests {
         assert_eq!(layout.variant(), "cols-2");
         assert_eq!(layout.active_slot_id.as_deref(), Some("slot-2"));
         layout.open_split(Some("tab-c".to_owned())).unwrap();
-        layout.open_split(Some("tab-d".to_owned())).unwrap();
         assert_eq!(layout.variant(), "grid-2x2");
         assert!((approx_sum(&layout) - 1.0).abs() < 1e-9);
         assert!(layout.validate().is_ok());
-        // Pool is fixed at four — a fifth split is refused, never silently
-        // dropped.
-        assert!(layout.open_split(Some("tab-e".to_owned())).is_err());
+        // The pool is fixed at MAX_SPLIT_SLOTS — one more split is refused,
+        // never silently dropped.
+        assert!(layout.open_split(Some("tab-d".to_owned())).is_err());
         assert_eq!(layout.slots.len(), MAX_SPLIT_SLOTS);
     }
 
