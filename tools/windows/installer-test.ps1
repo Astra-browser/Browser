@@ -29,6 +29,7 @@ function Check($name, $ok, $detail = '') {
 Write-Host "== install $Setup -> $InstallDir"
 $proc = Start-Process -FilePath $Setup -ArgumentList '/S', "/D=$InstallDir" -Wait -PassThru
 Check 'installer exits 0' ($proc.ExitCode -eq 0) "exit=$($proc.ExitCode)"
+Check 'astra.exe is installed' (Test-Path (Join-Path $InstallDir 'astra.exe'))
 Check 'firefox.exe is installed' (Test-Path (Join-Path $InstallDir 'firefox.exe'))
 Check 'astra-core.exe is installed' (Test-Path (Join-Path $InstallDir 'astra-core.exe'))
 Check 'uninstaller is written' (Test-Path (Join-Path $InstallDir 'uninstall.exe'))
@@ -41,7 +42,7 @@ $registered = (Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -ErrorAc
 Check 'default apps capability is registered' ($registered -eq 'Software\Astra\Capabilities') "$registered"
 Check 'HTML ProgId command exists' (Test-Path 'HKCU:\Software\Classes\AstraHTML\shell\open\command')
 Check 'URL ProgId command exists' (Test-Path 'HKCU:\Software\Classes\AstraURL\shell\open\command')
-$appId = (Get-ItemProperty 'HKCU:\Software\Classes\Applications\firefox.exe\Application' -ErrorAction SilentlyContinue).AppUserModelID
+$appId = (Get-ItemProperty 'HKCU:\Software\Classes\Applications\astra.exe\Application' -ErrorAction SilentlyContinue).AppUserModelID
 Check 'AppUserModelID is registered' ($appId -eq 'Astra.Browser') "$appId"
 
 $programs = [Environment]::GetFolderPath('Programs')
@@ -51,7 +52,7 @@ Check 'desktop shortcut exists' (Test-Path (Join-Path $desktop 'Astra.lnk'))
 
 if ($RunProbe) {
     Write-Host '== live version probe against the installed binary'
-    & python (Join-Path $root 'tools\marionette-probe\version-probe.py') (Join-Path $InstallDir 'firefox.exe')
+    & python (Join-Path $root 'tools\marionette-probe\version-probe.py') (Join-Path $InstallDir 'astra.exe')
     Check 'installed build passes the live version probe' ($LASTEXITCODE -eq 0)
 }
 
@@ -69,6 +70,7 @@ if ($KeepInstalled) {
     Check 'capability registration removed' (-not ((Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -ErrorAction SilentlyContinue).Astra))
     Check 'HTML ProgId removed' (-not (Test-Path 'HKCU:\Software\Classes\AstraHTML'))
     Check 'URL ProgId removed' (-not (Test-Path 'HKCU:\Software\Classes\AstraURL'))
+    Check 'Astra app identity removed' (-not (Test-Path 'HKCU:\Software\Classes\Applications\astra.exe'))
 }
 
 $result = if ($failures.Count -eq 0) { 'PASS' } else { 'FAIL (' + ($failures -join ', ') + ')' }

@@ -64,6 +64,11 @@ $robocopyArgs = @(
 & robocopy @robocopyArgs | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
 
+# Give the product its own executable name. The engine launcher works under
+# any name and this keeps Windows' Applications\firefox.exe identity (shared
+# with a real Firefox install) untouched. firefox.exe stays for compatibility.
+Copy-Item (Join-Path $app 'firefox.exe') (Join-Path $app 'astra.exe') -Force
+
 $gitCommit = (git -C $root rev-parse --short HEAD 2>$null)
 $gitBranch = (git -C $root rev-parse --abbrev-ref HEAD 2>$null)
 $engineVersion = '153.6.0esr'
@@ -93,7 +98,7 @@ setlocal
 set "ASTRA_DIR=%~dp0"
 if not defined ASTRA_PROFILE set "ASTRA_PROFILE=%APPDATA%\Astra\Profiles\default"
 if not exist "%ASTRA_PROFILE%" mkdir "%ASTRA_PROFILE%"
-start "" "%ASTRA_DIR%firefox.exe" -profile "%ASTRA_PROFILE%" -no-remote %*
+start "" "%ASTRA_DIR%astra.exe" -profile "%ASTRA_PROFILE%" -no-remote %*
 '@
 Set-Content -Path (Join-Path $app 'astra.cmd') -Value $launcher -Encoding ASCII
 
@@ -109,7 +114,9 @@ the Astra interface. Work is off in this build (Beta 1 rule).
 Double-click ``astra.cmd``. It keeps its profile in
 ``%APPDATA%\Astra\Profiles\default``, separate from Firefox.
 
-You can also run ``firefox.exe -profile <dir> -no-remote`` directly.
+You can also run ``astra.exe -profile <dir> -no-remote`` directly. The
+``firefox.exe`` beside it is the original engine launcher and is kept for
+compatibility.
 
 ## Install
 
@@ -127,7 +134,7 @@ Windows 11 x64. The build uses the system WebView2/Windows App Runtime
 components staged beside the binary; no Visual C++ redistributable or .NET
 download is needed.
 
-For the discrete GPU, set Windows Graphics preference for ``firefox.exe`` to
+For the discrete GPU, set Windows Graphics preference for ``astra.exe`` to
 **High performance** (NVIDIA RTX), and prefer the NVIDIA GPU in the NVIDIA
 Control Panel. The browser reports the adapter in ``about:support``.
 
