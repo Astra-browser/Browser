@@ -169,28 +169,30 @@ the `obj-astra-linux` default.
 The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
 `brand-lint` does not scan a duplicate browser tree:
 
-- `Astra-0.1.745-windows-x86_64.zip` - 134,817,640 bytes
-  (`sha256 7845323998c4e96f210ddcc4a78c20df07f9bef1c20f0aa1a2919902a875dfd8`).
-  It carries the full product tree, `astra-core.exe`, `astra.cmd` (profile in
-  `%APPDATA%\Astra`), `README.md`, `BUILD.txt` and the overlay files. Extracted
-  on a clean directory, `version-probe.py` reports **8/8 PASS** on the
-  extracted `firefox.exe`.
-- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,041,102 bytes
-  (`sha256 254376333b48c181353f630b49310a7eebb500705935cfbc91ed7183a88538b6`),
+- `Astra-0.1.745-windows-x86_64.zip` - 135,267,806 bytes
+  (`sha256 a295080b9ef6f7af658cba196ec8d9449251ea506fcd73b0099dbc9cd0311e16`).
+  It carries the full product tree, `astra-core.exe`, `astra.exe` (the engine
+  launcher under the product name), `astra.cmd` (profile in `%APPDATA%\Astra`),
+  `README.md`, `BUILD.txt` and the overlay files. Extracted on a clean
+  directory, `version-probe.py` reports **8/8 PASS** on the extracted
+  `astra.exe`; `firefox.exe` stays beside it for compatibility and never
+  shares Windows' stock-Firefox application identity.
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,043,759 bytes
+  (`sha256 e33300031fa4cd780c1330a25a78ce750f4c661e8651ef7a31a042210e848e0b`),
   NSIS 3.13, per-user
   (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
   and no machine-wide registry writes. It creates Start Menu and desktop
   shortcuts, an uninstaller, an install record, an Astra ProgId for HTML and
   URL handling, `RegisteredApplications` + `Capabilities` for Windows Default
   apps, `OpenWithProgids` entries (never a forced default) and an
-  `AppUserModelID` (`Astra.Browser`).
+  `AppUserModelID` (`Astra.Browser`) under `Applications\astra.exe`.
 
 `tools/windows/installer-test.ps1 -Setup ... -RunProbe` installs to a throwaway
 directory, checks the payload, shortcuts, profile directory and registry
 contract, runs the live version probe against the installed binary, then
 silently uninstalls and verifies that files, shortcuts and registry keys are
-gone. Live result: **29/29 PASS** (13 install checks + 8 live probe checks +
-8 uninstall checks).
+gone. Live result: **31/31 PASS** (14 install checks + 8 live probe checks +
+9 uninstall checks).
 
 Limits: the artifacts are unsigned (no Authenticode certificate on this
 machine); Windows owns the default-browser choice, so the installer registers

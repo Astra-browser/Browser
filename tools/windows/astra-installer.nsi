@@ -1,4 +1,4 @@
-; Astra per-user Windows installer (NSIS 3.x).
+﻿; Astra per-user Windows installer (NSIS 3.x).
 ;
 ; Built by tools/package-windows.ps1 -Installer:
 ;   makensis /DVERSION=... /DSTAGE=<staged Astra> /DOUT=<release dir> \
@@ -49,7 +49,7 @@ VIAddVersionKey "LegalCopyright" "Astra"
 !define MUI_UNICON "${ICON}"
 !define MUI_WELCOMEPAGE_TITLE "Install Astra ${VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "Astra installs for the current user only. No administrator rights are needed.$\r$\n$\r$\nThe browser, the astra-core sidecar and the Windows packaging files are copied to $\"$LOCALAPPDATA\Programs\Astra$\". Your profile stays in $\"%APPDATA%\Astra$\" and is kept when you uninstall."
-!define MUI_FINISHPAGE_RUN "$INSTDIR\firefox.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\astra.exe"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "-profile $\"$APPDATA\Astra\Profiles\default$\" -no-remote"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch Astra"
 !define MUI_FINISHPAGE_LINK "Open Windows default apps to choose Astra"
@@ -66,7 +66,7 @@ VIAddVersionKey "LegalCopyright" "Astra"
 !insertmacro MUI_LANGUAGE "English"
 
 !macro WriteAppCommand ROOT
-  WriteRegStr HKCU "${ROOT}\shell\open\command" "" "$\"$INSTDIR\firefox.exe$\" -profile $\"$APPDATA\Astra\Profiles\default$\" -no-remote $\"%1$\""
+  WriteRegStr HKCU "${ROOT}\shell\open\command" "" "$\"$INSTDIR\astra.exe$\" -profile $\"$APPDATA\Astra\Profiles\default$\" -no-remote $\"%1$\""
 !macroend
 
 Function .onInit
@@ -88,13 +88,13 @@ Section "Astra" SEC_MAIN
 
   ; --- shortcuts -----------------------------------------------------------
   CreateDirectory "$SMPROGRAMS\Astra"
-  CreateShortCut "$SMPROGRAMS\Astra\Astra.lnk" "$INSTDIR\firefox.exe" \
+  CreateShortCut "$SMPROGRAMS\Astra\Astra.lnk" "$INSTDIR\astra.exe" \
     '-profile "$APPDATA\Astra\Profiles\default" -no-remote' \
-    "$INSTDIR\firefox.exe" 0 SW_SHOWNORMAL
+    "$INSTDIR\astra.exe" 0 SW_SHOWNORMAL
   CreateShortCut "$SMPROGRAMS\Astra\Uninstall Astra.lnk" "$INSTDIR\uninstall.exe"
-  CreateShortCut "$DESKTOP\Astra.lnk" "$INSTDIR\firefox.exe" \
+  CreateShortCut "$DESKTOP\Astra.lnk" "$INSTDIR\astra.exe" \
     '-profile "$APPDATA\Astra\Profiles\default" -no-remote' \
-    "$INSTDIR\firefox.exe" 0 SW_SHOWNORMAL
+    "$INSTDIR\astra.exe" 0 SW_SHOWNORMAL
 
   ; --- install record ------------------------------------------------------
   WriteRegStr HKCU "Software\Astra" "InstallDir" "$INSTDIR"
@@ -105,7 +105,7 @@ Section "Astra" SEC_MAIN
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
     "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
-    "DisplayIcon" "$INSTDIR\firefox.exe,0"
+    "DisplayIcon" "$INSTDIR\astra.exe,0"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
     "Publisher" "Astra"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
@@ -120,12 +120,12 @@ Section "Astra" SEC_MAIN
   ; --- ProgId, capabilities and default-browser registration ---------------
   WriteRegStr HKCU "Software\Classes\AstraHTML" "" "Astra HTML Document"
   WriteRegStr HKCU "Software\Classes\AstraHTML" "FriendlyTypeName" "Astra HTML Document"
-  WriteRegStr HKCU "Software\Classes\AstraHTML\DefaultIcon" "" "$INSTDIR\firefox.exe,0"
+  WriteRegStr HKCU "Software\Classes\AstraHTML\DefaultIcon" "" "$INSTDIR\astra.exe,0"
   !insertmacro WriteAppCommand "Software\Classes\AstraHTML"
 
   WriteRegStr HKCU "Software\Classes\AstraURL" "" "Astra URL"
   WriteRegStr HKCU "Software\Classes\AstraURL" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\AstraURL\DefaultIcon" "" "$INSTDIR\firefox.exe,0"
+  WriteRegStr HKCU "Software\Classes\AstraURL\DefaultIcon" "" "$INSTDIR\astra.exe,0"
   !insertmacro WriteAppCommand "Software\Classes\AstraURL"
 
   ; Open-with entries, never a forced default: Windows still owns the choice.
@@ -137,7 +137,7 @@ Section "Astra" SEC_MAIN
   WriteRegStr HKCU "Software\RegisteredApplications" "Astra" "Software\Astra\Capabilities"
   WriteRegStr HKCU "Software\Astra\Capabilities" "ApplicationName" "Astra"
   WriteRegStr HKCU "Software\Astra\Capabilities" "ApplicationDescription" "Browse the web with Astra"
-  WriteRegStr HKCU "Software\Astra\Capabilities" "ApplicationIcon" "$INSTDIR\firefox.exe,0"
+  WriteRegStr HKCU "Software\Astra\Capabilities" "ApplicationIcon" "$INSTDIR\astra.exe,0"
   WriteRegStr HKCU "Software\Astra\Capabilities\FileAssociations" ".html" "AstraHTML"
   WriteRegStr HKCU "Software\Astra\Capabilities\FileAssociations" ".htm" "AstraHTML"
   WriteRegStr HKCU "Software\Astra\Capabilities\FileAssociations" ".xhtml" "AstraHTML"
@@ -146,13 +146,13 @@ Section "Astra" SEC_MAIN
   WriteRegStr HKCU "Software\Astra\Capabilities\URLAssociations" "https" "AstraURL"
 
   ; AppUserModelID registration for the exe (taskbar grouping, notifications).
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\Application" "ApplicationName" "Astra"
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\Application" "ApplicationIcon" "$INSTDIR\firefox.exe,0"
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\Application" "AppUserModelID" "Astra.Browser"
-  !insertmacro WriteAppCommand "Software\Classes\Applications\firefox.exe"
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\SupportedTypes" ".html" ""
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\SupportedTypes" ".htm" ""
-  WriteRegStr HKCU "Software\Classes\Applications\firefox.exe\SupportedTypes" ".xhtml" ""
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\Application" "ApplicationName" "Astra"
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\Application" "ApplicationIcon" "$INSTDIR\astra.exe,0"
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\Application" "AppUserModelID" "Astra.Browser"
+  !insertmacro WriteAppCommand "Software\Classes\Applications\astra.exe"
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\SupportedTypes" ".html" ""
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\SupportedTypes" ".htm" ""
+  WriteRegStr HKCU "Software\Classes\Applications\astra.exe\SupportedTypes" ".xhtml" ""
 
   ; Refresh the shell so Open-with and Default apps see the new ProgId.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
@@ -172,7 +172,7 @@ Section "Uninstall"
   DeleteRegKey HKCU "Software\Astra"
   DeleteRegKey HKCU "Software\Classes\AstraHTML"
   DeleteRegKey HKCU "Software\Classes\AstraURL"
-  DeleteRegKey HKCU "Software\Classes\Applications\firefox.exe"
+  DeleteRegKey HKCU "Software\Classes\Applications\astra.exe"
   DeleteRegValue HKCU "Software\Classes\.html\OpenWithProgids" "AstraHTML"
   DeleteRegValue HKCU "Software\Classes\.htm\OpenWithProgids" "AstraHTML"
   DeleteRegValue HKCU "Software\Classes\.xhtml\OpenWithProgids" "AstraHTML"
