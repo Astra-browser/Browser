@@ -51,6 +51,10 @@ UI_IDEA
 # Agent worktrees (tools, not repo content)
 .worktrees/
 
+# Local Python venv (repo scripts prefer it via tools/venv-python.sh;
+# system python3/python is the fallback, so Linux without .venv is unchanged)
+.venv/
+
 ui_inspiration/
 
 /test_repo/

@@ -12,6 +12,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Repo venv python when present (.venv/bin/python on Linux,
+# .venv/Scripts/python.exe on Windows Git-Bash), else system python3/python.
+PYTHON="$(bash "$ROOT/tools/venv-python.sh" 2>/dev/null || true)"
+[ -n "$PYTHON" ] || PYTHON="python3"
 JOBS="${JOBS:-2}"
 SKIP_UI=0
 SKIP_BUILD=0
@@ -146,7 +150,7 @@ step "rendering mozconfig"
 if [ -x "$ROOT/engine/mach" ]; then
   step "engine build dependencies (mach bootstrap, best effort)"
   ( cd "$ROOT/engine" && MOZCONFIG="$ROOT/out/mozconfig.linux" \
-    python3 ./mach bootstrap --application-choice=browser --no-interactive ) || {
+    "$PYTHON" ./mach bootstrap --application-choice=browser --no-interactive ) || {
     echo "setup.sh: warning: mach bootstrap incomplete; the engine build will report what is missing" >&2
   }
 fi

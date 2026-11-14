@@ -1,5 +1,5 @@
 # footprint (P1-T12): enforces the §6.7 patch-series footprint budget
-# (≤1500 P2/P3 lines, ≤60 patches, ≤8 P3) plus the §6.3 header lint.
+# (≤4000 P2/P3 lines, ≤60 patches, ≤8 P3) plus the §6.3 header lint.
 # Engine-free: lint skips apply-checks and footprint reads patches/*.patch
 # only, so no Firefox tarball fetch is needed.
 name: footprint

@@ -16,6 +16,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo venv python when present (.venv/bin/python on Linux,
+# .venv/Scripts/python.exe on Windows Git-Bash), else system python3/python.
+PYTHON="$(bash "$ROOT/tools/venv-python.sh" 2>/dev/null || true)"
+[ -n "$PYTHON" ] || die "missing python (install python3 or create .venv: python -m venv .venv)"
 JOBS="${JOBS:-2}"
 SKIP_UI=0
 SKIP_BUILD=0
@@ -42,7 +46,8 @@ need curl "install curl"
 need tar "install tar"
 need gpg "install gnupg"
 need patch "install patch"
-need python3 "install python3"
+# python3 may come from the repo venv (.venv); system python3 otherwise.
+[ -n "$PYTHON" ] || die "missing python (install python3 or create .venv)"
 need cargo "install Rust from https://rustup.rs"
 echo "bootstrap: tools OK (jobs=$JOBS)"
 

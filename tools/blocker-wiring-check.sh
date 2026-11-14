@@ -17,6 +17,10 @@
 #   ENGINE_DIR defaults to <repo>/engine. Reads only — never writes there.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Repo venv python when present (.venv/bin/python on Linux,
+# .venv/Scripts/python.exe on Windows Git-Bash), else system python3/python.
+PYTHON="$(bash "$ROOT/tools/venv-python.sh" 2>/dev/null || true)"
+[ -n "$PYTHON" ] || PYTHON="python3"
 ENGINE_DIR="${1:-$ROOT/engine}"
 P3="$ROOT/patches/ASTRA-0003-astra-blocker-gkrust.patch"
 P4="$ROOT/patches/ASTRA-0004-astra-blocker-engine.patch"
@@ -72,7 +76,7 @@ else
 fi
 
 # 3b. patch body == source of truth ---------------------------------------
-python3 - "$ROOT" "$P4" <<'EOF' || FAIL=$((FAIL+1))
+"$PYTHON" - "$ROOT" "$P4" <<'EOF' || FAIL=$((FAIL+1))
 import re, sys
 from pathlib import Path
 root, patch = Path(sys.argv[1]), Path(sys.argv[2])
@@ -116,7 +120,7 @@ grep -qE "AstraBlocker::(ShouldBlockChannel|ApplyChannelAction)" "$ENGINE_DIR/ne
   && ok "channel hook calls AstraBlocker" || bad "channel hook missing"
 
 # 6. branding / telemetry in shipped data ----------------------------------
-python3 - "$ROOT" <<'EOF' || FAIL=$((FAIL+1))
+"$PYTHON" - "$ROOT" <<'EOF' || FAIL=$((FAIL+1))
 import json, re, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -159,10 +163,10 @@ print(f"PASS: shipped catalog ({len(catalog['lists'])} lists) and resources ({le
 EOF
 
 # 7. data + parity ---------------------------------------------------------
-if python3 "$ROOT/blocker/tools/sync.py" --check >/dev/null 2>&1; then
+if "$PYTHON" "$ROOT/blocker/tools/sync.py" --check >/dev/null 2>&1; then
   ok "sync.py --check (catalog/resources match the reference clones)"
 else
-  bad "sync.py --check failed (run python3 blocker/tools/sync.py)"
+  bad "sync.py --check failed (run $PYTHON blocker/tools/sync.py)"
 fi
 if cargo test -q -p astra-blocker >/tmp/astra-blocker-test.$$ 2>&1; then
   ok "crates/astra-blocker parity fixtures"

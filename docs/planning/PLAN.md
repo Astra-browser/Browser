@@ -374,7 +374,7 @@ Rules: no Astra module outside `host/` may import Firefox internals (`Services`,
 ### 6.7 Footprint budgets (CI-enforced)
 | Metric | Budget (initial) |
 |---|---|
-| Total upstream lines touched by P2/P3 patches | ≤ 1,500 (alert at 1,000) |
+| Total upstream lines touched by P2/P3 patches | ≤ 4,000 (alert at 3,500; raised from 1,500 by D-50) |
 | Number of patches | ≤ 60 |
 | P3 patches | ≤ 8, each with owner sign-off |
 | Files outside `overlay/astra/` modified | tracked and listed; growth requires justification |

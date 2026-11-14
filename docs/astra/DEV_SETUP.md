@@ -44,6 +44,17 @@ It runs `engine/obj-astra-linux/dist/bin/firefox` with `-no-remote` and a
 profile in `out/dev-profile`, and prints the build command if the binary is
 missing.
 
+Windows uses the sibling PowerShell launcher (the Linux script is unchanged):
+
+```powershell
+.\tools\run-dev.ps1              # reuse out\dev-profile
+.\tools\run-dev.ps1 -Fresh       # empty profile
+.\tools\run-dev.ps1 -- -new-window
+```
+
+It runs `engine\obj-astra-windows\dist\bin\firefox.exe` and prints the
+`forge build --os windows --jobs 2` command if the binary is missing.
+
 ## Versioning the dev/alpha build
 
 Astra's own version lives in `branding/astra.toml`; the Firefox pin in
@@ -143,6 +154,20 @@ After `build:chrome` or the shell build, stage before refreshing the dist:
 hashed bundle and the app boots to "app frame timed out".
 
 ## Drive the running browser (Marionette)
+
+Repo Python scripts (`tools/state-check.py`, `tools/contract-runner/run.py`,
+`tools/marionette-probe/*.py`, `tools/perf/**/*.py`) are stdlib-only. Shell
+entry points (`setup.sh`, `tools/bootstrap.sh`, `tools/package-release.sh`,
+`tools/blocker-wiring-check.sh`, `tools/perf/full-suite.sh`) resolve the
+interpreter via `tools/venv-python.sh`: `$ROOT/.venv` when present
+(`.venv/bin/python` on Linux, `.venv/Scripts/python.exe` on Windows
+Git-Bash), else system `python3`/`python`. Create it with
+`python -m venv .venv`, then activate for direct probe runs:
+
+```sh
+source .venv/bin/activate          # Linux
+.\.venv\Scripts\Activate.ps1       # Windows PowerShell
+```
 
 Playwright cannot attach to this build (it needs `-juggler-pipe`; our ESR
 build does not speak it). Use the in-tree harnesses:

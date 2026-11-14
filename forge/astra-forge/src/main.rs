@@ -19,6 +19,101 @@ fn repo_root() -> PathBuf {
     }
 }
 
+/// The host platform name used by `--os` and the objdir/binary helpers.
+fn host_os() -> &'static str {
+    if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    }
+}
+
+fn objdir_name(os: &str) -> String {
+    format!("obj-astra-{os}")
+}
+
+fn exe_suffix(os: &str) -> &'static str {
+    if os == "windows" { ".exe" } else { "" }
+}
+
+/// Drop the Windows verbatim prefix that Git for Windows rejects.
+fn strip_verbatim(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest.to_string());
+    }
+    path
+}
+
+/// Convert a Windows path to the form MSYS/MozillaBuild accepts (`/e/Astra`).
+fn to_msys_path(path: &Path) -> String {
+    let s = path.to_string_lossy().replace('\\', "/");
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2 && bytes[1] == b':' {
+        format!("/{}{}", s[0..1].to_lowercase(), &s[2..])
+    } else {
+        s
+    }
+}
+
+/// Recursive copy for Windows, where `cp -a` is not available. Linux keeps
+/// the existing `cp -a` path so its file modes and symlinks are unchanged.
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        let ty = entry.file_type().map_err(|e| e.to_string())?;
+        if ty.is_dir() {
+            copy_dir_all(&from, &to)?;
+        } else {
+            fs::copy(&from, &to).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Copy a directory tree, preserving the existing Linux `cp -a` path.
+fn copy_dir(root: &Path, src: &Path, dst: &Path) -> Result<(), String> {
+    if cfg!(windows) {
+        copy_dir_all(src, dst)
+    } else {
+        run(
+            "cp",
+            &[
+                "-a",
+                &format!("{}/.", src.to_string_lossy()),
+                &dst.to_string_lossy(),
+            ],
+            root,
+        )
+        .map(|_| ())
+    }
+}
+
+/// `OS:` header from a patch, or `None` when the patch is platform-neutral.
+fn patch_os(patch: &Path) -> Option<String> {
+    let text = fs::read_to_string(patch).ok()?;
+    for line in text.lines() {
+        if line.starts_with("---") {
+            break;
+        }
+        if let Some(value) = line.strip_prefix("OS:") {
+            let value = value.trim().to_lowercase();
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+    }
+    None
+}
+
 // Minimal upstream.toml reader: top-level `key = value` string pairs.
 fn read_upstream(root: &Path) -> std::collections::HashMap<String, String> {
     let text = fs::read_to_string(root.join("upstream.toml")).expect("read upstream.toml");
@@ -173,26 +268,61 @@ fn cmd_fetch(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_doctor(root: &Path) -> Result<(), String> {
+fn cmd_doctor(root: &Path, os: &str) -> Result<(), String> {
     let mut ok = true;
-    for (prog, why) in [
+    let python = if os == "windows" { "python" } else { "python3" };
+    let mut tools: Vec<(&str, &str)> = vec![
         ("curl", "downloads"),
         ("tar", "extraction"),
         ("gpg", "signatures"),
         ("git", "patch baseline"),
         ("rustc", "forge itself"),
-        ("python3", "state-check"),
+        (python, "state-check"),
         ("bun", "UI workspace (P3)"),
-    ] {
-        match run(prog, &["--version"], root) {
+    ];
+    if os == "windows" {
+        tools.extend([
+            ("clang-cl", "target C/C++ compiler"),
+            ("nasm", "assembly"),
+            ("sccache", "compiler cache"),
+        ]);
+    }
+    for (prog, why) in tools {
+        let version_arg = if prog == "nasm" { "-v" } else { "--version" };
+        match run(prog, &[version_arg], root) {
             Ok(first) => println!(
-                "doctor: {prog:8} OK ({}) — {why}",
+                "doctor: {prog:10} OK ({}) — {why}",
                 first.lines().next().unwrap_or("")
             ),
             Err(e) => {
-                println!("doctor: {prog:8} MISSING ({e}) — {why}");
+                println!("doctor: {prog:10} MISSING ({e}) — {why}");
                 ok = false;
             }
+        }
+    }
+    if os == "windows" {
+        if let Ok(version) = run("nasm", &["-v"], root) {
+            if version.contains("NASM version 3.") {
+                println!(
+                    "doctor: nasm 3.x crashes the pinned libvpx assembly; set ASTRA_NASM_DIR to a NASM 2.16.x directory ({})",
+                    version.lines().next().unwrap_or("")
+                );
+                ok = false;
+            }
+        }
+        let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
+        if shell.exists() {
+            println!("doctor: MozillaBuild OK ({})", shell.display());
+        } else {
+            println!("doctor: MozillaBuild MISSING (C:\\mozilla-build\\start-shell.bat)");
+            ok = false;
+        }
+        let make = Path::new("C:\\mozilla-build\\msys2\\usr\\bin\\make.exe");
+        if make.exists() {
+            println!("doctor: make OK ({})", make.display());
+        } else {
+            println!("doctor: make MISSING (install ezwinports.make into MozillaBuild)");
+            ok = false;
         }
     }
     let up = read_upstream(root);
@@ -205,7 +335,7 @@ fn cmd_doctor(root: &Path) -> Result<(), String> {
             }
         }
     }
-    if let Err(e) = cmd_doctor_mozconfig(root) {
+    if let Err(e) = cmd_doctor_mozconfig(root, os) {
         println!("doctor: mozconfig: {e}");
         ok = false;
     }
@@ -233,32 +363,29 @@ fn configure_files(engine: &Path) -> Vec<String> {
 }
 
 fn configure_has(engine: &Path, needle: &str) -> bool {
-    let files = configure_files(engine);
-    let mut cmd = Command::new("grep");
-    cmd.args(["-rq", "--", needle]);
-    for f in &files {
-        cmd.arg(f);
-    }
-    match cmd.output() {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
-    }
+    configure_files(engine).iter().any(|f| {
+        fs::read_to_string(f)
+            .map(|text| text.contains(needle))
+            .unwrap_or(false)
+    })
 }
 
-// Validate config/mozconfig.linux flags against the pinned source (P1-T02).
-fn cmd_doctor_mozconfig(root: &Path) -> Result<(), String> {
-    let template = root.join("config/mozconfig.linux");
+// Validate config/mozconfig.<os> flags against the pinned source (P1-T02).
+fn cmd_doctor_mozconfig(root: &Path, os: &str) -> Result<(), String> {
+    let template = root.join(format!("config/mozconfig.{os}"));
     if !template.exists() {
-        return Err("config/mozconfig.linux missing".into());
+        return Err(format!("config/mozconfig.{os} missing"));
     }
     let engine = root.join("engine");
     if !engine.join("toolkit/moz.configure").exists() {
         return Err("engine/ source absent (run `forge fetch` first)".into());
     }
-    // The template carries one placeholder in --with-branding; only the
-    // option *name* is validated, so substitute a dummy value first.
+    // The template carries placeholders in --with-branding and the objdir;
+    // only the option *name* is validated, so substitute dummy values first.
     let text = fs::read_to_string(&template).map_err(|e| e.to_string())?;
-    let text = text.replace("@ASTRA_BRANDING_DIR@", "astra/branding");
+    let text = text
+        .replace("@ASTRA_BRANDING_DIR@", "astra/branding")
+        .replace("@ASTRA_OBJDIR@", "@TOPSRCDIR@/obj-astra-test");
     let mut checked = 0;
     let mut bad: Vec<String> = Vec::new();
     for raw in text.lines() {
@@ -438,9 +565,14 @@ fn render_branding(root: &Path) -> Result<(), String> {
 
 // Render config/mozconfig.<os> into out/mozconfig.<os> (P1-T02).
 // Substitutes @ASTRA_*@ placeholders from branding/astra.toml.
-fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
-    if os != "linux" {
-        return Err(format!("os {os}: only linux yet (windows P9, macos P10)"));
+// Windows is a scaffold: the template mirrors linux and carries explicit
+// TODO(windows-port) markers for flags still unverified on a real toolchain.
+fn cmd_config(root: &Path, os: &str, branding: &str, objdir: Option<&str>) -> Result<(), String> {
+    match os {
+        "linux" | "windows" => {}
+        _ => {
+            return Err(format!("os {os}: only linux|windows yet (macos P10)"));
+        }
     }
     let template_path = root.join(format!("config/mozconfig.{os}"));
     if !template_path.exists() {
@@ -480,10 +612,13 @@ fn cmd_config(root: &Path, os: &str, branding: &str) -> Result<(), String> {
         }
     };
     let template = fs::read_to_string(&template_path).map_err(|e| e.to_string())?;
+    let default_objdir = format!("@TOPSRCDIR@/{}", objdir_name(os));
+    let objdir = objdir.unwrap_or(&default_objdir);
     let rendered = template
         .replace("@ASTRA_BRANDING_DIR@", branding_dir)
         .replace("@ASTRA_DISPLAY_NAME@", &display)
-        .replace("@ASTRA_BINARY_NAME@", &binary);
+        .replace("@ASTRA_BINARY_NAME@", &binary)
+        .replace("@ASTRA_OBJDIR@", objdir);
     if rendered.contains("@ASTRA_") {
         return Err("config: unsubstituted @ASTRA_*@ placeholder left".into());
     }
@@ -555,7 +690,7 @@ fn patch_content_present(engine: &Path, patch: &Path) -> bool {
 
 // Copy overlay/astra/** into engine/astra/ and apply the P2 hook list (P1-T05).
 // Idempotent: re-copies the tree, skips patches that already apply reversed.
-fn cmd_overlay(root: &Path) -> Result<(), String> {
+fn cmd_overlay(root: &Path, os: &str) -> Result<(), String> {
     let src = root.join("overlay/astra");
     if !src.join("moz.build").exists() {
         return Err("overlay/astra/moz.build missing".into());
@@ -568,16 +703,7 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     if dest.exists() {
         fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
     }
-    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
-    run(
-        "cp",
-        &[
-            "-a",
-            &format!("{}/.", src.to_string_lossy()),
-            &dest.to_string_lossy(),
-        ],
-        root,
-    )?;
+    copy_dir(root, &src, &dest)?;
     println!("overlay: copied overlay/astra -> engine/astra");
     // Apply hook patches in order (P2 list; full series handling is P1-T12).
     let mut patches: Vec<std::path::PathBuf> = Vec::new();
@@ -596,6 +722,12 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     }
     for p in &patches {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        if let Some(only) = patch_os(p) {
+            if only != os {
+                println!("overlay: {name} skipped (OS: {only})");
+                continue;
+            }
+        }
         // Already applied? `git apply --reverse --check` exits 0 only then.
         // Cargo.lock is a derived vendored artifact: later patches and
         // `mach vendor rust` rewrite it, so reverse-checking it would make an
@@ -631,7 +763,11 @@ fn cmd_overlay(root: &Path) -> Result<(), String> {
     // body or the fetched engine. Stage it after the series so a fresh tree
     // gets the patch-created files and an existing tree is refreshed in place.
     stage_blocker(root, &engine)?;
-    stage_passkeys(root, &engine)?;
+    if os == "linux" {
+        stage_passkeys(root, &engine)?;
+    } else {
+        println!("overlay: passkeys/engine skipped on {os} (Windows uses Windows Hello)");
+    }
     // Sanity: the wiring targets must exist after overlay.
     for f in [
         "astra/moz.build",
@@ -661,16 +797,7 @@ fn stage_passkeys(root: &Path, engine: &Path) -> Result<(), String> {
     if dest.exists() {
         fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
     }
-    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
-    run(
-        "cp",
-        &[
-            "-a",
-            &format!("{}/.", src.to_string_lossy()),
-            &dest.to_string_lossy(),
-        ],
-        root,
-    )?;
+    copy_dir(root, &src, &dest)?;
     println!("overlay: staged passkeys/engine -> toolkit/components/astra_passkeys");
     Ok(())
 }
@@ -687,16 +814,7 @@ fn stage_blocker(root: &Path, engine: &Path) -> Result<(), String> {
     if dest.exists() {
         fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
     }
-    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
-    run(
-        "cp",
-        &[
-            "-a",
-            &format!("{}/.", src.to_string_lossy()),
-            &dest.to_string_lossy(),
-        ],
-        root,
-    )?;
+    copy_dir(root, &src, &dest)?;
     println!("overlay: staged blocker/engine -> toolkit/components/astra_blocker_engine");
 
     let data_dest = engine.join("astra/blocker");
@@ -988,9 +1106,19 @@ fn cmd_lint(root: &Path) -> Result<(), String> {
             }
         }
         // Must apply cleanly OR already be applied (reverse-checks clean).
+        // Cargo.lock is excluded from the forward check: it is a generated
+        // lockfile touched by adjacent series patches (e.g. ASTRA-0003 inserts
+        // astra_blocker_engine right where ASTRA-0014's hunk expects it), so a
+        // later patch can only match once its predecessors are applied — which
+        // is exactly how `forge import` applies the series. The reverse check
+        // already excludes it for the same reason; all other files are still
+        // strictly checked in both directions.
         if engine.join("mach").exists() {
             let pstr = p.to_string_lossy().into_owned();
-            let clean = git_check(&engine, &["apply", "--check", &pstr]);
+            let clean = git_check(
+                &engine,
+                &["apply", "--check", "--exclude=Cargo.lock", &pstr],
+            );
             let applied = git_check(
                 &engine,
                 &[
@@ -1240,7 +1368,7 @@ fn count_added(body: &str) -> (usize, usize) {
 // 3-way fallback. Per-patch clean/offset/fuzz/conflict report goes to
 // out/patch-health.json; on success the docs hook refreshes
 // docs/astra/UPSTREAM.md. --check only classifies, never writes engine/.
-fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
+fn cmd_import(root: &Path, check_only: bool, os: &str) -> Result<(), String> {
     let engine = root.join("engine");
     if !engine.join("mach").exists() {
         return Err("engine/ source absent (run `forge fetch` first)".into());
@@ -1255,7 +1383,10 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
     let mut conflicts = 0;
     for p in &entries {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        // Rust's canonicalize returns a verbatim `\\?\E:\...` path on Windows;
+        // Git for Windows rejects that prefix.
         let pabs = fs::canonicalize(p)
+            .map(strip_verbatim)
             .map_err(|e| e.to_string())?
             .to_string_lossy()
             .into_owned();
@@ -1289,6 +1420,13 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
                 added,
             });
         };
+        if let Some(only) = patch_os(p) {
+            if only != os {
+                println!("import: {name}: skipped (OS: {only})");
+                push("skipped", format!("OS: {only}"));
+                continue;
+            }
+        }
         if git_check(&engine, &["apply", "--reverse", "--check", &pabs]) {
             println!("import: {name}: already applied, skipping");
             push("already-applied", "reverse-check clean".into());
@@ -1355,8 +1493,32 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
     // own crates can block vendoring while our deps are fine (P4-T02);
     // the build fails fast with a missing-crate error if anything needed
     // is actually absent.
-    {
-        use std::process::Command;
+    let vendor = if os == "windows" {
+        let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
+        if !shell.exists() {
+            Err("C:\\mozilla-build\\start-shell.bat absent".to_string())
+        } else {
+            let mozconfig = env::var("MOZCONFIG")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| root.join("out/mozconfig.windows"));
+            let script = format!(
+                "cd {} && export MOZCONFIG={} && ./mach vendor rust --ignore-modified",
+                to_msys_path(&engine),
+                to_msys_path(&mozconfig)
+            );
+            Command::new("cmd")
+                .args([
+                    "/C",
+                    "C:\\mozilla-build\\start-shell.bat",
+                    "-no-start",
+                    "-defterm",
+                    "-c",
+                ])
+                .arg(script)
+                .output()
+                .map_err(|e| format!("spawn MozillaBuild: {e}"))
+        }
+    } else {
         let mut cmd = Command::new("./mach");
         cmd.args(["vendor", "rust", "--ignore-modified"])
             .current_dir(&engine);
@@ -1366,18 +1528,19 @@ fn cmd_import(root: &Path, check_only: bool) -> Result<(), String> {
                 cmd.env("MOZCONFIG", &rendered);
             }
         }
-        match cmd.output().map_err(|e| format!("spawn mach: {e}")) {
-            Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
-            Ok(o) => println!(
-                "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
-                String::from_utf8_lossy(&o.stderr)
-                    .trim()
-                    .lines()
-                    .last()
-                    .unwrap_or("")
-            ),
-            Err(e) => println!("import: WARNING vendor skipped ({e})"),
-        }
+        cmd.output().map_err(|e| format!("spawn mach: {e}"))
+    };
+    match vendor {
+        Ok(o) if o.status.success() => println!("import: vendored Rust sources refreshed"),
+        Ok(o) => println!(
+            "import: WARNING `mach vendor rust` incomplete ({}); see docs/astra/BLOCKER_WIRING.md §4",
+            String::from_utf8_lossy(&o.stderr)
+                .trim()
+                .lines()
+                .last()
+                .unwrap_or("")
+        ),
+        Err(e) => println!("import: WARNING vendor skipped ({e})"),
     }
     println!(
         "import: done ({} patch(es), health in out/patch-health.json)",
@@ -1595,7 +1758,7 @@ fn compute_footprint(root: &Path) -> Result<Footprint, String> {
     })
 }
 
-// `forge footprint`: enforce the §6.7 budget (defaults ≤1500 lines P2/P3,
+// `forge footprint`: enforce the §6.7 budget (defaults ≤4000 lines P2/P3,
 // ≤60 patches, ≤8 P3). Always writes out/footprint.json; exits 1 over
 // budget with the offending dimensions named.
 fn cmd_footprint(
@@ -1640,40 +1803,97 @@ fn cmd_footprint(
 // Run the build: `mach build` (full) or `mach build faster` (frontend-only, U-02).
 // Defaults MOZCONFIG to out/mozconfig.linux and SCCACHE_DIR to out/sccache
 // when the caller did not set them (the P1-T04 proven setup).
-fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String> {
+fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<(), String> {
     let engine = root.join("engine");
     if !engine.join("mach").exists() {
         return Err("engine/ source absent (run `forge fetch` first)".into());
     }
-    let mut cmd = Command::new("./mach");
-    cmd.arg("build").current_dir(&engine);
+    let mozconfig = std::env::var("MOZCONFIG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| root.join(format!("out/mozconfig.{os}")));
+    if !mozconfig.exists() {
+        return Err(format!(
+            "build: {} absent (run `forge config --os {os}`)",
+            mozconfig.display()
+        ));
+    }
+    let sccache = std::env::var("SCCACHE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            if os == "windows" {
+                PathBuf::from("D:/astra-build/sccache")
+            } else {
+                root.join("out/sccache")
+            }
+        });
+    let mut mach_args: Vec<String> = vec!["build".into()];
     if faster {
-        cmd.arg("faster");
+        mach_args.push("faster".into());
     }
     if let Some(n) = jobs {
-        cmd.arg(format!("-j{n}"));
+        mach_args.push(format!("-j{n}"));
     }
-    if std::env::var("MOZCONFIG").is_err() {
-        let rendered = root.join("out/mozconfig.linux");
-        if rendered.exists() {
-            cmd.env("MOZCONFIG", &rendered);
-            println!("build: MOZCONFIG defaulted to {}", rendered.display());
-        } else {
-            println!(
-                "build: WARNING no MOZCONFIG set and out/mozconfig.linux absent (run `forge config`)"
+
+    let status = if os == "windows" {
+        let shell = Path::new("C:\\mozilla-build\\start-shell.bat");
+        if !shell.exists() {
+            return Err(
+                "build: C:\\mozilla-build\\start-shell.bat absent (install MozillaBuild)".into(),
             );
         }
-    }
-    if std::env::var("SCCACHE_DIR").is_err() {
-        let dir = root.join("out/sccache");
-        cmd.env("SCCACHE_DIR", &dir);
-        println!("build: SCCACHE_DIR defaulted to {}", dir.display());
-    }
-    let st = cmd.status().map_err(|e| format!("spawn mach: {e}"))?;
-    if !st.success() {
+        let nasm_dir = std::env::var("ASTRA_NASM_DIR").unwrap_or_else(|_| "C:\\tools\\nasm".into());
+        let mut script = format!(
+            "export PATH=\"/c/Program Files/LLVM/bin:{}:$PATH\" && ",
+            to_msys_path(Path::new(&nasm_dir))
+        );
+        let _ = fs::create_dir_all(&sccache);
+        script.push_str(&format!(
+            "export MOZCONFIG={} && export SCCACHE_DIR={} && \
+             export SCCACHE_LOG=warn && export SCCACHE_ERROR_LOG={} && \
+             export SCCACHE_IDLE_TIMEOUT=0; \
+             sccache --show-stats >/dev/null 2>&1 || sccache --start-server >/dev/null 2>&1 || true; ",
+            to_msys_path(&mozconfig),
+            to_msys_path(&sccache),
+            to_msys_path(&sccache.join("error.log"))
+        ));
+        for key in ["MOZ_WINDOWS_APP_SDK_DIR", "MOZ_WINDOWS_RS_DIR"] {
+            if let Ok(value) = std::env::var(key) {
+                if !value.is_empty() {
+                    script.push_str(&format!(
+                        "export {key}={} && ",
+                        to_msys_path(Path::new(&value))
+                    ));
+                }
+            }
+        }
+        script.push_str(&format!(
+            "cd {} && ./mach {}",
+            to_msys_path(&engine),
+            mach_args.join(" ")
+        ));
+        Command::new("cmd")
+            .args([
+                "/C",
+                "C:\\mozilla-build\\start-shell.bat",
+                "-no-start",
+                "-defterm",
+                "-c",
+            ])
+            .arg(script)
+            .status()
+            .map_err(|e| format!("spawn MozillaBuild: {e}"))?
+    } else {
+        let mut cmd = Command::new("./mach");
+        cmd.args(&mach_args)
+            .current_dir(&engine)
+            .env("MOZCONFIG", &mozconfig)
+            .env("SCCACHE_DIR", &sccache);
+        cmd.status().map_err(|e| format!("spawn mach: {e}"))?
+    };
+    if !status.success() {
         return Err("mach build failed (see output above)".into());
     }
-    if let Err(e) = install_core_binary(root) {
+    if let Err(e) = install_core_binary(root, os) {
         // A missing sidecar must not fail a browser build; the shell answers
         // `unavailable` when no core sits beside the binary.
         println!("core: WARNING {e}");
@@ -1685,7 +1905,7 @@ fn cmd_build(root: &Path, faster: bool, jobs: Option<&str>) -> Result<(), String
 /// Build and install the Rust sidecar next to the browser binary (P5b).
 /// `ASTRA_CORE_SKIP=1` opts out; `ASTRA_CORE_PROFILE=debug` builds the debug
 /// profile instead of release.
-fn install_core_binary(root: &Path) -> Result<(), String> {
+fn install_core_binary(root: &Path, os: &str) -> Result<(), String> {
     if std::env::var("ASTRA_CORE_SKIP").ok().as_deref() == Some("1") {
         println!("core: skipped (ASTRA_CORE_SKIP=1)");
         return Ok(());
@@ -1701,13 +1921,17 @@ fn install_core_binary(root: &Path) -> Result<(), String> {
     if !st.success() {
         return Err("astra-core build failed".into());
     }
-    let src = root.join("target").join(&profile).join("astra-core");
-    let dist = root.join("engine/obj-astra-linux/dist/bin");
+    let suffix = exe_suffix(os);
+    let src = root
+        .join("target")
+        .join(&profile)
+        .join(format!("astra-core{suffix}"));
+    let dist = root.join("engine").join(objdir_name(os)).join("dist/bin");
     if !dist.exists() {
         println!("core: no dist/bin yet; skipping install");
         return Ok(());
     }
-    let dest = dist.join("astra-core");
+    let dest = dist.join(format!("astra-core{suffix}"));
     std::fs::copy(&src, &dest).map_err(|e| format!("copy core: {e}"))?;
     #[cfg(unix)]
     {
@@ -1759,7 +1983,7 @@ fn cmd_test(root: &Path, mode: &str) -> Result<(), String> {
 
 fn usage() -> ! {
     eprintln!(
-        "usage: astra-forge <fetch|doctor|config [--os linux] [--branding astra|unofficial]|overlay|lint|export|import [--check]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N]|test [--smoke] [--fixture-only]>"
+        "usage: astra-forge <fetch|doctor|config [--os linux|windows] [--branding astra|unofficial] [--objdir PATH]|overlay [--os linux|windows]|lint|export|import [--check] [--os linux|windows]|footprint [--max-lines N] [--max-patches N] [--max-p3 N]|build [--faster] [--jobs N] [--os linux|windows]|test [--smoke] [--fixture-only]>"
     );
     std::process::exit(2);
 }
@@ -1769,33 +1993,61 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let res = match args.first().map(|s| s.as_str()) {
         Some("fetch") => cmd_fetch(&root),
-        Some("doctor") => cmd_doctor(&root),
-        Some("overlay") => cmd_overlay(&root),
+        Some("doctor") => {
+            let mut os = host_os();
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
+                    other => {
+                        eprintln!("astra-forge: error: unknown doctor flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_doctor(&root, os)
+        }
+        Some("overlay") => {
+            let mut os = host_os();
+            let mut it = args.iter().skip(1);
+            while let Some(a) = it.next() {
+                match a.as_str() {
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
+                    other => {
+                        eprintln!("astra-forge: error: unknown overlay flag {other}");
+                        usage();
+                    }
+                }
+            }
+            cmd_overlay(&root, os)
+        }
         Some("lint") => cmd_lint(&root),
         Some("export") => cmd_export(&root),
         Some("import") => {
             let mut check_only = false;
+            let mut os = host_os();
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 match a.as_str() {
                     "--check" => check_only = true,
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
                     other => {
                         eprintln!("astra-forge: error: unknown import flag {other}");
                         usage();
                     }
                 }
             }
-            cmd_import(&root, check_only)
+            cmd_import(&root, check_only, os)
         }
         Some("footprint") => {
-            let mut max_lines = 1500usize;
+            let mut max_lines = 4000usize;
             let mut max_patches = 60usize;
             let mut max_p3 = 8usize;
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 let mut val = || it.next().map(|s| s.as_str()).unwrap_or("");
                 match a.as_str() {
-                    "--max-lines" => max_lines = val().parse().unwrap_or(1500),
+                    "--max-lines" => max_lines = val().parse().unwrap_or(4000),
                     "--max-patches" => max_patches = val().parse().unwrap_or(60),
                     "--max-p3" => max_p3 = val().parse().unwrap_or(8),
                     other => {
@@ -1807,36 +2059,42 @@ fn main() {
             cmd_footprint(&root, max_lines, max_patches, max_p3)
         }
         Some("config") => {
-            let mut os = "linux";
+            let mut os = host_os();
             let mut branding = "astra";
+            let mut objdir: Option<String> = None;
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 match a.as_str() {
                     "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
                     "--branding" => branding = it.next().map(|s| s.as_str()).unwrap_or(branding),
+                    "--objdir" => {
+                        objdir = Some(it.next().map(|s| s.to_string()).unwrap_or_default())
+                    }
                     other => {
                         eprintln!("astra-forge: error: unknown config flag {other}");
                         usage();
                     }
                 }
             }
-            cmd_config(&root, os, branding)
+            cmd_config(&root, os, branding, objdir.as_deref())
         }
         Some("build") => {
             let mut faster = false;
             let mut jobs: Option<&str> = None;
+            let mut os = host_os();
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 match a.as_str() {
                     "--faster" => faster = true,
                     "--jobs" => jobs = Some(it.next().map(|s| s.as_str()).unwrap_or("")),
+                    "--os" => os = it.next().map(|s| s.as_str()).unwrap_or(os),
                     other => {
                         eprintln!("astra-forge: error: unknown build flag {other}");
                         usage();
                     }
                 }
             }
-            cmd_build(&root, faster, jobs)
+            cmd_build(&root, os, faster, jobs)
         }
         Some("test") => {
             let mut mode = "full";
@@ -1858,5 +2116,64 @@ fn main() {
     if let Err(e) = res {
         eprintln!("astra-forge: error: {e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn msys_path_converts_a_windows_drive() {
+        assert_eq!(
+            to_msys_path(Path::new("E:\\Astra\\engine")),
+            "/e/Astra/engine"
+        );
+        assert_eq!(to_msys_path(Path::new("D:/astra-build")), "/d/astra-build");
+    }
+
+    #[test]
+    fn msys_path_leaves_a_relative_path_alone() {
+        assert_eq!(
+            to_msys_path(Path::new("out/mozconfig.windows")),
+            "out/mozconfig.windows"
+        );
+    }
+
+    #[test]
+    fn verbatim_prefixes_are_dropped() {
+        assert_eq!(
+            strip_verbatim(PathBuf::from(r"\\?\E:\Astra\engine")).to_string_lossy(),
+            r"E:\Astra\engine"
+        );
+        assert_eq!(
+            strip_verbatim(PathBuf::from(r"\\?\UNC\server\share")).to_string_lossy(),
+            r"\\server\share"
+        );
+    }
+
+    #[test]
+    fn exe_suffix_is_windows_only() {
+        assert_eq!(exe_suffix("windows"), ".exe");
+        assert_eq!(exe_suffix("linux"), "");
+    }
+
+    #[test]
+    fn patch_os_reads_the_header_before_the_body() {
+        let dir = env::temp_dir().join(format!(
+            "astra-forge-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let patch = dir.join("OS.patch");
+        fs::write(&patch, "Patch-Id: T\nOS: linux\n---\ndiff --git a/x b/x\n").unwrap();
+        assert_eq!(patch_os(&patch).as_deref(), Some("linux"));
+        fs::write(&patch, "Patch-Id: T\n---\ndiff --git a/x b/x\n").unwrap();
+        assert_eq!(patch_os(&patch), None);
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

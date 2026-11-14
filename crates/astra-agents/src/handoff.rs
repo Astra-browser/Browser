@@ -725,6 +725,7 @@ mod tests {
         // `spawn_piped` retries that transient failure briefly. Rewriting
         // the script every iteration reproduces the race without the
         // retry (observed ~20% per-spawn failure); with it, all settle.
+        // Windows uses a .cmd mock so the same spawn loop is covered there.
         let root = std::env::temp_dir().join(format!(
             "astra-handoff-spawnretry-{}-{}",
             std::process::id(),
@@ -734,11 +735,16 @@ mod tests {
                 .as_nanos()
         ));
         std::fs::create_dir_all(&root).expect("retry sandbox");
+        #[cfg(windows)]
+        let bin = root.join("fake.cmd");
+        #[cfg(unix)]
         let bin = root.join("fake");
         for _ in 0..30 {
-            std::fs::write(&bin, "#!/bin/sh\nexit 0\n").expect("rewrite fake");
+            #[cfg(windows)]
+            std::fs::write(&bin, "@echo off\r\nexit /b 0\r\n").expect("rewrite fake");
             #[cfg(unix)]
             {
+                std::fs::write(&bin, "#!/bin/sh\nexit 0\n").expect("rewrite fake");
                 use std::os::unix::fs::PermissionsExt;
                 std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
                     .expect("chmod fake");

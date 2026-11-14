@@ -1,0 +1,11 @@
+# Normalize line endings cross-platform; keep Unix LF for scripts.
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.patch text eol=lf
+
+# NOTE: Unix exec bits (100755) are stored in the git index, not in this file
+# (gitattributes has no exec-bit directive). On Windows (no exec bit),
+# keep repo-local `core.filemode=false` so checkout never reports phantom
+# mode changes (100755 => 100644). Do not set +x here; use `git update-index
+# --chmod=+x <path>` on a Unix host if a script needs the exec bit.

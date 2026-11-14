@@ -1,0 +1,50 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Astra mozconfig — Windows (scaffold, UNVERIFIED).
+# TODO(windows-port): verify every flag against ESR 153.6.0 Windows build
+#   docs (MozillaBuild + VS2022 + Win SDK). Mirrored from
+#   config/mozconfig.linux; Windows-specific flags (toolchain paths,
+#   target triple, sccache, crashreporter/updater defaults, sandbox) still
+#   need confirmation on a real Windows toolchain before use.
+# TEMPLATE: rendered by `forge config --os windows` into out/mozconfig.windows
+# (placeholders @VAR@ filled from branding/astra.toml).
+# Branding: @ASTRA_BRANDING_DIR@ (display: @ASTRA_DISPLAY_NAME@).
+
+# Rendered by `forge config --os windows [--objdir PATH]`; the default is
+# @TOPSRCDIR@/obj-astra-windows. A local D: objdir is selected with --objdir.
+mk_add_options MOZ_OBJDIR=@ASTRA_OBJDIR@
+
+ac_add_options --enable-project=browser
+ac_add_options --with-branding=@ASTRA_BRANDING_DIR@
+
+# Telemetry / data reporting off (mirrored from linux; verify option name on Windows).
+export MOZ_TELEMETRY_REPORTING=
+
+# Crash reporting off (mirrored from linux; verify on Windows).
+ac_add_options --disable-crashreporter
+
+# Built-in updater off for dev builds; release updates use Astra's own host
+# (mirrored from linux; verify on Windows).
+ac_add_options --disable-updater
+
+# Parental controls off (mirrored from linux; verify literal on Windows).
+ac_add_options --disable-parental-controls
+
+# TODO(windows-port): verify whether --disable-backgroundtasks applies on
+# Windows (mirrored from linux; the Windows task agent may differ).
+ac_add_options --disable-backgroundtasks
+
+# No legacy profile creation (mirrored from linux; verify literal on Windows).
+ac_add_options --disable-legacy-profile-creation
+
+# WebDriver for contract/E2E tests (mirrored from linux).
+ac_add_options --enable-geckodriver
+
+# TODO(windows-port): sccache on Windows (mirrored from linux).
+# Verify install path + --with-ccache=sccache under MozillaBuild.
+ac_add_options --with-ccache=sccache
+
+# Release-like first build (mirrored from linux).
+ac_add_options --enable-release

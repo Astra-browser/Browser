@@ -43,6 +43,15 @@ in the dev build.
   it removes a native UI surface or provides a capability the UI is already
   using.
 
+### Owner override: Windows 11 x64 port (D-51, 2026-11-14)
+
+The Windows 11 x64 port and its packaging are now in scope by owner direction.
+This supersedes the Windows half of the "Windows/macOS ports" and
+"Packaging/release work (P8+)" exclusions; macOS remains out of scope. The
+Windows build follows every hard rule below: native wiring, a real backend,
+live verification on the running build, isolated contexts, and no Linux
+regression. Plan and locked decisions: `docs/astra/WINDOWS_MASTER_PLAN.md`.
+
 ## Hard rules for agents
 
 1. **Wire only what a surface uses.** No speculative Host API routes, events or

@@ -1,0 +1,97 @@
+Patch-Id: ASTRA-0016
+Title: Fix NSPR Windows socket and process casts for clang 23
+Tier: P2
+OS: windows
+Upstream-Files: nsprpub/pr/src/io/prsocket.c, nsprpub/pr/src/md/windows/ntmisc.c, nsprpub/pr/src/md/windows/w95io.c, nsprpub/pr/src/md/windows/w95sock.c
+Intent: clang 23 promotes -Wincompatible-pointer-types to an error. NSPR passes PRInt32*/PRUint32* to Windows APIs that take u_long*/LPDWORD (ioctlsocket, WSAIoctl, GetOverlappedResult, GetExitCodeProcess, ReadFile, WriteFile). Use the Windows types, cast where the API takes a pointer, and restore the declared PRInt32 return type. These are Windows-only files; values and widths are unchanged.
+Risk: low (PRInt32/PRUint32 are 32-bit and u_long/DWORD are 32-bit on Windows; casts only restore the declared API type)
+Test: `forge lint`; `mach build --jobs 2` on Windows gets past config/external/nspr/pr
+Verified-On: 153.6.0
+Removal-Plan: drop when upstream NSPR uses u_long/DWORD here; re-check after a base bump with `git -C engine diff FETCH_HEAD -- nsprpub/pr/src/io/prsocket.c nsprpub/pr/src/md/windows/ntmisc.c nsprpub/pr/src/md/windows/w95io.c nsprpub/pr/src/md/windows/w95sock.c`
+---
+diff --git a/nsprpub/pr/src/io/prsocket.c b/nsprpub/pr/src/io/prsocket.c
+index 13cc12ba41..02f1cbbcd5 100644
+--- a/nsprpub/pr/src/io/prsocket.c
++++ b/nsprpub/pr/src/io/prsocket.c
+@@ -305,7 +305,7 @@ static PRStatus PR_CALLBACK SocketConnectContinue(PRFileDesc* fd,
+     } else {
+ #  if defined(_WIN64)
+       if (fd->secret->overlappedActive) {
+-        PRInt32 rvSent;
++        DWORD rvSent;
+         if (GetOverlappedResult((HANDLE)osfd, &fd->secret->ol, &rvSent,
+                                 FALSE) == FALSE) {
+           err = WSAGetLastError();
+@@ -339,7 +339,7 @@ static PRStatus PR_CALLBACK SocketConnectContinue(PRFileDesc* fd,
+    * To get result we need to use GetOverlappedResult. */
+   if (fd->secret->overlappedActive) {
+     PR_ASSERT(fd->secret->nonblocking);
+-    PRInt32 rvSent;
++    DWORD rvSent;
+     if (GetOverlappedResult((HANDLE)osfd, &fd->secret->ol, &rvSent, FALSE) ==
+         TRUE) {
+       fd->secret->overlappedActive = PR_FALSE;
+diff --git a/nsprpub/pr/src/md/windows/ntmisc.c b/nsprpub/pr/src/md/windows/ntmisc.c
+index 19b12660f5..5ab7a11e34 100644
+--- a/nsprpub/pr/src/md/windows/ntmisc.c
++++ b/nsprpub/pr/src/md/windows/ntmisc.c
+@@ -733,7 +733,7 @@ PRStatus _PR_WaitWindowsProcess(PRProcess* process, PRInt32* exitCode) {
+   }
+   PR_ASSERT(dwRetVal == WAIT_OBJECT_0);
+   if (exitCode != NULL &&
+-      GetExitCodeProcess(process->md.handle, exitCode) == FALSE) {
++      GetExitCodeProcess(process->md.handle, (LPDWORD)exitCode) == FALSE) {
+     PR_SetError(PR_UNKNOWN_ERROR, GetLastError());
+     return PR_FAILURE;
+   }
+diff --git a/nsprpub/pr/src/md/windows/w95io.c b/nsprpub/pr/src/md/windows/w95io.c
+index 42c9e06a0c..6cbac1609e 100644
+--- a/nsprpub/pr/src/md/windows/w95io.c
++++ b/nsprpub/pr/src/md/windows/w95io.c
+@@ -229,7 +229,7 @@ PROsfd _PR_MD_OPEN_FILE(const char* name, PRIntn osflags, int mode) {
+ }
+ 
+ PRInt32 _PR_MD_READ(PRFileDesc* fd, void* buf, PRInt32 len) {
+-  PRUint32 bytes;
++  DWORD bytes;
+   int rv, err;
+ 
+   rv = ReadFile((HANDLE)fd->secret->md.osfd, (LPVOID)buf, len, &bytes, NULL);
+@@ -250,7 +250,7 @@ PRInt32 _PR_MD_READ(PRFileDesc* fd, void* buf, PRInt32 len) {
+ 
+ PRInt32 _PR_MD_WRITE(PRFileDesc* fd, const void* buf, PRInt32 len) {
+   PROsfd f = fd->secret->md.osfd;
+-  PRInt32 bytes;
++  DWORD bytes;
+   int rv;
+ 
+   rv = WriteFile((HANDLE)f, buf, len, &bytes, NULL);
+diff --git a/nsprpub/pr/src/md/windows/w95sock.c b/nsprpub/pr/src/md/windows/w95sock.c
+index a07b1b9b46..dc194960d4 100644
+--- a/nsprpub/pr/src/md/windows/w95sock.c
++++ b/nsprpub/pr/src/md/windows/w95sock.c
+@@ -95,13 +95,13 @@ PRInt32 _MD_CloseSocket(PROsfd osfd) {
+ }
+ 
+ PRInt32 _MD_SocketAvailable(PRFileDesc* fd) {
+-  PRInt32 result;
++  u_long result;
+ 
+   if (ioctlsocket(fd->secret->md.osfd, FIONREAD, &result) < 0) {
+     PR_SetError(PR_BAD_DESCRIPTOR_ERROR, WSAGetLastError());
+     return -1;
+   }
+-  return result;
++  return (PRInt32)result;
+ }
+ 
+ PROsfd _MD_Accept(PRFileDesc* fd, PRNetAddr* raddr, PRUint32* rlen,
+@@ -302,7 +302,7 @@ static _pr_win_connectex_ptr _pr_win_connectex = NULL;
+ static PRStatus PR_CALLBACK _pr_set_connectex(void) {
+   _pr_win_connectex = NULL;
+   SOCKET sock;
+-  PRInt32 dwBytes;
++  DWORD dwBytes;
+   int rc;
+ 
+   /* Dummy socket needed for WSAIoctl */
