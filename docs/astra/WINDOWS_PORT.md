@@ -112,6 +112,25 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   Product builds set `WASI_SYSROOT` and remove the baseline-only
   `--without-wasm-sandboxed-libraries` line.
 
+### First patched build and live probes (2026-11-14)
+
+- `forge import --os windows` applied ASTRA-0001..0013, skipped 0014, and
+  treated 0015/0016 as already applied.
+- `forge overlay --os windows` staged the overlay, blocker and Astra branding;
+  passkeys stayed absent.
+- `mach configure` with `--with-branding=astra/branding` and
+  `--with-wasi-sysroot=D:/astra-build/wasi-34/wasi-sysroot-34.0` passed.
+- Patched `mach build` **PASS** 2026-11-14 13:05, wall 15:08, thin Rust LTO;
+  `xul.dll` 182,513,664 bytes.
+- `tools/marionette-probe/version-probe.py <windows firefox.exe>` **8/8 PASS**:
+  Astra version 0.1.745, `about_info` reports `Windows_NT 10.0` / `x86_64`,
+  app booted, Settings -> About shows `Version 0.1.745`.
+- `tools/windows/sidecar-probe.py` **5/5 PASS**: the shell finds
+  `astra-core.exe` beside the browser, reports `data-core=running`, the process
+  is alive, `ProfD/astra/core.sqlite` is created, and the sidecar stops with the
+  browser.
+- `mach build faster` after an overlay is **10-13 s**.
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
@@ -122,9 +141,12 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   `SCCACHE_ERROR_LOG`, `SCCACHE_IDLE_TIMEOUT=0` and pre-starts the server.
 - `tools/windows/sccache-smoke.ps1` PASS: C/C++ hit, Rust hit, 16 concurrent
   compiles, server alive afterwards.
-- Real engine build evidence: 46 compiles executed, 45 cache writes, 0 cache
-  errors, 0 compilation failures. The first pass is misses; the next build of
-  the same sources hits.
+- Real engine build evidence: the baseline first pass executed 1,985 compiles
+  and wrote 1,952 objects with 0 cache errors. The patched build executed 510
+  compiles with **458 hits and 43 misses (91.42%)**, 0 cache errors and 0
+  compilation failures.
+- The first pass over new sources is misses; the next build of the same
+  sources hits.
 - The earlier "connection forcibly closed" errors happened when a forced
   build-tree stop also killed the server. Do not `taskkill /T` the sccache
   server; `forge build` now starts it detached and keeps it idle-alive.
