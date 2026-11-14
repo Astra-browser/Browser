@@ -75,7 +75,7 @@ Mozconfig: local `out/mozconfig.windows.local` (unofficial branding,
 | second build | stopped after 4 min 42 s: NSPR `w95sock.c` pointer types under clang 23 (fixed in ASTRA-0016) and an sccache server connection reset (server restarted) |
 | third build | reached `gkrust` fat-LTO completion in ~78 min, then stopped on `prsocket.c`/`ntmisc.c`/`w95io.c` NSPR casts; fixed in ASTRA-0016 |
 | fourth build | reached C++ `browser/components` and `media/libvpx`, then NASM 3.02 crashed `dequantize_mmx.asm` with `0xC0000005`; reconfigured with NASM 2.16.03 |
-| fifth build | started 2026-11-14 09:00; result pending |
+| fifth build | resumed 2026-11-14 09:57 at `-j5`, then `-j20`; sccache active (45 cache writes, 0 errors); in progress |
 
 Warnings already known: `dxcompiler.dll` missing (WebGPU disabled), WASI
 sandboxed libraries disabled in the baseline config. Both must be resolved

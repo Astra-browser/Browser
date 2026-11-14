@@ -108,6 +108,23 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   Product builds set `WASI_SYSROOT` and remove the baseline-only
   `--without-wasm-sandboxed-libraries` line.
 
+### sccache (verified 2026-11-14)
+
+- One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
+  process can exit and the server stays alive.
+- Cache at `D:\astra-build\sccache` (10 GiB max), diagnostics at
+  `D:\astra-build\sccache\error.log`.
+- `forge build --os windows` sets `SCCACHE_LOG=warn`,
+  `SCCACHE_ERROR_LOG`, `SCCACHE_IDLE_TIMEOUT=0` and pre-starts the server.
+- `tools/windows/sccache-smoke.ps1` PASS: C/C++ hit, Rust hit, 16 concurrent
+  compiles, server alive afterwards.
+- Real engine build evidence: 46 compiles executed, 45 cache writes, 0 cache
+  errors, 0 compilation failures. The first pass is misses; the next build of
+  the same sources hits.
+- The earlier "connection forcibly closed" errors happened when a forced
+  build-tree stop also killed the server. Do not `taskkill /T` the sccache
+  server; `forge build` now starts it detached and keeps it idle-alive.
+
 ## What remains UNVERIFIED (intentionally left for later)
 
 See the blocker list in the port report; summary:
