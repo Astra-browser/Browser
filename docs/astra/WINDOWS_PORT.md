@@ -52,7 +52,7 @@ patches (ASTRA-0014) are skipped by `import`/`overlay --os windows`, and
 | MozillaBuild | 4.2.1 at `C:\mozilla-build` (MSYS2 `msys2/usr/bin`) |
 | GNU make | 4.4.1 (winget `ezwinports.make`; MozillaBuild 4.2.1 does not bundle it) |
 | Python | 3.12.10 (MozillaBuild `C:\mozilla-build\python3`) |
-| NASM | 3.02 at `C:\tools\nasm` |
+| NASM | **2.16.03** at `D:\astra-build\nasm-2.16.03\nasm-2.16.03` for builds (3.02 at `C:\tools\nasm` crashes the pinned libvpx `dequantize_mmx.asm`); set `ASTRA_NASM_DIR` |
 | cbindgen | 0.29.4 (`cargo install cbindgen --locked`) |
 | sccache | 0.19.0, cache at `D:\astra-build\sccache` |
 | Windows App SDK | 2.2.0 redistributable, SHA-256 pinned by the tree; DLLs staged at `D:\astra-build\windowsappsdk\winappsdk-x86_64-pc-windows-msvc` |
@@ -72,11 +72,12 @@ backend emit an absolute MSYS path when `os.path.relpath` crosses drives.
 Environment used:
 
 ```sh
-export PATH="/c/Users/Rem/AppData/Local/Microsoft/WinGet/Packages/ezwinports.make_Microsoft.Winget.Source_8wekyb3d8bbwe/bin:/c/Program Files/LLVM/bin:/c/tools/nasm:$PATH"
+export PATH="/c/Users/Rem/AppData/Local/Microsoft/WinGet/Packages/ezwinports.make_Microsoft.Winget.Source_8wekyb3d8bbwe/bin:/c/Program Files/LLVM/bin:/d/astra-build/nasm-2.16.03/nasm-2.16.03:/c/tools/nasm:$PATH"
 export MOZCONFIG=/e/Astra/out/mozconfig.windows.local
 export SCCACHE_DIR=/d/astra-build/sccache
 export MOZ_WINDOWS_APP_SDK_DIR=/d/astra-build/windowsappsdk/winappsdk-x86_64-pc-windows-msvc
 export MOZ_WINDOWS_RS_DIR=/d/astra-build/windows-rs/windows-0.62.2
+export ASTRA_NASM_DIR=D:/astra-build/nasm-2.16.03/nasm-2.16.03
 cd /e/Astra/engine && ./mach configure
 ```
 
