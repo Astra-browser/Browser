@@ -49,7 +49,7 @@ Machine-readable output: `out/settings-probe.json` (`pages`, `representative`,
 | 10 | Profiles | 4 rows (custom) | - | New Profile opens Name/Photo/Colour/Create | OK |
 | 11 | Spaces | 1 space (custom) | - | Edit opens the editor; New Space keeps Settings and opens "Edit Space 2" | OK |
 | 12 | Features | 3 | 0 | `notes.enabled`, `tasks.enabled` flip and persist | OK |
-| 13 | Keyboard & accessibility | 81 | 0 | Ctrl+Shift+Y captured on a keymap row -> Save/Cancel | BAD (launcher row) |
+| 13 | Keyboard & accessibility | 81 | 0 | Ctrl+Shift+Y captured on a keymap row -> Save/Cancel; launcher row reads "Works from any app." | OK |
 | 14 | About | 3 | 0 | Copy Diagnostics expands the report | OK (updates dev-gated) |
 
 **Totals:** 14 pages, 176 setting rows, 3 disabled rows, 0 page alerts, 0
@@ -144,39 +144,42 @@ reason: Firefox honours `browser.download.useDownloadDir` there exactly as it
 does elsewhere. The flag is now `false`, the switch is enabled, and flipping it
 writes the pref.
 
-## Still open
-
-### F1 - Keyboard: the launcher row has no backend
+## Fixed: the launcher row
 
 ```
-Open the launcher | That action could not be completed. Please try again.
+Open the launcher | Works from any app. | Ctrl Shift Space
 ```
 
-This is bigger than a missing route. The launcher is a **separate native panel
-window** (`ui/app/panel.html` + `PanelApp.svelte`) that the browser port has
-never shipped: the chrome bundle has no `panel.html`, `panel_intent` is
-unrouted, no host module creates the window, and `Commands.run` refuses
-`launcher.toggle`, which the address field and sidebar search also call.
+The five `launcher_*` commands had nothing to route to: the launcher was a
+separate native panel window (`ui/app/panel.html` + `PanelApp.svelte`) that the
+browser port never shipped. The build now provides a surface and a shortcut:
 
-So the five `launcher_*` commands cannot be routed to anything: there is no
-surface for the shortcut to open. Wiring the Settings card alone would make it
-report `registered: false`, and its only message for that state is "another app
-may be using it", which would be untrue.
+- **The surface:** `features/launcher/LauncherOverlay.svelte` draws the launcher
+  over the browser chrome, using the host calls the window used
+  (`launcher_search`, `launcher_run`). `Commands.run` accepts `launcher.toggle`,
+  so the address field and the sidebar search button open it too.
+- **The shortcut:** `Launcher.sys.mjs` owns the accelerator (Settings key
+  `launcher.shortcut`, default `CmdOrCtrl+Shift+Space`), validates it against
+  the same grammar as the keymap, refuses keys the desktop or an app already
+  answers to, and stores it. The chrome key handler steps aside while the
+  overlay is up.
+- **Global:** `crates/astra-core/src/hotkey.rs` registers the accelerator with
+  `RegisterHotKey` on a dedicated message-loop thread. A press arrives on the
+  sidecar's event channel, the host turns it into `ui-command launcher.toggle`,
+  and the app brings the window forward and opens the overlay.
 
-The row stays as it is until the launcher surface exists. Two ways to build it:
+Verified live: `Launcher.trigger()` reports `registered: true`; a real
+system-wide Ctrl+Shift+Space (injected with `keybd_event`, browser unfocused)
+opens the overlay and the next press closes it, three presses alternating; the
+Settings card reads "Works from any app."; recording `Ctrl+Shift+Y` applies and
+persists; `Shift+Y` is refused with `needs_modifier` and `CmdOrCtrl+T` with
+`app_command`.
 
-1. **In-chrome overlay** on the existing search surface (`createSearchSurface`
-   + `ResultList`), toggled by `launcher.toggle`, plus a global hotkey so it
-   opens from any app. This is the smaller build and reuses the launcher's
-   query and run commands (`launcher_search`, `launcher_run`, already routed).
-2. **Native panel window** as designed: build `panel.html` into the chrome
-   bundle, add a host module that creates/positions/shows the window, route
-   `panel_state`/`panel_ready`/`panel_intent`, and register the accelerator.
+The double-tap row is not offered (`double_tap_supported: false`): noticing a
+modifier tapped twice while another app is in front needs a low-level keyboard
+hook this host does not install.
 
-Either way the copy "Works from any app." only becomes true with an OS-level
-hotkey (a Rust `RegisterHotKey` thread in `astra-core`, or an engine patch).
-
-### F6 - dormant unrouted bindings
+## Dormant unrouted bindings
 
 `work_clear_website_data`, `work_local_servers`, `work_screenshot_sites`,
 `work_set_screenshot_site` remain unrouted. Every Work page leaves with the
