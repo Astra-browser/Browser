@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$shared/i18n/messages";
   import { surface as browser } from "$domain/surface";
+  import { preferences } from "$domain/preferences";
   import * as settings from "../lib/settings-state.svelte";
   import { groups, shownSections } from "../lib/settings-model";
   import Icon from "$shared/ui/Icon";
@@ -55,7 +56,9 @@
       onclick={() => void browser.close()}
     />
   </header>
-  {#await identity then { default: SettingsIdentity }}<SettingsIdentity />{/await}
+  {#if preferences.accountEnabled()}
+    {#await identity then { default: SettingsIdentity }}<SettingsIdentity />{/await}
+  {/if}
   <div class="settings-sidebar-search">
     <Icon icon={Search01Icon} size={14} /><input
       type="search"
