@@ -131,6 +131,14 @@ for (const name of [
   "operation_status",
   "operations_reconcile",
   "operation_acknowledge",
+  // Settings surfaces that must reach their host module rather than fail in
+  // the card: the Windows privacy rows and the login item.
+  "windows_reputation_managed",
+  "windows_diagnostics_settings",
+  "login_item_set",
+  "login_item_open_settings",
+  "open_software_update",
+  "favicon_probe",
 ]) {
   check(`${name} is routed`, routes.some((route) => route.name === name));
 }

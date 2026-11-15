@@ -202,10 +202,12 @@ def main():
         privacy = m.js("""
           const f=document.querySelector('iframe[data-astra-app-frame]');
           const d=f&&f.contentDocument;
+          const row=d?.querySelector('[data-setting="privacy.smartscreen"]');
           const text=(d?.body?.innerText||'');
           return JSON.stringify({
-            windows: text.includes('Windows security') || text.includes('Microsoft Defender'),
-            diagnostics: text.includes('Diagnostics') || text.includes('diagnostic'),
+            windows: text.includes('Microsoft Defender'),
+            diagnostics: text.includes('diagnostic'),
+            row: (row?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 220),
             alert: d?.querySelector('[role="alert"]')?.textContent || null,
           });
         """)
@@ -213,6 +215,13 @@ def main():
         check("Settings > Privacy renders the Windows group",
               priv.get("windows") is True, privacy)
         check("Settings > Privacy has no route error", not priv.get("alert"), privacy)
+        # The route is the failure the alert lookup used to miss: the card
+        # writes a refused call into the row's description, not into an alert.
+        row = priv.get("row") or ""
+        check("the SmartScreen row reaches its host method",
+              "could not read windows control status" not in row.lower(), row)
+        check("the diagnostics button has a route",
+              "could not open windows diagnostic settings" not in row.lower(), row)
     except Exception as e:
         import traceback
         traceback.print_exc()
