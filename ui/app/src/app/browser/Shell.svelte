@@ -577,16 +577,17 @@
     return url !== null && url !== "" && url !== "about:blank";
   });
   // The column draws the page controls and the one address field while it is
-  // in its full shape: that is where the window's left edge is, and the bar
-  // above the page then has nothing of its own to carry. It keeps the job
-  // whenever the column is a rail, put away, or standing beside a panel, and
-  // always when the bar was pinned there on purpose.
+  // in its full shape. Put away, the card *is* the column: the same head has
+  // to slide out with it, or the card comes out headless — a column with no
+  // way back and no address, which is what the peek used to look like. The
+  // bar above the page therefore belongs to the shapes where the column is a
+  // rail or standing beside a panel, and to a bar pinned there on purpose.
   let columnCompact = $derived(
     isCompact() ||
       toolHost.activeTool() !== null ||
       ["settings", "tasks", "notes", "work"].includes(browserPage.currentPage() ?? ""),
   );
-  let sidebarOwnsBar = $derived(!columnCompact && !sidebarHidden() && barMode !== "always");
+  let sidebarOwnsBar = $derived(!columnCompact && barMode !== "always");
   let barVisible = $derived(
     !sidebarOwnsBar &&
       (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),
