@@ -252,10 +252,10 @@
   const slides = () => !reducedMotion();
   /** Once out, the card stays a moment whatever the pointer does: it is
    *  still arriving, and a hand settling onto it should not send it back. */
-  const SETTLE_MS = 520;
+  const SETTLE_MS = 240;
   /** Leaving the card gives it a moment: a pointer overshooting its edge
    *  and coming straight back should not see it go and return. */
-  const LINGER_MS = 280;
+  const LINGER_MS = 140;
   let opened = 0;
   let linger: ReturnType<typeof setTimeout> | undefined;
   let lowered: ReturnType<typeof setTimeout> | undefined;
@@ -518,15 +518,13 @@
     if (command.id === "sidebar.toggleCompact") queueMicrotask(toggleShape);
   });
 
-  /** Long enough for the column to go and come back as the card. */
-  const HIDING_SHOWN_MS = 1600;
-
   function toggleShape() {
     if (tools.activeTool() !== null) return tools.close();
+    // Put away, and that is all: the column goes and stays gone until the
+    // pointer reaches the window's edge. It used to come straight back out as
+    // the card and leave again with the pointer, which read as the button
+    // failing to take.
     toggleMode();
-    // Put away from its own button, the column comes straight back as the
-    // card it now is, and leaves with the pointer as any card does.
-    if (isHidden()) attention.pulse(HIDING_SHOWN_MS);
   }
 </script>
 
@@ -639,6 +637,13 @@
     :global([data-under-panel]) {
       transition: none;
     }
+  }
+
+  /* The column is a single composited layer: it slides on `translate` alone,
+     and asking for the layer up front is what keeps the first frame of the
+     slide from rasterising a card, its frost and a 36px shadow. */
+  .browser-sidebar {
+    will-change: translate;
   }
 
   /* Hidden, the column is a card that waits beside the window and slides

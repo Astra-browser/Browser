@@ -1225,16 +1225,21 @@
   /* A floating bar is laid over the page instead of taking a row. The page
      keeps the whole stage's rectangle; the bar travels on its own layer with
      a real ground so what passes under it stays readable, and the shell
-     raises/clips the frame to this strip. */
+     raises/clips the frame to this strip.
+
+     Its ground is opaque: a 94%-opaque chrome plus a 14px backdrop blur
+     bought a slightly softer edge, but a blur over a strip that the page
+     slides under is re-computed every frame of every slide — the sidebar's
+     peek made the whole window feel slow. The bar covers the page, so an
+     opaque ground is the honest material anyway. */
   .stage-column[data-bar-overlay="true"] .stage-bar {
     position: absolute;
     z-index: 30;
     inset-block-start: 0;
     inset-inline: 0;
-    background: color-mix(in srgb, var(--color-chrome) 94%, transparent);
+    background: var(--color-chrome);
     border-block-end: 1px solid var(--color-border);
     box-shadow: var(--shadow-float);
-    backdrop-filter: blur(14px);
     transition:
       transform var(--motion-base) var(--ease-out),
       opacity var(--motion-fast) var(--ease-out);
