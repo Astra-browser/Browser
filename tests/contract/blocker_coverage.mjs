@@ -21,6 +21,10 @@ const ROOT = path.dirname(
   path.dirname(path.dirname(fileURLToPath(import.meta.url))),
 );
 const INVENTORY = path.join(ROOT, "blocker/lists/superadblock-hosts.json");
+const TESTER_INVENTORY = path.join(
+  ROOT,
+  "blocker/lists/adblocktester-hosts.json",
+);
 const LIST = path.join(ROOT, "blocker/lists/astra-telemetry.txt");
 const SEED = path.join(ROOT, "blocker/seed/astra-telemetry.txt.gz");
 const CFG = path.join(ROOT, "overlay/astra/mozilla.cfg");
@@ -86,7 +90,50 @@ check(
     .join(", "),
 );
 
-// 3. The shared-domain exception stays path-scoped and the bundled seed
+// 3. The Adblock Tester inventory: every fetch-probed host and every bait it
+//    left open in the captured run is covered now.
+const tester = JSON.parse(fs.readFileSync(TESTER_INVENTORY, "utf8"));
+const testerHosts = tester.hosts.filter((entry) => entry.method !== "cosmetic");
+const testerMissing = testerHosts.filter(
+  (entry) => !hostsCovered(entry.host, rules),
+);
+check(
+  `${testerHosts.length} Adblock Tester hosts have a host-wide rule`,
+  testerMissing.length === 0,
+  testerMissing
+    .slice(0, 12)
+    .map((entry) => entry.host)
+    .join(", "),
+);
+const testerOpen = testerHosts.filter((entry) => entry.open);
+check(
+  `the ${testerOpen.length} Adblock Tester hosts the capture left open are blocked`,
+  testerOpen.every((entry) => hostsCovered(entry.host, rules)),
+  testerOpen
+    .filter((entry) => !hostsCovered(entry.host, rules))
+    .map((entry) => entry.host)
+    .join(", "),
+);
+// The site's script baits are local files whose global must never be defined,
+// and its cosmetic baits are nodes inserted after load. Both are covered by
+// the hand-maintained heuristics rather than by a host rule.
+const BAIT_RULES = [
+  ...tester.baits.scripts.map((bait) => bait.rule),
+  ...tester.baits.cosmetic.flatMap((bait) => bait.rules),
+];
+const missingBaits = BAIT_RULES.filter((rule) => !rules.has(rule));
+check(
+  "every script and cosmetic bait has a rule",
+  missingBaits.length === 0,
+  missingBaits.join(", "),
+);
+check(
+  "the bait rules the capture left open are the baits now covered",
+  tester.baits.scripts.filter((bait) => bait.open).length === 2 &&
+    tester.baits.cosmetic.every((bait) => bait.open && bait.rules.length > 0),
+);
+
+// 4. The shared-domain exception stays path-scoped and the bundled seed
 //    carries the covering path rule.
 const bundled = [
   "easylist.txt.gz",
@@ -101,9 +148,14 @@ check(
   !rules.has("||vk.com^$important") && bundled.includes("||vk.com/rtrg"),
 );
 
-// 4. No host rule appears twice in the generated section.
+// 5. No host rule appears twice in the generated sections.
 const markerIndex = source.indexOf("! >>> superadblock-strict");
 check("strict section marker exists", markerIndex !== -1);
+check(
+  "Adblock Tester strict section exists",
+  source.includes("! >>> adblocktester-strict") &&
+    source.includes("! <<< adblocktester-strict"),
+);
 const section = markerIndex === -1 ? "" : source.slice(markerIndex);
 const dups = [];
 const seen = new Set();
@@ -113,9 +165,9 @@ for (const line of section.split("\n")) {
   if (seen.has(rule)) dups.push(rule);
   seen.add(rule);
 }
-check("generated section has no duplicate rules", dups.length === 0, dups.slice(0, 5).join(", "));
+check("generated sections have no duplicate rules", dups.length === 0, dups.slice(0, 5).join(", "));
 
-// 5. The generator's `--check` is green (source inventory and list agree).
+// 6. The generator's `--check` is green (source inventories and list agree).
 let generatorOk = false;
 let generatorDetail = "";
 try {
@@ -126,16 +178,34 @@ try {
 }
 check("strict section is current (superadblock.py --check)", generatorOk, generatorDetail);
 
-// 6. The packaged gzip is the same text (a stale jar ships stale rules).
+// 7. The packaged gzip is the same text (a stale jar ships stale rules).
 const packed = zlib.gunzipSync(fs.readFileSync(SEED)).toString("utf8");
 check("packaged seed matches the list text", packed === source);
 check(
-  "packaged seed carries the generated section",
+  "packaged seed carries the generated sections",
   packed.includes("! >>> superadblock-strict") &&
+    packed.includes("! >>> adblocktester-strict") &&
     packed.includes("||pagead2.googlesyndication.com^$important"),
 );
 
-// 7. Browser-wide privacy posture stays strengthened. Each target closes a
+// 8. Cosmetic delivery must survive a page's own CSP, and a batch that brings
+//    a new class/id must be answered without waiting for the floor: both are
+//    required for the baits this benchmark inserts after load.
+const ACTOR = path.join(ROOT, "overlay/astra/actors/AstraBlockerChild.sys.mjs");
+const actor = fs.readFileSync(ACTOR, "utf8");
+check(
+  "cosmetic CSS loads as a chrome sheet, not a page style node",
+  actor.includes("loadSheetUsingURIString") &&
+    actor.includes("AGENT_SHEET") &&
+    // The style node survives only as the fallback of the sheet path.
+    actor.includes("if (!this.#applySheet(css))"),
+);
+check(
+  "an unseen class/id batch is looked up immediately",
+  actor.includes("IMMEDIATE_BATCHES") && actor.includes("collectMutated"),
+);
+
+// 9. Browser-wide privacy posture stays strengthened. Each target closes a
 //    cheap high-entropy surface; the list is asserted so a later edit cannot
 //    silently weaken it.
 const cfg = fs.readFileSync(CFG, "utf8");
@@ -277,6 +347,14 @@ check(
   inventory.scored_categories.every((category) =>
     inventory.hosts.some((entry) => entry.categories.includes(category)),
   ),
+);
+check(
+  "the Adblock Tester inventory pins its source and every category",
+  tester.source === "https://adblocktester.pages.dev/" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(tester.captured) &&
+    tester.categories.every((category) =>
+      tester.hosts.some((entry) => entry.category === category),
+    ),
 );
 
 function isDefaultTarget(cfgText, target) {

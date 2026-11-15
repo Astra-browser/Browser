@@ -52,9 +52,23 @@
 ||analytics.s3.amazonaws.com^
 
 ! Generic ad-script paths. These are script files whose only purpose is to
-! load an ad or a page-ad bridge. Scoped to script requests.
+! load an ad or a page-ad bridge. Scoped to script requests. The last two
+! match the file name at any depth: a nested /assets/analytics.js is still an
+! analytics bundle, so the cost is that site's statistics, not its UI.
 /\/ads\.js$/$script
 /pagead\.js$/$script
+/\/advertisement\.js$/$script
+/\/analytics\.js$/$script
+
+! Generic element-hiding baits. These are the class and id names that ad
+! containers use, including the ones the public Adblock Tester inserts after
+! the document has loaded; hiding them here means the selector is already
+! compiled when the node appears.
+##.adsbox
+##.ad-banner
+##.adsbygoogle
+##.google-ad
+###ad-container
 
 ! Known ad, analytics and device-telemetry hosts published by the
 ! Turtlecute ad-block test (https://adblock.turtlecute.org/). These are
@@ -291,7 +305,6 @@
 ||bat.bing.com^$important
 ||bidder.criteo.com^$important
 ||bingads.microsoft.com^$important
-||c.amazon-adsystem.com^$important
 ||c.gumgum.com^$important
 ||casalemedia.com^$important
 ||cdn.doubleverify.com^$important
@@ -305,9 +318,6 @@
 ||contextual.media.net^$important
 ||contextweb.com^$important
 ||criteo.com^$important
-||d.adroll.com^$important
-||d.applovin.com^$important
-||dis.criteo.com^$important
 ||doubleverify.com^$important
 ||eb2.3lift.com^$important
 ||events3alt.adcolony.com^$important
@@ -321,30 +331,23 @@
 ||googleads4.g.doubleclick.net^$important
 ||googleadservices.com^$important
 ||googletagservices.com^$important
-||gum.criteo.com^$important
 ||hbopenbid.pubmatic.com^$important
-||htlb.casalemedia.com^$important
 ||htlbid.com^$important
-||ib.adnxs.com^$important
 ||image6.pubmatic.com^$important
 ||images.taboola.com^$important
 ||indexexchange.com^$important
 ||init.supersonicads.com^$important
 ||inmobi.com^$important
 ||insightexpressai.com^$important
-||insights.adsrvr.org^$important
-||ir-na.amazon-adsystem.com^$important
 ||live.chartboost.com^$important
 ||log.fc.yahoo.com^$important
 ||log.outbrain.com^$important
 ||m.doubleclick.net^$important
-||match.adsrvr.org^$important
 ||mc.yandex.ru^$important
 ||media.net^$important
 ||mediavisor.doubleclick.net^$important
 ||metrika.yandex.ru^$important
 ||mgid.com^$important
-||ms.applovin.com^$important
 ||nr.taboola.com^$important
 ||oas.openx.net^$important
 ||odb.outbrain.com^$important
@@ -354,54 +357,37 @@
 ||optimized-by.rubiconproject.com^$important
 ||outcome-ssp.supersonicads.com^$important
 ||pagead.l.doubleclick.net^$important
-||pagead2.googleadservices.com^$important
 ||pagead2.googlesyndication.com^$important
 ||pangleglobal.com^$important
 ||partnerads.ysm.yahoo.com^$important
 ||pixel.adsafeprotected.com^$important
 ||pixel.rubiconproject.com^$important
-||prebid.adnxs.com^$important
 ||propellerads.com^$important
 ||propellerclick.com^$important
 ||pubads.g.doubleclick.net^$important
 ||pubmatic.com^$important
-||rcm-na.amazon-adsystem.com^$important
-||rt.applovin.com^$important
-||rtb.openx.net^$important
 ||rubiconproject.com^$important
-||s.adroll.com^$important
 ||search.spotxchange.com^$important
-||secure.adnxs.com^$important
 ||securepubads.g.doubleclick.net^$important
-||servicer.mgid.com^$important
 ||sharethrough.com^$important
-||simage2.pubmatic.com^$important
-||sin3-ib.adnxs.com^$important
 ||smartyads.com^$important
 ||spotxchange.com^$important
-||sslwidget.criteo.com^$important
 ||stackadapt.com^$important
 ||static.adsafeprotected.com^$important
 ||static.criteo.net^$important
 ||static.doubleclick.net^$important
-||static.media.net^$important
 ||stats.g.doubleclick.net^$important
 ||stickyadstv.com^$important
 ||sync.kargo.com^$important
 ||tlx.3lift.com^$important
 ||tpc.googlesyndication.com^$important
-||tps.doubleverify.com^$important
 ||trc.taboola.com^$important
-||u.openx.net^$important
 ||udc.yahoo.com^$important
 ||udcm.yahoo.com^$important
 ||unityads.unity3d.com^$important
-||us-ads.openx.net^$important
 ||vungle.com^$important
 ||wd.adcolony.com^$important
-||webview.unityads.unity3d.com^$important
 ||widgets.outbrain.com^$important
-||ws-na.amazon-adsystem.com^$important
 
 ! Analytics and product telemetry
 ||adm.hotjar.com^$important
@@ -448,34 +434,26 @@
 ||quantcast.com^$important
 ||quantserve.com^$important
 ||realtime.luckyorange.com^$important
-||region1.google-analytics.com^$important
 ||rs.fullstory.com^$important
 ||rudderstack.com^$important
-||s.clarity.ms^$important
 ||sb.scorecardresearch.com^$important
 ||script.hotjar.com^$important
 ||settings.luckyorange.net^$important
 ||snowplowanalytics.com^$important
-||ssl.google-analytics.com^$important
-||static.cloudflareinsights.com^$important
 ||static.hotjar.com^$important
 ||stats.wp.com^$important
 ||surveys.hotjar.com^$important
 ||tools.mouseflow.com^$important
-||tracker.snowplowanalytics.com^$important
 ||upload.luckyorange.net^$important
 ||us.i.posthog.com^$important
 ||vars.hotjar.com^$important
 ||w1.luckyorange.com^$important
-||www.google-analytics.com^$important
-||www.googletagmanager.com^$important
 
 ! Cross-site tracking, attribution and fingerprinting
 ||ad.crwdcntrl.net^$important
 ||adjust.com^$important
 ||api.rlcdn.com^$important
 ||api2.branch.io^$important
-||app.adjust.com^$important
 ||app.appsflyer.com^$important
 ||appsflyer.com^$important
 ||bcp.crwdcntrl.net^$important
@@ -496,10 +474,7 @@
 ||sdk-api-v1.singular.net^$important
 ||siftscience.com^$important
 ||sync-tm.everesttech.net^$important
-||sync.crwdcntrl.net^$important
 ||sync.mathtag.com^$important
-||tags.bluekai.com^$important
-||tags.crwdcntrl.net^$important
 ||wzrkt.com^$important
 
 ! Social platform pixels and SDKs (per-site shields restore embeds)
@@ -523,7 +498,6 @@
 ||business-api.tiktok.com^$important
 ||connect.facebook.net^$important
 ||ct.pinterest.com^$important
-||dc.ads.linkedin.com^$important
 ||events.reddit.com^$important
 ||events.redditmedia.com^$important
 ||graph.instagram.com^$important
@@ -535,7 +509,6 @@
 ||pixel.facebook.com^$important
 ||pixel.quora.com^$important
 ||pixel.redditmedia.com^$important
-||px.ads.linkedin.com^$important
 ||px.srvcs.tumblr.com^$important
 ||sc-static.net^$important
 ||snap.licdn.com^$important
@@ -553,7 +526,6 @@
 ||list-manage.com^$important
 ||munchkin.marketo.net^$important
 ||sdk.iad-01.braze.com^$important
-||track.customer.io^$important
 ||track.hubspot.com^$important
 
 ! Video ad delivery and monetisation
@@ -592,7 +564,6 @@
 
 ! Consent-management platforms (per-site shields restore a site's banner)
 ||app.usercentrics.eu^$important
-||cmp.inmobi.com^$important
 ||cmp.osano.com^$important
 ||cmp.usercentrics.eu^$important
 ||consent.cookiebot.com^$important
@@ -665,16 +636,13 @@
 ||smartclip.net^$important
 ||smetrics.samsung.com^$important
 ||telemetry.microsoft.com^$important
-||tr.iadsdk.apple.com^$important
 ||tracking.miui.com^$important
 ||tracking.rus.miui.com^$important
 ||tvinteractive.tv^$important
 ||tvpixel.com^$important
 ||us.ibs.lgappstv.com^$important
-||us.info.lgsmartad.com^$important
 ||vortex-win.data.microsoft.com^$important
 ||vortex.data.microsoft.com^$important
-||watson.telemetry.microsoft.com^$important
 ||yumenetworks.com^$important
 
 ! Malvertising, pop-under and cryptomining hosts
@@ -690,7 +658,6 @@
 ||statdynamic.com^$important
 ||trafficjunky.net^$important
 ||webminepool.com^$important
-||www.coinimp.com^$important
 
 ! Error-reporting and session-replay endpoints
 ||api.bugsnag.com^$important
@@ -704,8 +671,189 @@
 ||ingest.sentry.io^$important
 ||js-agent.newrelic.com^$important
 ||notify.bugsnag.com^$important
-||o0.ingest.sentry.io^$important
 ||r.lr-ingest.com^$important
-||rum.browser-intake-datadoghq.com^$important
 ||sessions.bugsnag.com^$important
 ! <<< superadblock-strict
+
+! >>> adblocktester-strict (generated by blocker/tools/superadblock.py)
+! Regenerate with: python3 blocker/tools/superadblock.py --write
+! Source inventory: blocker/lists/adblocktester-hosts.json
+! Captured: 2026-11-15 from https://adblocktester.pages.dev/
+!
+! The public test requests https://<host>/favicon.ico with
+! fetch(no-cors) and counts a host blocked only when that request
+! fails, so the same host-anchored $important shape is required.
+! Hosts the community lists, the head or the section above already
+! cover are not repeated here; its local-script and cosmetic baits
+! live in the hand-maintained heuristics above.
+
+! Core ad networks (Google, Amazon, Microsoft, Yahoo, Criteo, Taboola, Outbrain)
+||adsdk.microsoft.com^$important
+||adserver-us.adtech.advertising.com^$important
+||adserver.yahoo.com^$important
+||adservice.google.de^$important
+||amplifypixel.outbrain.com^$important
+||analytics.microsoft.com^$important
+||analytics.s3.amazonaws.com^$important
+||app.ssp.yahoo.com^$important
+||beap-bc.yahoo.com^$important
+||msadsscale.microsoft.com^$important
+||safeframe.googlesyndication.com^$important
+||traffic.outbrain.com^$important
+||video-ad-stats.googlesyndication.com^$important
+||vidstat.taboola.com^$important
+
+! Programmatic exchanges and header bidding
+||ads.sovrn.com^$important
+||adx.adform.net^$important
+||ap.lijit.com^$important
+||ce.lijit.com^$important
+||gslbeacon.lijit.com^$important
+||js-sec.indexww.com^$important
+||s1.adform.net^$important
+||server.adform.net^$important
+||track.adform.net^$important
+||vap.lijit.com^$important
+
+! Analytics, product telemetry and session-replay SDKs
+||adobedc.demdex.net^$important
+||api.eu.amplitude.com^$important
+||assets.adobedtm.com^$important
+||cdn.amplitude.com^$important
+||cdn.matomo.cloud^$important
+||cdn.mxpnl.com^$important
+||cm.everesttech.net^$important
+||dpm.demdex.net^$important
+||events.segmentapis.com^$important
+||fast.demdex.net^$important
+||fullstory.com^$important
+||heapanalytics.com^$important
+||luckyorange.com^$important
+||matomo.cloud^$important
+||mouseflow.com^$important
+||plausible.io^$important
+||regionconfig.amplitude.com^$important
+||script.crazyegg.com^$important
+||sr-client-cfg.amplitude.com^$important
+||sr-client-cfg.eu.amplitude.com^$important
+||sstats.adobe.com^$important
+||tracking.crazyegg.com^$important
+
+! Social platform pixels, SDKs and app logging
+||ads-api.nextdoor.com^$important
+||ads-twitter.com^$important
+||adsapi.snapchat.com^$important
+||alb.reddit.com^$important
+||analytics.facebook.com^$important
+||analytics.us.tiktok.com^$important
+||app-analytics.snapchat.com^$important
+||log.tiktokv.com^$important
+||pixel.nextdoor.com^$important
+||pixel.reddit.com^$important
+||q.quora.com^$important
+||tracker.redditmedia.com^$important
+||tracking.nextdoor.com^$important
+||us-tracking.nextdoor.com^$important
+||www.facebook.com^$important
+||xlog-va.tiktokv.com^$important
+||xlog.tiktokv.com^$important
+
+! Mobile ad networks, attribution and mediation SDKs
+||ads.nexage.com^$important
+||api.chartboost.com^$important
+||api3.branch.io^$important
+||app.adjust.net^$important
+||app.adjust.world^$important
+||cdn-settings.appsflyersdk.com^$important
+||cdn.branch.io^$important
+||cdn2.inner-active.mobi^$important
+||collect.analytics.unity3d.com^$important
+||da.chartboost.com^$important
+||detect.rayjump.com^$important
+||i.l.inmobicdn.net^$important
+||inapps.appsflyersdk.com^$important
+||mediation.unity3d.com^$important
+||net.rayjump.com^$important
+||protected-api.branch.io^$important
+||sdk-api.mintegral.com^$important
+||sdk-events.inner-active.mobi^$important
+||sdk.branch.io^$important
+||setting.rayjump.com^$important
+||v1.branch.io^$important
+
+! Regional ad tech (Yandex, Baidu, Tencent, Naver, VK, Mail.ru)
+||acjs.aliyun.com^$important
+||adcr.naver.com^$important
+||adimg3.search.naver.net^$important
+||adsdk.yandex.ru^$important
+||adtimaserver.vn^$important
+||an.yandex.ru^$important
+||app-tracking-gfa-collector.naver.com^$important
+||atanx.alicdn.com^$important
+||beacon.qq.com^$important
+||bs.yandex.ru^$important
+||cafe-ads-api.daum.net^$important
+||cpro.baidu.com^$important
+||cpro.baidustatic.com^$important
+||display.ad.daum.net^$important
+||dorangesource.alicdn.com^$important
+||dup.baidustatic.com^$important
+||e.qq.com^$important
+||eclick.baidu.com^$important
+||event.impression-neo.naver.com^$important
+||gdt.qq.com^$important
+||hm.baidu.com^$important
+||mobads.baidu.com^$important
+||nsclick.baidu.com^$important
+||pingjs.qq.com^$important
+||pos.baidu.com^$important
+||rs.mail.ru^$important
+||tajs.qq.com^$important
+||track.tiara.daum.net^$important
+||vk-ads.com^$important
+||wcs.naver.net^$important
+
+! Device-maker and connected-TV telemetry and advertising
+||ads.samsung.com^$important
+||adv.sec.intl.miui.com^$important
+||analytics.bigdata.samsung.com^$important
+||log-config.samsungacr.com^$important
+||news-events.apple.com^$important
+||pixel.web.roku.com^$important
+||securemetrics.apple.com^$important
+||stocks-analytics-events.apple.com^$important
+||weather-analytics-events.apple.com^$important
+
+! Consent-management platforms (per-site shields restore a site's banner)
+||api.privacy-center.org^$important
+||cookie-cdn.cookiepro.com^$important
+||quantcast.mgr.consensu.org^$important
+||smetrics.onetrust.com^$important
+
+! Affiliate networks and conversion pixels
+||ad.zanox.com^$important
+||analytics.linksynergy.com^$important
+||awin1.com^$important
+||clk.tradedoubler.com^$important
+||imp.tradedoubler.com^$important
+||impact.com^$important
+||t.myvisualiq.net^$important
+||t.tradedoubler.com^$important
+||track.webgains.com^$important
+||track.webgains.org^$important
+||tradedoubler.com^$important
+||www.emjcd.com^$important
+||www.zanox-affiliate.de^$important
+
+! Error reporting and session replay
+||api.raygun.io^$important
+||api.rollbar.com^$important
+||beacon-1.newrelic.com^$important
+||browser-intake-datadoghq.eu^$important
+||browser-intake-us5-datadoghq.com^$important
+||cdn.logrocket.io^$important
+||i.logrocket.com^$important
+||insights-collector.newrelic.com^$important
+||sentry.io^$important
+! <<< adblocktester-strict
+

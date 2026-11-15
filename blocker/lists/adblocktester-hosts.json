@@ -1,0 +1,3128 @@
+{
+  "source": "https://adblocktester.pages.dev/",
+  "captured": "2026-11-15",
+  "probe_note": "Every network target is requested as https://<host>/favicon.ico with fetch(no-cors) and counts blocked only when that request fails. The script baits are local files whose global must stay undefined; the cosmetic baits are elements inserted after load that must be hidden within two animation frames.",
+  "capture": {
+    "mode": "full",
+    "score": 93,
+    "total": 443,
+    "blocked": 410,
+    "open": 33
+  },
+  "categories": [
+    "core-ad-networks",
+    "programmatic-rtb",
+    "analytics-telemetry",
+    "social-pixels",
+    "mobile-app-ads",
+    "regional-adtech",
+    "oem-tv-telemetry",
+    "consent-annoyance",
+    "affiliate-conversion",
+    "error-session-replay"
+  ],
+  "hosts": [
+    {
+      "host": "pagead2.googlesyndication.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "googleads.g.doubleclick.net",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "securepubads.g.doubleclick.net",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ad.doubleclick.net",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "stats.g.doubleclick.net",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tpc.googlesyndication.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "partner.googleadservices.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pagead2.googleadservices.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adservice.google.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adservice.google.de",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "afs.googlesyndication.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "safeframe.googlesyndication.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "video-ad-stats.googlesyndication.com",
+      "category": "core-ad-networks",
+      "service": "Google Ads / DoubleClick",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "aax.amazon-adsystem.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "c.amazon-adsystem.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "s.amazon-adsystem.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mads.amazon-adsystem.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "fls-na.amazon-adsystem.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adtago.s3.amazonaws.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analyticsengine.s3.amazonaws.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.s3.amazonaws.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "advice-ads.s3.amazonaws.com",
+      "category": "core-ad-networks",
+      "service": "Amazon Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bat.bing.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "c.bing.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.ads.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bingads.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adsdk.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "msadsscale.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adtech.yahooinc.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "udc.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "udcm.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.query.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "partnerads.ysm.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gemini.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.fc.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adserver.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adserver-us.adtech.advertising.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static.criteo.net",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gum.criteo.com",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bidder.criteo.com",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sslwidget.criteo.com",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cas.criteo.com",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "dis.criteo.com",
+      "category": "core-ad-networks",
+      "service": "Criteo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.microsoft.com",
+      "category": "core-ad-networks",
+      "service": "Microsoft Advertising",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "trc.taboola.com",
+      "category": "core-ad-networks",
+      "service": "Taboola",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.taboola.com",
+      "category": "core-ad-networks",
+      "service": "Taboola",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "images.taboola.com",
+      "category": "core-ad-networks",
+      "service": "Taboola",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.taboola.com",
+      "category": "core-ad-networks",
+      "service": "Taboola",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "vidstat.taboola.com",
+      "category": "core-ad-networks",
+      "service": "Taboola",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "widgets.outbrain.com",
+      "category": "core-ad-networks",
+      "service": "Outbrain",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "odb.outbrain.com",
+      "category": "core-ad-networks",
+      "service": "Outbrain",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "amplifypixel.outbrain.com",
+      "category": "core-ad-networks",
+      "service": "Outbrain",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "traffic.outbrain.com",
+      "category": "core-ad-networks",
+      "service": "Outbrain",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.outbrain.com",
+      "category": "core-ad-networks",
+      "service": "Outbrain",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app.ssp.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static.media.net",
+      "category": "core-ad-networks",
+      "service": "Media.net",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "contextual.media.net",
+      "category": "core-ad-networks",
+      "service": "Media.net",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adservetx.media.net",
+      "category": "core-ad-networks",
+      "service": "Media.net",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "media.net",
+      "category": "core-ad-networks",
+      "service": "Media.net",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "beap-bc.yahoo.com",
+      "category": "core-ad-networks",
+      "service": "Yahoo / Verizon / AOL",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "ads.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "PubMatic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "hbopenbid.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "PubMatic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "image2.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "PubMatic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gads.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "PubMatic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ow.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "PubMatic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "fastlane.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pixel.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "eus.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "s.update.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "prebid-server.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "micro.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "smarttag.rubiconproject.com",
+      "category": "programmatic-rtb",
+      "service": "Magnite / Rubicon",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "us-u.openx.net",
+      "category": "programmatic-rtb",
+      "service": "OpenX",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "u.openx.net",
+      "category": "programmatic-rtb",
+      "service": "OpenX",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "rtb.openx.net",
+      "category": "programmatic-rtb",
+      "service": "OpenX",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "delivery-us.openx.net",
+      "category": "programmatic-rtb",
+      "service": "OpenX",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "jp-u.openx.net",
+      "category": "programmatic-rtb",
+      "service": "OpenX",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ib.adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "secure.adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "acdn.adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sin3-ib.adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "nym1-ib.adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adnxs.com",
+      "category": "programmatic-rtb",
+      "service": "Xandr / AppNexus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "match.adsrvr.org",
+      "category": "programmatic-rtb",
+      "service": "The Trade Desk",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "insight.adsrvr.org",
+      "category": "programmatic-rtb",
+      "service": "The Trade Desk",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "js.adsrvr.org",
+      "category": "programmatic-rtb",
+      "service": "The Trade Desk",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bid.adsrvr.org",
+      "category": "programmatic-rtb",
+      "service": "The Trade Desk",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "js-sec.indexww.com",
+      "category": "programmatic-rtb",
+      "service": "Index Exchange / Casale",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "as-sec.casalemedia.com",
+      "category": "programmatic-rtb",
+      "service": "Index Exchange / Casale",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ssum-sec.casalemedia.com",
+      "category": "programmatic-rtb",
+      "service": "Index Exchange / Casale",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "htlb.casalemedia.com",
+      "category": "programmatic-rtb",
+      "service": "Index Exchange / Casale",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "r.casalemedia.com",
+      "category": "programmatic-rtb",
+      "service": "Index Exchange / Casale",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ap.lijit.com",
+      "category": "programmatic-rtb",
+      "service": "Sovrn / Lijit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ce.lijit.com",
+      "category": "programmatic-rtb",
+      "service": "Sovrn / Lijit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "vap.lijit.com",
+      "category": "programmatic-rtb",
+      "service": "Sovrn / Lijit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gslbeacon.lijit.com",
+      "category": "programmatic-rtb",
+      "service": "Sovrn / Lijit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.sovrn.com",
+      "category": "programmatic-rtb",
+      "service": "Sovrn / Lijit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "track.adform.net",
+      "category": "programmatic-rtb",
+      "service": "Adform",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adx.adform.net",
+      "category": "programmatic-rtb",
+      "service": "Adform",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "s1.adform.net",
+      "category": "programmatic-rtb",
+      "service": "Adform",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "server.adform.net",
+      "category": "programmatic-rtb",
+      "service": "Adform",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "x.bidswitch.net",
+      "category": "programmatic-rtb",
+      "service": "Bidswitch / Sharethrough",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "simage2.pubmatic.com",
+      "category": "programmatic-rtb",
+      "service": "Bidswitch / Sharethrough",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "native.sharethrough.com",
+      "category": "programmatic-rtb",
+      "service": "Bidswitch / Sharethrough",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "match.sharethrough.com",
+      "category": "programmatic-rtb",
+      "service": "Bidswitch / Sharethrough",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.google-analytics.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ssl.google-analytics.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "google-analytics.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.google.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "region1.google-analytics.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.googletagmanager.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "googletagmanager.com",
+      "category": "analytics-telemetry",
+      "service": "Google Analytics / Tag Manager",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.clarity.ms",
+      "category": "analytics-telemetry",
+      "service": "Microsoft Clarity",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "c.clarity.ms",
+      "category": "analytics-telemetry",
+      "service": "Microsoft Clarity",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "scripts.clarity.ms",
+      "category": "analytics-telemetry",
+      "service": "Microsoft Clarity",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "a.clarity.ms",
+      "category": "analytics-telemetry",
+      "service": "Microsoft Clarity",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "assets.adobedtm.com",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "dpm.demdex.net",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "fast.demdex.net",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cm.everesttech.net",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adobedc.demdex.net",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "script.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "identify.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.hotjar.io",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "insights.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adm.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "surveys.hotjar.com",
+      "category": "analytics-telemetry",
+      "service": "Hotjar",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.segment.com",
+      "category": "analytics-telemetry",
+      "service": "Segment",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.segment.io",
+      "category": "analytics-telemetry",
+      "service": "Segment",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.mxpnl.com",
+      "category": "analytics-telemetry",
+      "service": "Mixpanel",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api-js.mixpanel.com",
+      "category": "analytics-telemetry",
+      "service": "Mixpanel",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.mixpanel.com",
+      "category": "analytics-telemetry",
+      "service": "Mixpanel",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "decide.mixpanel.com",
+      "category": "analytics-telemetry",
+      "service": "Mixpanel",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api2.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "regionconfig.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.eu.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sr-client-cfg.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sr-client-cfg.eu.amplitude.com",
+      "category": "analytics-telemetry",
+      "service": "Amplitude",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "fullstory.com",
+      "category": "analytics-telemetry",
+      "service": "FullStory",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "edge.fullstory.com",
+      "category": "analytics-telemetry",
+      "service": "FullStory",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "rs.fullstory.com",
+      "category": "analytics-telemetry",
+      "service": "FullStory",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.segmentapis.com",
+      "category": "analytics-telemetry",
+      "service": "Segment",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "o-collector.fullstory.com",
+      "category": "analytics-telemetry",
+      "service": "FullStory",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "o2.mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gtm.mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tools.mouseflow.com",
+      "category": "analytics-telemetry",
+      "service": "Mouseflow",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "luckyorange.com",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.luckyorange.com",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "realtime.luckyorange.com",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.luckyorange.com",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "w1.luckyorange.com",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "upload.luckyorange.net",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cs.luckyorange.net",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "settings.luckyorange.net",
+      "category": "analytics-telemetry",
+      "service": "Lucky Orange",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "script.crazyegg.com",
+      "category": "analytics-telemetry",
+      "service": "Crazy Egg / Heap",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tracking.crazyegg.com",
+      "category": "analytics-telemetry",
+      "service": "Crazy Egg / Heap",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.heapanalytics.com",
+      "category": "analytics-telemetry",
+      "service": "Crazy Egg / Heap",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "heapanalytics.com",
+      "category": "analytics-telemetry",
+      "service": "Crazy Egg / Heap",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "c.heapanalytics.com",
+      "category": "analytics-telemetry",
+      "service": "Crazy Egg / Heap",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "plausible.io",
+      "category": "analytics-telemetry",
+      "service": "Plausible / Matomo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.matomo.cloud",
+      "category": "analytics-telemetry",
+      "service": "Plausible / Matomo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "matomo.cloud",
+      "category": "analytics-telemetry",
+      "service": "Plausible / Matomo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "stats.wp.com",
+      "category": "analytics-telemetry",
+      "service": "Plausible / Matomo",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sstats.adobe.com",
+      "category": "analytics-telemetry",
+      "service": "Adobe Experience Cloud",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "connect.facebook.net",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pixel.facebook.com",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "an.facebook.com",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.facebook.com",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "graph.facebook.com",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.facebook.com",
+      "category": "social-pixels",
+      "service": "Meta / Facebook",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads-api.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics-sg.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads-sg.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "business-api.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.byteoversea.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mon.tiktokv.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.us.tiktok.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static.ads-twitter.com",
+      "category": "social-pixels",
+      "service": "X / Twitter",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.twitter.com",
+      "category": "social-pixels",
+      "service": "X / Twitter",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads-api.twitter.com",
+      "category": "social-pixels",
+      "service": "X / Twitter",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads-twitter.com",
+      "category": "social-pixels",
+      "service": "X / Twitter",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "snap.licdn.com",
+      "category": "social-pixels",
+      "service": "LinkedIn",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.linkedin.com",
+      "category": "social-pixels",
+      "service": "LinkedIn",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "px.ads.linkedin.com",
+      "category": "social-pixels",
+      "service": "LinkedIn",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.pointdrive.linkedin.com",
+      "category": "social-pixels",
+      "service": "LinkedIn",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.pinterest.com",
+      "category": "social-pixels",
+      "service": "Pinterest",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.pinterest.com",
+      "category": "social-pixels",
+      "service": "Pinterest",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.pinterest.com",
+      "category": "social-pixels",
+      "service": "Pinterest",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "trk.pinterest.com",
+      "category": "social-pixels",
+      "service": "Pinterest",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.reddit.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.redditmedia.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "alb.reddit.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pixel.redditmedia.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tr.snapchat.com",
+      "category": "social-pixels",
+      "service": "Snapchat",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.snapchat.com",
+      "category": "social-pixels",
+      "service": "Snapchat",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adsapi.snapchat.com",
+      "category": "social-pixels",
+      "service": "Snapchat",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app-analytics.snapchat.com",
+      "category": "social-pixels",
+      "service": "Snapchat",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sc-static.net",
+      "category": "social-pixels",
+      "service": "Snapchat",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "q.quora.com",
+      "category": "social-pixels",
+      "service": "Quora / Nextdoor",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.tiktokv.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "xlog.tiktokv.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "tracker.redditmedia.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads-api.nextdoor.com",
+      "category": "social-pixels",
+      "service": "Quora / Nextdoor",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pixel.nextdoor.com",
+      "category": "social-pixels",
+      "service": "Quora / Nextdoor",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tracking.nextdoor.com",
+      "category": "social-pixels",
+      "service": "Quora / Nextdoor",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "us-tracking.nextdoor.com",
+      "category": "social-pixels",
+      "service": "Quora / Nextdoor",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pixel.reddit.com",
+      "category": "social-pixels",
+      "service": "Reddit",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "xlog-va.tiktokv.com",
+      "category": "social-pixels",
+      "service": "TikTok",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "app.adjust.com",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "view.adjust.com",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gdpr.adjust.com",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.adjust.com",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "s2s.adjust.com",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app.adjust.net",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "t.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "conversions.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adrevenue.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "impression.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "launches.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "track.appsflyer.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api2.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdk.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "v1.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api3.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "protected-api.branch.io",
+      "category": "mobile-app-ads",
+      "service": "Branch",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "control.kochava.com",
+      "category": "mobile-app-ads",
+      "service": "Kochava",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "kvinit-prod.api.kochava.com",
+      "category": "mobile-app-ads",
+      "service": "Kochava",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tracker.kochava.com",
+      "category": "mobile-app-ads",
+      "service": "Kochava",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "imp.control.kochava.com",
+      "category": "mobile-app-ads",
+      "service": "Kochava",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "auction.unityads.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "webview.unityads.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "config.unityads.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adserver.unityads.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "d.applovin.com",
+      "category": "mobile-app-ads",
+      "service": "AppLovin",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "a.applovin.com",
+      "category": "mobile-app-ads",
+      "service": "AppLovin",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ms.applovin.com",
+      "category": "mobile-app-ads",
+      "service": "AppLovin",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "rt.applovin.com",
+      "category": "mobile-app-ads",
+      "service": "AppLovin",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "res1.applovin.com",
+      "category": "mobile-app-ads",
+      "service": "AppLovin",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mediation.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.api.vungle.com",
+      "category": "mobile-app-ads",
+      "service": "Vungle / Liftoff",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.vungle.com",
+      "category": "mobile-app-ads",
+      "service": "Vungle / Liftoff",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "config.ads.vungle.com",
+      "category": "mobile-app-ads",
+      "service": "Vungle / Liftoff",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events.ads.vungle.com",
+      "category": "mobile-app-ads",
+      "service": "Vungle / Liftoff",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "init.supersonicads.com",
+      "category": "mobile-app-ads",
+      "service": "ironSource / Fyber / Inneractive",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "outcome-ssp.supersonicads.com",
+      "category": "mobile-app-ads",
+      "service": "ironSource / Fyber / Inneractive",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.nexage.com",
+      "category": "mobile-app-ads",
+      "service": "ironSource / Fyber / Inneractive",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "live.chartboost.com",
+      "category": "mobile-app-ads",
+      "service": "Chartboost",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "da.chartboost.com",
+      "category": "mobile-app-ads",
+      "service": "Chartboost",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.chartboost.com",
+      "category": "mobile-app-ads",
+      "service": "Chartboost",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads30.adcolony.com",
+      "category": "mobile-app-ads",
+      "service": "AdColony",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adc3-launch.adcolony.com",
+      "category": "mobile-app-ads",
+      "service": "AdColony",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "events3alt.adcolony.com",
+      "category": "mobile-app-ads",
+      "service": "AdColony",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "wd.adcolony.com",
+      "category": "mobile-app-ads",
+      "service": "AdColony",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdkm.w.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "telemetry.sdk.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "i.l.inmobicdn.net",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "config.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sync.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pbs.inmobi.com",
+      "category": "mobile-app-ads",
+      "service": "InMobi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdk-api.mintegral.com",
+      "category": "mobile-app-ads",
+      "service": "Mintegral / Rayjump",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "net.rayjump.com",
+      "category": "mobile-app-ads",
+      "service": "Mintegral / Rayjump",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "setting.rayjump.com",
+      "category": "mobile-app-ads",
+      "service": "Mintegral / Rayjump",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "cdn-settings.appsflyersdk.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "cdn2.inner-active.mobi",
+      "category": "mobile-app-ads",
+      "service": "ironSource / Fyber / Inneractive",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "inapps.appsflyersdk.com",
+      "category": "mobile-app-ads",
+      "service": "AppsFlyer",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "app.adjust.world",
+      "category": "mobile-app-ads",
+      "service": "Adjust",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "collect.analytics.unity3d.com",
+      "category": "mobile-app-ads",
+      "service": "Unity Ads",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "sdk-events.inner-active.mobi",
+      "category": "mobile-app-ads",
+      "service": "ironSource / Fyber / Inneractive",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "detect.rayjump.com",
+      "category": "mobile-app-ads",
+      "service": "Mintegral / Rayjump",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "extmaps-api.yandex.net",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "appmetrica.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adfstat.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "metrika.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "offerwall.yandex.net",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adfox.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mc.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bs.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adsdk.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "an.yandex.ru",
+      "category": "regional-adtech",
+      "service": "Yandex",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "hm.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "eclick.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cpro.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pos.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "dup.baidustatic.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "mobads.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "nsclick.baidu.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "pingjs.qq.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "acjs.aliyun.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "atanx.alicdn.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "beacon.qq.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "gdt.qq.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tajs.qq.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adcr.naver.com",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "wcs.naver.net",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "display.ad.daum.net",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "track.tiara.daum.net",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "event.impression-neo.naver.com",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cafe-ads-api.daum.net",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "media.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "static2.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "stream.adtimaserver.vn",
+      "category": "regional-adtech",
+      "service": "Vietnam ad networks",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "top-fwz1.mail.ru",
+      "category": "regional-adtech",
+      "service": "VK / Mail.ru",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ad.mail.ru",
+      "category": "regional-adtech",
+      "service": "VK / Mail.ru",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "rs.mail.ru",
+      "category": "regional-adtech",
+      "service": "VK / Mail.ru",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.vk.com",
+      "category": "regional-adtech",
+      "service": "VK / Mail.ru",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app-tracking-gfa-collector.naver.com",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adimg3.search.naver.net",
+      "category": "regional-adtech",
+      "service": "Kakao / Naver",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "e.qq.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "vk-ads.com",
+      "category": "regional-adtech",
+      "service": "VK / Mail.ru",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "dorangesource.alicdn.com",
+      "category": "regional-adtech",
+      "service": "Tencent / Alibaba",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "cpro.baidustatic.com",
+      "category": "regional-adtech",
+      "service": "Baidu",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.ad.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "data.mistat.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "data.mistat.india.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "data.mistat.rus.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdkconfig.ad.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdkconfig.ad.intl.xiaomi.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tracking.rus.miui.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tracking.miui.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adv.sec.intl.miui.com",
+      "category": "oem-tv-telemetry",
+      "service": "Xiaomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "samsungads.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "smetrics.samsung.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "nmetrics.samsung.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "samsung-com.112.2o7.net",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics-api.samsunghealthcn.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "log-config.samsungacr.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.samsung.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "metrics.data.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "metrics2.data.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "grs.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "logservice.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "logservice1.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "logbak.hicloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Huawei",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adsfs.oppomobile.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "adx.ads.oppomobile.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ck.ads.oppomobile.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "data.ads.oppomobile.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "iot-eu-logser.realme.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bdapi-ads.realmemobile.com",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "click.oneplus.cn",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "open.oneplus.net",
+      "category": "oem-tv-telemetry",
+      "service": "Oppo / Realme / OnePlus",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "iadsdk.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api-adservices.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "metrics.icloud.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "metrics.mzstatic.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "books-analytics-events.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "weather-analytics-events.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "notes-analytics-events.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ads.roku.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "p.ads.roku.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "scribe.logs.roku.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "us.info.lgsmartad.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ad.lgappstv.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tvinteractive.tv",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "securemetrics.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "analytics.bigdata.samsung.com",
+      "category": "oem-tv-telemetry",
+      "service": "Samsung",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "pixel.web.roku.com",
+      "category": "oem-tv-telemetry",
+      "service": "Roku / LG / Vizio",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "stocks-analytics-events.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "news-events.apple.com",
+      "category": "oem-tv-telemetry",
+      "service": "Apple Ads / metrics",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "cdn.cookielaw.org",
+      "category": "consent-annoyance",
+      "service": "OneTrust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "geolocation.onetrust.com",
+      "category": "consent-annoyance",
+      "service": "OneTrust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "privacyportal.onetrust.com",
+      "category": "consent-annoyance",
+      "service": "OneTrust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "smetrics.onetrust.com",
+      "category": "consent-annoyance",
+      "service": "OneTrust",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "consent.cookiebot.com",
+      "category": "consent-annoyance",
+      "service": "Cookiebot",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "consentcdn.cookiebot.com",
+      "category": "consent-annoyance",
+      "service": "Cookiebot",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "imgsct.cookiebot.com",
+      "category": "consent-annoyance",
+      "service": "Cookiebot",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "privacy-analytics-proxy.cookiebot.com",
+      "category": "consent-annoyance",
+      "service": "Cookiebot",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cmp.quantcast.com",
+      "category": "consent-annoyance",
+      "service": "Quantcast Choice",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "choice.quantcast.com",
+      "category": "consent-annoyance",
+      "service": "Quantcast Choice",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "quantcast.mgr.consensu.org",
+      "category": "consent-annoyance",
+      "service": "Quantcast Choice",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sourcepoint.mgr.consensu.org",
+      "category": "consent-annoyance",
+      "service": "Sourcepoint / Didomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.privacy-mgmt.com",
+      "category": "consent-annoyance",
+      "service": "Sourcepoint / Didomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.privacy-center.org",
+      "category": "consent-annoyance",
+      "service": "Sourcepoint / Didomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sdk.privacy-center.org",
+      "category": "consent-annoyance",
+      "service": "Sourcepoint / Didomi",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cookie-cdn.cookiepro.com",
+      "category": "consent-annoyance",
+      "service": "OneTrust",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "www.awin1.com",
+      "category": "affiliate-conversion",
+      "service": "Awin / Zanox",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "awin1.com",
+      "category": "affiliate-conversion",
+      "service": "Awin / Zanox",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.zanox-affiliate.de",
+      "category": "affiliate-conversion",
+      "service": "Awin / Zanox",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ad.zanox.com",
+      "category": "affiliate-conversion",
+      "service": "Awin / Zanox",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "click.linksynergy.com",
+      "category": "affiliate-conversion",
+      "service": "Rakuten / LinkShare",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "ad.linksynergy.com",
+      "category": "affiliate-conversion",
+      "service": "Rakuten / LinkShare",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "analytics.linksynergy.com",
+      "category": "affiliate-conversion",
+      "service": "Rakuten / LinkShare",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "t.tradedoubler.com",
+      "category": "affiliate-conversion",
+      "service": "Tradedoubler",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "clk.tradedoubler.com",
+      "category": "affiliate-conversion",
+      "service": "Tradedoubler",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "imp.tradedoubler.com",
+      "category": "affiliate-conversion",
+      "service": "Tradedoubler",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "tradedoubler.com",
+      "category": "affiliate-conversion",
+      "service": "Tradedoubler",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "track.webgains.com",
+      "category": "affiliate-conversion",
+      "service": "Webgains / Partnerize",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "prf.hn",
+      "category": "affiliate-conversion",
+      "service": "Webgains / Partnerize",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "t.myvisualiq.net",
+      "category": "affiliate-conversion",
+      "service": "Webgains / Partnerize",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "track.webgains.org",
+      "category": "affiliate-conversion",
+      "service": "Webgains / Partnerize",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.emjcd.com",
+      "category": "affiliate-conversion",
+      "service": "CJ / ShareASale / Impact",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "www.anrdoezrs.net",
+      "category": "affiliate-conversion",
+      "service": "CJ / ShareASale / Impact",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "shareasale.com",
+      "category": "affiliate-conversion",
+      "service": "CJ / ShareASale / Impact",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "impact.com",
+      "category": "affiliate-conversion",
+      "service": "CJ / ShareASale / Impact",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "trk.impact.com",
+      "category": "affiliate-conversion",
+      "service": "CJ / ShareASale / Impact",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "browser.sentry-cdn.com",
+      "category": "error-session-replay",
+      "service": "Sentry",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app.getsentry.com",
+      "category": "error-session-replay",
+      "service": "Sentry",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "o0.ingest.sentry.io",
+      "category": "error-session-replay",
+      "service": "Sentry",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sentry.io",
+      "category": "error-session-replay",
+      "service": "Sentry",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "notify.bugsnag.com",
+      "category": "error-session-replay",
+      "service": "Bugsnag",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "sessions.bugsnag.com",
+      "category": "error-session-replay",
+      "service": "Bugsnag",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.bugsnag.com",
+      "category": "error-session-replay",
+      "service": "Bugsnag",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "app.bugsnag.com",
+      "category": "error-session-replay",
+      "service": "Bugsnag",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "browser-intake-datadoghq.com",
+      "category": "error-session-replay",
+      "service": "Datadog RUM",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "browser-intake-datadoghq.eu",
+      "category": "error-session-replay",
+      "service": "Datadog RUM",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "rum.browser-intake-datadoghq.com",
+      "category": "error-session-replay",
+      "service": "Datadog RUM",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bam.nr-data.net",
+      "category": "error-session-replay",
+      "service": "New Relic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "js-agent.newrelic.com",
+      "category": "error-session-replay",
+      "service": "New Relic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "bam-cell.nr-data.net",
+      "category": "error-session-replay",
+      "service": "New Relic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "beacon-1.newrelic.com",
+      "category": "error-session-replay",
+      "service": "New Relic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "insights-collector.newrelic.com",
+      "category": "error-session-replay",
+      "service": "New Relic",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.rollbar.com",
+      "category": "error-session-replay",
+      "service": "Rollbar / Raygun",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.lr-ingest.com",
+      "category": "error-session-replay",
+      "service": "LogRocket",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "r.lr-ingest.com",
+      "category": "error-session-replay",
+      "service": "LogRocket",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "i.logrocket.com",
+      "category": "error-session-replay",
+      "service": "LogRocket",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "cdn.logrocket.io",
+      "category": "error-session-replay",
+      "service": "LogRocket",
+      "method": "network",
+      "open": false
+    },
+    {
+      "host": "api.raygun.io",
+      "category": "error-session-replay",
+      "service": "Rollbar / Raygun",
+      "method": "network",
+      "open": true
+    },
+    {
+      "host": "browser-intake-us5-datadoghq.com",
+      "category": "error-session-replay",
+      "service": "Rollbar / Raygun",
+      "method": "network",
+      "open": true
+    }
+  ],
+  "baits": {
+    "scripts": [
+      {
+        "file": "ads.js",
+        "rule": "/\\/ads\\.js$/$script",
+        "open": false
+      },
+      {
+        "file": "pagead.js",
+        "rule": "/pagead\\.js$/$script",
+        "open": false
+      },
+      {
+        "file": "advertisement.js",
+        "rule": "/\\/advertisement\\.js$/$script",
+        "open": true
+      },
+      {
+        "file": "analytics.js",
+        "rule": "/\\/analytics\\.js$/$script",
+        "open": true
+      }
+    ],
+    "cosmetic": [
+      {
+        "selectors": ".adsbox .ad-banner #ad-container",
+        "rules": [
+          "##.adsbox",
+          "##.ad-banner",
+          "###ad-container"
+        ],
+        "open": true
+      },
+      {
+        "selectors": ".adsbygoogle .google-ad",
+        "rules": [
+          "##.adsbygoogle",
+          "##.google-ad"
+        ],
+        "open": true
+      }
+    ]
+  }
+}
