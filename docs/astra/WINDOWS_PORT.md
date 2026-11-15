@@ -130,6 +130,12 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   is alive, `ProfD/astra/core.sqlite` is created, and the sidecar stops with the
   browser.
 - `mach build faster` after an overlay is **10-13 s**.
+- `tools/windows/settings-probe.py` **105/105 PASS**: 14 Settings pages render
+  with no alerts, 20 representative controls change and persist, and no new
+  unrouted Settings binding. The chart and its findings are in
+  `docs/astra/SETTINGS_AUDIT.md`; five failures are recorded there (launcher
+  shortcut, the Windows SmartScreen card, the identity card, Spaces "New Space",
+  and the forced download-confirmation policy).
 
 ### Headed visual probe (2026-11-14)
 
