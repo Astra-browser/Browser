@@ -1,11 +1,13 @@
-import "$styles/global.css";
+﻿import "$styles/global.css";
 import { afterEach, expect, test, vi } from "vitest";
+import { tick } from "svelte";
 import { render } from "vitest-browser-svelte";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { surface } from "$domain/surface";
 import * as notices from "$session/notice.svelte";
+import * as sidebarMode from "$session/sidebar-mode.svelte";
 import { theme } from "$domain/appearance";
 import Shell from "../Shell.svelte";
 
@@ -17,6 +19,8 @@ vi.mock("$shared/ipc/bindings", async () => {
     pagePermissionCardHost: async () => {},
     tabsBootstrap: async () => {},
     sidebarSetHidden: async () => {},
+    sidebarSetWidth: async () => {},
+    settingSet: async () => ({ accepted: true, operation_id: null }),
   });
 });
 
@@ -60,30 +64,45 @@ test("landmarks name the shell regions for assistive technology", async () => {
   // Tab lists are navigation landmarks with names.
   const navs = screen.container.querySelectorAll("nav[aria-label]");
   expect(navs.length).toBeGreaterThan(0);
-  // The address field is a search landmark in the main-page bar.
+  // The address field is a search landmark, in the column's head.
   expect(screen.container.querySelector('form[role="search"]')).not.toBeNull();
   // The skip link names the stage the app draws; native pages own their own
   // document, so the target exists on the new-tab and internal stages.
   expect(screen.container.querySelector(".skip-link")?.getAttribute("href")).toBe("#astra-stage");
 });
 
-test("the address field stands in the main-page bar, never in the sidebar", async () => {
+test("the address field stands in the column's head, and the bar keeps it when the column is a rail", async () => {
   await surface.init();
   await tabs.init();
   emitNativeEvent("itemsChanged", boot());
   const screen = await render(Shell);
 
   const field = screen.container.querySelector("[data-astra-address]")!;
-  const bar = screen.container.querySelector(".stage-column > [data-content-bar]")!;
   const sidebar = screen.container.querySelector("aside")!;
-  expect(bar).not.toBeNull();
-  expect(bar.contains(field)).toBe(true);
-  expect(sidebar.contains(field)).toBe(false);
+  expect(sidebar.contains(field)).toBe(true);
+  // The bar above the page has nothing of its own to carry while the column
+  // is in its full shape.
+  expect(screen.container.querySelector(".stage-column [data-content-bar]")).toBeNull();
   // One field, the product's own, not a second bar for the new tab.
   expect(screen.container.querySelectorAll("[data-astra-address]")).toHaveLength(1);
+
+  // Put the column away and the bar is the field's home again.
+  sidebarMode.holdShown(false);
+  sidebarMode.setMode("hidden");
+  await tick();
+  await expect
+    .poll(() => screen.container.querySelector(".stage-column [data-content-bar]"), {
+      timeout: 4000,
+    })
+    .not.toBeNull();
+  const bar = screen.container.querySelector(".stage-column [data-content-bar]")!;
+  await expect
+    .poll(() => bar.contains(screen.container.querySelector("[data-astra-address]")))
+    .toBe(true);
+  sidebarMode.setMode("default");
 });
 
-test("keyboard order runs skip link, the tab column, the address field, then content", async () => {
+test("keyboard order runs skip link, the address field, the column's list, then content", async () => {
   await surface.init();
   await tabs.init();
   emitNativeEvent("itemsChanged", boot());
@@ -94,10 +113,10 @@ test("keyboard order runs skip link, the tab column, the address field, then con
   const address = screen.container.querySelector<HTMLInputElement>("[data-astra-address]")!;
   const firstTab = screen.container.querySelector<HTMLElement>("[data-astra-tab-id] button")!;
   expect(order[0]).toBe(skip);
+  // The column's head carries the controls and the field, so the address is
+  // reached before the list it stands above.
   expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(skip));
-  // The address field lives in the main-page bar, after the column it sits
-  // beside; the tab list is still the first stop inside the window.
-  expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(firstTab));
+  expect(order.indexOf(address)).toBeLessThan(order.indexOf(firstTab));
 
   // The skip link moves focus to the stage the app draws. A native page owns
   // the content surface itself, so the link is present and named, and the

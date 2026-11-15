@@ -41,6 +41,7 @@
   import { requestTab } from "$session/work-tab.svelte";
   import {
     expanded as sidebarWidth,
+    isCompact,
     isHidden as sidebarHidden,
   } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
@@ -75,7 +76,7 @@
     SidebarNotice,
     UtilityTray,
   } from "$features/sidebar";
-  import { ContentBar } from "$features/toolbar";
+  import { ContentBar, PageNav } from "$features/toolbar";
   import { IS_WINDOWS } from "$shared/platform";
   import { flags } from "$shared/flags";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
@@ -563,8 +564,20 @@
     const url = tabs.activeTab()?.url ?? null;
     return url !== null && url !== "" && url !== "about:blank";
   });
+  // The column draws the page controls and the one address field while it is
+  // in its full shape: that is where the window's left edge is, and the bar
+  // above the page then has nothing of its own to carry. It keeps the job
+  // whenever the column is a rail, put away, or standing beside a panel, and
+  // always when the bar was pinned there on purpose.
+  let columnCompact = $derived(
+    isCompact() ||
+      toolHost.activeTool() !== null ||
+      ["settings", "tasks", "notes", "work"].includes(browserPage.currentPage() ?? ""),
+  );
+  let sidebarOwnsBar = $derived(!columnCompact && !sidebarHidden() && barMode !== "always");
   let barVisible = $derived(
-    barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused,
+    !sidebarOwnsBar &&
+      (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),
   );
   // The bar floats whenever it is not pinned to a row: over a web page in
   // `auto`, and everywhere in `hidden`.
@@ -703,6 +716,37 @@
         {compact}
       />{/await}{/if}{/snippet}
 
+<!-- The page's controls and the one address field, composed once here and
+     rendered wherever the window puts them: the column's head while it is in
+     its full shape, the bar above the page otherwise. A snippet is only
+     mounted where it is drawn, so the field exists once either way. -->
+{#snippet pageNav()}<PageNav buttonSize={30} iconSize={16} />{/snippet}
+{#snippet addressField()}
+  <AddressField>
+    {#snippet trailing(page)}
+      <UtilityTray
+        label={page === null
+          ? m.utilities()
+          : page.warning
+            ? m.site_info_label_status({ status: page.warning })
+            : m.site_info_label()}
+        warning={page?.warning}
+        onopen={() => raiseForTray(true)}
+        onclose={() => raiseForTray(false)}
+      >
+        {#snippet children(open)}
+          {#snippet siteHead(name: string | null, control?: Snippet)}
+            <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+          {/snippet}
+          <BlockerShield {open} head={page ? siteHead : undefined} />
+          <ExtensionsSection />
+          <SiteDetails {page} {open} />
+        {/snippet}
+      </UtilityTray>
+    {/snippet}
+  </AddressField>
+{/snippet}
+
 <!-- The chrome view starts at the window's corner in every shape and draws
      the gutter itself, which stays a place to drag the window by. -->
 <div
@@ -735,6 +779,8 @@
   {/if}
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
   <Sidebar
+    nav={sidebarOwnsBar ? pageNav : undefined}
+    field={sidebarOwnsBar ? addressField : undefined}
     >{#snippet browserBody(compact)}
       {#if !compact && !inWork}<StoreInstallBanner />{/if}
       {#if compact && (inWork || paneled)}
@@ -885,59 +931,37 @@
       >{/snippet}</Sidebar
   >
   <div class="stage-column" data-bar-overlay={barOverPage}>
-    <!-- The page's own bar: navigation and the one address field, above the
-         stage and never in the sidebar. The field is composed here, with the
-         tray that acts on the page it names, and the bar only places it.
-         It stays in the tree on every surface: the home page and internal
-         pages keep it in a row, and a web page floats it over the page when
-         the person pinned it or reached for the top edge. -->
-    <div
-      class="stage-bar"
-      role="toolbar"
-      tabindex="-1"
-      aria-label={m.ui_navigation()}
-      data-drag-region
-      data-hidden={!barVisible}
-      data-mode={barMode}
-      bind:this={barElement}
-      onpointerenter={barEnter}
-      onpointerleave={barLeave}
-      onfocusin={() => (barFocused = true)}
-      onfocusout={(event) => {
-        const next = event.relatedTarget;
-        if (next instanceof Node && barElement?.contains(next)) return;
-        barFocused = false;
-      }}
-    >
-      <ContentBar>
-        {#snippet field()}
-          <AddressField>
-            {#snippet trailing(page)}
-              <UtilityTray
-                label={page === null
-                  ? m.utilities()
-                  : page.warning
-                    ? m.site_info_label_status({ status: page.warning })
-                    : m.site_info_label()}
-                warning={page?.warning}
-                onopen={() => raiseForTray(true)}
-                onclose={() => raiseForTray(false)}
-              >
-                {#snippet children(open)}
-                  {#snippet siteHead(name: string | null, control?: Snippet)}
-                    <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
-                  {/snippet}
-                  <BlockerShield {open} head={page ? siteHead : undefined} />
-                  <ExtensionsSection />
-                  <SiteDetails {page} {open} />
-                {/snippet}
-              </UtilityTray>
-            {/snippet}
-          </AddressField>
-        {/snippet}
-      </ContentBar>
-    </div>
-    {#if barOverPage}
+    {#if !sidebarOwnsBar}
+      <!-- The page's own bar: navigation and the one address field, above the
+           stage. The field is composed once at the top of this file, with the
+           tray that acts on the page it names, and the bar only places it.
+           It stays in the tree on every surface: internal pages keep it in a
+           row, and a web page floats it over the page when the person pinned
+           it or reached for the top edge. -->
+      <div
+        class="stage-bar"
+        role="toolbar"
+        tabindex="-1"
+        aria-label={m.ui_navigation()}
+        data-drag-region
+        data-hidden={!barVisible}
+        data-mode={barMode}
+        bind:this={barElement}
+        onpointerenter={barEnter}
+        onpointerleave={barLeave}
+        onfocusin={() => (barFocused = true)}
+        onfocusout={(event) => {
+          const next = event.relatedTarget;
+          if (next instanceof Node && barElement?.contains(next)) return;
+          barFocused = false;
+        }}
+      >
+        <ContentBar>
+          {#snippet field()}{@render addressField()}{/snippet}
+        </ContentBar>
+      </div>
+    {/if}
+    {#if barOverPage && !sidebarOwnsBar}
       <!-- The strip that brings a floating bar back. It stays in the tree
            while the bar is shown so keyboard focus is not dropped; when the
            bar is down it sits beneath it and takes no pointer. -->

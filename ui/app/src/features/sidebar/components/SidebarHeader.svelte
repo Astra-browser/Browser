@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as m from "$shared/i18n/messages";
   import type { Snippet } from "svelte";
-  import { EllipsisIcon } from "@hugeicons/core-free-icons";
+  import { EllipsisIcon, SidebarLeftIcon } from "@hugeicons/core-free-icons";
   import { tabs } from "$domain/tabs";
   import { blocker, blockerSites, siteMenuState } from "$domain/blocker";
   import { clearRequest, pageSite } from "$domain/site-data";
@@ -23,12 +23,22 @@
     compact,
     pageControls = true,
     utilities,
+    nav,
+    field,
+    ontoggle,
   }: {
     compact: boolean;
     /** Back, forward and reload act on a page; Work shows none. */
     pageControls?: boolean;
     /** The tools that stand at the column's head, in one row or the rail grid. */
     utilities?: Snippet;
+    /** The page's own controls, composed by the shell so both places that
+     *  draw them mount the same component. */
+    nav?: Snippet;
+    /** The address field, in the column's head instead of the content bar. */
+    field?: Snippet;
+    /** Puts the column away. The head's own end, after the page controls. */
+    ontoggle?: () => void;
   } = $props();
 
   let active = $derived(tabs.activeTab());
@@ -172,30 +182,87 @@
     <span class="mt-[6px] mb-[7px] h-px w-[22px] rounded-full bg-border" aria-hidden="true"></span>
   </header>
 {:else}
+  <!--
+    The column's head, in three bands: the page's own controls with the way to
+    put the column away, then the one address field, then the tools. The bars
+    a person reaches for most often sit at the top of the window's left edge,
+    where the pointer already is, instead of crossing the top of the page.
+  -->
   <header
-    class="sidebar-toolbar flex shrink-0 items-center pe-2"
+    class="sidebar-top"
     data-drag-region
-    style:min-height="var(--titlebar-height)"
-    style:padding-inline-start={lights ? "var(--traffic-light-inset)" : "var(--tab-inset)"}
+    style:padding-block-start={lights ? "var(--traffic-light-inset)" : undefined}
     aria-label={m.ui_navigation()}
   >
-    {#if utilities}{@render utilities()}{/if}
-    <SiteShield />
+    <div class="sidebar-top-row" style:padding-inline-start={lights ? "52px" : undefined}>
+      {#if pageControls && nav}{@render nav()}{/if}
+      <span class="sidebar-top-gap" aria-hidden="true"></span>
+      {#if pageControls}<IconButton
+          icon={EllipsisIcon}
+          label={m.ui_sidebar_options()}
+          size={16}
+          buttonSize={30}
+          haspopup
+          onclick={openSidebarMenu}
+        />{/if}
+      {#if ontoggle}<IconButton
+          icon={SidebarLeftIcon}
+          label={m.ui_compact_mode()}
+          size={16}
+          buttonSize={30}
+          onclick={ontoggle}
+        />{/if}
+    </div>
+    {#if field}
+      <div class="sidebar-top-field">
+        {@render field()}
+        <SiteShield />
+      </div>
+    {/if}
+    {#if utilities}<div class="sidebar-top-utilities">{@render utilities()}</div>{/if}
   </header>
 {/if}
 
 <style>
-  /* The utility bar inside follows the header's own width, not the window's,
-     so dragging the column narrow rearranges the tools at the right moment. */
-  .sidebar-toolbar {
-    container-type: inline-size;
+  .sidebar-top {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 10px 4px;
   }
 
-  /* When the utilities become the two-row grid, the shield belongs on the
-     first row with the tools instead of floating at the seam between rows. */
-  @container (max-width: 260px) {
-    .sidebar-toolbar :global(.site-shield) {
-      align-self: flex-start;
-    }
+  .sidebar-top-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-block-size: var(--control-large);
+  }
+
+  .sidebar-top-gap {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .sidebar-top-field {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-inline-size: 0;
+  }
+
+  /* The field keeps its own shape; the row only says where it stands. */
+  .sidebar-top-field > :global(:first-child) {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  /* The tools sit on their own band under the field, so the address is the one
+     full-width thing at the top of the column. */
+  .sidebar-top-utilities {
+    display: flex;
+    align-items: center;
+    min-inline-size: 0;
+    padding-block-start: 2px;
   }
 </style>

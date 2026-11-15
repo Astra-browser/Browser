@@ -5,6 +5,7 @@ import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision, spaceFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { surface } from "$domain/surface";
+import * as sidebar from "$session/sidebar-mode.svelte";
 import Shell from "../Shell.svelte";
 
 vi.mock("../WorkWorkspace.svelte", async () => await import("./StageStub.svelte"));
@@ -21,6 +22,7 @@ vi.mock("$shared/ipc/bindings", async () => {
 });
 
 afterEach(() => {
+  sidebar.adoptMode("default");
   surface.dispose();
   tabs.dispose();
 });
@@ -34,6 +36,9 @@ function hover(hover: boolean) {
 async function floatingBar() {
   await surface.init();
   await tabs.init();
+  // The column in its full shape draws the address itself; the floating bar
+  // belongs to the shapes where the column is away or a rail.
+  sidebar.adoptMode("hidden");
   const tab = tabFixture({ url: "https://example.com/a" });
   emitNativeEvent("itemsChanged", {
     projection_revision: revision(40),

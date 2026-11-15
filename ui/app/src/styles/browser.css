@@ -364,11 +364,11 @@
 }
 
 /* The same card in dark: one step of charcoal over the field, with the same
-   corner and one soft drop. The ladder keeps Astra's neutral scheme; only the
-   card treatment is shared with Paper. */
+   corner and one soft drop. Solid rather than mixed, so the column reads as
+   one panel instead of a pane the window's own light shows through. */
 :root[data-theme="dark"] .browser-sidebar:not([data-hidden]) {
   border-radius: var(--content-radius);
-  background: color-mix(in srgb, var(--color-surface) 24%, transparent);
+  background: var(--color-chrome);
   box-shadow: var(--shadow-card);
 }
 

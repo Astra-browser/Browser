@@ -36,11 +36,17 @@
     toolPanel,
     browserBody,
     dock,
+    nav,
+    field,
   }: {
     settingsNavigation: Snippet;
     toolPanel: Snippet<[tools.ToolKind]>;
     browserBody: Snippet<[boolean]>;
     dock: Snippet<[boolean]>;
+    /** The page's own controls, drawn at the column's head. */
+    nav?: Snippet;
+    /** The one address field, drawn at the column's head. */
+    field?: Snippet;
   } = $props();
   let settings = $derived(browserPage.currentPage() === "settings");
   const SETTINGS_PANEL = 264;
@@ -579,7 +585,10 @@
     {#if !settings && (!compact || headerCompact)}<SidebarHeader
         compact={headerCompact}
         pageControls={!inWork}
-        >{#snippet utilities()}<UtilityBar ontoggle={toggleShape} />{/snippet}</SidebarHeader
+        {nav}
+        {field}
+        ontoggle={toggleShape}
+        >{#snippet utilities()}<UtilityBar />{/snippet}</SidebarHeader
       >{/if}
     {#if compact && (!paneled || (settings && settingsExtent === 0))}<div
         class="sidebar-compact-utilities"
