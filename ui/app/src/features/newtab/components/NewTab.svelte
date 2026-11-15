@@ -22,8 +22,8 @@
   import { clockFace, clockFormat, dayKey, focusSpan, untilNextMinute } from "../lib/clock";
   import { readSystemClock, systemHour24 } from "../lib/system-clock.svelte";
   import { focus, localDay } from "$domain/time";
-  import { groundPath, notchShape, notchWidth } from "../lib/ground";
-  import { layout, type Box } from "../lib/layout";
+  import { groundPath, notchShape } from "../lib/ground";
+  import { layout, TITLE_BAND, type Box } from "../lib/layout";
   import { WORDMARK } from "$shared/lib/wordmark";
   import { reducedMotion } from "$shared/lib/motion";
   import {
@@ -248,7 +248,9 @@
   const id = $props.id();
   let ground = $derived(groundPath(width, height, page.notch));
   let lip = $derived(notchShape(width, height, page.notch));
-  let fieldWidth = $derived(notchWidth(width, page.notch));
+  // How much of the width the field takes: the frost that reads beside the
+  // page is placed against it, since the group stands where the field does.
+  let fieldWidth = $derived(page.field.w);
   let letters = $derived(
     `scale(${page.mark.w / WORDMARK.width}) ` +
       `translate(${-WORDMARK.x} ${-WORDMARK.y}) scale(${WORDMARK.scaleX} ${WORDMARK.scaleY})`,
@@ -415,16 +417,10 @@
     </svg>
   {/if}
 
-  <!-- The band the field hangs in is the window's title bar: beside the
-       field, it moves the window. -->
-  <div
-    class="drag"
-    data-tauri-drag-region
-    aria-hidden="true"
-    style:height={`${page.notch.height}px`}
-  ></div>
+  <!-- The band the page's top edge moves the window by. -->
+  <div class="drag" data-tauri-drag-region aria-hidden="true" style:height={`${TITLE_BAND}px`}></div>
 
-  <div class="field" style:width={`${fieldWidth}px`} style:height={`${page.notch.height}px`}>
+  <div class="field" style={at(page.field)}>
     {@render search()}
   </div>
 
@@ -665,13 +661,40 @@
     inset-inline: 0;
   }
 
-  /* The field fills the notch: the window's glass is its material. */
+  /* The field's box is the field's material: the shared search is only its
+     words, so the shape it stands in is drawn here, at the notch's own corner
+     and weight. */
   .field {
     position: absolute;
     z-index: 2;
-    inset-block-start: 0;
-    inset-inline: 0;
-    margin-inline: auto;
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control-large);
+    background: var(--color-address);
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out);
+  }
+
+  .field:hover {
+    background: var(--color-address-hover);
+  }
+
+  /* The search fills the box the page gives it. */
+  .field > :global(:first-child) {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .field:focus-within {
+    border-color: var(--color-border-strong);
+    background: var(--color-address-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .field {
+      transition: none;
+    }
   }
 
   .greeting,

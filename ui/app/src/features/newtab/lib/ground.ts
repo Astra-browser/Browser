@@ -30,6 +30,9 @@ function contour(
   const span = notchWidth(width, notch);
   const depth = Math.min(notch.height, height - notch.flare);
   const { radius: r, flare: f } = notch;
+  // A notch of no width is a page with no cut in it: the field stands on the
+  // page now, so the ground is the plain rectangle.
+  if (span <= 0 || notch.height <= 0) return null;
   if (span < 2 * r || depth < r + f) return null;
   const left = n((width - span) / 2);
   const right = n((width + span) / 2);
