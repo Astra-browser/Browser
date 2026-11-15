@@ -133,7 +133,10 @@
   });
 
   onMount(async () => {
+    const bootStart = performance.now();
+    if (frameRoot) frameRoot.dataset.bootStart = String(Math.round(bootStart));
     const host = await loadHost();
+    if (frameRoot) frameRoot.dataset.bootHost = String(Math.round(performance.now()));
     if (!host) {
       slotError = "Host API unavailable outside the browser window";
       // Same pattern for the app region: without the Host API the packaged
@@ -144,7 +147,9 @@
     // One startup owner for the Rust core. The command comes from
     // `astra.core.command` (dev/packaged path); empty is an honest
     // `unavailable` and never starts a fake process. The core is optional:
-    // the browser works without it while the Rust backend is pending.
+    // the browser works without it while the Rust backend is pending. Start
+    // it beside the app frame; metadata waits for it below.
+    let coreLaunch = null;
     try {
       const services = frameRoot?.ownerDocument?.defaultView?.Services;
       const chromeWin = frameRoot?.ownerDocument?.defaultView ?? null;
@@ -182,16 +187,20 @@
       // P5b: the sidecar must be up before the organisation snapshot is read.
       // A missing binary is an honest unavailable; the browser still boots.
       if (command !== "" && database !== "") {
-        try {
-          const launched = await host.Boot.launchCore({
-            request_id: "shell-boot",
-            command,
-            arguments: ["--db", database],
-          });
-          frameRoot.dataset.core = launched?.state ?? "started";
-        } catch (e) {
-          frameRoot.dataset.core = `error:${String(e).slice(0, 160)}`;
-        }
+        coreLaunch = host.Boot.launchCore({
+          request_id: "shell-boot",
+          command,
+          arguments: ["--db", database],
+        }).then(
+          (launched) => {
+            frameRoot.dataset.core = launched?.state ?? "started";
+            if (frameRoot) frameRoot.dataset.bootCore = String(Math.round(performance.now()));
+          },
+          (e) => {
+            frameRoot.dataset.core = `error:${String(e).slice(0, 160)}`;
+            if (frameRoot) frameRoot.dataset.bootCore = String(Math.round(performance.now()));
+          },
+        );
       } else {
         frameRoot.dataset.core = command === "" ? "no-command" : "no-database";
       }
@@ -200,6 +209,7 @@
     } catch {
       // No Services in a preview DOM.
     }
+    if (frameRoot) frameRoot.dataset.bootCore = String(Math.round(performance.now()));
     // One Host API instance per window. `resource://` ES modules are per
     // document, so an import inside the app frame would give it a second tab
     // model while this window owns the content browser: a navigation would
@@ -600,12 +610,14 @@
     // in this window's host modules, so the app boots in host mode. The
     // interim mounts stay wired (live contract tests drive them); they hide
     // on host-ready and return only if the app fails (P3-T16).
+    if (frameRoot) frameRoot.dataset.bootFrame = String(Math.round(performance.now()));
     appApi = mountAppFrame(appMount, host, {
       window_id: ownWindowId,
       // Records the mode the app actually booted in (P3-T15 contract seam:
       // live suites assert `host` here). Ready also retires the interim
       // chrome (P3-T16); a failure keeps it visible with appError set.
       onReady: (mode) => {
+        if (frameRoot) frameRoot.dataset.bootReady = String(Math.round(performance.now()));
         appMount.dataset.appReady = mode;
         appBooted = mode === "host";
         if (!appBooted) {
@@ -982,6 +994,7 @@
           // normal window's in-memory store.
           if (!privateWindow) {
             try {
+              if (coreLaunch) await coreLaunch;
               await host.Metadata?.prepare?.({ private: privateWindow, window_id: ownWindowId });
             } catch {
               // No core or no snapshot: the browser keeps its default space.

@@ -156,6 +156,12 @@ Section "Astra" SEC_MAIN
 
   ; Refresh the shell so Open-with and Default apps see the new ProgId.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
+
+  ; Warm the executable cache and the fresh profile once. Without this the
+  ; first launch pays Windows' first-scan and profile-creation cost (8-10 s
+  ; measured); the headless screenshot exits without showing a window.
+  nsExec::ExecToLog '"$INSTDIR\astra.exe" --headless --screenshot "$TEMP\astra-warm.png" -profile "$APPDATA\Astra\Profiles\default" about:blank'
+  Delete "$TEMP\astra-warm.png"
 SectionEnd
 
 Section "Uninstall"
