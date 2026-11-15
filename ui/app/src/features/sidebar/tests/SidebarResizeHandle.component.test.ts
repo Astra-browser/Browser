@@ -4,29 +4,73 @@ import * as sidebar from "$session/sidebar-mode.svelte";
 import SidebarResizeHandle from "../components/SidebarResizeHandle.svelte";
 
 const native = vi.hoisted(() => ({
-  resize: vi.fn(
-    async (_width: number | null, enabled: boolean, _revision: number | null) => enabled,
-  ),
+  setWidth: vi.fn(async (_width: number | null, _travel: boolean, _revision: number | null) => {}),
+  setHidden: vi.fn(async (_hidden: boolean) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
-    sidebarResize: native.resize,
-    sidebarResizeGuide: async () => true,
-    sidebarSetHidden: async () => {},
-    sidebarPeek: async () => {},
-    sidebarSetWidth: async () => {},
+    sidebarSetWidth: native.setWidth,
+    sidebarSetHidden: native.setHidden,
+    settingSet: async () => ({ operation_id: null, accepted: true }),
+    settingGet: async () => null,
+    sidebarResize: async () => false,
+    sidebarResizeGuide: async () => false,
   });
 });
 
-test("leaving for a tool switches the native guide off at the newest revision", async () => {
+// A synthetic pointer is not a real active pointer, so the browser refuses
+// capture; the component only needs the calls to be harmless.
+vi.spyOn(HTMLElement.prototype, "setPointerCapture").mockImplementation(() => {});
+vi.spyOn(HTMLElement.prototype, "releasePointerCapture").mockImplementation(() => {});
+vi.spyOn(HTMLElement.prototype, "hasPointerCapture").mockReturnValue(true);
+
+const at = (x: number) =>
+  ({ bubbles: true, pointerId: 1, button: 0, clientX: x, clientY: 320 }) as const;
+
+test("the column follows the pointer while it is held, then settles on release", async () => {
+  sidebar.setMode("default");
   const screen = await render(SidebarResizeHandle, { width: 240 });
-  await expect.poll(() => native.resize.mock.calls.length).toBeGreaterThan(0);
-  // A tool opening advances the revision in the same turn the handle leaves.
-  sidebar.setPanelExtent(336);
+  const handle = screen.container.querySelector<HTMLElement>('[role="separator"]');
+  expect(handle).not.toBeNull();
+  if (!handle) return;
+
+  handle.dispatchEvent(new PointerEvent("pointerdown", at(500)));
+  expect(sidebar.sidebarDragWidth()).toBe(240);
+
+  handle.dispatchEvent(new PointerEvent("pointermove", at(560)));
+  expect(sidebar.sidebarDragWidth()).toBe(300);
+  await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[0]).toBe(300);
+  expect(native.setWidth.mock.calls.at(-1)?.[1]).toBe(false);
+
+  handle.dispatchEvent(new PointerEvent("pointermove", at(600)));
+  expect(sidebar.sidebarDragWidth()).toBe(340);
+
+  handle.dispatchEvent(new PointerEvent("pointerup", at(600)));
+  expect(sidebar.sidebarDragWidth()).toBeNull();
+  expect(sidebar.expanded()).toBe(340);
+  await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[1]).toBe(true);
+
   screen.unmount();
-  await expect.poll(() => native.resize.mock.calls.at(-1)?.[1]).toBe(false);
-  expect(native.resize.mock.calls.at(-1)?.[2]).toBe(sidebar.sidebarResizeRevision());
-  sidebar.setPanelExtent(0);
+});
+
+test("escape puts the column back where it started", async () => {
+  sidebar.setMode("default");
+  const before = sidebar.expanded();
+  const screen = await render(SidebarResizeHandle, { width: before });
+  const handle = screen.container.querySelector<HTMLElement>('[role="separator"]');
+  expect(handle).not.toBeNull();
+  if (!handle) return;
+
+  handle.dispatchEvent(new PointerEvent("pointerdown", at(500)));
+  handle.dispatchEvent(new PointerEvent("pointermove", at(580)));
+  expect(sidebar.sidebarDragWidth()).toBe(before + 80);
+
+  handle.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(sidebar.sidebarDragWidth()).toBeNull();
+  expect(sidebar.expanded()).toBe(before);
+  await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[0]).toBe(before);
+
+  screen.unmount();
 });

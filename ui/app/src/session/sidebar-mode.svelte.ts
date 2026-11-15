@@ -26,6 +26,12 @@ let desiredMode: SidebarMode = "default";
 let expandedWidth = $state.raw(240);
 let drag: { mode: SidebarMode; desired: SidebarMode; expanded: number; pending: number } | null =
   null;
+/**
+ * The width the column shows while the handle is held. It follows the pointer
+ * on every move (the layout is never left to snap on release), but the shape
+ * the column settles into is still decided when the drag ends.
+ */
+let dragPreview = $state.raw<number | null>(null);
 let resizeSettlement = $state(0);
 // One ordering counter, seeded above every earlier owner: an earlier
 // document, and an earlier copy of this module in the same document, which a
@@ -51,6 +57,8 @@ export function holdShown(value: boolean) {
   if (mode === "hidden") publish(true);
 }
 export const expanded = () => expandedWidth;
+/** The live width a held handle is showing, or null when no drag is running. */
+export const sidebarDragWidth = () => dragPreview;
 /** The chrome gap between the rail and an open utility panel. */
 export const PANEL_GAP = 8;
 let panelExtent = $state.raw(0);
@@ -107,6 +115,7 @@ function publish(travel = false) {
 export function applyDragWidth(value: number) {
   if (drag) {
     drag.pending = value;
+    previewSidebarResize(value);
     return;
   }
   const next = resolveDragWidth(value);
@@ -119,22 +128,55 @@ export function applyDragWidth(value: number) {
   if (modeChanged) save(mode);
 }
 
-/** The non-native capture fallback also keeps the rendered layout unchanged. */
 export function beginSidebarResize() {
   if (drag) return;
   drag = { mode, desired: desiredMode, expanded: expandedWidth, pending: effectiveWidth() };
+  dragPreview = effectiveWidth();
+}
+
+/**
+ * Moves the column to the pointer's width without settling the shape. The
+ * bounds are the expanded ones, so the live edge never passes the minimum the
+ * column can actually occupy; a release below the snap point still puts it away.
+ */
+export function previewSidebarResize(value: number) {
+  if (!drag) return;
+  const raw = Number.isFinite(value) ? value : drag.pending;
+  drag.pending = Math.max(COMPACT_WIDTH, Math.min(MAX_EXPANDED_WIDTH, Math.round(raw)));
+  const next = Math.max(MIN_EXPANDED_WIDTH, drag.pending);
+  if (next === dragPreview) return;
+  dragPreview = next;
+}
+
+/**
+ * Tells native where the live edge is. Called at most once per display frame
+ * by the handle: the app's own column already tracks the pointer, but the page
+ * beside it is native and only moves when it is told.
+ */
+export function publishSidebarResize() {
+  if (!drag || dragPreview === null) return;
+  resizeRevision++;
+  // No travel: the page tracks the pointer instead of chasing it.
+  void commands.sidebarSetWidth(dragPreview, false, resizeRevision);
 }
 
 export function finishSidebarResize(value: number) {
   if (!drag) return;
   drag = null;
+  dragPreview = null;
   adoptResizeWidth(value);
-  // The page travels to the new edge, as it does from the native guide.
+  // The page travels the last few pixels to the settled shape.
   void commands.sidebarSetWidth(publishedWidth(), true, resizeRevision);
 }
 
 export function cancelSidebarResize() {
+  if (!drag) return;
   drag = null;
+  if (dragPreview === null) return;
+  dragPreview = null;
+  // A cancelled drag published live widths; put the page back at the shape
+  // the column never left.
+  publish();
 }
 
 /** Native has admitted one final width; adopt its display shape without another layout command. */
