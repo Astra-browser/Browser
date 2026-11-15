@@ -10,6 +10,7 @@
 
 pub mod diagnostics;
 pub mod history;
+pub mod hotkey;
 pub mod keymap;
 pub mod keymap_ext;
 pub mod layout;
