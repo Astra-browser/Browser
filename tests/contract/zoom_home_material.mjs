@@ -371,6 +371,21 @@ function levelsOf(res) {
   await Commands.run({ id: "nav.home" });
   const afterNewTab = (await Tabs.get({ request_id: "h-5", astra_tab_id: tab.astra_tab_id })).tab;
   check("about:newtab means the New Tab surface", afterNewTab.url === "about:blank", afterNewTab.url);
+
+  // Asking for the New Tab again is a settled no-op, not a load nothing can
+  // finish (the engine cannot reload an empty stage).
+  const blankTab = await Tabs.create({ request_id: "h-6", url: "about:blank", background: true });
+  const again = await Navigation.loadURL({
+    request_id: "h-7",
+    astra_tab_id: blankTab.astra_tab_id,
+    url: "about:blank",
+  });
+  const settled = (await Tabs.get({ request_id: "h-8", astra_tab_id: blankTab.astra_tab_id })).tab;
+  check(
+    "re-asking for the New Tab leaves the tab settled",
+    again.accepted === true && settled.loading !== true,
+    settled.loading,
+  );
 }
 
 // === Window material =====================================================
