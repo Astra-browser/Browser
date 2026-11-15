@@ -484,6 +484,15 @@ function outcome(kind) {
 
 export const Keymap = {
   /**
+   * Canonical text for `text` on `platform`, or null when it is not an
+   * accelerator. Lets the launcher validate its own recorder against the same
+   * grammar the registry uses.
+   */
+  canonical(text, platform = null) {
+    return canonicalAccelerator(text, platformOf(platform ?? currentPlatform()));
+  },
+
+  /**
    * Every registry command with its current keys and defaults, sorted by id.
    * `accelerator` is the person's binding or the platform default;
    * `default_accelerator` is the registry default for that platform.

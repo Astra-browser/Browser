@@ -108,6 +108,7 @@ const APP_ACTIONS = new Set([
   "find.next",
   "find.previous",
   "find.show",
+  "launcher.toggle",
   "split.choose",
   "theme.dark",
   "theme.light",

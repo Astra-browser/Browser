@@ -107,6 +107,13 @@ export class BootSidecar {
     try {
       for (;;) {
         const msg = await SidecarFrame.readNext(this.proc.stdout);
+        // An unsolicited frame is the core reporting something: a hotkey
+        // press, for one. There is no request to answer, so it goes to the
+        // event channel the app already listens on.
+        if (msg.kind === "evt") {
+          if (msg.name === "launcher.toggle") emit("ui-command", "launcher.toggle");
+          continue;
+        }
         const resolve = this.pending.get(msg.id);
         if (resolve) {
           this.pending.delete(msg.id);
@@ -233,6 +240,24 @@ export const Boot = {
   },
 
   /**
+   * Register (or re-register) the launcher's global shortcut in the core.
+   * The desktop decides whether the key is free, so the answer is relayed
+   * rather than assumed: Settings reports what the system said.
+   */
+  async launcherShortcut({ accelerator = "" } = {}) {
+    const core = currentCore();
+    if (!core?.alive) {
+      return { registered: false, reason: "unavailable" };
+    }
+    try {
+      const reply = await core.call("launcher.set", { accelerator });
+      return reply?.payload ?? { registered: false, reason: "unavailable" };
+    } catch {
+      return { registered: false, reason: "unavailable" };
+    }
+  },
+
+  /**
    * Launch the Rust core once. The shell owns the command path (packaged
    * binary or dev build); without one the answer is an honest unavailable.
    * Concurrent callers share one launch; a dead handle is discarded.
@@ -276,6 +301,11 @@ export const Boot = {
         setCore(null);
         return err(request_id, "core_launch_failed", "core exited during startup");
       }
+      // The launcher's shortcut lives in the core, and the app may have asked
+      // for it before the core was up. Hand it over now that it is.
+      void import("./Launcher.sys.mjs")
+        .then(({ Launcher }) => Launcher.reapply())
+        .catch(() => {});
       return ok(request_id, { state: "running" });
     } catch (e) {
       setCore(null);

@@ -51,6 +51,7 @@ import { ChromeExtensions } from "./ChromeExtensions.sys.mjs";
 import { Commands } from "./Commands.sys.mjs";
 import { Zoom, __resetZoomForTests } from "./Zoom.sys.mjs";
 import { Keymap } from "./Keymap.sys.mjs";
+import { Launcher } from "./Launcher.sys.mjs";
 import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
 import { Profiles, __resetProfilesForTests } from "./Profiles.sys.mjs";
@@ -114,6 +115,7 @@ export {
   Commands,
   Zoom,
   Keymap,
+  Launcher,
   Work,
   Downloads,
   Profiles,

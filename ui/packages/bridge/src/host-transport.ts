@@ -35,6 +35,7 @@ export interface HostModules {
   Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Zoom: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Launcher: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Profiles: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -227,6 +228,11 @@ const ROUTES: Record<string, Route> = {
   newtab_cancel: ["Search", "newtabCancel"],
   launcher_search: ["Search", "launcherSearch"],
   launcher_run: ["Search", "launcherRun"],
+  launcher_trigger: ["Launcher", "trigger"],
+  launcher_set_shortcut: ["Launcher", "setShortcut"],
+  launcher_record_shortcut: ["Launcher", "recordShortcut"],
+  launcher_set_double_tap: ["Launcher", "setDoubleTap"],
+  launcher_open_accessibility: ["Launcher", "openAccessibility"],
   spaces_create: ["Tabs", "createSpace"],
   spaces_update: ["Tabs", "updateSpace"],
   spaces_delete: ["Tabs", "deleteSpace"],
