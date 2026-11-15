@@ -11,6 +11,20 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## UI v2 lane (D-52, from 2026-11-15)
+
+Layout only, taken from the owner's reference (New Tab, Search, Settings):
+the column's head carries the page controls and the one address field, New
+Tab reads name → day → field, Settings reads at a 680px measure. Palette,
+fonts and every frozen search surface are unchanged. Branch `ui-v2`; not
+merged — the owner reviews and confirms it first.
+
+| Task | Branch | What | Verified |
+|---|---|---|---|
+| Column head | `ui-v2` | `PageNav` extracted from `ContentBar`; `Shell` composes the field once and renders it in the column's head or the bar; `SidebarHeader` three bands | svelte-check 0, eslint 0, stylelint 0, `NewTabLook`/`ShellA11y`/`BarHover`/`ShellLook`/`SidebarLook`/`SettingsInset`/`NarrowChrome`/`ThemeLook` component suites pass; golden screenshots of shell/newtab/settings in both themes |
+| New Tab group | `ui-v2` | name, time and date, then the field; the page is no longer cut by a notch | `layout` unit 7/7, `NewTabLook` 4/4 |
+| Settings measure | `ui-v2` | 680px column, 30px title, quiet group caption | golden screenshot (settings, dark) |
+
 ## Windows 11 x64 port (D-51, from 2026-11-14)
 
 Plan: `docs/astra/WINDOWS_MASTER_PLAN.md`. Integration branch `windows-port`;
