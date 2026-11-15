@@ -739,13 +739,26 @@
     container-type: inline-size;
   }
 
+  /* The panel's head: the tools on one row, spread evenly across the panel so
+     they read as the panel's own band rather than a cluster in a corner.
+     The band is deliberately not an inline-size container: the column's own
+     narrow rule (a centred 4-column grid) is for a 240px column sharing its
+     row with the shield, and applied here it broke seven tools into a ragged
+     4 + 3 block floating in the middle of the head. */
   .sidebar-tool-utilities {
     display: flex;
     flex: none;
     align-items: center;
-    padding: 4px 10px 3px;
-    border-block-end: 1px solid var(--color-border);
-    container-type: inline-size;
+    padding: 8px 12px 7px;
+  }
+
+  .sidebar-tool-utilities :global(.utility-bar) {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    justify-items: center;
+    inline-size: 100%;
+    gap: 0;
   }
 
   .sidebar-tool-panel {
