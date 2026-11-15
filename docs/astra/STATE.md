@@ -42,6 +42,39 @@ probes. Task rows are added here when each task starts.
 | W3 system routes | `win/w3-system-windows` | real Windows default-browser, login-item, SmartScreen-policy and diagnostics routes; General/Privacy rows wired; contract imports are file URLs on Windows | system_model 120/120, wire 51/51, live system-probe 15/15; 63/64 contract suites pass on Windows |
 | W1 window frame | `fix/windows-window-frame` | visible Windows caption controls, XUL window-drag edges, Astra boot mark and dark first paint; window-only capture helper | frame-probe 7/7, `WM_NCHITTEST` HTCAPTION at top gutter, controls 3→1→3, startup dark at 1.28 s / UI 2.99 s |
 
+## Settings audit: Import/Export were dead on this engine (2026-11-15)
+
+**Symptom:** Settings → General reported *No other browsers found on this
+device* on a machine with Edge installed, and both export buttons failed.
+
+**Root cause:** `Migration.sys.mjs` imported `IOUtils` from
+`resource://gre/modules/IOUtils.sys.mjs`, which this engine no longer ships:
+`IOUtils` is a chrome WebIDL global (see `dom/docs/ioutils_migration.md`). The
+failed import made `modules()` return `null`, so import sources were always
+empty and export always answered `failed`.
+
+**Fix:** read `IOUtils` from the chrome global; offer only migrators with real
+`getMigrateData()` for their profile (an empty browser is no longer listed, and
+the test-only migrator is skipped); export bookmarks as Netscape HTML and
+history as CSV, matching the copy in Settings.
+
+| Surface | What works now | Files |
+|---|---|---|
+| Import browser data | Microsoft Edge is detected with its profile and readable kinds; an empty/test source is not listed | `overlay/astra/host/Migration.sys.mjs` |
+| Export bookmarks | A Netscape bookmark file other browsers import | same |
+| Export history | One CSV row per visit: `date,title,address` | same |
+
+**Verification:** `node tests/contract/migration_model.mjs` 23/23 (including
+the HTML/CSV shape and the empty/test-source cases); `tabs_settings` 50/50;
+`zoom_home_material` 47/47; `wire_coverage` 62/62; live settings audit on the
+rebuilt Windows dev build 94 controls / 0 failed. `Migration.importSources()`
+returns `Microsoft Edge / Profile 1 / history` instead of `[]`; a live effect
+pass covers 44 checks (accent, fonts, density, motion, contrast, material, page
+bar, downloads ask, language, proxy, home, zoom, switch-to-open, close buttons,
+New Tab wordmark/greeting/clock/trackers) and an 8-check theme pass covers
+editing a colour and importing a shared theme. Those reported rows are not
+defects.
+
 ## Owner release: alpha 0.1.745 distro packages (2026-11-11)
 
 Owner override of the SCOPE packaging exclusion (P8+): alpha channel ships now
@@ -1041,6 +1074,12 @@ Everything below was re-run against the freshly packed dev build.
   artifacts (`SelectiveStyles`, clipboard, work/semantic) still fail on the
   documented missing `content_style.js` and friends. They are not part of the
   canonical gate.
+
+## Owner report: Home lands on the New Tab (2026-11-15)
+
+| Surface | Fix | Wiring / files | Live evidence |
+|---|---|---|---|
+| Home button | Clicking Home from a page left the old page in front with the tab spinning forever. The blank-stage load called `browser.loadURI("about:blank", …)`, but ESR 153's `nsIWebNavigation.loadURI` takes an `nsIURI`, not a string: the call threw, the error was swallowed, and neither `nav.committed` nor the `busy` edge ever settled the tab. The blank stage now loads through `fixupAndLoadURIString`, and asking for the New Tab when it is already the current head is a settled no-op instead of a load nothing can finish. | `overlay/astra/host/Content.sys.mjs` (`loadIn` blank branch), `overlay/astra/host/Navigation.sys.mjs` (`loadURL` blank no-op) | `tests/contract/zoom_home_material.mjs` (47 checks, incl. the settled no-op); Windows dev-build Marionette: Home from a loopback page → `about:blank`, New Tab surface, favicon spinner gone at 0.5 s; Home again on the New Tab → no spinner. `tools/marionette-probe/material-zoom-home-probe.py` now checks both |
 
 ## Owner report: floating page bar + in-window profiles (2026-11-07)
 

@@ -7,8 +7,8 @@
 // Import reads another installed browser through the engine's own profile
 // migrators (`MigrationUtils`), the same code Firefox's migration wizard
 // calls. Astra supplies the surface and the progress snapshots; no Firefox
-// window is opened. Export writes a portable JSON file through a native save
-// picker: the profile's bookmarks tree or its Places history.
+// window is opened. Export writes a portable file through a native save
+// picker: bookmarks as Netscape HTML, history as CSV.
 //
 // What this module will and will not say:
 // - A source is offered only when the engine reports a migrator and it can
@@ -21,12 +21,19 @@
 import { emit } from "./Events.sys.mjs";
 
 const NAMES = {
-  chrome: "Chrome",
+  chrome: "Google Chrome",
+  "chrome-beta": "Google Chrome Beta",
+  "chrome-dev": "Google Chrome Dev",
   chromium: "Chromium",
+  canary: "Google Chrome Canary",
   brave: "Brave",
   opera: "Opera",
+  "opera-gx": "Opera GX",
   vivaldi: "Vivaldi",
-  edge: "Edge",
+  edge: "Microsoft Edge (legacy)",
+  "chromium-edge": "Microsoft Edge",
+  "chromium-edge-beta": "Microsoft Edge Beta",
+  "chromium-360se": "360 Secure Browser",
   safari: "Safari",
   firefox: "Firefox",
 };
@@ -58,10 +65,16 @@ function modules(scope) {
       PlacesUtils: scope.ChromeUtils.importESModule(
         "resource://gre/modules/PlacesUtils.sys.mjs",
       ).PlacesUtils,
-      IOUtils: scope.ChromeUtils.importESModule(
-        "resource://gre/modules/IOUtils.sys.mjs",
-      ).IOUtils,
     };
+  } catch {
+    return null;
+  }
+}
+
+/** `IOUtils` is a chrome WebIDL global in this engine, not a JS module. */
+function ioutils(scope) {
+  try {
+    return scope.IOUtils ?? globalThis.IOUtils ?? null;
   } catch {
     return null;
   }
@@ -106,6 +119,69 @@ function displayName(key) {
   return NAMES[key] ?? key;
 }
 
+/** Places dates are microseconds since the epoch; HTML wants seconds. */
+function addedSeconds(dateAdded) {
+  const micros = Number(dateAdded);
+  return Number.isFinite(micros) && micros > 0 ? String(Math.floor(micros / 1_000_000)) : "";
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** The Netscape bookmark file every other browser can import. */
+function bookmarksHtml(node) {
+  const lines = [
+    "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
+    "<!-- This is an automatically generated file. Do not edit. -->",
+    '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
+    "<TITLE>Bookmarks</TITLE>",
+    "<H1>Bookmarks</H1>",
+    "<DL><p>",
+  ];
+  const indent = (depth) => "    ".repeat(depth);
+  const walk = (entry, depth) => {
+    for (const child of entry?.children ?? []) {
+      if (child.type === 2) {
+        lines.push(`${indent(depth)}<DT><H3>${escapeHtml(child.title ?? "")}</H3>`);
+        lines.push(`${indent(depth)}<DL><p>`);
+        walk(child, depth + 1);
+        lines.push(`${indent(depth)}</DL><p>`);
+      } else if (child.type === 1 && typeof child.uri === "string") {
+        const added = addedSeconds(child.dateAdded);
+        const stamp = added === "" ? "" : ` ADD_DATE="${added}"`;
+        lines.push(
+          `${indent(depth)}<DT><A HREF="${escapeHtml(child.uri)}"${stamp}>` +
+            `${escapeHtml(child.title ?? child.uri)}</A>`,
+        );
+      }
+    }
+  };
+  walk(node, 1);
+  lines.push("</DL><p>");
+  return lines.join("\n") + "\n";
+}
+
+function csvCell(text) {
+  const value = String(text ?? "");
+  return /[",\r\n]/u.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+/** One row per visit, with the date, title and address. */
+function historyCsv(visits) {
+  const lines = ["date,title,address"];
+  for (const visit of visits) {
+    const micros = Number(visit.visit_date);
+    const date = Number.isFinite(micros) && micros > 0 ? new Date(micros / 1000).toISOString() : "";
+    lines.push(`${csvCell(date)},${csvCell(visit.title)},${csvCell(visit.url)}`);
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+
 export const Migration = {
   /** The installed browsers the engine can read right now. */
   async importSources() {
@@ -122,8 +198,9 @@ export const Migration = {
       keys = [];
     }
     for (const key of keys) {
-      // Migrating the running browser into itself is not a source.
-      if (key === "firefox") continue;
+      // Migrating the running browser into itself is not a source, and the
+      // engine's test-only migrator is never a browser a person can pick.
+      if (key === "firefox" || key === "internal-testing") continue;
       let migrator = null;
       try {
         migrator = await mu.getMigrator(key);
@@ -146,9 +223,22 @@ export const Migration = {
         profiles = [];
       }
       if (profiles.length === 0) profiles = [{ id: "default", name: "Default" }];
+      // What this source can actually give: the engine's own per-profile
+      // answer, not the global capability bits, so an empty browser is not
+      // offered as if it held data.
+      let data = 0;
+      try {
+        data = Number(
+          await migrator.getMigrateData(
+            profiles[0].id === "default" ? null : profiles[0],
+          ),
+        );
+      } catch {
+        data = 0;
+      }
       const kinds = [];
-      if (bit(mu, "BOOKMARKS") !== 0) kinds.push("bookmarks");
-      if (bit(mu, "HISTORY") !== 0) kinds.push("history");
+      if ((data & bit(mu, "BOOKMARKS")) !== 0) kinds.push("bookmarks");
+      if ((data & bit(mu, "HISTORY")) !== 0) kinds.push("history");
       if (kinds.length === 0) continue;
       out.push({
         id: key,
@@ -242,14 +332,15 @@ export const Migration = {
     return false;
   },
 
-  /** Write the profile's bookmarks or history to a JSON file the person picks. */
+  /** Write the profile's bookmarks as HTML or its history as CSV. */
   async exportBrowserData({ kind = "" } = {}) {
     if (kind !== "bookmarks" && kind !== "history") return "failed";
     const scope = chromeScope();
     if (!scope) return "failed";
     const services = scope.Services;
-    const { PlacesUtils, IOUtils } = modules(scope) ?? {};
-    if (!services || !PlacesUtils || !IOUtils) return "failed";
+    const { PlacesUtils } = modules(scope) ?? {};
+    const io = ioutils(scope);
+    if (!services || !PlacesUtils || !io) return "failed";
 
     let isPrivate = false;
     try {
@@ -263,36 +354,30 @@ export const Migration = {
     }
     if (isPrivate) return "private";
 
-    let data;
+    let text;
     try {
       if (kind === "bookmarks") {
-        data = {
-          format: "astra-bookmarks-v1",
-          exported_at: new Date().toISOString(),
-          bookmarks: await PlacesUtils.promiseBookmarksTree("", {
-            includeItemIds: false,
-          }),
-        };
+        const tree = await PlacesUtils.promiseBookmarksTree("", {
+          includeItemIds: false,
+        });
+        text = bookmarksHtml(tree);
       } else {
         const db = await PlacesUtils.promiseDBConnection();
         const rows = await db.executeCached(
-          `SELECT url, title, visit_count, last_visit_date
-             FROM moz_places
-            WHERE hidden = 0 AND last_visit_date IS NOT NULL
-            ORDER BY last_visit_date DESC
+          `SELECT p.url AS url, p.title AS title, v.visit_date AS visit_date
+             FROM moz_historyvisits v
+             JOIN moz_places p ON p.id = v.place_id
+            WHERE p.hidden = 0
+            ORDER BY v.visit_date DESC
             LIMIT 100000`,
         );
-        data = {
-          format: "astra-history-v1",
-          exported_at: new Date().toISOString(),
-          visits: rows.map((row) => ({
+        text = historyCsv(
+          rows.map((row) => ({
             url: row.getResultByName("url"),
             title: row.getResultByName("title") ?? "",
-            visit_count: row.getResultByName("visit_count") ?? 0,
-            last_visit:
-              Number(row.getResultByName("last_visit_date") ?? 0) / 1000,
+            visit_date: row.getResultByName("visit_date"),
           })),
-        };
+        );
       }
     } catch {
       return "failed";
@@ -307,9 +392,10 @@ export const Migration = {
       const context = win?.browsingContext ?? null;
       if (!context) return "failed";
       picker.init(context, "Export browser data", scope.Ci.nsIFilePicker.modeSave);
-      picker.defaultString = `astra-${kind}.json`;
-      picker.defaultExtension = "json";
-      picker.appendFilter("JSON", "*.json");
+      const extension = kind === "bookmarks" ? "html" : "csv";
+      picker.defaultString = `astra-${kind}.${extension}`;
+      picker.defaultExtension = extension;
+      picker.appendFilter(kind === "bookmarks" ? "HTML" : "CSV", `*.${extension}`);
       const result = await new Promise((resolve) => picker.open(resolve));
       if (result !== scope.Ci.nsIFilePicker.returnOK &&
           result !== scope.Ci.nsIFilePicker.returnReplace) {
@@ -321,7 +407,7 @@ export const Migration = {
     }
     if (target === "") return "failed";
     try {
-      await IOUtils.writeUTF8(target, JSON.stringify(data, null, 2));
+      await io.writeUTF8(target, text);
       return "saved";
     } catch {
       return "failed";
