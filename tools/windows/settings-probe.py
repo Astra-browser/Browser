@@ -49,16 +49,6 @@ SETTINGS_DIR = os.path.join(ROOT, "ui", "app", "src", "features", "settings")
 # entry: the check below fails on anything new, not on these.
 KNOWN_UNROUTED = {
     "favicon_probe",
-    "launcher_open_accessibility",
-    "launcher_record_shortcut",
-    "launcher_set_double_tap",
-    "launcher_set_shortcut",
-    "launcher_trigger",
-    "login_item_open_settings",
-    "login_item_set",
-    "open_software_update",
-    "windows_diagnostics_settings",
-    "windows_reputation_managed",
     "work_clear_website_data",
     "work_local_servers",
     "work_screenshot_sites",

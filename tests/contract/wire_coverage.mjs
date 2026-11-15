@@ -139,6 +139,13 @@ for (const name of [
   "login_item_open_settings",
   "open_software_update",
   "favicon_probe",
+  // The launcher surface: its shortcut card and the entry points that ask for
+  // it (the address field, the sidebar button, its own accelerator).
+  "launcher_trigger",
+  "launcher_set_shortcut",
+  "launcher_record_shortcut",
+  "launcher_set_double_tap",
+  "launcher_open_accessibility",
 ]) {
   check(`${name} is routed`, routes.some((route) => route.name === name));
 }

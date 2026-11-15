@@ -133,10 +133,10 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
 - `tools/windows/settings-probe.py` **105/105 PASS**: 14 Settings pages render
   with no alerts, 20 representative controls change and persist, and no new
   unrouted Settings binding. The chart is in `docs/astra/SETTINGS_AUDIT.md`.
-  Four findings from the first pass are fixed and verified there (the Windows
+  Every finding from the first pass is fixed and verified there: the Windows
   privacy routes, the identity card, Spaces "New Space", the Windows download
-  policy); the launcher row stays open because this build has no launcher
-  window to open.
+  policy, and the launcher (an in-chrome overlay plus a `RegisterHotKey` thread
+  in `astra-core` that opens it from any app).
 
 ### Headed visual probe (2026-11-14)
 
