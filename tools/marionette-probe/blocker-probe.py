@@ -216,6 +216,10 @@ try:
     """)
     print("ACTOR", actor, "STYLE", style)
     check("cosmetic rule hid the element", hidden == "none", f"display={hidden}")
+    check(
+        "cosmetic CSS bypasses the page origin (no page style node)",
+        style is False,
+    )
     check("page image element still exists", img is True)
 
     stats = json.loads(m.js(

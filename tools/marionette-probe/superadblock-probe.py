@@ -33,8 +33,12 @@ import sys
 import tempfile
 import time
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
+BINARY = "firefox.exe" if os.name == "nt" else "firefox"
+FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
+    ROOT, "engine", OBJDIR, "dist", "bin", BINARY
+)
 PORT = 2896
 OUT = os.path.join(ROOT, "out", "superadblock")
 SITE = "https://superadblocktest.com/?run=1"

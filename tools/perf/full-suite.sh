@@ -99,6 +99,7 @@ PROBES=(
   "settings_parity:tools/marionette-probe/settings-parity-probe.py"
   "blocker:tools/marionette-probe/blocker-probe.py"
   "superadblock:tools/marionette-probe/superadblock-probe.py"
+  "adblocktester:tools/marionette-probe/adblocktester-probe.py"
   "shields:tools/marionette-probe/shields-probe.py"
   "fingerprint:tools/marionette-probe/fingerprint-probe.py"
   "tabs_settings:tools/marionette-probe/tabs-settings-probe.py"

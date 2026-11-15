@@ -254,3 +254,64 @@ superadblock: PASS
 
 The probe refreshes the live 14-list bundle before measuring, so the result is
 not the offline seed alone. Evidence: `out/superadblock/report.json`.
+
+## Adblock Tester: baits, fetches and a CSP-strict page (2026-11-15)
+
+The second public benchmark, <https://adblocktester.pages.dev/>, runs 443
+checks in `full` mode: 437 network targets, four local script baits and two
+cosmetic baits. The 2026-11-15 capture (score 93, 410/443) left 33 open. They
+had three different causes and needed three different fixes:
+
+| Cause | Fix | Where |
+|---|---|---|
+| Subdomains the community lists match only for one resource type (`log.tiktokv.com`, `sstats.adobe.com`, `net.rayjump.com`, `pixel.reddit.com`, …) reach a `fetch(no-cors)` | reviewed inventory + the same host-anchored, type-agnostic `$important` shape as the other benchmark | `blocker/lists/adblocktester-hosts.json`, `! >>> adblocktester-strict` section of `blocker/lists/astra-telemetry.txt` |
+| `/advertisement.js` and `/analytics.js` baits answered because only `/ads.js` and `/pagead.js` were listed | two more `$script` path heuristics, matching the file name at any depth | `blocker/lists/astra-telemetry.txt` |
+| the cosmetic baits (`.adsbox .ad-banner #ad-container`, `.adsbygoogle .google-ad`) were not hidden | the five class/id names are bundled, and the actor applies them as an **agent sheet** through `windowUtils` instead of a page `<style>` node | `blocker/lists/astra-telemetry.txt`, `overlay/astra/actors/AstraBlockerChild.sys.mjs` |
+
+The CSP cause is the interesting one. `adblocktester.pages.dev` ships a
+`Content-Security-Policy` whose `style-src` rejects any `<style>` element the
+page did not author, so the actor's injected node produced no stylesheet at all
+(`style.sheet === null`, computed `display: block`) even though the selector
+was present. Cosmetic CSS now loads through
+`windowUtils.loadSheetUsingURIString(data:, AGENT_SHEET)`: it is chrome side,
+cannot be dropped by the page's policy, and its `!important` declarations
+outrank the page's own. The old `<style>` path stays as the fallback when the
+seam is unavailable.
+
+Two actor freshness changes came with it:
+
+- **A batch that brings a previously unseen class or id is looked up
+  immediately** (bounded to 32 such batches per document), so a container
+  injected after load is hidden on the frame it appears instead of after the
+  500 ms floor. Batches that only repeat known names still cost nothing.
+- **The batch scan reads the mutation records** (added subtrees, their shadow
+  roots, class/id attribute changes) instead of re-walking the whole document,
+  so the immediate lookup stays cheap on a large page.
+
+### Verification (2026-11-15, packaged Windows dev build)
+
+```
+PASS blocker active on a fresh profile
+PASS compiled rule set is the full bundle :: 200862 rules
+PASS run 1 score is 100
+PASS run 1 has no open row
+PASS run 1 ran the whole benchmark :: 443/443
+... runs 2 and 3 identical
+adblocktester: PASS
+```
+
+- `tools/marionette-probe/adblocktester-probe.py --runs 3` — three consecutive
+  runs, each 443/443 with score 100 and zero open rows. Outside a browser,
+  `cargo test -p astra-blocker` (`benchmark_hosts`) compiles the packaged seed
+  and proves every inventoried host is blocked for six request types, that both
+  new script baits are blocked while `myanalytics.js`/`analytics.min.js` are
+  not, and that the five cosmetic names resolve from a bare hint.
+- `tests/contract/blocker_coverage.mjs` 22/22 covers both inventories, both
+  generated sections, the bait rules and the packaged gzip.
+- No regression: `blocker-probe.py` PASS (plus a new check that the page sees
+  no style node), `superadblock-probe.py` still 482/482 headline 100.
+
+Trade-offs: `/analytics.js` matches the file name at any depth, so a site that
+serves its own analytics bundle under that name loses its statistics (not its
+UI); and the cosmetic names are generic enough to hide a legitimately named
+element. The per-site shield restores both for one site.

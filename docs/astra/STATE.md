@@ -11,6 +11,27 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Adblock Tester: 93 → 100 (2026-11-15)
+
+The owner's export from <https://adblocktester.pages.dev/> scored 93 (410/443,
+33 open). The 33 split into three causes, all closed:
+
+| Cause | Fix | File |
+|---|---|---|
+| 29 subdomains (`log.tiktokv.com`, `sstats.adobe.com`, `net.rayjump.com`, `pixel.reddit.com`, `api.raygun.io`, `cookie-cdn.cookiepro.com`, …) that community lists match only for one request type, so a `fetch(no-cors)` reached them | reviewed inventory + generated `||host^$important` section (one rule per host, every type) | `blocker/lists/adblocktester-hosts.json`, `blocker/lists/astra-telemetry.txt` (`! >>> adblocktester-strict`), same generator: `blocker/tools/superadblock.py` (now writes both sections) |
+| `/advertisement.js` and `/analytics.js` local baits | two `$script` heuristics beside `/ads.js`, `/pagead.js` | `blocker/lists/astra-telemetry.txt` |
+| both cosmetic baits inserted after load were visible | five generic class/id rules **plus** the real bug: the page's `style-src` CSP dropped the actor's `<style>` node, so no cosmetic CSS ever applied. CSS now loads as an `AGENT_SHEET` through `windowUtils`; a batch carrying an unseen class/id is looked up immediately (32/document) and scans mutation records instead of the whole document | `overlay/astra/actors/AstraBlockerChild.sys.mjs` |
+
+**Verification:** `adblocktester-probe.py --runs 3` → 443/443, score 100, zero
+open rows on three consecutive runs of the packaged Windows build (200 862
+compiled rules); `cargo test -p astra-blocker` 22/22 including the new
+`benchmark_hosts` (every inventoried host blocked for six request types,
+nested `myanalytics.js` untouched, cosmetic names resolve from a bare hint);
+`blocker_coverage` 22/22; `blocker-probe` PASS (new assertion: the page sees no
+style node); `superadblock-probe` still 482/482 headline 100. Docs:
+`docs/astra/BLOCKER.md`. The probe is registered in `tools/perf/full-suite.sh`;
+`superadblock-probe.py` now resolves the Windows build like the other probes.
+
 ## UI v2 lane (D-52, from 2026-11-15)
 
 Layout only, taken from the owner's reference (New Tab, Search, Settings):
