@@ -42,6 +42,7 @@
   import { applySpaceTheme, spaceThemeValues } from "$features/tabs";
   import * as m from "$shared/i18n/messages";
   import Shell from "./Shell.svelte";
+  import LauncherOverlay from "$features/launcher/LauncherOverlay.svelte";
   import { WindowControlsOverlay } from "$shared/ui/WindowControls";
 
   // Follows the stored preference and nothing else. Adopting reads the
@@ -109,6 +110,22 @@
       webext.accessRequest() !== null,
   );
 
+  // The launcher overlay. The shortcut, the address field's "search or enter
+  // an address" and the sidebar's search button all ask for it through the one
+  // command, so there is one surface and one key path.
+  let launcherOpen = $state(false);
+  let handledLauncher = 0;
+  $effect(() => {
+    const command = ui.uiCommand();
+    if (command.seq === 0 || command.seq === handledLauncher) return;
+    handledLauncher = command.seq;
+    if (command.id !== "launcher.toggle") return;
+    launcherOpen = !launcherOpen;
+    // A shortcut pressed while another app was in front has to bring this one
+    // forward: the overlay is drawn here, not in a window of its own.
+    if (launcherOpen) window.focus();
+  });
+
   // Page keystrokes are matched natively (menu bar, engine key tables, the
   // GTK window handler); these are the same keys while chrome has focus,
   // read from the one resolved keymap.
@@ -118,6 +135,13 @@
     if (consentActive || event.defaultPrevented || event.isComposing) return;
     const pressed = acceleratorFrom(event, IS_MAC);
     if (pressed === null) return;
+    // The launcher's shortcut is the core's global hotkey, so it arrives as a
+    // `launcher.toggle` command rather than as a key here. Matching it here
+    // too would toggle twice and cancel itself out.
+    //
+    // The overlay owns the keyboard while it is up, Escape and typing
+    // included; chrome shortcuts must not fire behind it.
+    if (launcherOpen) return;
     const command = keymap.commandFor(event, IS_MAC, pressed);
     if (command === null) return;
     event.preventDefault();
@@ -125,6 +149,11 @@
   }
 
   onMount(installCloseService);
+  // Register the launcher's shortcut with the desktop once per window: the
+  // core owns the registration, and this is the first read that hands it over.
+  onMount(() => {
+    void commands.launcherTrigger().catch(() => {});
+  });
   onMount(() => void passkeys.start());
   // The startup read can land before the session has a profile, which lists
   // nothing; read again once the profile is known, and when it changes.
@@ -273,6 +302,9 @@
     <WindowControlsOverlay always={IS_WINDOWS} />
   {/if}
 </div>
+{#if launcherOpen}
+  <LauncherOverlay onclose={() => (launcherOpen = false)} />
+{/if}
 {#if webext.review() !== null}
   <WebExtensionReview review={webext.review()!} />
 {:else if webext.prompt() !== null}
