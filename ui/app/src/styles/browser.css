@@ -163,30 +163,33 @@
   container-type: inline-size;
 }
 
-/* Pages read at the roomier scale; every primitive inside follows. */
+/* Pages read at the roomier scale; every primitive inside follows. The
+   column is a reading measure, not the window's width: 680px is where a
+   label and its control still sit on one line without a long line of text. */
 .settings-page {
   --text-body: var(--text-page-body);
   --text-label: 12px;
 
-  max-width: 850px;
+  max-width: 680px;
   margin-inline: auto;
-  padding: 52px clamp(22px, 5cqi, 60px) 64px;
+  padding: 40px clamp(22px, 5cqi, 32px) 56px;
 }
 .settings-page-heading {
-  margin-block-end: 34px;
+  margin-block-end: 26px;
 }
 .settings-page-heading h1 {
   margin: 0;
   /* Display type carries the Arc-style serif; body copy stays Inter. */
   font-family: var(--font-display);
-  font-size: 27px;
-  line-height: 1.25;
+  font-size: 30px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
   font-weight: 400;
   outline: none;
 }
 .settings-page-heading > p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
+  color: var(--color-muted);
   font-size: 13px;
   line-height: 1.6;
 }
