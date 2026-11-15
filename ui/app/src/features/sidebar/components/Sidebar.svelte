@@ -342,6 +342,17 @@
     window.addEventListener("astra:sidebar-edge", edge);
     return () => window.removeEventListener("astra:sidebar-edge", edge);
   });
+  // A hand that reaches the edge before the column has finished going away is
+  // still a hand at the edge. The card used to need a second hover once the
+  // hide settled, which read as the reveal missing the first time.
+  $effect(() => {
+    const settled = away;
+    const near = atEdge;
+    if (!settled || !near) return;
+    untrack(() => {
+      if (!peeking) peek();
+    });
+  });
   $effect(() => {
     const wanted = attention.wanted();
     if (!away) return;
@@ -566,10 +577,15 @@
   data-header-fresh={headerFresh}
   data-pointer-in={pointerIn || attention.wanted()}
   onpointerenter={entered}
-  onpointermove={() => {
+  onpointermove={(event) => {
     // An arrival from the page's own view, or while another window had the
     // keyboard, can come without an enter; the first move inside counts.
     if (!pointerIn) entered();
+    // Held out for the edge, then used: a hand this far into the column is not
+    // at the edge any more, so the card is released by leaving the column
+    // rather than by the edge it was asked from. Without this a hand that
+    // bottomed out against the window's left edge kept the card out for good.
+    if (atEdge && event.clientX > 24) atEdge = false;
   }}
   onpointerleave={() => {
     pointerIn = false;

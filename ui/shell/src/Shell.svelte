@@ -1324,7 +1324,17 @@
         class="astra-sidebar-reveal"
         aria-hidden="true"
         onpointerenter={() => postSidebarEdge(true)}
-        onpointerleave={() => postSidebarEdge(false)}
+        onpointerleave={(event) => {
+          // Leaving into the window's own resize border at the far left is not
+          // leaving the edge: Windows keeps the outermost pixels for resizing,
+          // so the chrome stops seeing the pointer there. A plain leave would
+          // pull the card back exactly when the hand is as far left as it can
+          // go — the case the edge exists for. The card is released when the
+          // hand moves back into the column or onto the page, not when it
+          // bottoms out against the edge.
+          if (event.clientX <= 8) return;
+          postSidebarEdge(false);
+        }}
       ></div>
       <div class="astra-bar-mount" role="banner" hidden={appBooted !== false} bind:this={barMount}></div>
       <div class="astra-split-mount" hidden={appBooted !== false} bind:this={splitMount}></div>
@@ -1788,7 +1798,12 @@
     z-index: 5;
     inset-block: 8px;
     inset-inline-start: 0;
-    inline-size: 14px;
+    /* The whole gutter: the page starts at this strip's outer edge when the
+       column is away, so a pointer anywhere in the gutter is at the edge. It
+       used to be 14px, which left a 2px band at the page's own edge where the
+       strip had ended and the page had not begun — hover there did nothing,
+       which read as the reveal being hit and miss. */
+    inline-size: 16px;
   }
   :global(.astra-frame[data-astra-sidebar-hidden="true"]) .astra-sidebar-reveal {
     display: block;
