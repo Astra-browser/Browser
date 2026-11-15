@@ -17,6 +17,7 @@
     isCompact,
     isHidden,
     setPanelExtent,
+    sidebarDragWidth,
     sidebarResizeActive,
     sidebarResizeSettlement,
     toggleMode,
@@ -303,7 +304,10 @@
     const settling = Math.max(0, opened + SETTLE_MS - performance.now());
     linger = setTimeout(
       () => {
-        if (pointerIn || atEdge || needed()) return;
+        // The pointer's own hover is the final word: a frame that is raised
+        // and clipped mid-slide can lose a enter, and a card must never slide
+        // out from under a hand that is resting on it.
+        if (pointerIn || atEdge || needed() || aside?.matches(":hover")) return;
         if (CUT_TO_CARD) {
           // The cut sets off first, so the card never runs past it.
           void commands.sidebarPeek(false, false, slides());
@@ -447,7 +451,8 @@
         : effectiveWidth(),
   );
   // The card holds the column; native insets the page by exactly the column.
-  let width = $derived(columnWidth);
+  // While the handle is held, the column shows the pointer's width at once.
+  let width = $derived(sidebarDragWidth() ?? columnWidth);
   // Settings' sections are as much a part of the column as the rail beside
   // them, so the width the shell insets the page by has to carry the panel
   // too: otherwise the page stands under the settings panel and the inset
@@ -574,7 +579,7 @@
 >
   <div class="sidebar-main">
     {#if !navigating && !railPage && tools.activeTool() === null}<SidebarResizeHandle
-        width={columnWidth}
+        {width}
         disabled={reshaping || hidden}
       />{/if}
     <!-- Settings stands beside the rail with no head: its panel runs the full
@@ -585,8 +590,7 @@
         pageControls={!inWork}
         {nav}
         {field}
-        ontoggle={toggleShape}
-        >{#snippet utilities()}<UtilityBar />{/snippet}</SidebarHeader
+        ontoggle={toggleShape}>{#snippet utilities()}<UtilityBar />{/snippet}</SidebarHeader
       >{/if}
     {#if compact && (!paneled || (settings && settingsExtent === 0))}<div
         class="sidebar-compact-utilities"
@@ -639,10 +643,11 @@
     }
   }
 
-  /* The column is a single composited layer: it slides on `translate` alone,
-     and asking for the layer up front is what keeps the first frame of the
-     slide from rasterising a card, its frost and a 36px shadow. */
-  .browser-sidebar {
+  /* The column is one composited layer while it can move, and only then: a
+     permanent layer over the whole tab list costs more than it saves. Asking
+     for it up front is what keeps the first frame of a slide from rasterising
+     a card, its frost and a 36px shadow. */
+  .browser-sidebar:is([data-hidden], [data-leaving], [data-handing], [data-armed]) {
     will-change: translate;
   }
 
@@ -681,7 +686,11 @@
   }
 
   .browser-sidebar[data-hidden][data-armed] {
-    transition: translate var(--motion-page) var(--ease-emphasized);
+    /* Chrome, not content: the card is the thing the hand is moving, so it
+       answers at the control pace instead of the page pace. It used to take
+       the page's 400 ms, which read as the window lagging behind the pointer;
+       the page underneath still travels for its own length. */
+    transition: translate var(--motion-base) var(--ease-out);
   }
 
   /* Cut to, the card wears the corners Windows gives its pages, so its own

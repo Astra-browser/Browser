@@ -69,6 +69,21 @@
       // The app frame is gone with the window.
     }
   }
+  /** The pointer is in the window's left gutter, which the page cannot see:
+   *  the column's card stays out for as long as this says so. */
+  let sidebarEdgePosted = false;
+  function postSidebarEdge(near) {
+    if (sidebarEdgePosted === near) return;
+    sidebarEdgePosted = near;
+    try {
+      appApi?.element?.contentWindow?.postMessage(
+        { ns: "astra-shell", kind: "sidebar-edge", near },
+        "*",
+      );
+    } catch {
+      // The app frame is gone with the window.
+    }
+  }
   /** The tab the stage shows, as the last projection named it. */
   let activeTabId = "";
   /** The tab and address the stage has already put in front (a real document
@@ -915,6 +930,10 @@
         // dark strip. With no page the card simply slides inside the app.
         const overPage = slot.dataset.hasPage === "true";
         frameRoot.dataset.astraSidebarPeek = hidden && peeking && overPage ? "true" : "false";
+        // Put away, the shell owns the window's left gutter: the page covers
+        // everything else, and the frame is clipped away from it.
+        frameRoot.dataset.astraSidebarHidden = hidden ? "true" : "false";
+        if (!hidden) postSidebarEdge(false);
         // `animate` marks a deliberate change of shape (the app's `travel`):
         // the page travels with the column. A drag reports false and the page
         // tracks the pointer without a transition lagging behind it.
@@ -1294,6 +1313,18 @@
         aria-hidden="true"
         onpointerenter={() => postBarHover(true)}
         onpointerleave={() => postBarHover(false)}
+      ></div>
+      <!-- The window's left gutter, likewise: while the column is put away the
+           page takes everything but this strip, and the app frame is clipped
+           to the card the moment it comes out, so the frame never sees a
+           pointer parked at the extreme left. That strip is what tells the app
+           "still at the edge" so the card stays instead of sliding away from
+           under the pointer. -->
+      <div
+        class="astra-sidebar-reveal"
+        aria-hidden="true"
+        onpointerenter={() => postSidebarEdge(true)}
+        onpointerleave={() => postSidebarEdge(false)}
       ></div>
       <div class="astra-bar-mount" role="banner" hidden={appBooted !== false} bind:this={barMount}></div>
       <div class="astra-split-mount" hidden={appBooted !== false} bind:this={splitMount}></div>
@@ -1743,6 +1774,23 @@
   /* `data-astra-bar` is set imperatively on the frame, so the ancestor is
      global; a scoped selector here is pruned as unreachable. */
   :global(.astra-frame[data-app-booted="true"][data-astra-bar="overlay"]) .astra-bar-reveal {
+    display: block;
+  }
+  /* The same share of the column's reveal, down the window's left gutter. The
+     page starts 16px in when the column is put away, and the frame is clipped
+     to the card while it peeks, so this strip is the only thing that can see a
+     pointer parked at the extreme edge. Wider than the gutter on purpose: it
+     has 8px of the card's own padding to spend and a hand that settles at the
+     edge should never miss it. */
+  .astra-sidebar-reveal {
+    display: none;
+    position: absolute;
+    z-index: 5;
+    inset-block: 8px;
+    inset-inline-start: 0;
+    inline-size: 14px;
+  }
+  :global(.astra-frame[data-astra-sidebar-hidden="true"]) .astra-sidebar-reveal {
     display: block;
   }
   /* The hidden column's card is inside the app frame; over a live page the

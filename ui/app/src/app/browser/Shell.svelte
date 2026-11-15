@@ -428,13 +428,25 @@
       attributeFilter: ["hidden", "style", "data-open", "data-state", "open"],
     });
     syncPopups();
-    // The shell owns the top-edge strip while the page covers this frame, so
-    // its hover reaches the bar the same way a pointer on the bar does.
+    // The shell owns the strips the page covers while it is in front: the top
+    // edge reaches the bar, the window's left gutter reaches the column's
+    // card. Both arrive here and travel on as the events the app already
+    // listens for, so there is one owner for each state.
     const onShellMessage = (event: MessageEvent) => {
-      const data = event.data as { ns?: string; kind?: string; hover?: boolean } | null;
-      if (data?.ns !== "astra-shell" || data.kind !== "bar-hover") return;
-      if (data.hover === true) revealEnter();
-      else revealLeave();
+      const data = event.data as
+        | { ns?: string; kind?: string; hover?: boolean; near?: boolean }
+        | null;
+      if (data?.ns !== "astra-shell") return;
+      if (data.kind === "bar-hover") {
+        if (data.hover === true) revealEnter();
+        else revealLeave();
+        return;
+      }
+      if (data.kind === "sidebar-edge") {
+        window.dispatchEvent(
+          new CustomEvent("astra:sidebar-edge", { detail: { near: data.near === true } }),
+        );
+      }
     };
     window.addEventListener("message", onShellMessage);
     return () => {
@@ -1154,14 +1166,15 @@
 <style>
   /* The reach: a strip at the window's left edge while the column is away.
      Out of the row, above the page and under the card, so asking for the card
-     never lays anything out again. Wide enough to find, narrow enough that a
-     page's own left edge is still usable. */
+     never lays anything out again. Wide enough that a hand settling at the
+     extreme edge never misses it; the card's own left padding covers the
+     overlap while it is out. */
   .sidebar-edge {
     position: fixed;
     inset-block: 8px;
     inset-inline-start: 0;
     z-index: 29;
-    inline-size: 10px;
+    inline-size: 14px;
     border-start-end-radius: var(--radius-capsule);
     border-end-end-radius: var(--radius-capsule);
     transition: background-color var(--motion-base) var(--ease-out);
