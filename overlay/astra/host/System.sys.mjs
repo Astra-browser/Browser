@@ -91,6 +91,8 @@ const SMARTSCREEN_POLICY_VALUES = [
   "ConfigureAppInstallControlEnabled",
 ];
 const ASTRA_PROGID = "astraurl";
+/** Where About sends a person when an update reports a manual download. */
+const UPDATE_PAGE = "https://gitlab.com/kyoiske/astra/-/releases";
 
 /** Test-only platform/pref/registry seams (Node has neither Services nor a
  *  window). */
@@ -625,6 +627,21 @@ export const System = {
   // never finish.
   async updateCheck() {
     return noUpdater();
+  },
+
+  /**
+   * Opens the release page in a new tab. The About row that asks for it only
+   * appears when an update reports a manual download, and this build has no
+   * updater, so the call is a guard rather than a common path.
+   */
+  async openSoftwareUpdate() {
+    try {
+      const { Search } = await import("./Search.sys.mjs");
+      const result = await Search.openUrl({ url: UPDATE_PAGE, new_tab: true });
+      return result?.accepted === true;
+    } catch {
+      return false;
+    }
   },
 
   /**

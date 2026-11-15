@@ -132,10 +132,11 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
 - `mach build faster` after an overlay is **10-13 s**.
 - `tools/windows/settings-probe.py` **105/105 PASS**: 14 Settings pages render
   with no alerts, 20 representative controls change and persist, and no new
-  unrouted Settings binding. The chart and its findings are in
-  `docs/astra/SETTINGS_AUDIT.md`; five failures are recorded there (launcher
-  shortcut, the Windows SmartScreen card, the identity card, Spaces "New Space",
-  and the forced download-confirmation policy).
+  unrouted Settings binding. The chart is in `docs/astra/SETTINGS_AUDIT.md`.
+  Four findings from the first pass are fixed and verified there (the Windows
+  privacy routes, the identity card, Spaces "New Space", the Windows download
+  policy); the launcher row stays open because this build has no launcher
+  window to open.
 
 ### Headed visual probe (2026-11-14)
 

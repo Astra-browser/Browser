@@ -1,16 +1,16 @@
-# Settings audit — Windows dev build
+# Settings audit - Windows dev build
 
 What every Settings surface does in the running build, checked live rather than
-read off the source. **Verified 2026-11-15** against
+read off the source.
+
+**First pass:** 2026-11-15, against `windows-port` at 348b85b5.
+**Second pass (fixes):** the same day, against the working tree that fixes the
+five findings below.
 
 ```
 engine/obj-astra-windows/dist/bin/firefox.exe
-Astra 0.1.745 · Windows_NT 10.0 · x86_64
+Astra 0.1.745 - Windows_NT 10.0 - x86_64
 ```
-
-The staged build matches `windows-port` at 348b85b5: the shell bundle, the app
-bundle and `mozilla.cfg` in `dist/bin` are the current overlay outputs, and
-ASTRA-0017..0019 reverse-check clean against `engine/`.
 
 Method: `tools/windows/settings-probe.py <firefox.exe>` launches the build
 headless with Marionette and a throwaway profile, opens Settings, walks every
@@ -24,7 +24,7 @@ python tools/windows/settings-probe.py engine/obj-astra-windows/dist/bin/firefox
 ```
 
 ```
-105 passed, 0 failed   (14 pages × 3 page checks + 20 rows × 3 + wiring)
+105 passed, 0 failed   (14 pages x 3 page checks + 20 rows x 3 + wiring)
 ```
 
 Machine-readable output: `out/settings-probe.json` (`pages`, `representative`,
@@ -32,29 +32,31 @@ Machine-readable output: `out/settings-probe.json` (`pages`, `representative`,
 
 ## The chart
 
-`✅` working and exercised live · `◐` works, one control disabled for a real
-state reason · `✗` a control in the group is broken.
+`OK` working and exercised live - `n/a` disabled for a real state reason -
+`BAD` a control in the group is broken.
 
 | # | Page | Rows | Disabled | Live check that passed | Verdict |
 |---|---|---|---|---|---|
-| 1 | General | 9 | 1 | startup select → `tabs.startup=new-tab` | ✅ |
-| 2 | Appearance | 15 | 1 | mode → `appearance=dark`, theme → `ui.theme=paper`, density → `ui.density=compact` | ✅ |
-| 3 | Tabs | 31 | 0 | `tabs.duplicates`, `split.enabled` flip and persist | ✅ |
-| 4 | New Tab | 10 | 1 | `ntp.wordmark`, `ntp.clock` flip and persist | ◐ |
-| 5 | Search | 4 | 0 | `search.suggestions` flips and persists | ✅ |
-| 6 | Extensions | 2 | 0 | `extensions.per-space` flips and persists | ✅ (empty: none installed) |
-| 7 | Privacy & security | 9 | 2 | `privacy.blocking` flips the blocker, `privacy.drm`, `history.scope` | ✗ Windows card |
-| 8 | Time & focus | 5 | 0 | `focus.breaks`, `time.track` flip and persist | ✅ |
-| 9 | Performance | 4 | 0 | `performance.sleep`, `performance.memory` → `save-memory` | ✅ |
-| 10 | Profiles | 4 rows (custom) | – | New Profile opens Name/Photo/Colour/Create | ✅ |
-| 11 | Spaces | 1 space (custom) | – | Edit opens the space editor | ✗ New Space |
-| 12 | Features | 3 | 0 | `notes.enabled`, `tasks.enabled` flip and persist | ✅ |
-| 13 | Keyboard & accessibility | 81 | 0 | Ctrl+Shift+Y captured on a keymap row → Save/Cancel | ✗ launcher |
-| 14 | About | 3 | 0 | Copy Diagnostics expands the report | ✅ (updates dev-gated) |
-| — | Identity card | – | – | click stays on General | ✗ |
+| 1 | General | 9 | 0 | startup select -> `tabs.startup=new-tab`; downloads switch -> `browser.download.useDownloadDir=false` | OK |
+| 2 | Appearance | 15 | 1 | mode -> `appearance=dark`, theme -> `ui.theme=paper`, density -> `compact` | OK |
+| 3 | Tabs | 31 | 0 | `tabs.duplicates`, `split.enabled` flip and persist | OK |
+| 4 | New Tab | 10 | 1 | `ntp.wordmark`, `ntp.clock` flip and persist | OK |
+| 5 | Search | 4 | 0 | `search.suggestions` flips and persists | OK |
+| 6 | Extensions | 2 | 0 | `extensions.per-space` flips and persists | OK (empty: none installed) |
+| 7 | Privacy & security | 9 | 1 | `privacy.blocking` flips the blocker, DRM, history scope; SmartScreen reads its host answer | OK |
+| 8 | Time & focus | 5 | 0 | `focus.breaks`, `time.track` flip and persist | OK |
+| 9 | Performance | 4 | 0 | `performance.sleep`, `performance.memory` -> `save-memory` | OK |
+| 10 | Profiles | 4 rows (custom) | - | New Profile opens Name/Photo/Colour/Create | OK |
+| 11 | Spaces | 1 space (custom) | - | Edit opens the editor; New Space keeps Settings and opens "Edit Space 2" | OK |
+| 12 | Features | 3 | 0 | `notes.enabled`, `tasks.enabled` flip and persist | OK |
+| 13 | Keyboard & accessibility | 81 | 0 | Ctrl+Shift+Y captured on a keymap row -> Save/Cancel | BAD (launcher row) |
+| 14 | About | 3 | 0 | Copy Diagnostics expands the report | OK (updates dev-gated) |
 
-**Totals:** 14 pages, 176 setting rows, 5 disabled rows, 0 page alerts, 0
+**Totals:** 14 pages, 176 setting rows, 3 disabled rows, 0 page alerts, 0
 `unknown_command` console errors on any page.
+
+The identity card is gone: it was drawn while `flags.account` is off, so a
+person could click a sign-in panel that had no section behind it.
 
 ## Row-level detail
 
@@ -62,147 +64,138 @@ state reason · `✗` a control in the group is broken.
 
 | Row | Verified |
 |---|---|
-| `general.startup` | select → `tabs.startup` = `new-tab`, label follows |
+| `general.startup` | select -> `tabs.startup` = `new-tab`, label follows |
+| `downloads.ask` | switch -> `browser.download.useDownloadDir` true -> false |
 | `general.home`, `downloads.path` | real values (empty home, `C:\Users\Rem\Downloads`) |
-| `general.export` | two buttons rendered |
-| `appearance.theme`, `appearance.palette` | `appearance=dark`, `ui.theme=paper` written through the host |
-| `appearance.contrast` | slider renders with value 50 |
-| `appearance.density` | select → `ui.density=compact` |
-| `appearance.motion` | switch flips, persists |
-| 31 Tabs rows | `tabs.duplicates` → `tabs.switch-to-open=false`; `split.enabled=false` |
-| 10 New Tab rows except `ntp.personalize` | `ntp.wordmark`, `ntp.clock` flip and persist |
-| 4 Search rows | suggestions switch persists |
+| `appearance.theme`, `appearance.palette` | `appearance=dark`, `ui.theme=paper` |
+| `appearance.density`, `appearance.motion` | `ui.density=compact`; motion flips and persists |
+| 31 Tabs rows | `tabs.duplicates` -> `tabs.switch-to-open=false`; `split.enabled=false` |
+| New Tab | `ntp.wordmark`, `ntp.clock` flip and persist |
+| Search | suggestions switch persists |
 | Extensions | per-space switch persists; honest "No extensions installed" |
-| Privacy | blocking switch flips the live blocker (`Protection is off for this profile.`), DRM, history scope → `profile` |
+| Privacy | blocking flips the live blocker, DRM, history scope -> `profile`; SmartScreen reads "not managed" |
 | Time & focus | breaks + tracking switches persist |
-| Performance | sleep switch, memory select → `save-memory` |
-| Profiles | 4 real profiles; New Profile dialog: Name / Choose Photo / Color / Create |
-| Spaces | 1 real space; Edit → "Edit Space" (Icon / Color / Theme / Done) |
+| Performance | sleep switch, memory select -> `save-memory` |
+| Profiles | 4 real profiles; New Profile dialog |
+| Spaces | 1 real space; Edit and New Space both open the space editor |
 | Features | notes + tasks switches, with honest "Off. Your notes are kept." |
 | Keyboard | all 80 keymap rows; rebinding captures the key and offers Save/Cancel |
-| About | version, platform, Copy Diagnostics expands to "Hide | Copy Diagnostics" |
+| About | version, platform, Copy Diagnostics expands |
 | Blocker | 6/14 ads, 3/19 optional, 2/2 malware, 3/3 trackers, 0/43 regional lists |
 
 ### Disabled rows, and why
 
 | Row | Page | Reason | Class |
 |---|---|---|---|
-| `privacy.smartscreen` | Privacy | "Could not read Windows control status." — the host method works, its route does not exist | **broken** |
-| `downloads.ask` | General | Host hardcodes `site_downloads_require_confirmation` = true on `WINNT` (`Downloads.sys.mjs:339`) | decision needed |
 | `appearance.zoom-levels` | Appearance | No site has been zoomed in this profile | conditional |
 | `ntp.personalize` | New Tab | Depends on the greeting, which is off | conditional |
 | `history.space` | Privacy | "0 visits" in this space | conditional |
-| `general.default` | General | "Available once Astra is installed." (status row, no control) | conditional |
 
-## Findings
+## Fixed in this pass
 
-### F1 — Keyboard: the launcher row is unwired (broken)
+### 1. Privacy: the Windows card could not reach its own host methods
+
+`System.sys.mjs` implemented `windowsReputationManaged()` and
+`windowsDiagnosticsSettings()`, and `bindings.ts` generated both calls, but no
+route existed, so every call was refused before it reached the module. The card
+now reads "Check sites and downloads for phishing and malware..." and the
+diagnostics button opens the Windows page.
+
+Routes added in `ui/packages/bridge/src/host-transport.ts`:
+`windows_reputation_managed`, `windows_diagnostics_settings`,
+`login_item_set`, `login_item_open_settings`, `open_software_update`,
+`favicon_probe`.
+
+The last three close the same gap for a hidden row (`login_item_*` answers
+`supported: false` on Windows), the About download button, and the zoom list's
+icon warm-up.
+
+`tools/windows/system-probe.py` used to pass this defect: it called the host
+module directly and looked for `[role=alert]`, while the card writes its failure
+into the row description. It now reads `[data-setting="privacy.smartscreen"]`
+and fails on "could not read Windows control status", so the route is what is
+tested.
+
+### 2. Identity card while Account is off
+
+`SettingsNavigation.svelte` drew the card unconditionally. It is now gated on
+`preferences.accountEnabled()`, the same flag `shownSections()` uses. The rail
+starts at General and no "Sign in" text renders.
+
+### 3. Spaces: New Space closed Settings
+
+Creating a space switches to it, and a space switch rebuilds the Settings
+surface: the page that asked for the editor was gone, and the person landed on
+the new space's New Tab. `SpacesPage.create()` now puts the page back in front
+and records the new space id in `lib/space-editor-request.svelte.ts`, which
+survives the rebuild, so the editor opens on the space that was just made.
+
+The profile-reset effect was also closing the editor on the first profile load;
+it now only acts on a real switch.
+
+Verified: click New Space -> Settings stays, dialog reads "Edit Space 2 ... Icon
+Color Theme Done", no alert. Reproduced twice.
+
+### 4. Windows forced the download-confirmation policy
+
+`Downloads.sys.mjs` reported `site_downloads_require_confirmation: OS ===
+"WINNT"`, which disabled "Ask where to save each file" on Windows for no engine
+reason: Firefox honours `browser.download.useDownloadDir` there exactly as it
+does elsewhere. The flag is now `false`, the switch is enabled, and flipping it
+writes the pref.
+
+## Still open
+
+### F1 - Keyboard: the launcher row has no backend
 
 ```
 Open the launcher | That action could not be completed. Please try again.
 ```
 
-`launcher_trigger` is called on mount. It is in the wire baseline's **unrouted**
-list, and `host-transport.ts` routes only `launcher_search` and `launcher_run`.
-No host module implements it, so the row's read fails and the card renders its
-failure text. `launcher_set_shortcut`, `launcher_record_shortcut`,
-`launcher_set_double_tap` and `launcher_open_accessibility` are unrouted too, so
-recording and resetting a shortcut would fail the same way. The other 80 rows on
-the page work.
+This is bigger than a missing route. The launcher is a **separate native panel
+window** (`ui/app/panel.html` + `PanelApp.svelte`) that the browser port has
+never shipped: the chrome bundle has no `panel.html`, `panel_intent` is
+unrouted, no host module creates the window, and `Commands.run` refuses
+`launcher.toggle`, which the address field and sidebar search also call.
 
-Evidence: `out/settings-probe.log`, `observations.launcher`.
+So the five `launcher_*` commands cannot be routed to anything: there is no
+surface for the shortcut to open. Wiring the Settings card alone would make it
+report `registered: false`, and its only message for that state is "another app
+may be using it", which would be untrue.
 
-### F2 — Privacy: the Windows card cannot reach its own host methods (broken)
+The row stays as it is until the launcher surface exists. Two ways to build it:
 
-```
-Microsoft Defender SmartScreen | Could not read Windows control status. Reopen Settings to retry.
-Windows diagnostic settings            →  Could not open Windows diagnostic settings
-```
+1. **In-chrome overlay** on the existing search surface (`createSearchSurface`
+   + `ResultList`), toggled by `launcher.toggle`, plus a global hotkey so it
+   opens from any app. This is the smaller build and reuses the launcher's
+   query and run commands (`launcher_search`, `launcher_run`, already routed).
+2. **Native panel window** as designed: build `panel.html` into the chrome
+   bundle, add a host module that creates/positions/shows the window, route
+   `panel_state`/`panel_ready`/`panel_intent`, and register the accelerator.
 
-`System.sys.mjs` implements both `windowsReputationManaged()` (answers `false`
-live) and `windowsDiagnosticsSettings()`, and `bindings.ts` generates both
-calls — but neither wire name is in the route table, so every call is refused
-before it reaches the module. The card's own "retry" advice cannot help.
+Either way the copy "Works from any app." only becomes true with an OS-level
+hotkey (a Rust `RegisterHotKey` thread in `astra-core`, or an engine patch).
 
-Evidence: `observations.smartscreen`, `observations.reputation`
-(`{"reputation":false}` when called directly on the host).
+### F6 - dormant unrouted bindings
 
-**Why `tools/windows/system-probe.py` still passes:** it calls
-`Services.astraHost.System.windowsReputationManaged()` directly, and its lookup
-for a route error is `[role=alert]`. The card writes its failure into the row's
-description, so the probe never sees it. A route-level check has to click the
-button or read the row text.
-
-### F3 — Identity card renders while Account is off (broken)
-
-`SettingsNavigation.svelte` renders `<SettingsIdentity />` unconditionally and
-`flags.account` is off, so the rail shows "Sign in / Your plan and devices", but
-the `account` section is filtered out of `shownSections()`. Clicking the card
-does nothing (measured: heading `General` before and after). The card is a
-control that cannot go anywhere.
-
-### F4 — Spaces: New Space closes Settings (broken flow)
-
-"Edit" on a space opens the editor properly. "New Space" creates the space
-(sidebar then shows `Space 2` and it becomes active), **Settings closes**, and
-the editor sheet the code opens after `create()` never lands — the user is
-dropped on the new space's new tab with an empty dialog left behind. Reproduced
-twice. `SpacesPage.create()` awaits `tabs.createSpace`, which switches space;
-the switch tears down the Settings surface before `edit(created, true)` runs.
-
-### F5 — Windows disables the download-confirmation choice (decision)
-
-`Downloads.sys.mjs:339` sets `site_downloads_require_confirmation` from
-`appinfo.OS === "WINNT"`, so on Windows "Ask where to save each file" is always
-on and the switch is always disabled. That is a host policy, not an OS fact:
-Firefox's own `browser.download.useDownloadDir` remains user-controlled on
-Windows. Either the assumption is wrong or a decision should say why Windows
-loses the choice.
-
-### F6 — 15 Settings bindings have no host route
-
-Cross-check of every `commands.*` call under `ui/app/src/features/settings`
-against `host-transport.ts`:
-
-| Binding | Wire | Visible today |
-|---|---|---|
-| `launcherTrigger`, `launcherSetShortcut`, `launcherRecordShortcut`, `launcherSetDoubleTap`, `launcherOpenAccessibility` | `launcher_*` | yes (F1) |
-| `windowsReputationManaged`, `windowsDiagnosticsSettings` | `windows_*` | yes (F2) |
-| `openSoftwareUpdate` | `open_software_update` | no — updates are off in dev builds |
-| `loginItemSet`, `loginItemOpenSettings` | `login_item_*` | no — `loginItemStatus` answers `supported: false` on Windows |
-| `faviconProbe` | `favicon_probe` | no — Zoom levels is empty, Sites is not in the nav |
-| `workClearWebsiteData`, `workLocalServers`, `workScreenshotSites`, `workSetScreenshotSite` | `work_*` | no — Work flag is off |
-
-The probe fails the run if a *new* unrouted Settings binding appears, so this
-list cannot grow silently.
+`work_clear_website_data`, `work_local_servers`, `work_screenshot_sites`,
+`work_set_screenshot_site` remain unrouted. Every Work page leaves with the
+`work` flag, which is off, so nothing can call them in this build. The Settings
+probe fails if a *new* unrouted Settings binding appears.
 
 ## Deliberate, not bugs
 
-- **About → Help says "Coming soon":** `lib/links.ts` stores `url: null` on
-  purpose; there is no documentation page yet. Website/GitLab/Discord/X open.
-- **About → Updates off:** dev builds; the row explains it.
+- **About -> Help says "Coming soon":** `lib/links.ts` stores `url: null` on
+  purpose; there is no documentation page yet.
+- **About -> Updates off:** dev builds; the row explains it.
 - **Extensions empty:** clean throwaway profile.
 - **Profiles show `default`, `default-default`, `default-release`:** the probe's
   throwaway profile directory is read as extra profiles; a real profile shows
-  one. Not a Settings defect.
+  one.
 
 ## Not covered by this probe
 
 Controls whose effect leaves the app, or needs a real desktop session: the
 native folder picker (`downloads.path`), "Show Log Folder", "Reset settings",
-default-browser registration, `Manage extensions` (opens the extensions
-surface), Import browser data (no source browser on the throwaway profile), and
-the engine-owned dialogs. Those need the headed pass, not this audit.
-
-## Next
-
-1. Route `windows_reputation_managed` and `windows_diagnostics_settings` in
-   `host-transport.ts` → removes F2 and makes the card read `false` (not
-   managed) instead of failing.
-2. Implement the launcher trigger in the host (state + accelerator + double-tap)
-   and route the four launcher commands → removes F1.
-3. Gate the identity card on `flags.account` → removes F3.
-4. Keep Settings open across a space create (or open the editor in the new
-   space's stack) → removes F4.
-5. Decide F5, then either keep the disabled row with a decision entry or expose
-   the switch.
+default-browser registration, `Manage extensions`, Import browser data, and the
+engine-owned dialogs. Those need the headed pass.

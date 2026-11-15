@@ -334,9 +334,10 @@ function makeNative(scope) {
     return {
       ask_destination: ask,
       directory: typeof directory === "string" && directory !== "" ? directory : null,
-      // This engine requires a save confirmation for every download only on
-      // Windows; everywhere else the choice above is the whole policy.
-      site_downloads_require_confirmation: services.appinfo?.OS === "WINNT",
+      // The choice above is the whole policy on every platform: the engine
+      // honours `browser.download.useDownloadDir` on Windows exactly as it does
+      // elsewhere, so Windows does not get a forced confirmation.
+      site_downloads_require_confirmation: false,
     };
   }
 

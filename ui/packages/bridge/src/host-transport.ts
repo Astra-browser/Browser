@@ -44,6 +44,7 @@ export interface HostModules {
   Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Favicons: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Migration: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -207,6 +208,12 @@ const ROUTES: Record<string, Route> = {
   update_check: ["System", "updateCheck"],
   default_browser_status: ["System", "defaultBrowserStatus"],
   login_item_status: ["System", "loginItemStatus"],
+  login_item_set: ["System", "loginItemSet"],
+  login_item_open_settings: ["System", "loginItemOpenSettings"],
+  open_software_update: ["System", "openSoftwareUpdate"],
+  windows_reputation_managed: ["System", "windowsReputationManaged"],
+  windows_diagnostics_settings: ["System", "windowsDiagnosticsSettings"],
+  favicon_probe: ["Favicons", "probe"],
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
   page_source: ["PageSource", "pageSource", { id: "tab_id" }],

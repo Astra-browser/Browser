@@ -597,6 +597,27 @@ export const Favicons = {
     return refs;
   },
 
+  /**
+   * Warms the icon cache for a set of origins. Settings' zoom list asks for
+   * this once it has read the sites the person zoomed, so the rows show their
+   * icons without a network request per row. No document means no renderer to
+   * decode into, which is an honest `false` rather than an error.
+   */
+  async probe({ origins = [], profileId = PROFILE_ID } = {}) {
+    const urls = Array.isArray(origins)
+      ? origins.filter((url) => typeof url === "string" && url !== "")
+      : [];
+    if (urls.length === 0) return true;
+    const doc = typeof globalThis !== "undefined" ? (globalThis.document ?? null) : null;
+    if (!doc) return false;
+    try {
+      await this.ensureForUrls({ urls, doc, profileId, limit: urls.length });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   async resolveStored({ url, doc = null, profileId = PROFILE_ID } = {}) {
     if (typeof url !== "string" || url === "") {
       return null;
