@@ -46,6 +46,7 @@ const {
   shouldSleep,
   selectForSleep,
   tabState,
+  enrich,
   parseExceptions,
   isExcepted,
   readPolicy,
@@ -605,6 +606,45 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
     result.slept.includes(pip) === false && TabsMod.__tabsState().tabs.get(pip).discarded === false,
   );
   check("the tick still reclaimed the one eligible tab", result.slept.length === 1 && result.slept[0] === spare);
+}
+
+// --- muted media is discardable; sound and PiP are not (D-7) -------------
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const muted = await addTab("https://muted.example/");
+  const sounding = await addTab("https://sound.example/");
+  const pip = await addTab("https://pip.example/");
+  const mutedNative = nativeFor(muted);
+  // A muted autoplay player: the engine says playback is active, but it
+  // produces no sound, so TabUnloader would discard it.
+  mutedNative.linkedBrowser.audioPlaybackActive = true;
+  const soundingNative = nativeFor(sounding);
+  soundingNative.attrs.add("soundplaying");
+  const pipNative = nativeFor(pip);
+  pipNative.attrs.add("pictureinpicture");
+  __setBrowserForTests(() => browser([mutedNative, soundingNative, pipNative]));
+  const config = { idle_timeout_ms: AFTER_MINUTES[5] };
+  const model = new Map(TabsMod.__sleepState().map((tab) => [tab.id, tab]));
+  const result = await Performance.tick(NOW);
+  check("a muted autoplay tab is slept", result.slept.join(",") === muted);
+  check(
+    "the muted tab's reason is idle, not audible",
+    shouldSleep(enrich(model.get(muted), mutedNative), NOW, config).reason === "idle",
+  );
+  check(
+    "a tab producing sound is audible",
+    shouldSleep(enrich(model.get(sounding), soundingNative), NOW, config).reason === "audible",
+  );
+  check(
+    "a picture-in-picture tab is audible",
+    shouldSleep(enrich(model.get(pip), pipNative), NOW, config).reason === "audible",
+  );
+  check(
+    "the sounding and PiP tabs stay awake",
+    TabsMod.__tabsState().tabs.get(sounding).discarded === false &&
+      TabsMod.__tabsState().tabs.get(pip).discarded === false,
+  );
 }
 
 // --- a private tab never sleeps ------------------------------------------

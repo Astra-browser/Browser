@@ -251,12 +251,11 @@ export function enrich(tab, native) {
   let pinned = tab.pinned === true;
   if (native) {
     try {
-      audible =
-        native.hasAttribute("soundplaying") ||
-        // Picture-in-Picture is a media surface even when muted; TabUnloader
-        // treats it as never discardable.
-        native.hasAttribute("pictureinpicture") ||
-        native.linkedBrowser?.audioPlaybackActive === true;
+      // Audible means sound is actually being produced, the same signal
+      // Firefox's TabUnloader reads (`tab.soundPlaying`). A muted autoplay
+      // player is discardable (D-7). Picture-in-Picture is a media surface even
+      // when muted, so it is never discardable.
+      audible = native.hasAttribute("soundplaying") || native.hasAttribute("pictureinpicture");
       devtools = native.getAttribute("devtools-opened") === "true";
       unsaved =
         native.linkedBrowser?.hasBeforeUnload === true ||
