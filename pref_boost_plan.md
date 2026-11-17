@@ -437,9 +437,51 @@ falsify it.
 
 ## 13. Results
 
-Filled by the tester. Empty until then.
+### Increment 1 (policy + one idle default) — 2026-11-17
 
-## 14. Review resolutions (2026-11-17)
+| Item | Result |
+|---|---|
+| Parity suites | `node tests/contract/sleep_model.mjs` 98 passed / 0 failed; `cargo test -p astra-core sleeping` 21 passed / 0 failed; `cargo fmt --check` clean |
+| Mutation checks | each new case was verified to fail under the mutation it guards (window 0, slice-before-filter, clamp `len` instead of `len-1`, batch `MAX_SAFE_INTEGER`, dropped `Number.isFinite`, 300000→600000) |
+| Runtime default | pre-change build: pref 600000, `Settings('performance.after')` = "15". Post-change build: pref **300000**, setting **"5"**, `prefHasUserValue` false |
+| Stored baseline | `out/pref-boost/inc1-before`: 50 tabs, 17 muted videos, steady 8.09 GB median / 8.39 GB max private, 11.85 GB working set, 4.17 cores median (machine was busy with review agents, so latency there is not comparable) |
+| After-run | `out/pref-boost/inc1-after` (17 min, `--idle-hold 720`) — filled when the run completes |
+
+Not yet measured: whether the drain actually reaches the 1.8 GB target, and
+cold vs warm activation cost (D-1). Those numbers decide whether 5 minutes
+stays.
+
+## 14. Build environment findings (2026-11-17)
+
+Two defects blocked a normal `mach build faster` on this machine. Both are
+reported, neither is worked around silently.
+
+1. **`forge build` on Windows cannot run mach.** `cmd_build` passes the shell
+   script as separate arguments after `-c`
+   (`Command::new("cmd").args(["/C", start-shell.bat, "-no-start", "-defterm",
+   "-c"]).arg(script)`). cmd.exe then parses the script's own `&&` and `||`,
+   which yields `The syntax of the command is incorrect` before bash sees it.
+   Fix: quote the script as one argument (`-c "<script>"`) or write it to a
+   temporary `.sh` and pass its path.
+2. **`forge overlay` cannot reconcile a tree that already has newer overlay
+   sources.** `ASTRA-0004` (blocker engine) fails with
+   `toolkit/components/astra_blocker_engine/AstraBlocker.cpp: already exists
+   in working directory`, because the engine tree carries the blocker branch's
+   newer sources while the patch still describes the older ones. Reverse-check
+   fails (content differs), forward-apply fails (files exist). Needs either a
+   regenerated patch (`forge export`) or a documented recovery; this plan does
+   not touch the engine tree.
+
+Workaround used for the measurement only, stated plainly: the overlay had
+already copied `overlay/astra` into `engine/astra`, so the two changed host
+modules and `mozilla.cfg` were copied into the packaged `dist/bin` by hand
+(`chrome/astra/content/astra/res/host/`, `dist/bin/mozilla.cfg`) and the
+runtime pref check confirmed 300000/"5". This is a dev-tree file sync, not a
+build; the after-numbers are valid for the JS policy, and the increment still
+needs a real `build --faster` before merge.
+
+
+## 15. Review resolutions (2026-11-17)
 
 Three independent agents reviewed the first draft. Everything they found is
 resolved here; nothing is dropped silently.
