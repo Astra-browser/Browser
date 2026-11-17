@@ -114,9 +114,11 @@ processes**, because they are 432 MB of the 510 MB.
    teardown path; nothing grows per navigation or per tab event.
 4. No native Firefox UI answers an action; no new Host API route without a UI
    caller.
-5. Policy decisions are pure functions with a Rust mirror and a parity test;
-   effects stay behind the existing `SleepHost` seam. No second copy of the
-   algorithm in a new module.
+5. Policy decisions are pure functions with a Rust mirror; the same cases are
+   asserted on both sides. The two lists are mirrored by hand today (a shared
+   fixture is a follow-up, not a claim this plan makes). Effects stay behind
+   the existing `SleepHost` seam; no second copy of the algorithm in a new
+   module.
 6. Every claim in this plan is a number produced by a probe on this machine,
    stored under `out/`, not an estimate.
 
@@ -244,8 +246,10 @@ Increment 1a (policy core, no default change):
 - Batch cap 4 unconditionally in `readPolicy`, so the first tick after a
   default change does not discard ~44 tabs at once (review M3). 50 tabs drain
   in ceil(44/4) = 11 ticks.
-- One shared case list asserted on both sides (ties, `n < K`, `K = 0`, batch
-  ordering, negative timeout), not two hand-synced lists (decision memo).
+- The same cases asserted in `tests/contract/sleep_model.mjs` and the Rust
+  unit tests (ties, `n < K`, `K = 0`, batch ordering, negative timeout). The
+  two lists are mirrored by hand; a shared fixture is a follow-up, and the
+  plan says so rather than claiming a mechanism it does not have.
 - Footprint is `null` and ignored in this increment.
 
 Increment 1b (one idle default, five literals):
@@ -415,7 +419,7 @@ falsify it.
 | D-5 | **Reject** the cache cap | accepted | Disk bytes do not move private/working set; 0 MB expected RSS delta, revalidation cost real. |
 | D-6 | Budget stays **internal**, no Settings control | accepted | 3 GB budget on 31.7 GB RAM; a 9-tab tree already uses 2.4 GB, so 1–2 GB settings would thrash. Existing `performance.memory` already occupies the name. |
 | D-7 | Muted-but-playing video stays exempt | accepted | 17 muted players are 5.1 GB of the 8.3 GB; discarding them kills background playback. The 2.5 GB target is stated for the realistic population instead. A "sleep muted media" opt-in needs its own decision. |
-| D-8 | Resolve the two-sleeper overlap (Firefox `TabUnloader` + Astra driver) | open | Same pref is the master switch for both (`browser.tabs.unloadOnLowMemory`), so Firefox can discard a keep-warm tab under pressure. Needs a separate Astra master pref or a documented precedence, plus the settings/probe updates. |
+| D-8 | Resolve the two-sleeper overlap (Firefox `TabUnloader` + Astra driver) | **accepted for increment 1**, separation in increment 2 | Same pref is the master switch for both (`browser.tabs.unloadOnLowMemory`), and it ships **true on Windows** (`firefox.js:1138`). The engine unloader does not run on a timer — it only acts under OS memory pressure (`browser.low_commit_space_threshold_mb` = 200 MB) — so lowering the idle value changes which tabs it would pick in that extreme, not when it runs. Increment 1 documents both consumers in `mozilla.cfg`; increment 2 gives Astra its own idle pref and leaves the engine's at 600000. Risk accepted, not hidden. |
 | D-9 | Pref mechanism per pref: `defaultPref` for user-facing defaults, `lockPref` only for posture | accepted | `mozilla.cfg` runs after `firefox.js`, and `lockPref` makes a value unmeasurable and unrevertible at runtime. |
 
 ## 12. Sequence
@@ -462,5 +466,5 @@ resolved here; nothing is dropped silently.
 | D-1 5 vs 10 | 5 stays provisional; the drain run decides, 10 is not representable without a UI change |
 | D-4 process count | deferred until 8/6/4 is measured; the 27–28 process census contradicts the premise |
 | D-5 cache cap | rejected |
-| D-8 two sleepers | recorded as an open decision with the exact pref overlap |
+| D-8 two sleepers | confirmed on Windows: `browser.tabs.unloadOnLowMemory` ships true there and is also Astra's master switch, so both unloaders run; Linux has only Astra's |
 
