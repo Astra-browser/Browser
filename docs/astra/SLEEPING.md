@@ -26,8 +26,8 @@
 eligible tabs oldest-first, capped at `max_count` every tick so one pass never
 discards everything. Before the idle/pressure test it drops the
 `keep_warm_count` most recently active eligible tabs (ties by id ascending),
-clamped to one fewer than the set so the oldest tab always remains a
-candidate.
+never more than the population itself, so a set at or under the window keeps
+every tab warm no matter how many ticks run.
 
 ## Wake
 

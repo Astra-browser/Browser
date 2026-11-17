@@ -119,15 +119,15 @@ export function shouldSleep(tab, nowMs, config, pressure = "none") {
  *
  * The `keep_warm_count` most recently active non-excluded tabs are dropped
  * after the exclusions and before the idle/pressure test, so they never sleep
- * whatever their idle age. Ranking ties go to the lower id. The window is
- * clamped to `eligible - 1` so it never protects the whole set: the oldest
- * eligible tab is always a candidate. */
+ * whatever their idle age. Ranking ties go to the lower id. The window never
+ * protects more tabs than exist: a population at or under the window sleeps
+ * nothing, so a small set keeps every tab warm. */
 export function selectForSleep(tabs, nowMs, config, pressure = "none", maxCount = Number.MAX_SAFE_INTEGER) {
   const eligible = tabs.filter((tab) => exclusionReason(tab) === null);
   const requested = config.keep_warm_count ?? DEFAULT_KEEP_WARM_COUNT;
   const keepWarmCount = Math.min(
     Number.isFinite(requested) ? Math.max(0, requested) : DEFAULT_KEEP_WARM_COUNT,
-    Math.max(0, eligible.length - 1),
+    Math.max(0, eligible.length),
   );
   const warm = new Set(
     [...eligible]

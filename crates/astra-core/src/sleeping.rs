@@ -109,10 +109,10 @@ impl TabState {
 pub struct SleepConfig {
     /// Idle milliseconds before a tab is sleep-eligible under no pressure.
     pub idle_timeout_ms: i64,
-    /// Most recently active non-excluded tabs that never sleep, clamped to
-    /// one less than the set so the oldest is always a candidate. Applies to
-    /// [`select_for_sleep`]; one tab's own [`should_sleep`] cannot see its
-    /// peers, so the window is enforced at selection.
+    /// Most recently active non-excluded tabs that never sleep, never more
+    /// than the population itself. Applies to [`select_for_sleep`]; one tab's
+    /// own [`should_sleep`] cannot see its peers, so the window is enforced at
+    /// selection.
     pub keep_warm_count: usize,
     /// Estimated KiB saved per discarded tab (metrics only).
     pub estimated_saved_kb_per_tab: u64,
@@ -215,8 +215,8 @@ pub fn should_sleep(
 /// The `keep_warm_count` most recently active non-excluded tabs are dropped
 /// after the exclusions and before the idle/pressure test, so they never
 /// sleep whatever their idle age. Ranking ties go to the lower id. The window
-/// is clamped to `eligible - 1` so it never protects the whole set: the
-/// oldest eligible tab is always a candidate.
+/// never protects more tabs than exist: a population at or under the window
+/// sleeps nothing, so a small set keeps every tab warm.
 pub fn select_for_sleep<'a>(
     tabs: &'a [TabState],
     now_ms: i64,
@@ -233,7 +233,7 @@ pub fn select_for_sleep<'a>(
             .cmp(&a.last_active_ms)
             .then_with(|| a.id.cmp(&b.id))
     });
-    let warm_len = config.keep_warm_count.min(eligible.len().saturating_sub(1));
+    let warm_len = config.keep_warm_count.min(eligible.len());
     let mut selected: Vec<&TabState> = eligible[warm_len..]
         .iter()
         .copied()
@@ -611,6 +611,9 @@ mod tests {
     fn negative_idle_timeout_clamps_to_zero() {
         let config = SleepConfig {
             idle_timeout_ms: -300_001,
+            // Keep-warm off: this test is about the timeout, and a one-tab
+            // population is otherwise all-warm.
+            keep_warm_count: 0,
             ..SleepConfig::default()
         };
         assert_eq!(effective_timeout_ms(&config, MemoryPressure::None), 0);
@@ -741,21 +744,6 @@ mod tests {
     }
 
     #[test]
-    fn exactly_keep_warm_tabs_still_release_the_oldest() {
-        // n == K: the clamp protects K-1, so one tab is always a candidate.
-        let config = SleepConfig {
-            idle_timeout_ms: 60_000,
-            ..SleepConfig::default()
-        };
-        let tabs: Vec<TabState> = (0..6)
-            .map(|i| idle(&format!("k{i}"), (10 + i as i64) * 60_000))
-            .collect();
-        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
-        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(ids, vec!["k5"]);
-    }
-
-    #[test]
     fn max_count_zero_selects_nothing() {
         let config = SleepConfig {
             idle_timeout_ms: 60_000,
@@ -768,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn keep_warm_never_protects_the_whole_set() {
+    fn keep_warm_covers_a_population_smaller_than_the_window() {
         let config = SleepConfig {
             idle_timeout_ms: 60_000,
             ..SleepConfig::default()
@@ -776,10 +764,9 @@ mod tests {
         let few: Vec<TabState> = (0..3)
             .map(|i| idle(&format!("n{i}"), (8 + i as i64) * 60_000))
             .collect();
+        // Three eligible tabs under a window of six: all three stay warm.
         let chosen = select_for_sleep(&few, NOW, &config, MemoryPressure::None, usize::MAX);
-        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
-        // Clamped to eligible - 1: the oldest tab is always a candidate.
-        assert_eq!(ids, vec!["n2"]);
+        assert!(chosen.is_empty());
         let none = SleepConfig {
             keep_warm_count: 0,
             ..config
@@ -787,6 +774,43 @@ mod tests {
         let all = select_for_sleep(&few, NOW, &none, MemoryPressure::None, usize::MAX);
         let all_ids: Vec<&str> = all.iter().map(|t| t.id.as_str()).collect();
         assert_eq!(all_ids, vec!["n2", "n1", "n0"]);
+    }
+
+    #[test]
+    fn exactly_keep_warm_tabs_sleep_nothing() {
+        // n == K: the whole population is the window, on every tick.
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..6)
+            .map(|i| idle(&format!("k{i}"), (10 + i as i64) * 60_000))
+            .collect();
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        assert!(chosen.is_empty());
+    }
+
+    #[test]
+    fn keep_warm_window_survives_repeated_ticks() {
+        // Six eligible tabs and a window of six: a tick must not eat a warm
+        // tab, so three ticks in a row still protect all six.
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let all: Vec<TabState> = (0..6)
+            .map(|i| idle(&format!("w{i}"), (10 + i as i64) * 60_000))
+            .collect();
+        let mut remaining = all;
+        for tick in 0..3 {
+            let chosen =
+                select_for_sleep(&remaining, NOW, &config, MemoryPressure::None, usize::MAX);
+            let ids: Vec<String> = chosen.iter().map(|t| t.id.clone()).collect();
+            assert!(chosen.is_empty(), "tick {tick} discarded {ids:?}");
+            // Removing no candidates must leave the protected set unchanged.
+            remaining.retain(|t| !ids.contains(&t.id));
+        }
+        assert_eq!(remaining.len(), 6);
     }
 
     #[test]

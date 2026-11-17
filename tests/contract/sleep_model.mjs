@@ -194,16 +194,14 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   const capPick = selectForSleep(crowded, NOW, { idle_timeout_ms: MINUTE }, "none", 4);
   check("the batch cap still applies after keep-warm", capPick.map((t) => t.id).join(",") === "m11,m10,m9,m8");
 
-  // The window is clamped to `eligible - 1`: it never protects the whole set.
+  // The window never protects more tabs than exist: a population at or under
+  // it sleeps nothing.
   const few = [
     tabState({ id: "n0", last_active_ms: NOW - 8 * MINUTE }),
     tabState({ id: "n1", last_active_ms: NOW - 9 * MINUTE }),
     tabState({ id: "n2", last_active_ms: NOW - 10 * MINUTE }),
   ];
-  check(
-    "fewer tabs than the window still reclaims the oldest",
-    selectForSleep(few, NOW, { idle_timeout_ms: MINUTE }).map((t) => t.id).join(",") === "n2",
-  );
+  check("fewer tabs than the window all stay warm", selectForSleep(few, NOW, { idle_timeout_ms: MINUTE }).length === 0);
   check(
     "keep_warm_count 0 protects nothing",
     selectForSleep(few, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: 0 })
@@ -233,10 +231,19 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   for (let i = 0; i < 6; i += 1) {
     exactly.push(tabState({ id: `k${i}`, last_active_ms: NOW - (10 + i) * MINUTE }));
   }
-  check(
-    "exactly the window size still releases the oldest",
-    selectForSleep(exactly, NOW, { idle_timeout_ms: MINUTE }).map((t) => t.id).join(",") === "k5",
-  );
+  check("exactly the window size sleeps nothing", selectForSleep(exactly, NOW, { idle_timeout_ms: MINUTE }).length === 0);
+
+  // Three ticks over the same six tabs must not eat the window one tab per
+  // pass (the earlier `eligible - 1` clamp did exactly that).
+  let remainingTicks = exactly.slice();
+  const perTick = [];
+  for (let tick = 0; tick < 3; tick += 1) {
+    const chosen = selectForSleep(remainingTicks, NOW, { idle_timeout_ms: MINUTE });
+    perTick.push(chosen.map((t) => t.id).join(","));
+    const gone = new Set(chosen.map((t) => t.id));
+    remainingTicks = remainingTicks.filter((tab) => !gone.has(tab.id));
+  }
+  check("three ticks never shrink the window", perTick.join("|") === "||" && remainingTicks.length === 6);
 }
 
 // === Settings -> policy ==================================================
@@ -388,18 +395,31 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   return id;
 }
 
+// The window is 6, so a fixture that wants a sleeper needs a seventh eligible
+// tab. These fillers are newer than the tab under test and stay warm.
+let warmSeq = 0;
+async function addWarmTabs(count, { idleMs = 16 * MINUTE } = {}) {
+  const ids = [];
+  for (let i = 0; i < count; i += 1) {
+    warmSeq += 1;
+    ids.push(await addTab(`https://warm${warmSeq}.example/`, { idleMs }));
+  }
+  return ids;
+}
+
 // --- one eligible tab sleeps, every exclusion stays ----------------------
 {
   resetWorld();
   const selected = await addTab("https://front.example/", { idleMs: 0, selected: true });
-  const idle = await addTab("https://idle.example/");
+  const idle = await addTab("https://idle.example/", { idleMs: 60 * MINUTE });
   const audible = await addTab("https://audio.example/");
   const pinned = await addTab("https://kept.example/");
   const excepted = await addTab("https://safe.example/");
+  const warm = await addWarmTabs(6);
   await Tabs.pin({ astra_tab_id: pinned });
   Settings.set({ key: "performance.exceptions", value: "safe.example" });
 
-  const all = [selected, idle, audible, pinned, excepted].map(nativeFor);
+  const all = [selected, idle, audible, pinned, excepted, ...warm].map(nativeFor);
   natives.get(audible).attrs.add("soundplaying");
   const gb = browser(all);
   __setBrowserForTests(() => gb);
@@ -411,8 +431,12 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   const result = await Performance.tick(NOW);
   stopProjection();
   check("the discard reaches the projection pump", projected > 0);
-  check("the tick reports the tabs it considered", result.considered === 4);
+  check("the tick reports the tabs it considered", result.considered === 10);
   check("only the idle tab sleeps", result.slept.length === 1 && result.slept[0] === idle);
+  check(
+    "the warm tabs stay awake",
+    warm.every((id) => TabsMod.__tabsState().tabs.get(id).discarded === false),
+  );
   check("the sleeping tab says so in the model", TabsMod.__tabsState().tabs.get(idle).discarded === true);
   check("the selected tab stays awake", TabsMod.__tabsState().tabs.get(selected).discarded === false);
   check("an audible tab stays awake", TabsMod.__tabsState().tabs.get(audible).discarded === false);
@@ -442,9 +466,10 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
-  const stubborn = await addTab("https://stubborn.example/");
+  const stubborn = await addTab("https://stubborn.example/", { idleMs: 60 * MINUTE });
+  const warm = await addWarmTabs(6);
   refused.add(stubborn);
-  __setBrowserForTests(() => browser([nativeFor(stubborn)]));
+  __setBrowserForTests(() => browser([nativeFor(stubborn), ...warm.map(nativeFor)]));
   const result = await Performance.tick(NOW);
   check("a refused discard is not counted", result.slept.length === 0);
   check(
@@ -458,7 +483,8 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
   const idle = await addTab("https://idle.example/", { idleMs: 6 * MINUTE });
-  __setBrowserForTests(() => browser([nativeFor(idle)]));
+  const warm = await addWarmTabs(6, { idleMs: 4 * MINUTE });
+  __setBrowserForTests(() => browser([nativeFor(idle), ...warm.map(nativeFor)]));
 
   Settings.set({ key: "performance.after", value: "60" });
   const long = await Performance.tick(NOW);
@@ -584,15 +610,16 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
-  // Older than the one reclaimable tab: only the exclusion keeps them awake.
+  // Older than every warm tab: only the exclusion keeps them awake.
   const marked = await addTab("https://webrtc.example/", { idleMs: 90 * MINUTE });
   const pip = await addTab("https://pip.example/", { idleMs: 91 * MINUTE });
-  const spare = await addTab("https://spare.example/");
+  const spare = await addTab("https://spare.example/", { idleMs: 20 * MINUTE });
+  const warm = await addWarmTabs(6);
   const markedNative = nativeFor(marked);
   markedNative.attrs.add("undiscardable");
   const pipNative = nativeFor(pip);
   pipNative.attrs.add("pictureinpicture");
-  __setBrowserForTests(() => browser([markedNative, pipNative, nativeFor(spare)]));
+  __setBrowserForTests(() => browser([markedNative, pipNative, nativeFor(spare), ...warm.map(nativeFor)]));
   const result = await Performance.tick(NOW);
   check(
     "an extension-marked tab stays awake",
@@ -609,9 +636,10 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
-  const muted = await addTab("https://muted.example/");
+  const muted = await addTab("https://muted.example/", { idleMs: 20 * MINUTE });
   const sounding = await addTab("https://sound.example/");
   const pip = await addTab("https://pip.example/");
+  const warm = await addWarmTabs(6);
   const mutedNative = nativeFor(muted);
   // A muted autoplay player: the engine says playback is active, but it
   // produces no sound, so TabUnloader would discard it.
@@ -620,7 +648,7 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   soundingNative.attrs.add("soundplaying");
   const pipNative = nativeFor(pip);
   pipNative.attrs.add("pictureinpicture");
-  __setBrowserForTests(() => browser([mutedNative, soundingNative, pipNative]));
+  __setBrowserForTests(() => browser([mutedNative, soundingNative, pipNative, ...warm.map(nativeFor)]));
   const config = { idle_timeout_ms: AFTER_MINUTES[5] };
   const model = new Map(TabsMod.__sleepState().map((tab) => [tab.id, tab]));
   const result = await Performance.tick(NOW);
@@ -648,9 +676,10 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
-  const handler = await addTab("https://handled.example/");
+  const handler = await addTab("https://handled.example/", { idleMs: 20 * MINUTE });
   const extension = await addTab("https://extension.example/");
   const attention = await addTab("https://attention.example/");
+  const warm = await addWarmTabs(6);
   const handlerNative = nativeFor(handler);
   // An ad/session handler: discarding restores the snapshot, so it is no
   // reason to keep the page resident.
@@ -659,7 +688,7 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   extensionNative.attrs.add("undiscardable");
   const attentionNative = nativeFor(attention);
   attentionNative.attrs.add("attention");
-  __setBrowserForTests(() => browser([handlerNative, extensionNative, attentionNative]));
+  __setBrowserForTests(() => browser([handlerNative, extensionNative, attentionNative, ...warm.map(nativeFor)]));
   const config = { idle_timeout_ms: AFTER_MINUTES[5] };
   const model = new Map(TabsMod.__sleepState().map((tab) => [tab.id, tab]));
   const result = await Performance.tick(NOW);
