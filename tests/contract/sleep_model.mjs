@@ -632,23 +632,35 @@ async function addWarmTabs(count, { idleMs = 16 * MINUTE } = {}) {
   check("the tick still reclaimed the one eligible tab", result.slept.length === 1 && result.slept[0] === spare);
 }
 
-// --- muted media is discardable; sound and PiP are not (D-7) -------------
+// --- media sessions and calls are exempt; muted autoplay is not (D-7) ----
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
   const muted = await addTab("https://muted.example/", { idleMs: 20 * MINUTE });
   const sounding = await addTab("https://sound.example/");
   const pip = await addTab("https://pip.example/");
+  const mediaSession = await addTab("https://video.example/");
+  const call = await addTab("https://call.example/");
   const warm = await addWarmTabs(6);
   const mutedNative = nativeFor(muted);
-  // A muted autoplay player: the engine says playback is active, but it
-  // produces no sound, so TabUnloader would discard it.
+  // A muted autoplay ad: the engine says playback is active, but there is no
+  // media session and no call, so it stays discardable.
   mutedNative.linkedBrowser.audioPlaybackActive = true;
   const soundingNative = nativeFor(sounding);
   soundingNative.attrs.add("soundplaying");
   const pipNative = nativeFor(pip);
   pipNative.attrs.add("pictureinpicture");
-  __setBrowserForTests(() => browser([mutedNative, soundingNative, pipNative, ...warm.map(nativeFor)]));
+  const mediaNative = nativeFor(mediaSession);
+  // A muted background video the person started: mediaController.isActive.
+  mediaNative.linkedBrowser = { browsingContext: { mediaController: { isActive: true } } };
+  const callNative = nativeFor(call);
+  // A Google Meet / Discord / WhatsApp call.
+  callNative.linkedBrowser = {
+    browsingContext: { currentWindowGlobal: { hasActivePeerConnections: () => true } },
+  };
+  __setBrowserForTests(() =>
+    browser([mutedNative, soundingNative, pipNative, mediaNative, callNative, ...warm.map(nativeFor)]),
+  );
   const config = { idle_timeout_ms: AFTER_MINUTES[5] };
   const model = new Map(TabsMod.__sleepState().map((tab) => [tab.id, tab]));
   const result = await Performance.tick(NOW);
@@ -656,6 +668,14 @@ async function addWarmTabs(count, { idleMs = 16 * MINUTE } = {}) {
   check(
     "the muted tab's reason is idle, not audible",
     shouldSleep(enrich(model.get(muted), mutedNative), NOW, config).reason === "idle",
+  );
+  check(
+    "a muted background media session is audible",
+    shouldSleep(enrich(model.get(mediaSession), mediaNative), NOW, config).reason === "audible",
+  );
+  check(
+    "a call tab is audible",
+    shouldSleep(enrich(model.get(call), callNative), NOW, config).reason === "audible",
   );
   check(
     "a tab producing sound is audible",
@@ -666,9 +686,10 @@ async function addWarmTabs(count, { idleMs = 16 * MINUTE } = {}) {
     shouldSleep(enrich(model.get(pip), pipNative), NOW, config).reason === "audible",
   );
   check(
-    "the sounding and PiP tabs stay awake",
-    TabsMod.__tabsState().tabs.get(sounding).discarded === false &&
-      TabsMod.__tabsState().tabs.get(pip).discarded === false,
+    "the sounding, PiP, media and call tabs stay awake",
+    [sounding, pip, mediaSession, call].every(
+      (id) => TabsMod.__tabsState().tabs.get(id).discarded === false,
+    ),
   );
 }
 

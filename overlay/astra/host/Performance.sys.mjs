@@ -24,9 +24,10 @@
 // a page is sleeping while it still holds its content process.
 //
 // Privacy: a private window's tabs are never auto-slept (no state is written
-// and the rail hides the list). Media, pinned/essential tabs, DevTools, an
-// extension-marked tab, an open sign-in/failure card and the selected tab are
-// excluded; a page-registered beforeunload handler is not (D-10).
+// and the rail hides the list). Media and call tabs, pinned/essential tabs,
+// DevTools, an extension-marked tab, an open sign-in/failure card and the
+// selected tab are excluded; a page-registered beforeunload handler is not
+// (D-10).
 //
 // Teardown: one interval, one event subscription and one `unload` listener,
 // all released by `stop()` (and by the test reset). Nothing grows per tick.
@@ -251,11 +252,22 @@ export function enrich(tab, native) {
   let pinned = tab.pinned === true;
   if (native) {
     try {
-      // Audible means sound is actually being produced, the same signal
-      // Firefox's TabUnloader reads (`tab.soundPlaying`). A muted autoplay
-      // player is discardable (D-7). Picture-in-Picture is a media surface even
-      // when muted, so it is never discardable.
-      audible = native.hasAttribute("soundplaying") || native.hasAttribute("pictureinpicture");
+      // `audible` is the policy's media exemption (Rust `TabState::audible` is
+      // never auto-slept) and now covers every way a person may still be
+      // consuming the tab: sound, Picture-in-Picture, a user-started media
+      // session (a muted background video) and a live WebRTC call.
+      const context = native.linkedBrowser?.browsingContext;
+      // The same session `Content.sys.mjs:587` reads.
+      const mediaActive = context?.mediaController?.isActive === true;
+      // The same signal TabUnloader's `usingWebRTC` reads (`TabUnloader.sys.mjs:87`).
+      const inCall = context?.currentWindowGlobal?.hasActivePeerConnections?.() === true;
+      // A muted autoplay ad is neither a session nor a call, so it stays
+      // discardable (D-7); `audioPlaybackActive` is deliberately not used.
+      audible =
+        native.hasAttribute("soundplaying") ||
+        native.hasAttribute("pictureinpicture") ||
+        mediaActive ||
+        inCall;
       devtools = native.getAttribute("devtools-opened") === "true";
       // Session state (URL, scroll, form data) is restored from the tab
       // snapshot, so a page-registered beforeunload handler is not a reason to
