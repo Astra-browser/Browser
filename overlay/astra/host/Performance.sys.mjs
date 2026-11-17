@@ -253,13 +253,18 @@ export function enrich(tab, native) {
   if (native) {
     try {
       // `audible` is the policy's media exemption (Rust `TabState::audible` is
-      // never auto-slept) and now covers every way a person may still be
-      // consuming the tab: sound, Picture-in-Picture, a user-started media
-      // session (a muted background video) and a live WebRTC call.
+      // never auto-slept) and covers every way a person may still be consuming
+      // the tab: sound, Picture-in-Picture, a media session that is actually
+      // playing, and a live WebRTC call.
       const context = native.linkedBrowser?.browsingContext;
-      // The same session `Content.sys.mjs:587` reads.
-      const mediaActive = context?.mediaController?.isActive === true;
+      // The same session `Content.sys.mjs:587` reads. A paused or finished
+      // session is not activity: nothing is going on, so the tab may sleep
+      // (D-12).
+      const controller = context?.mediaController;
+      const mediaActive = controller?.isActive === true && controller.isPlaying === true;
       // The same signal TabUnloader's `usingWebRTC` reads (`TabUnloader.sys.mjs:87`).
+      // It returns false once the call disconnects, so a dead call protects
+      // nothing (D-12).
       const inCall = context?.currentWindowGlobal?.hasActivePeerConnections?.() === true;
       // A muted autoplay ad is neither a session nor a call, so it stays
       // discardable (D-7); `audioPlaybackActive` is deliberately not used.
