@@ -1027,6 +1027,8 @@ def report_md(result, phases, outdir):
         "| | |",
         "|---|---|",
         f"| build | `{result.get('binary')}` |",
+        f"| sleep policy | enabled `{result.get('marionette_prefs', {}).get('enabled')}`, "
+        f"viewport {result.get('marionette_prefs', {}).get('policy')} |",
         f"| provenance | git {prov.get('git_head')}, "
         f"{git_state}, binary "
         f"{binary_info.get('size')} bytes @ {binary_info.get('mtime')}, probe sha256 "
@@ -1160,6 +1162,30 @@ def main():
         })())"""))
         result["ipc_process_count"] = ipc.get("value")
         time.sleep(8)
+        # Marionette's recommended preferences disable tab unloading. That is
+        # the same pref as Astra's sleep master switch, so a driven run would
+        # measure a browser that never sleeps anything. Clear the user value so
+        # the build's own default applies, and record both facts.
+        policy = json.loads(m.chrome("""return JSON.stringify((() => {
+          const P = 'browser.tabs.unloadOnLowMemory';
+          const def = Services.prefs.getDefaultBranch('').getBoolPref(P);
+          const had = Services.prefs.prefHasUserValue(P);
+          try { Services.prefs.clearUserPref(P); } catch (e) {}
+          return {
+            browser_pid: Services.appinfo.processID,
+            marionette_value: had ? false : null,
+            default_value: def,
+            value: Services.prefs.getBoolPref(P),
+            user: Services.prefs.prefHasUserValue(P),
+            enabled: Services.astraHost.Settings.current('performance.sleep'),
+            policy: Services.astraHost.Performance.status().policy,
+          };
+        })())"""))
+        result["marionette_prefs"] = policy
+        result["browser_pid"] = policy.get("browser_pid")
+        if str(policy.get("enabled")) != "true":
+            raise RuntimeError(
+                f"sleep policy is off after Marionette prefs: {json.dumps(policy)[:300]}")
         result["phases"]["baseline"] = time.time()
         time.sleep(8)
 
@@ -1348,7 +1374,7 @@ def main():
                     fh.write(json.dumps(row) + "\n")
             result["idle_hold"]["rows_annotated"] = stamped
         result["reclaim"] = reclaim_curve(result, rows)
-        phases = summarize(result, rows, workers, root_pid)
+        phases = summarize(result, rows, workers, result.get("browser_pid") or root_pid)
         result["phases_summary"] = phases
         with open(os.path.join(outdir, "result.json"), "w", encoding="utf-8") as fh:
             json.dump(result, fh, indent=2)
