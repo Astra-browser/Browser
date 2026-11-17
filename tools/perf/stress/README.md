@@ -61,8 +61,29 @@ inserts a key-observations block into `docs/performance/OBSERVATIONS.md`.
 | `memory-6` | six tabs each holding 64 MiB resident + 12k DOM nodes |
 | `ui-tour` | six tabs then real UI clicks (tab create/switch, address bar, sidebar, Work, Settings) |
 
-## Notes / traps
+## Real-site tab stress (cold cache)
 
+`web_tabs_probe.py` opens a fixed list of real sites (news, video, heavy web
+apps), one URL per site, in a fresh profile, so nothing is served from cache.
+It walks every tab afterwards: Astra's background tabs are lazy
+(`Content.sys.mjs` `pending`), so creating 50 tabs loads nothing and activation
+is what a person actually pays. Video tabs are muted through `Tabs.setMuted`.
+
+```sh
+python3 tools/perf/stress/web_tabs_probe.py                       # all 50, ~4 min
+python3 tools/perf/stress/web_tabs_probe.py --tabs 20 --steady 30
+```
+
+It writes `out/web-tabs-<stamp>/`: `samples.jsonl` (2.5 s rows), `result.json`
+(phases, activation times, per-tab PIDs, mute flags, video playback quality),
+`REPORT.md` (phase table), `tabs.png`, and the sampler it used
+(`sampler.ps1` on Windows). The Windows sampler covers CPU per process,
+private/working set, GPU engine + video decode, GPU memory, handles, threads,
+network and commit charge; on Linux the tree is walked through `/proc`
+(CPU, RSS, private) and GPU columns stay null — `run_matrix.py` owns GPU
+attribution there.
+
+## Notes / traps
 - The harness launches headed builds with a fresh profile and normalises the
   window with Hyprland Lua dispatchers (`hyprctl eval`), because tiling gives
   each browser a different viewport.

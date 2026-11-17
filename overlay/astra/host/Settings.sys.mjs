@@ -392,7 +392,7 @@ const NATIVE = {
   "performance.after": {
     prefs: ["browser.tabs.min_inactive_duration_before_unload"],
     read: (prefs) => {
-      const ms = intPref(prefs, "browser.tabs.min_inactive_duration_before_unload", 600000);
+      const ms = intPref(prefs, "browser.tabs.min_inactive_duration_before_unload", 300000);
       return ms < 600000 ? "5" : ms < 1350000 ? "15" : ms < 2700000 ? "30" : "60";
     },
     write: (prefs, value) => {

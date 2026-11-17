@@ -24,9 +24,10 @@
 // a page is sleeping while it still holds its content process.
 //
 // Privacy: a private window's tabs are never auto-slept (no state is written
-// and the rail hides the list). Media, pinned/essential tabs, DevTools, a
-// page with a beforeunload handler, an open sign-in/failure card and the
-// selected tab are excluded.
+// and the rail hides the list). Media and call tabs, pinned/essential tabs,
+// DevTools, an extension-marked tab, an open sign-in/failure card and the
+// selected tab are excluded; a page-registered beforeunload handler is not
+// (D-10).
 //
 // Teardown: one interval, one event subscription and one `unload` listener,
 // all released by `stop()` (and by the test reset). Nothing grows per tick.
@@ -40,7 +41,10 @@ import {
 import { Settings } from "./Settings.sys.mjs";
 
 /** `crates/astra-core/src/sleeping.rs`. */
-export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Most recently active tabs that never sleep (Rust `DEFAULT_KEEP_WARM_COUNT`). */
+export const DEFAULT_KEEP_WARM_COUNT = 6;
 
 /** The values `performance.after` stores, in minutes. */
 export const AFTER_MINUTES = Object.freeze({ 5: 300000, 15: 900000, 30: 1800000, 60: 3600000 });
@@ -48,8 +52,8 @@ export const AFTER_MINUTES = Object.freeze({ 5: 300000, 15: 900000, 30: 1800000,
 /** How often the driver looks at the tabs. */
 const TICK_MS = 30_000;
 
-/** A batch cap under pressure so one tick does not discard everything. */
-const PRESSURE_BATCH = 4;
+/** A batch cap per tick so one pass does not discard everything. */
+const TICK_BATCH = 4;
 
 /** Memory pressure names from the Rust policy. */
 export const MEMORY_PRESSURE = Object.freeze({
@@ -79,20 +83,32 @@ export function tabState({
   };
 }
 
-/** Effective idle timeout under pressure (Rust `effective_timeout_ms`). */
+/** Effective idle timeout under pressure (Rust `effective_timeout_ms`).
+ *  A negative delay reads as 0, so the rounded half cannot differ between the
+ *  two mirrors (Rust truncates, JS `Math.floor` does not). */
 export function effectiveTimeoutMs(idleMs, pressure = "none") {
-  if (pressure === "moderate") return Math.floor(idleMs / 2) + (idleMs % 2);
+  const base = Math.max(0, idleMs);
+  if (pressure === "moderate") return Math.floor(base / 2) + (base % 2);
   if (pressure === "critical") return 0;
-  return idleMs;
+  return base;
+}
+
+/** The exclusion for a tab, or null (`StayReason` in the Rust policy). Shared
+ *  by `shouldSleep` and `selectForSleep` so the keep-warm ranking and the
+ *  per-tab test cannot drift apart. */
+function exclusionReason(tab) {
+  if (tab.active) return "active";
+  if (tab.discarded) return "already-discarded";
+  if (tab.audible) return "audible";
+  if (tab.pinned) return "pinned";
+  if (tab.devtools_open) return "devtools";
+  return null;
 }
 
 /** Pure policy: should this tab sleep at `nowMs`? (Rust `should_sleep`). */
 export function shouldSleep(tab, nowMs, config, pressure = "none") {
-  if (tab.active) return { sleep: false, reason: "active" };
-  if (tab.discarded) return { sleep: false, reason: "already-discarded" };
-  if (tab.audible) return { sleep: false, reason: "audible" };
-  if (tab.pinned) return { sleep: false, reason: "pinned" };
-  if (tab.devtools_open) return { sleep: false, reason: "devtools" };
+  const reason = exclusionReason(tab);
+  if (reason !== null) return { sleep: false, reason };
   const idle = Math.max(0, nowMs - tab.last_active_ms);
   if (idle >= effectiveTimeoutMs(config.idle_timeout_ms, pressure)) {
     return { sleep: true, reason: "idle" };
@@ -100,9 +116,28 @@ export function shouldSleep(tab, nowMs, config, pressure = "none") {
   return { sleep: false, reason: "recently-active" };
 }
 
-/** Oldest-first candidates, capped (Rust `select_for_sleep`). */
+/** Oldest-first candidates, capped (Rust `select_for_sleep`).
+ *
+ * The `keep_warm_count` most recently active non-excluded tabs are dropped
+ * after the exclusions and before the idle/pressure test, so they never sleep
+ * whatever their idle age. Ranking ties go to the lower id. The window never
+ * protects more tabs than exist: a population at or under the window sleeps
+ * nothing, so a small set keeps every tab warm. */
 export function selectForSleep(tabs, nowMs, config, pressure = "none", maxCount = Number.MAX_SAFE_INTEGER) {
-  return tabs
+  const eligible = tabs.filter((tab) => exclusionReason(tab) === null);
+  const requested = config.keep_warm_count ?? DEFAULT_KEEP_WARM_COUNT;
+  const keepWarmCount = Math.min(
+    Number.isFinite(requested) ? Math.max(0, requested) : DEFAULT_KEEP_WARM_COUNT,
+    Math.max(0, eligible.length),
+  );
+  const warm = new Set(
+    [...eligible]
+      .sort((a, b) => b.last_active_ms - a.last_active_ms || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .slice(0, keepWarmCount)
+      .map((tab) => tab.id),
+  );
+  return eligible
+    .filter((tab) => !warm.has(tab.id))
     .filter((tab) => shouldSleep(tab, nowMs, config, pressure).sleep)
     .sort((a, b) => a.last_active_ms - b.last_active_ms)
     .slice(0, Math.max(0, maxCount));
@@ -148,18 +183,19 @@ export function isExcepted(url, exceptions) {
 /** The policy the host should apply right now, read from the real settings. */
 export function readPolicy(setting = (key, fallback) => Settings.current(key) ?? fallback) {
   const enabled = String(setting("performance.sleep", "true")) !== "false";
-  const after = String(setting("performance.after", "15"));
+  const after = String(setting("performance.after", "5"));
   const memory = String(setting("performance.memory", "balanced"));
   const pressure = MEMORY_PRESSURE[memory] ?? "none";
   const exceptions = parseExceptions(setting("performance.exceptions", ""));
   return {
     enabled,
-    idleMs: AFTER_MINUTES[after] ?? AFTER_MINUTES[15],
+    idleMs: AFTER_MINUTES[after] ?? DEFAULT_IDLE_TIMEOUT_MS,
+    keep_warm_count: DEFAULT_KEEP_WARM_COUNT,
     pressure: pressure === "keep-ready" ? "none" : pressure,
     // "keep-ready" means do not unload in the background at all.
     background: pressure !== "keep-ready",
     exceptions,
-    batch: pressure === "moderate" ? PRESSURE_BATCH : Number.MAX_SAFE_INTEGER,
+    batch: TICK_BATCH,
     tickMs: TICK_MS,
   };
 }
@@ -216,16 +252,34 @@ export function enrich(tab, native) {
   let pinned = tab.pinned === true;
   if (native) {
     try {
+      // `audible` is the policy's media exemption (Rust `TabState::audible` is
+      // never auto-slept) and covers every way a person may still be consuming
+      // the tab: sound, Picture-in-Picture, a media session that is actually
+      // playing, and a live WebRTC call.
+      const context = native.linkedBrowser?.browsingContext;
+      // The same session `Content.sys.mjs:587` reads. A paused or finished
+      // session is not activity: nothing is going on, so the tab may sleep
+      // (D-12).
+      const controller = context?.mediaController;
+      const mediaActive = controller?.isActive === true && controller.isPlaying === true;
+      // The same signal TabUnloader's `usingWebRTC` reads (`TabUnloader.sys.mjs:87`).
+      // It returns false once the call disconnects, so a dead call protects
+      // nothing (D-12).
+      const inCall = context?.currentWindowGlobal?.hasActivePeerConnections?.() === true;
+      // A muted autoplay ad is neither a session nor a call, so it stays
+      // discardable (D-7); `audioPlaybackActive` is deliberately not used.
       audible =
         native.hasAttribute("soundplaying") ||
-        // Picture-in-Picture is a media surface even when muted; TabUnloader
-        // treats it as never discardable.
         native.hasAttribute("pictureinpicture") ||
-        native.linkedBrowser?.audioPlaybackActive === true;
+        mediaActive ||
+        inCall;
       devtools = native.getAttribute("devtools-opened") === "true";
+      // Session state (URL, scroll, form data) is restored from the tab
+      // snapshot, so a page-registered beforeunload handler is not a reason to
+      // keep a background tab resident (D-10). An extension marking the tab
+      // non-discardable (autoDiscardable=false) and the attention flag still
+      // are.
       unsaved =
-        native.linkedBrowser?.hasBeforeUnload === true ||
-        // An extension can mark a tab non-discardable (autoDiscardable=false).
         native.hasAttribute("undiscardable") ||
         native.undiscardable === true ||
         native.hasAttribute("attention");
@@ -321,7 +375,7 @@ async function runTick(nowMs) {
   const candidates = selectForSleep(
     states,
     nowMs,
-    { idle_timeout_ms: policy.idleMs },
+    { idle_timeout_ms: policy.idleMs, keep_warm_count: policy.keep_warm_count },
     policy.pressure,
     policy.batch,
   );
