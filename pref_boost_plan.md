@@ -445,7 +445,8 @@ falsify it.
 | Mutation checks | each new case was verified to fail under the mutation it guards (window 0, slice-before-filter, clamp `len` instead of `len-1`, batch `MAX_SAFE_INTEGER`, dropped `Number.isFinite`, 300000→600000) |
 | Runtime default | pre-change build: pref 600000, `Settings('performance.after')` = "15". Post-change build: pref **300000**, setting **"5"**, `prefHasUserValue` false |
 | Stored baseline | `out/pref-boost/inc1-before`: 50 tabs, 17 muted videos, steady 8.09 GB median / 8.39 GB max private, 11.85 GB working set, 4.17 cores median (machine was busy with review agents, so latency there is not comparable) |
-| After-run | `out/pref-boost/inc1-after` (17 min, `--idle-hold 720`) — filled when the run completes |
+| After-run (first attempt, `inc1-after-policydisabled`) | **invalid and kept for the record**: 0 discarded / 51 awake after 720 s. Marionette's recommended preferences set `browser.tabs.unloadOnLowMemory = false`, which is also Astra's sleep master switch, so the driver reported `enabled: false` and never ticked. The probe now clears that user value, asserts `performance.sleep === "true"`, records the policy and fails the run otherwise; the measurement was repeated. |
+| After-run (policy on) | `out/pref-boost/inc1-after` — filled when the repeated run completes |
 
 Not yet measured: whether the drain actually reaches the 1.8 GB target, and
 cold vs warm activation cost (D-1). Those numbers decide whether 5 minutes
@@ -471,6 +472,17 @@ reported, neither is worked around silently.
    fails (content differs), forward-apply fails (files exist). Needs either a
    regenerated patch (`forge export`) or a documented recovery; this plan does
    not touch the engine tree.
+
+3. **Marionette disables the feature it is supposed to measure.** Marionette's
+   recommended preferences set `browser.tabs.unloadOnLowMemory = false` as a
+   user value at session start, and that is exactly Astra's sleep master
+   switch. Every driven run therefore measured a browser that never sleeps
+   anything: the first after-run held 51 tabs awake for 12 minutes with 0
+   discards. The probe now clears the user value after the session starts,
+   asserts `Settings('performance.sleep') === "true"`, records the restored
+   policy in `result.json` and aborts if it is off. This also means any tool,
+   policy or profile that writes that pref turns the feature off for real —
+   one more argument for the separate Astra master pref in D-8.
 
 Workaround used for the measurement only, stated plainly: the overlay had
 already copied `overlay/astra` into `engine/astra`, so the two changed host
