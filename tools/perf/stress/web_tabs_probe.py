@@ -25,8 +25,9 @@ What it does, in order:
 4. Mutates nothing else apart from the run's own controls: video tabs are
    muted through `Tabs.setMuted`, `--pause-video` also pauses them, and
    `--idle-hold` leaves the window untouched so the sleeping driver can
-   discard tabs. The window stays headed, and the platform sampler records the
-   browser process tree only (never a pre-existing Firefox on the machine).
+   discard tabs, then audits every tab (discarded / audible / warm / other).
+   The window stays headed, and the platform sampler records the browser
+   process tree only (never a pre-existing Firefox on the machine).
 
 Phases written to `<out>/result.json` and sliced in `REPORT.md`:
 `baseline` (one blank tab), `open+walk` (cold loading), `steady` (all tabs
@@ -278,6 +279,17 @@ return JSON.stringify((() => {
 })())
 """
 
+DISCARD_AUDIT = """
+return JSON.stringify([...gBrowser.tabs].map((t, i) => {
+  const b = t.linkedBrowser;
+  let url = "";
+  try { url = (b.currentURI || {}).spec || ""; } catch (e) {}
+  return { index: i, id: t.getAttribute('astra-tab-id') || "", url,
+           selected: t.selected === true, discarded: t.hasAttribute('discarded'),
+           soundplaying: t.hasAttribute('soundplaying'), muted: t.hasAttribute('muted') };
+}))
+"""
+
 REWALK = """
 const done = arguments[arguments.length - 1];
 (async () => {
@@ -458,6 +470,35 @@ const done = arguments[arguments.length - 1];
   await new Promise((r) => setTimeout(r, 500));
   done(JSON.stringify({ tabs: gBrowser.tabs.length }));
 })()
+"""
+
+STAGE_SELECT = """
+const done = arguments[arguments.length - 1];
+(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  if (gBrowser.tabs.length === 0) { done(JSON.stringify({ ok: false, reason: "no awake tab" })); return; }
+  let tab = gBrowser.tabs[0];
+  let fallback = false;
+  gBrowser.selectedTab = tab;
+  for (let i = 0; i < 100 && tab.hasAttribute('discarded'); i++) await wait(100);
+  if (tab.hasAttribute('discarded')) {
+    tab = [...gBrowser.tabs].find((t) => !t.hasAttribute('discarded')) || null;
+    if (!tab) { done(JSON.stringify({ ok: false, reason: "no awake tab" })); return; }
+    fallback = true;
+    gBrowser.selectedTab = tab;
+    await wait(300);
+  }
+  done(JSON.stringify({ ok: true, fallback, index: [...gBrowser.tabs].indexOf(tab),
+                        id: tab.getAttribute('astra-tab-id') || "" }));
+})()
+"""
+
+STAGE_LOAD = """
+const url = arguments[0];
+gBrowser.selectedBrowser.fixupAndLoadURIString(url, {
+  triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+});
+return 'ok'
 """
 
 STAGE_VIDEO = """
@@ -944,6 +985,25 @@ def reclaim_curve(result, rows):
     }
 
 
+def classify_audit(audit, walk):
+    walked = [w.get("id") for w in walk if w.get("id")]
+    # sleeping.rs DEFAULT_KEEP_WARM_COUNT: the six most recently active tabs
+    # are never selected for sleep, and the selected tab is active.
+    warm_ids = set(walked[-6:])
+    warm_ids.update(row["id"] for row in audit if row.get("selected"))
+    for row in audit:
+        if row.get("discarded"):
+            row["reason"] = "discarded"
+        elif row.get("soundplaying"):
+            row["reason"] = "audible"
+        elif row.get("id") in warm_ids:
+            row["reason"] = "warm"
+        else:
+            row["reason"] = "other"
+    return {key: sum(1 for row in audit if row["reason"] == key)
+            for key in ("discarded", "audible", "warm", "other")}
+
+
 def summarize(result, rows, workers, root_pid=None):
     ph = result["phases"]
 
@@ -1081,6 +1141,17 @@ def report_md(result, phases, outdir):
         lines += ["", f"Idle hold: {hold['seconds']} s untouched, {last.get('discarded')} discarded / "
                   f"{last.get('awake')} awake at the end "
                   f"({last.get('total')} tabs), {hold.get('rows_annotated', 0)} rows stamped."]
+    audit = result.get("discard_audit")
+    if audit:
+        counts = result.get("discard_audit_counts") or {}
+        lines += ["", "## Discard audit (end of idle hold)", "",
+                  "| reason | tabs |", "|---|---|"]
+        for reason in ("discarded", "audible", "warm", "other"):
+            lines.append(f"| {reason} | {counts.get(reason, 0)} |")
+        other = [r for r in audit if r.get("reason") == "other"]
+        if other:
+            lines += ["", "Awake and unexplained: " + ", ".join(
+                f"`{r['id']}` {r['url'][:60]}" for r in other[:10])]
     reclaim = result.get("reclaim")
     if reclaim:
         under = reclaim["first_ts_under_10pct"] is not None
@@ -1099,6 +1170,8 @@ def report_md(result, phases, outdir):
         lines += ["", f"Visible stage: {visible.get('fps')} fps, " +
                   f"{v.get('w')}x{v.get('h')} {v.get('decoded_frames')} decoded / "
                   f"{v.get('dropped_frames')} dropped frames in 5 s."]
+    if result.get("stage_skipped"):
+        lines += ["", f"Stage probe skipped: {result['stage_skipped']}."]
     untitled = [x for x in result.get("tabs_final", []) if not x["title"]]
     if untitled:
         lines += ["", "Tabs with no title: " + ", ".join(f"`{x['id']}` {x['url'][:60]}" for x in untitled)]
@@ -1260,6 +1333,14 @@ def main():
             observations.append(counts)
             result["phases"]["idle_hold_end"] = time.time()
             result["idle_hold"] = {"seconds": args.idle_hold, "observations": observations}
+            try:
+                audit = json.loads(m.chrome(DISCARD_AUDIT))
+            except Exception as exc:  # noqa: BLE001 - the audit never fails the run
+                audit = []
+                result["probes"]["discard_audit_error"] = str(exc)
+            result["discard_audit"] = audit
+            if audit:
+                result["discard_audit_counts"] = classify_audit(audit, walk)
 
         result["probes"]["chrome_frames"] = json.loads(m.chrome_async(CHROME_FRAMES, [6000]))
         result["probes"]["tab_pids"] = json.loads(m.chrome_async(TAB_PIDS))
@@ -1283,13 +1364,44 @@ def main():
             })
         result["probes"]["switch_ms"] = json.loads(m.chrome_async(SWITCH))
 
-        m.chrome_async("""const done = arguments[arguments.length - 1];
-          (async () => { gBrowser.selectedTab = gBrowser.tabs[0];
-            await new Promise((r) => setTimeout(r, 1500)); done(JSON.stringify({ ok: true })); })()""")
-        m.cmd("Marionette:SetContext", {"value": "content"})
-        m.cmd("WebDriver:Navigate", {"url": stage_video})
-        time.sleep(6)
-        result["probes"]["stage_video"] = json.loads(m.execute_async(STAGE_VIDEO, [5000]))
+        try:
+            stage = json.loads(m.chrome_async(STAGE_SELECT))
+            result["probes"]["stage_select"] = stage
+            if not stage.get("ok"):
+                result["stage_skipped"] = stage.get("reason") or "no awake tab"
+            else:
+                m.chrome(STAGE_LOAD, [stage_video])
+                m.cmd("Marionette:SetContext", {"value": "content"})
+                handles = m.cmd("WebDriver:GetWindowHandles")["value"]
+                index = stage.get("index", 0)
+                ordered = []
+                if 0 <= index < len(handles):
+                    ordered.append(handles[index])
+                for handle in handles:
+                    if len(ordered) >= 6:
+                        break
+                    if handle not in ordered:
+                        ordered.append(handle)
+                target = stage_video.split("?")[0]
+                opened = False
+                for position, handle in enumerate(ordered):
+                    try:
+                        # Selection already happened in chrome; do not re-select
+                        # a tab or pull OS focus back to the window.
+                        m.cmd("WebDriver:SwitchToWindow", {"handle": handle, "focus": False})
+                        time.sleep(6 if position == 0 else 2)
+                        href = str(m.execute("return location.href"))
+                    except Exception:  # noqa: BLE001 - a stale or discarded candidate
+                        continue
+                    if href.startswith(target):
+                        opened = True
+                        break
+                if not opened:
+                    result["stage_skipped"] = "stage page did not open"
+                else:
+                    result["probes"]["stage_video"] = json.loads(m.execute_async(STAGE_VIDEO, [5000]))
+        except Exception as exc:  # noqa: BLE001 - the stage probe never fails the run
+            result["stage_skipped"] = f"stage probe error: {exc}"
 
         result["phases"]["video_phase"] = time.time()
         if not args.no_video_phase:
