@@ -15,20 +15,35 @@ block it.
 
 ## 1. Goal and non-goals
 
-Goal, measured by `tools/perf/stress/web_tabs_probe.py`:
+Goal, measured by `tools/perf/stress/web_tabs_probe.py`. The population matters:
+17 muted-but-playing videos are a permanent policy exemption (Firefox never
+discards a tab with active media), so the 50-tab target is stated twice.
 
 | Metric | Measured today | Target |
 |---|---|---|
 | Whole tree, 1 blank tab (private / working set) | 510 MB / 952 MB | 350 MB / 600 MB |
-| Main process, 1 blank tab | 210 MB | 150 MB |
-| 50 real tabs at steady state (private) | 8.30 GB | 2.50 GB |
-| 50 tabs, working set | 12.2 GB | 4.0 GB |
+| Parent process, 1 blank tab | 210 MB | 150 MB |
+| 50 tabs, stress population (17 playing), private | 8.30 GB | ≤ 6.5 GB |
+| 50 tabs, realistic population (3 playing), private | n/a | ≤ 2.5 GB |
+| 50 tabs after the drain (5 min idle + 4/tick) | n/a | ≤ 1.8 GB |
+| 50 tabs, working set (realistic) | 12.2 GB | ≤ 4.0 GB |
 | 50 tabs, CPU (cores of 16) | 6.0 median / 9.6 peak | 1.5 / 3.0 |
 | GPU process memory | 1.2–1.4 GB | 400 MB |
-| Tab activation p95 | 2.9 s | 1.2 s |
+| Warm tab activation p95 (tab was awake) | not measured | 400 ms |
+| Cold tab activation p95 (tab was discarded) | 2.9 s | 1.2 s |
 | Chrome frame p99 | 17 ms | 17 ms (no regression) |
 | Reclaim after closing every tab | 85 % in 15 s | 90 % in 10 s |
 | Crashes / OOM at 50 tabs on 16 GB | 0 | 0 |
+
+Evidence provenance: the 50-tab numbers in §2 came from the temp harness. They
+are the design baseline, not a stored repo artifact. W0.2 re-runs the repo
+probe at 50 tabs before any target is measured.
+
+Why 6.5 GB and not 2.5 GB for the stress run: the ten YouTube watch pages are
+5.1 GB of the 8.3 GB, and `shouldSleep` must keep exempting tabs with active
+media or background music and muted playback die. The reclaimable set is the
+other 33 tabs; keeping 6 warm leaves ~27 to discard. The 2.5 GB target belongs
+to ordinary browsing (a few videos), and both numbers are reported.
 
 Non-goals:
 
@@ -42,8 +57,15 @@ Non-goals:
 
 ## 2. Evidence
 
-Full report: `out/web-tabs-<stamp>/REPORT.md` from the probe. Summary of the
-50-site run:
+Provenance, stated exactly: the 50-tab table below was produced by the
+pre-repo version of the harness in a temp directory, on the same build and
+machine, and is reproduced here as the design baseline. The repo probe
+(`tools/perf/stress/web_tabs_probe.py`) currently has only an 8-tab run stored
+under `out/`. **W0.2 must re-run `--tabs 50` from the repo probe and store the
+artifact before any target in §1 is cited as met** (review: invariant 6).
+
+Full report from the temp harness: `REPORT.md` with `samples.jsonl`,
+103 rows at 2.5 s.
 
 | Phase | Private (med/max) | Working set | CPU cores (med/max) | GPU | video decode |
 |---|---|---|---|---|---|
@@ -136,15 +158,29 @@ time-only behaviour, identical to today. This keeps the first increment safe.
 
 ### 5.3 Decision order (single function, no branching elsewhere)
 
-1. If the tab is selected, audible, pinned, in PiP, has DevTools open, is
-   private, has an open dialog, or is in the last `keep_warm_count` by
-   `last_active_ms`: do not sleep.
-2. If `footprint_kb > budget_kb`: sleep the oldest eligible tab immediately.
-3. Else if `now - last_active >= effective_timeout(idle_timeout_ms, pressure)`:
+`should_sleep` stays a per-tab exemption check. The keep-warm window is a
+set-level rule and lives only in `select_for_sleep` / `selectForSleep`, which
+already rank oldest-first and own the batch cap (review B3).
+
+1. Driver pre-filters (before the policy): private window, unsaved page, open
+   dialog, and the selected tab. PiP folds into `audible` in `enrich`.
+2. Policy per-tab exemptions: active, already discarded, audible (includes
+   PiP), pinned, DevTools.
+3. Keep-warm: rank the remaining eligible tabs by `last_active_ms` descending,
+   ties by `id` ascending, drop the newest `min(keep_warm_count, eligible - 1)`
+   (never protect the whole set — review M1).
+4. If `footprint_kb > budget_kb`: sleep the oldest eligible tab immediately.
+5. Else if `now - last_active >= effective_timeout(idle_timeout_ms, pressure)`:
    sleep the oldest eligible tab.
-4. Cap the batch at 4 per tick.
-5. Effects: `Tabs.discard` (already the driver's call) and no wake unless the
+6. Cap the batch at 4 per tick, always, not only under pressure (review M3).
+   Filter keep-warm first, then slice, or the cap spends slots on warm tabs.
+7. Effects: `Tabs.discard` (already the driver's call) and no wake unless the
    person selects the tab.
+
+Invariant 2 is therefore a **driver** guarantee for private/dialog/PiP and a
+**policy** guarantee for active/audible/pinned/DevTools. The Rust mirror cannot
+see a private window and must not pretend to; the plan says so instead of
+implying the struct knows (review M4).
 
 ### 5.4 Footprint signal
 
@@ -166,7 +202,7 @@ itself. Decision D-3 below picks the option.
 
 | Pref | Today | Proposed | Why |
 |---|---|---|---|
-| idle timeout default | three values: 30 min (`DEFAULT_IDLE_TIMEOUT_MS`, Rust + JS), 15 min (`readPolicy` fallback), 10 min (`Settings` fallback 600000 ms) | 5 min, one constant in all three | 50 tabs idle for 4 min held 8.3 GB; three defaults is itself a defect |
+| idle timeout default | live value is 15 min: the engine ships `browser.tabs.min_inactive_duration_before_unload` = 600000 ms (`engine/browser/app/profile/firefox.js:1145`), `Settings.read` maps 600000 to the `"15"` bucket, and `readPolicy` applies `AFTER_MINUTES[15]`. `DEFAULT_IDLE_TIMEOUT_MS` (30 min) is test-only. | 5 min: `defaultPref(..., 300000)` in `overlay/astra/mozilla.cfg`, `Settings` fallback 300000, `readPolicy` fallback `AFTER_MINUTES[5]`, both constants 300000, UI reset default `"5"`. One test asserts the five literals agree. | 50 tabs idle for 4 min held 8.3 GB. The settings enum is 5/15/30/60, so 10 min is not representable; 5 is the only aggressive value that fits without a UI change. Provisional until the drain measurement (D-1). |
 | `dom.ipc.processPrelaunch.fission.number` | 3 | 0 | ~25–30 MB idle, no user-visible cost |
 | `dom.ipc.processCount` | 8 | 4 | fewer idle processes at 50 tabs; isolation trade-off accepted after measurement |
 | `browser.cache.disk.smart_size.enabled` | true | false | 424 MB written in 4 min |
@@ -181,26 +217,53 @@ removed from the patch.
 
 Owned by one writer at a time. Read-only agents may run in parallel.
 
-### W0 — Evidence harness (done, on this branch)
+### W0 — Evidence harness
 
-`tools/perf/stress/web_tabs_probe.py` + README. Produces the numbers above.
+`tools/perf/stress/web_tabs_probe.py` + README (done). **W0.2** gives it the
+instruments the targets need, in this order:
+
+1. `--idle-hold <s>`: keep the window inactive after the walk and sample
+   throughout; write `discarded_count` / `awake_count` per row. Without it the
+   steady phase is measured before any tab can reach the timeout (review B4).
+2. Close **all** tabs (drop the `tabs[0]` keep) and report a 20 s reclaim
+   series plus `first_ts_under_10pct`.
+3. `parent_priv_mb` in the summary (`pid == root_pid`).
+4. Split activation timing: start the clock after the dwell, and add a
+   `REWALK` pass over discarded tabs → `warm_activate_*`.
+5. `--pause-video` to measure the population that invariant 2 allows.
+6. Record `git rev-parse HEAD`, `git status --porcelain`, binary mtime/size and
+   the probe hash in `result.json`.
+7. Stop pinning `dom.ipc.processCount` in `user.js`; read it from the build.
 
 ### W1 — Budget policy
 
-Increment 1 (safe, JS + Rust parity):
-- `keep_warm_count` in `should_sleep` / `selectForSleep` and the JS mirror.
-- One idle default: 5 minutes everywhere. Today three numbers disagree —
-  `DEFAULT_IDLE_TIMEOUT_MS` is 30 min in `sleeping.rs` and in
-  `Performance.sys.mjs`, `readPolicy` falls back to 15 min
-  (`AFTER_MINUTES[15]`), and `Settings.sys.mjs` falls back to 600000 ms
-  (10 min). Pick 5 min and make the three agree.
-- Parity contract walks both implementations with the same cases.
-- No new signal required; footprint is `null` and ignored.
+Increment 1a (policy core, no default change):
+- `keep_warm_count` as a field on `SleepConfig` / the JS `config` object, used
+  only by `select_for_sleep` / `selectForSleep` (review B3). Default 6,
+  clamped to `min(count, eligible - 1)`; ties by `id`.
+- Batch cap 4 unconditionally in `readPolicy`, so the first tick after a
+  default change does not discard ~44 tabs at once (review M3). 50 tabs drain
+  in ceil(44/4) = 11 ticks.
+- One shared case list asserted on both sides (ties, `n < K`, `K = 0`, batch
+  ordering, negative timeout), not two hand-synced lists (decision memo).
+- Footprint is `null` and ignored in this increment.
+
+Increment 1b (one idle default, five literals):
+- `defaultPref("browser.tabs.min_inactive_duration_before_unload", 300000)` in
+  `overlay/astra/mozilla.cfg` (the live pref source is the engine default,
+  `firefox.js:1145` = 600000).
+- `Settings.sys.mjs` fallback 300000, `Performance.sys.mjs` `readPolicy`
+  fallback `AFTER_MINUTES[5]`, both `DEFAULT_IDLE_TIMEOUT_MS`, and
+  `ui/app/src/domain/preferences/preferences.svelte.ts:51` reset default `"5"`.
+- One test asserts the five literals agree; another asserts a stored `"15"`
+  still means 15 minutes.
+- The drain run decides D-1 before this lands.
 
 Increment 2 (after D-3):
 - `footprint_kb` / `budget_kb` inputs, budget derived as
   `min(0.25 * total_ram, 3 GB)` with a floor of 1 GB.
-- Pressure mapping: over budget → `critical` for that tick.
+- Pressure mapping: separate budget pressure value that keeps `batch: 4` and
+  never overrides `keep-ready`; `critical` stays unreachable from Settings.
 
 Increment 3 (settings, only if approved):
 - expose the budget as "Memory" in Settings, values 1/2/3 GB, default 25 % RAM.
@@ -281,32 +344,50 @@ Per increment, in this order:
 
 | Check | Command | Pass condition |
 |---|---|---|
-| Unit / parity | `cargo test -p astra-core sleeping` (and the JS unit suite) | all pass, same cases both sides |
+| Unit / parity | `cargo test -p astra-core sleeping` + `node tests/contract/sleep_model.mjs` | all pass; the same cases asserted on both sides, including ties and `n < K` |
 | Contract | `python3 tests/contract/shell_app_chrome.py`, `tools/state-check.py` | unchanged counts |
 | Build | `cargo run -q --manifest-path forge/astra-forge/Cargo.toml -- build --faster` | exit 0; never omit `--jobs 2` for engine builds |
-| Probe | `python3 tools/perf/stress/web_tabs_probe.py --tabs 50` | targets in §1 for the increment |
-| Leak | probe `--cycles 20` (new) | private ≤1.15 × baseline each cycle |
+| Probe (baseline) | `python3 tools/perf/stress/web_tabs_probe.py --tabs 50` on the **pre-change binary** | stored under `out/pref-boost/<increment>-before/` |
+| Probe (after) | same command on the rebuilt binary | targets in §1; both populations (`--pause-video` off/on) |
+| Drain | `--idle-hold 700` (11 ticks at 5 min + batch 4) | `discarded_count` in every row; memory falls during the hold |
+| Leak | close **all** tabs (including the first), then sample 20 s | private ≤1.15 × baseline; parent and GPU reported separately |
 | Startup | `python3 tools/perf/bench_startup.py` | no regression beyond 5 % |
 
-Real numbers are appended to `out/pref-boost/<increment>.md` and to this plan's
-"Results" section before any commit is proposed.
+Rules added after review:
+
+- A build and a probe are one lockstep step. Never probe while a writer has
+  uncommitted source or a build is running (shared tree, one `engine/obj-*`).
+- Every `result.json` records `git rev-parse HEAD`, `git status --porcelain`,
+  the binary mtime/size and the probe's own hash; a dirty tree invalidates the
+  run.
+- The leak test closes the stage tab too. Today `CLOSE_ALL` keeps
+  `gBrowser.tabs[0]`, which is why "after close" still holds a 1080p player
+  and reads as 1.71× baseline (decision memo). That is a probe defect, not a
+  product leak, until proven otherwise.
+- Real numbers go to `out/pref-boost/<increment>.md` and §13 before a commit is
+  proposed.
 
 ## 9. Merge protocol
 
 1. All increments on `perf/pref-boost`; `origin/main` is merged in (not
    rebased) whenever it moves, to keep the merge honest.
-2. Required before proposing a merge: W1–W4 done, full test matrix green, leak
-   gate green, probe numbers at or under target, reviewer sign-off, and no
-   pref or code change without its own measured delta.
+2. **Each increment is its own commit and carries its own gate** (review M8):
+   its tests green, its before/after numbers stored, reviewer sign-off. An
+   increment that cannot be measured is not merged; it is retired with the
+   number that replaced it instead of blocking the branch.
 3. The owner approves the merge explicitly. Until then the branch stays
    unmerged even if everything is green.
-4. Merge as a `--no-ff` merge commit into `main` with a message that lists
-   increments and numbers. No squash: each increment keeps its evidence.
+4. Merge as a `--no-ff` merge commit into `main` with a message that lists the
+   increments that actually landed and their numbers. No squash: each
+   increment keeps its evidence and stays individually revertible.
 5. After merge: rebuild `build --faster`, rerun the probe on `main`, push to
    GitLab (`origin`) and GitHub (`github`), then fetch both and verify the
-   tip SHAs match. A push that succeeds on one host only is a failed merge.
-6. Rollback: revert the merge commit (`git revert -m 1 <sha>`); every pref is
-   independently revertible; no data migration is involved.
+   tip SHAs match. If the second push fails, `main` is considered split:
+   stop, report per-host SHAs, and do not claim a merge until both match.
+6. Rollback: revert the increment commit on `main` (`git revert <sha>`), rebuild,
+   re-probe. The merge commit is only reverted if the increments cannot be
+   reverted individually. No data migration is involved; every pref is a
+   default and every policy change is behind `performance.sleep`.
 
 ## 10. Risks
 
@@ -314,32 +395,72 @@ Real numbers are appended to `out/pref-boost/<increment>.md` and to this plan's
 |---|---|---|
 | Discarding too eagerly | tab clicks reload (1–4 s cold) | keep-warm 6, idle 5 min, batch 4, exemptions |
 | Footprint signal unavailable | budget never fires | fall back to time-only, never guess a number |
-| Process count 8 → 4 | less isolation, one crash takes more tabs | measure crash blast radius; revert if probe shows regressions |
-| Cache cap | more revalidation on revisit | measure with a revisit phase before keeping |
-| `items-changed` coalescing | UI misses a delta | contract test compares list before/after; no lost rows |
-| Rust/JS drift | policy differs by engine | existing parity test extended with the new inputs |
+| Two sleepers | Firefox `TabUnloader` can discard a keep-warm tab under OS pressure while Astra's driver also runs | recorded as D-8; resolve ownership before increment 2 |
+| Process count 8 → 4 | less isolation, one crash takes more tabs | 9 tabs already spawn 27–28 processes, so the pref may not be the lever; do not change until measured (D-4) |
+| Cache cap | more revalidation for a 0 MB RSS delta | rejected by D-5 unless a revisit phase shows a memory effect |
+| `items-changed` coalescing | UI misses a delta | contract test compares list before/after; no lost rows; rAF id released in `stop()` |
+| Rust/JS drift | policy differs by engine | one case list asserted on both sides, not two hand-synced lists |
 
-## 11. Decisions to record
+## 11. Decisions
 
-- D-1 idle default 5 min vs 10 min. (proposed: 5, evidence: 4 min idle held 8.3 GB)
-- D-2 keep-warm 6 vs 8. (proposed: 6)
-- D-3 footprint signal: local Gecko fix, per-process reporter, or OS sampler.
-- D-4 process count 4 vs 6.
-- D-5 cache cap 128 MB vs 256 MB.
-- D-6 whether a budget control appears in Settings or stays internal.
+Each decision is written here with the number that justified it, and what would
+falsify it.
 
-Each decision is written here with the number that justified it.
+| # | Decision | Status | Basis / falsifier |
+|---|---|---|---|
+| D-1 | Idle default **5 min**, provisional | open until the drain run | 50 tabs at 4 min idle held 8.3 GB; the enum is 5/15/30/60 so 10 is not representable. Falsify by measuring cold activation p95 after a real drain: if >1.2 s, move to 15 min or add a 10 option. |
+| D-2 | Keep-warm **6** | accepted | 240 MB per extra tab measured in the 8-tab run; 6 warm ≈ 1.4 GB against a 3 GB budget. Falsify with a recorded activation-order replay if clicks outside the last 6 exceed ~20 %. |
+| D-3 | Footprint signal: **local tolerance fix for `requestProcInfo` first**, OS sampler second, per-process reporter rejected | accepted | The reporter sum only sees the parent (22 % of the tree); the OS sampler needs a new route + wire type. Falsify if the throw is inside C++ and the patch grows beyond a few lines. |
+| D-4 | Do **not** change `dom.ipc.processCount` yet | accepted | 9 tabs already spawn 27–28 processes under a pref of 8, so the lever is unproven; measure 8/6/4 before touching it. |
+| D-5 | **Reject** the cache cap | accepted | Disk bytes do not move private/working set; 0 MB expected RSS delta, revalidation cost real. |
+| D-6 | Budget stays **internal**, no Settings control | accepted | 3 GB budget on 31.7 GB RAM; a 9-tab tree already uses 2.4 GB, so 1–2 GB settings would thrash. Existing `performance.memory` already occupies the name. |
+| D-7 | Muted-but-playing video stays exempt | accepted | 17 muted players are 5.1 GB of the 8.3 GB; discarding them kills background playback. The 2.5 GB target is stated for the realistic population instead. A "sleep muted media" opt-in needs its own decision. |
+| D-8 | Resolve the two-sleeper overlap (Firefox `TabUnloader` + Astra driver) | open | Same pref is the master switch for both (`browser.tabs.unloadOnLowMemory`), so Firefox can discard a keep-warm tab under pressure. Needs a separate Astra master pref or a documented precedence, plus the settings/probe updates. |
+| D-9 | Pref mechanism per pref: `defaultPref` for user-facing defaults, `lockPref` only for posture | accepted | `mozilla.cfg` runs after `firefox.js`, and `lockPref` makes a value unmeasurable and unrevertible at runtime. |
 
 ## 12. Sequence
 
-1. W0 (done).
-2. W1 inc 1 + parity test; probe delta.
-3. W3 event coalescing (independent of policy, visible win).
-4. W1 inc 2 after D-3; probe delta.
-5. W2 prefs one at a time; keep only measured wins.
-6. W4 bug fixes + leak gate.
-7. Full matrix, reviewer sign-off, owner approval, merge.
+1. W0 (done) and W0.2: fix the probe (idle hold, discard count, close-all,
+   git state, pause-video, warm re-activation) and store the 50-tab baseline.
+2. W1 inc 1a (policy core: keep-warm, clamp, batch) + parity tests; drain run
+   decides D-1.
+3. W1 inc 1b (one idle default across five literals).
+4. W3 event coalescing (independent of policy, visible win).
+5. W1 inc 2 after D-3; probe delta.
+6. W2 prefs one at a time; keep only measured wins (D-4, D-5 constrain this).
+7. W4 bug fixes + leak gate (with close-all).
+8. Full matrix, reviewer sign-off, owner approval, merge.
 
 ## 13. Results
 
 Filled by the tester. Empty until then.
+
+## 14. Review resolutions (2026-11-17)
+
+Three independent agents reviewed the first draft. Everything they found is
+resolved here; nothing is dropped silently.
+
+| Finding | Resolution in this plan |
+|---|---|
+| B1 the 5-minute change would be a runtime no-op | §5.5 now names the real chain (engine pref 600000 → Settings bucket "15" → `readPolicy` `AFTER_MINUTES[15]`) and the five literals that must agree; W1 1b implements them as one unit with an equality test |
+| B2 2.5 GB unreachable with 17 playing videos | §1 states two populations; D-7 keeps the media exemption; the stress target is 6.5 GB |
+| B3 keep-warm in `should_sleep` forces duplicate ranking | §5.3 and W1 place it in `select_for_sleep` / `SleepConfig.keep_warm_count`; `should_sleep` stays per-tab |
+| B4 probe cannot measure any of this | §8 and W0.2 add idle hold, discard count, close-all reclaim, cold vs warm activation, `--pause-video`, git provenance; `dom.ipc.processCount` leaves the probe's `user.js` |
+| M1 small windows and discarded tabs consume warm slots | clamp to `min(count, eligible - 1)`; rank non-discarded only |
+| M2 ties are undefined | deterministic drop of the newest K, ties by id, asserted on both sides |
+| M3 batch cap and ordering | batch 4 always; filter keep-warm then slice; drain time documented (11 ticks) |
+| M4 private/dialog/PiP claimed as policy | §5.3 states driver-guarantee vs policy-guarantee; no `private` field added to the Rust struct |
+| M5 keep-warm breaks existing driver tests | `keep_warm_count` is a policy parameter; tests pass 0 for old behaviour, plus the warm matrix |
+| M6 one driver per process, dies with its window | recorded; multi-window probe and per-window guard are a precondition for the budget claim |
+| M7 unattributable evidence, lockPref trade-off | §8 requires HEAD + status + binary hash per run; D-9 fixes the pref mechanism |
+| M8 all-or-nothing merge gate | §9 gates each increment on its own numbers; the merge lists only what landed |
+| m1 negative-timeout division differs | parity case added, clamp to >= 0 |
+| m2 UI reset restores 15 | `ui/app/src/domain/preferences/preferences.svelte.ts:51` and its fixture move to "5" |
+| m3 parent process not reported | `parent_priv_mb` added to the probe summary |
+| m4 reclaim measured only at 15 s | close-all plus a 20 s series, first row under 10 % reported |
+| m5 footprint sampler teardown | sampled inside `runTick` as a per-tick promise, no interval, fallback `null` once |
+| D-1 5 vs 10 | 5 stays provisional; the drain run decides, 10 is not representable without a UI change |
+| D-4 process count | deferred until 8/6/4 is measured; the 27–28 process census contradicts the premise |
+| D-5 cache cap | rejected |
+| D-8 two sleepers | recorded as an open decision with the exact pref overlap |
+
