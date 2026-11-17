@@ -69,9 +69,11 @@ behaviour.
 The policy is a line-for-line JS twin of `sleeping.rs`
 (`should_sleep`, `effective_timeout_ms`, `select_for_sleep`); a contract test
 walks both implementations' cases. A tick enriches the model's
-`__sleepState()` with native facts (audible, DevTools, `beforeunload`, pinned)
-and discards oldest-first through `Tabs.discard`; the content binding then
-calls `gBrowser.discardBrowser`. If the engine refuses, the model is put back
+`__sleepState()` with native facts (audible, DevTools, `undiscardable`,
+`attention`, pinned) and discards oldest-first through `Tabs.discard`; the
+content binding then calls `gBrowser.discardBrowser`. A page-registered
+`beforeunload` handler is not an exemption (D-10). If the engine refuses, the
+model is put back
 to awake, so the projection never claims a sleeping page. A change to
 `performance.after` runs a tick immediately; the driver reads the settings
 rather than caching them.

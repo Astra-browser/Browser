@@ -24,9 +24,9 @@
 // a page is sleeping while it still holds its content process.
 //
 // Privacy: a private window's tabs are never auto-slept (no state is written
-// and the rail hides the list). Media, pinned/essential tabs, DevTools, a
-// page with a beforeunload handler, an open sign-in/failure card and the
-// selected tab are excluded.
+// and the rail hides the list). Media, pinned/essential tabs, DevTools, an
+// extension-marked tab, an open sign-in/failure card and the selected tab are
+// excluded; a page-registered beforeunload handler is not (D-10).
 //
 // Teardown: one interval, one event subscription and one `unload` listener,
 // all released by `stop()` (and by the test reset). Nothing grows per tick.
@@ -257,9 +257,12 @@ export function enrich(tab, native) {
       // when muted, so it is never discardable.
       audible = native.hasAttribute("soundplaying") || native.hasAttribute("pictureinpicture");
       devtools = native.getAttribute("devtools-opened") === "true";
+      // Session state (URL, scroll, form data) is restored from the tab
+      // snapshot, so a page-registered beforeunload handler is not a reason to
+      // keep a background tab resident (D-10). An extension marking the tab
+      // non-discardable (autoDiscardable=false) and the attention flag still
+      // are.
       unsaved =
-        native.linkedBrowser?.hasBeforeUnload === true ||
-        // An extension can mark a tab non-discardable (autoDiscardable=false).
         native.hasAttribute("undiscardable") ||
         native.undiscardable === true ||
         native.hasAttribute("attention");

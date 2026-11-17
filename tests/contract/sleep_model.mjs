@@ -396,13 +396,11 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   const audible = await addTab("https://audio.example/");
   const pinned = await addTab("https://kept.example/");
   const excepted = await addTab("https://safe.example/");
-  const unsaved = await addTab("https://form.example/");
   await Tabs.pin({ astra_tab_id: pinned });
   Settings.set({ key: "performance.exceptions", value: "safe.example" });
 
-  const all = [selected, idle, audible, pinned, excepted, unsaved].map(nativeFor);
+  const all = [selected, idle, audible, pinned, excepted].map(nativeFor);
   natives.get(audible).attrs.add("soundplaying");
-  natives.get(unsaved).linkedBrowser.hasBeforeUnload = true;
   const gb = browser(all);
   __setBrowserForTests(() => gb);
 
@@ -420,7 +418,6 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   check("an audible tab stays awake", TabsMod.__tabsState().tabs.get(audible).discarded === false);
   check("a kept tab stays awake", TabsMod.__tabsState().tabs.get(pinned).discarded === false);
   check("an excepted site stays awake", TabsMod.__tabsState().tabs.get(excepted).discarded === false);
-  check("a page with unsaved input stays awake", TabsMod.__tabsState().tabs.get(unsaved).discarded === false);
 
   const projection = TabsMod.__itemsSnapshot();
   const sleeping = projection.tabs.find((tab) => tab.id === idle);
@@ -644,6 +641,48 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
     "the sounding and PiP tabs stay awake",
     TabsMod.__tabsState().tabs.get(sounding).discarded === false &&
       TabsMod.__tabsState().tabs.get(pip).discarded === false,
+  );
+}
+
+// --- beforeunload is not an exemption; extension/attention are (D-10) ----
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const handler = await addTab("https://handled.example/");
+  const extension = await addTab("https://extension.example/");
+  const attention = await addTab("https://attention.example/");
+  const handlerNative = nativeFor(handler);
+  // An ad/session handler: discarding restores the snapshot, so it is no
+  // reason to keep the page resident.
+  handlerNative.linkedBrowser.hasBeforeUnload = true;
+  const extensionNative = nativeFor(extension);
+  extensionNative.attrs.add("undiscardable");
+  const attentionNative = nativeFor(attention);
+  attentionNative.attrs.add("attention");
+  __setBrowserForTests(() => browser([handlerNative, extensionNative, attentionNative]));
+  const config = { idle_timeout_ms: AFTER_MINUTES[5] };
+  const model = new Map(TabsMod.__sleepState().map((tab) => [tab.id, tab]));
+  const result = await Performance.tick(NOW);
+  check("a beforeunload handler no longer keeps the tab resident", result.slept.join(",") === handler);
+  check(
+    "its reason is idle, not unsaved",
+    enrich(model.get(handler), handlerNative).unsaved === false &&
+      shouldSleep(enrich(model.get(handler), handlerNative), NOW, config).reason === "idle",
+  );
+  check(
+    "an extension-marked tab is unsaved before the policy",
+    enrich(model.get(extension), extensionNative).unsaved === true &&
+      result.slept.includes(extension) === false,
+  );
+  check(
+    "an attention tab is unsaved before the policy",
+    enrich(model.get(attention), attentionNative).unsaved === true &&
+      result.slept.includes(attention) === false,
+  );
+  check(
+    "the extension and attention tabs stay awake",
+    TabsMod.__tabsState().tabs.get(extension).discarded === false &&
+      TabsMod.__tabsState().tabs.get(attention).discarded === false,
   );
 }
 
