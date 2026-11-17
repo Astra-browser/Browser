@@ -24,8 +24,12 @@ use std::collections::HashMap;
 use std::time::Instant;
 use thiserror::Error;
 
-/// Default idle time before a tab becomes sleep-eligible (30 minutes).
-pub const DEFAULT_IDLE_TIMEOUT_MS: i64 = 30 * 60 * 1000;
+/// Default idle time before a tab becomes sleep-eligible (5 minutes).
+pub const DEFAULT_IDLE_TIMEOUT_MS: i64 = 5 * 60 * 1000;
+
+/// Default keep-warm window: this many most recently active tabs are never
+/// selected for sleep, so a click on one of them does not reload.
+pub const DEFAULT_KEEP_WARM_COUNT: usize = 6;
 
 /// Default per-discarded-tab memory-saving estimate (50 MiB, Firefox
 /// content-process ballpark; refined by P4-T10 baselines in PERF.md).
@@ -105,6 +109,11 @@ impl TabState {
 pub struct SleepConfig {
     /// Idle milliseconds before a tab is sleep-eligible under no pressure.
     pub idle_timeout_ms: i64,
+    /// Most recently active non-excluded tabs that never sleep, clamped to
+    /// one less than the set so the oldest is always a candidate. Applies to
+    /// [`select_for_sleep`]; one tab's own [`should_sleep`] cannot see its
+    /// peers, so the window is enforced at selection.
+    pub keep_warm_count: usize,
     /// Estimated KiB saved per discarded tab (metrics only).
     pub estimated_saved_kb_per_tab: u64,
 }
@@ -113,6 +122,7 @@ impl Default for SleepConfig {
     fn default() -> Self {
         Self {
             idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
+            keep_warm_count: DEFAULT_KEEP_WARM_COUNT,
             estimated_saved_kb_per_tab: DEFAULT_ESTIMATED_SAVED_KB_PER_TAB,
         }
     }
@@ -144,12 +154,33 @@ impl SleepDecision {
 }
 
 /// Effective idle timeout under pressure. Moderate halves it; Critical
-/// returns 0 so any inactive tab is immediately eligible.
+/// returns 0 so any inactive tab is immediately eligible. A negative delay
+/// reads as 0, so the rounded half cannot differ between the two mirrors
+/// (Rust truncates, JS `Math.floor` does not).
 pub fn effective_timeout_ms(config: &SleepConfig, pressure: MemoryPressure) -> i64 {
+    let base = config.idle_timeout_ms.max(0);
     match pressure {
-        MemoryPressure::None => config.idle_timeout_ms,
-        MemoryPressure::Moderate => config.idle_timeout_ms / 2 + config.idle_timeout_ms % 2,
+        MemoryPressure::None => base,
+        MemoryPressure::Moderate => base / 2 + base % 2,
         MemoryPressure::Critical => 0,
+    }
+}
+
+/// Exclusions shared by [`should_sleep`] and [`select_for_sleep`], so the
+/// keep-warm ranking and the per-tab test cannot drift apart.
+fn exclusion_reason(tab: &TabState) -> Option<StayReason> {
+    if tab.active {
+        Some(StayReason::Active)
+    } else if tab.discarded {
+        Some(StayReason::AlreadyDiscarded)
+    } else if tab.audible {
+        Some(StayReason::Audible)
+    } else if tab.pinned {
+        Some(StayReason::Pinned)
+    } else if tab.devtools_open {
+        Some(StayReason::DevtoolsOpen)
+    } else {
+        None
     }
 }
 
@@ -165,20 +196,8 @@ pub fn should_sleep(
     config: &SleepConfig,
     pressure: MemoryPressure,
 ) -> SleepDecision {
-    if tab.active {
-        return SleepDecision::Stay(StayReason::Active);
-    }
-    if tab.discarded {
-        return SleepDecision::Stay(StayReason::AlreadyDiscarded);
-    }
-    if tab.audible {
-        return SleepDecision::Stay(StayReason::Audible);
-    }
-    if tab.pinned {
-        return SleepDecision::Stay(StayReason::Pinned);
-    }
-    if tab.devtools_open {
-        return SleepDecision::Stay(StayReason::DevtoolsOpen);
+    if let Some(reason) = exclusion_reason(tab) {
+        return SleepDecision::Stay(reason);
     }
     let idle_ms = now_ms.saturating_sub(tab.last_active_ms);
     if idle_ms >= effective_timeout_ms(config, pressure) {
@@ -192,6 +211,12 @@ pub fn should_sleep(
 /// all). Only tabs with [`SleepDecision::Sleep`] are returned, ordered by
 /// `last_active_ms` ascending so memory-pressure batch sleeps reclaim the
 /// stalest tabs first.
+///
+/// The `keep_warm_count` most recently active non-excluded tabs are dropped
+/// after the exclusions and before the idle/pressure test, so they never
+/// sleep whatever their idle age. Ranking ties go to the lower id. The window
+/// is clamped to `eligible - 1` so it never protects the whole set: the
+/// oldest eligible tab is always a candidate.
 pub fn select_for_sleep<'a>(
     tabs: &'a [TabState],
     now_ms: i64,
@@ -201,11 +226,22 @@ pub fn select_for_sleep<'a>(
 ) -> Vec<&'a TabState> {
     let mut eligible: Vec<&TabState> = tabs
         .iter()
+        .filter(|t| exclusion_reason(t).is_none())
+        .collect();
+    eligible.sort_by(|a, b| {
+        b.last_active_ms
+            .cmp(&a.last_active_ms)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    let warm_len = config.keep_warm_count.min(eligible.len().saturating_sub(1));
+    let mut selected: Vec<&TabState> = eligible[warm_len..]
+        .iter()
+        .copied()
         .filter(|t| should_sleep(t, now_ms, config, pressure).should_sleep())
         .collect();
-    eligible.sort_by_key(|t| t.last_active_ms);
-    eligible.truncate(max_count);
-    eligible
+    selected.sort_by_key(|t| t.last_active_ms);
+    selected.truncate(max_count);
+    selected
 }
 
 /// Host-side events that may wake a discarded tab.
@@ -532,6 +568,8 @@ mod tests {
     fn select_for_sleep_returns_oldest_first_with_cap() {
         let config = SleepConfig {
             idle_timeout_ms: 10_000,
+            // Ordering/cap in isolation; the keep-warm window has its own test.
+            keep_warm_count: 0,
             ..SleepConfig::default()
         };
         let tabs = vec![
@@ -546,6 +584,224 @@ mod tests {
         let capped = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, 1);
         assert_eq!(capped.len(), 1);
         assert_eq!(capped[0].id, "old-stale");
+    }
+
+    #[test]
+    fn idle_default_is_five_minutes() {
+        assert_eq!(DEFAULT_IDLE_TIMEOUT_MS, 300_000);
+        let config = SleepConfig::default();
+        assert_eq!(config.idle_timeout_ms, 300_000);
+        assert_eq!(
+            should_sleep(&idle("u", 240_000), NOW, &config, MemoryPressure::None),
+            SleepDecision::Stay(StayReason::RecentlyActive)
+        );
+        assert_eq!(
+            should_sleep(&idle("t", 300_000), NOW, &config, MemoryPressure::None),
+            SleepDecision::Sleep
+        );
+    }
+
+    #[test]
+    fn default_keep_warm_count_is_six() {
+        assert_eq!(DEFAULT_KEEP_WARM_COUNT, 6);
+        assert_eq!(SleepConfig::default().keep_warm_count, 6);
+    }
+
+    #[test]
+    fn negative_idle_timeout_clamps_to_zero() {
+        let config = SleepConfig {
+            idle_timeout_ms: -300_001,
+            ..SleepConfig::default()
+        };
+        assert_eq!(effective_timeout_ms(&config, MemoryPressure::None), 0);
+        assert_eq!(effective_timeout_ms(&config, MemoryPressure::Moderate), 0);
+        assert_eq!(effective_timeout_ms(&config, MemoryPressure::Critical), 0);
+        // No truncation/floor divergence at odd negatives.
+        for value in [-1, -2] {
+            let odd = SleepConfig {
+                idle_timeout_ms: value,
+                ..SleepConfig::default()
+            };
+            assert_eq!(effective_timeout_ms(&odd, MemoryPressure::None), 0);
+            assert_eq!(effective_timeout_ms(&odd, MemoryPressure::Moderate), 0);
+        }
+        // No panic; a fresh inactive tab is immediately eligible.
+        let tabs = vec![idle("fresh", 0).audible(), idle("cold", 0)];
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["cold"]);
+    }
+
+    #[test]
+    fn keep_warm_window_protects_the_recent_tabs() {
+        // 8 idle tabs, default keep-warm 6: only the two oldest are candidates.
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..8)
+            .map(|i| idle(&format!("t{i}"), 120_000 + i as i64 * 60_000))
+            .collect();
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t7", "t6"]);
+        // The same tabs under critical pressure: the window still holds.
+        let critical = select_for_sleep(&tabs, NOW, &config, MemoryPressure::Critical, usize::MAX);
+        let critical_ids: Vec<&str> = critical.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(critical_ids, vec!["t7", "t6"]);
+    }
+
+    #[test]
+    fn keep_warm_ties_rank_by_id() {
+        // Eight tabs share one last_active_ms; the six warm slots go to the
+        // six lowest ids, so exactly t6 and t7 are candidates.
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..8).map(|i| idle(&format!("t{i}"), 600_000)).collect();
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["t6", "t7"]);
+    }
+
+    #[test]
+    fn discarded_tabs_do_not_consume_warm_slots() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            keep_warm_count: 2,
+            ..SleepConfig::default()
+        };
+        // The discarded tabs are the newest, so a ranking that forgot to filter
+        // exclusions first would hand them both warm slots and select all three
+        // live tabs instead of one.
+        let tabs = vec![
+            idle("discarded-1", 60_000).discarded(),
+            idle("discarded-2", 120_000).discarded(),
+            idle("live-a", 20 * 60_000),
+            idle("live-b", 21 * 60_000),
+            idle("live-c", 22 * 60_000),
+        ];
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        // Warm slots hold the two newest live tabs, not the discarded ones.
+        assert_eq!(ids, vec!["live-c"]);
+    }
+
+    #[test]
+    fn keep_warm_never_overrides_exclusions() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            keep_warm_count: 1,
+            ..SleepConfig::default()
+        };
+        // Every excluded tab is newer than both live tabs: ranking them would
+        // give the one warm slot to the selected tab and leave two candidates.
+        let tabs = vec![
+            idle("selected", 60_000).active(),
+            idle("audible", 120_000).audible(),
+            idle("pinned", 180_000).pinned(),
+            idle("devtools", 240_000).devtools_open(),
+            idle("discarded", 300_000).discarded(),
+            idle("warm", 20 * 60_000),
+            idle("cold", 25 * 60_000),
+        ];
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::Critical, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        // Excluded tabs neither sleep nor take the warm slot: the newest
+        // eligible tab ("warm", 20 min) is protected, "cold" sleeps.
+        assert_eq!(ids, vec!["cold"]);
+    }
+
+    #[test]
+    fn empty_and_fully_excluded_sets_select_nothing() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let empty: Vec<TabState> = Vec::new();
+        assert!(
+            select_for_sleep(&empty, NOW, &config, MemoryPressure::Critical, usize::MAX).is_empty()
+        );
+        let excluded = vec![
+            idle("a", 90 * 60_000).active(),
+            idle("b", 90 * 60_000).audible(),
+            idle("c", 90 * 60_000).pinned(),
+            idle("d", 90 * 60_000).devtools_open(),
+            idle("e", 90 * 60_000).discarded(),
+        ];
+        let chosen = select_for_sleep(
+            &excluded,
+            NOW,
+            &config,
+            MemoryPressure::Critical,
+            usize::MAX,
+        );
+        assert!(chosen.is_empty());
+    }
+
+    #[test]
+    fn exactly_keep_warm_tabs_still_release_the_oldest() {
+        // n == K: the clamp protects K-1, so one tab is always a candidate.
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..6)
+            .map(|i| idle(&format!("k{i}"), (10 + i as i64) * 60_000))
+            .collect();
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["k5"]);
+    }
+
+    #[test]
+    fn max_count_zero_selects_nothing() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..3)
+            .map(|i| idle(&format!("z{i}"), (20 + i as i64) * 60_000))
+            .collect();
+        assert!(select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, 0).is_empty());
+    }
+
+    #[test]
+    fn keep_warm_never_protects_the_whole_set() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let few: Vec<TabState> = (0..3)
+            .map(|i| idle(&format!("n{i}"), (8 + i as i64) * 60_000))
+            .collect();
+        let chosen = select_for_sleep(&few, NOW, &config, MemoryPressure::None, usize::MAX);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        // Clamped to eligible - 1: the oldest tab is always a candidate.
+        assert_eq!(ids, vec!["n2"]);
+        let none = SleepConfig {
+            keep_warm_count: 0,
+            ..config
+        };
+        let all = select_for_sleep(&few, NOW, &none, MemoryPressure::None, usize::MAX);
+        let all_ids: Vec<&str> = all.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(all_ids, vec!["n2", "n1", "n0"]);
+    }
+
+    #[test]
+    fn keep_warm_and_batch_cap_compose() {
+        let config = SleepConfig {
+            idle_timeout_ms: 60_000,
+            ..SleepConfig::default()
+        };
+        let tabs: Vec<TabState> = (0..12)
+            .map(|i| idle(&format!("m{i}"), (5 + i as i64) * 60_000))
+            .collect();
+        let chosen = select_for_sleep(&tabs, NOW, &config, MemoryPressure::None, 4);
+        let ids: Vec<&str> = chosen.iter().map(|t| t.id.as_str()).collect();
+        // 12 eligible, 6 kept warm → 6 candidates, capped to the oldest 4.
+        assert_eq!(ids, vec!["m11", "m10", "m9", "m8"]);
     }
 
     #[test]
@@ -641,6 +897,8 @@ mod tests {
         // event restores.
         let config = SleepConfig {
             idle_timeout_ms: 10_000,
+            // No keep-warm: the one eligible tab must be the candidate.
+            keep_warm_count: 0,
             ..SleepConfig::default()
         };
         let tabs = vec![idle("old", 60_000), idle("young", 1_000)];

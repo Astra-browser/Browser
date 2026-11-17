@@ -8,7 +8,7 @@ vi.mock("$domain/preferences", () => ({
     value: (key: string) =>
       ({
         "performance.sleep": "true",
-        "performance.after": "15",
+        "performance.after": "5",
         "performance.memory": "balanced",
         "performance.exceptions": "kept.example",
       })[key],

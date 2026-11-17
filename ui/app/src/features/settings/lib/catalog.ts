@@ -778,7 +778,7 @@ export const fields = {
     section: "performance",
     label: m.pref_performance_after,
     description: m.pref_performance_after_help,
-    initial: "15",
+    initial: "5",
     options: [
       { value: "5", label: m.pref_performance_after_option_0 },
       { value: "15", label: m.pref_performance_after_option_1 },

@@ -18,12 +18,16 @@
    - already discarded (wake first)
 2. Timer last: `idle_ms = now_ms - last_active_ms` (future skew counts as
    recently-active) against the pressure-adjusted timeout:
-   - `None` → `idle_timeout_ms` (default 30 min)
+   - `None` → `idle_timeout_ms` (default 5 min)
    - `Moderate` → half timeout
    - `Critical` → 0 (any inactive, non-excluded tab is eligible)
 
 `select_for_sleep(tabs, now, config, pressure, max_count)` returns the
-eligible tabs oldest-first, capped for memory-pressure batch sleeps.
+eligible tabs oldest-first, capped at `max_count` every tick so one pass never
+discards everything. Before the idle/pressure test it drops the
+`keep_warm_count` most recently active eligible tabs (ties by id ascending),
+clamped to one fewer than the set so the oldest tab always remains a
+candidate.
 
 ## Wake
 
@@ -59,7 +63,7 @@ behaviour.
 |---|---|---|
 | `performance.sleep` | `browser.tabs.unloadOnLowMemory` | master switch; `false` tears the interval down |
 | `performance.after` | `browser.tabs.min_inactive_duration_before_unload` | idle delay: 5/15/30/60 minutes |
-| `performance.memory` | Astra key | `balanced` (full delay), `save-memory` (half delay, batches of 4), `keep-ready` (background unload off) |
+| `performance.memory` | Astra key | `balanced` (full delay), `save-memory` (half delay), `keep-ready` (background unload off); every mode batches 4 per tick |
 | `performance.exceptions` | Astra key | sites (and their subdomains) that never sleep |
 
 The policy is a line-for-line JS twin of `sleeping.rs`

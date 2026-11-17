@@ -7,6 +7,10 @@
 //     audible, pinned, DevTools, idle timeout
 //   - moderate pressure halves the delay; critical discards any inactive tab
 //   - `selectForSleep` returns oldest first and honours the batch cap
+//   - the keep-warm window protects the 6 most recently active eligible tabs,
+//     after the exclusions and before the idle/pressure test, clamped to one
+//     fewer than the set so the oldest is always a candidate
+//   - the idle default is 5 minutes in the policy and in the settings fallback
 //   - `readPolicy` maps performance.sleep/after/memory/exceptions, and
 //     "keep-ready" turns background unload off
 //   - exceptions are normalised to a host and cover subdomains
@@ -17,19 +21,23 @@
 //
 // Usage: node tests/contract/sleep_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const SettingsMod = await import(path.join(HOST, "Settings.sys.mjs"));
-const PerfMod = await import(path.join(HOST, "Performance.sys.mjs"));
+// A file URL: `import()` rejects a bare Windows absolute path ("e:" scheme).
+const hostModule = (name) => import(pathToFileURL(path.join(HOST, name)).href);
+
+const Events = await hostModule("Events.sys.mjs");
+const TabsMod = await hostModule("Tabs.sys.mjs");
+const SettingsMod = await hostModule("Settings.sys.mjs");
+const PerfMod = await hostModule("Performance.sys.mjs");
 
 const { Tabs } = TabsMod;
-const { Settings, __resetSettingsForTests } = SettingsMod;
+const { Settings, __resetSettingsForTests, __setPrefsForTests } = SettingsMod;
 const {
   Performance,
   DEFAULT_IDLE_TIMEOUT_MS,
@@ -101,9 +109,133 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
     tabState({ id: "fresh", last_active_ms: NOW - 1000 }),
     tabState({ id: "excluded", last_active_ms: NOW - 90_000, audible: true }),
   ];
-  const chosen = selectForSleep(tabs, NOW, { idle_timeout_ms: 10_000 }, "none", Number.MAX_SAFE_INTEGER);
+  // Ordering/cap in isolation; the keep-warm window has its own cases below.
+  const orderConfig = { idle_timeout_ms: 10_000, keep_warm_count: 0 };
+  const chosen = selectForSleep(tabs, NOW, orderConfig, "none", Number.MAX_SAFE_INTEGER);
   check("candidates are oldest first", chosen.map((t) => t.id).join(",") === "old,new");
-  check("the cap is applied", selectForSleep(tabs, NOW, { idle_timeout_ms: 10_000 }, "none", 1).length === 1);
+  check("the cap is applied", selectForSleep(tabs, NOW, orderConfig, "none", 1).length === 1);
+
+  // --- keep-warm window ---------------------------------------------------
+  // 8 eligible idle tabs, default keep-warm 6: only the two oldest are chosen.
+  const idleMany = [];
+  for (let i = 0; i < 8; i += 1) {
+    idleMany.push(tabState({ id: `w${i}`, last_active_ms: NOW - (120_000 + i * MINUTE) }));
+  }
+  const warmPick = selectForSleep(idleMany, NOW, { idle_timeout_ms: MINUTE });
+  check("the keep-warm window leaves only the two oldest idle tabs", warmPick.map((t) => t.id).join(",") === "w7,w6");
+  check(
+    "keep-warm holds under critical pressure too",
+    selectForSleep(idleMany, NOW, { idle_timeout_ms: MINUTE }, "critical").map((t) => t.id).join(",") === "w7,w6",
+  );
+
+  const tied = [
+    tabState({ id: "b", last_active_ms: NOW - 10 * MINUTE }),
+    tabState({ id: "a", last_active_ms: NOW - 10 * MINUTE }),
+  ];
+  const tiePick = selectForSleep(tied, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: 1 });
+  check("keep-warm ties rank by id", tiePick.length === 1 && tiePick[0].id === "b");
+
+  const allTied = [];
+  for (let i = 0; i < 8; i += 1) {
+    allTied.push(tabState({ id: `t${i}`, last_active_ms: NOW - 10 * MINUTE }));
+  }
+  check(
+    "a full tie leaves exactly the two highest ids",
+    selectForSleep(allTied, NOW, { idle_timeout_ms: MINUTE }).map((t) => t.id).join(",") === "t6,t7",
+  );
+  check(
+    "a non-finite window falls back to the default",
+    selectForSleep(allTied, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: NaN }).map((t) => t.id).join(",") ===
+      "t6,t7",
+  );
+
+  // Excluded tabs are the newest, so a ranking that forgets the exclusion
+  // filter would hand them the warm slots and select three live tabs.
+  const slots = [
+    tabState({ id: "discarded-1", last_active_ms: NOW - MINUTE, discarded: true }),
+    tabState({ id: "discarded-2", last_active_ms: NOW - 2 * MINUTE, discarded: true }),
+    tabState({ id: "live-a", last_active_ms: NOW - 20 * MINUTE }),
+    tabState({ id: "live-b", last_active_ms: NOW - 21 * MINUTE }),
+    tabState({ id: "live-c", last_active_ms: NOW - 22 * MINUTE }),
+  ];
+  check(
+    "already-discarded tabs do not consume warm slots",
+    selectForSleep(slots, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: 2 }).map((t) => t.id).join(",") === "live-c",
+  );
+
+  check("a negative delay clamps to zero", effectiveTimeoutMs(-300_001, "none") === 0 && effectiveTimeoutMs(-300_001, "moderate") === 0);
+  check("odd negative delays clamp too", effectiveTimeoutMs(-1, "none") === 0 && effectiveTimeoutMs(-2, "moderate") === 0);
+  check(
+    "a negative delay sleeps a fresh tab without diverging",
+    shouldSleep(tabState({ id: "x", last_active_ms: NOW }), NOW, { idle_timeout_ms: -300_001 }).sleep === true,
+  );
+
+  // Every excluded tab is newer than both live tabs: ranking them would give
+  // the one warm slot to the selected tab and leave two candidates.
+  const guarded = [
+    tabState({ id: "selected", last_active_ms: NOW - MINUTE, active: true }),
+    tabState({ id: "audible", last_active_ms: NOW - 2 * MINUTE, audible: true }),
+    tabState({ id: "pinned", last_active_ms: NOW - 3 * MINUTE, pinned: true }),
+    tabState({ id: "devtools", last_active_ms: NOW - 4 * MINUTE, devtools_open: true }),
+    tabState({ id: "discarded", last_active_ms: NOW - 5 * MINUTE, discarded: true }),
+    tabState({ id: "warm", last_active_ms: NOW - 20 * MINUTE }),
+    tabState({ id: "cold", last_active_ms: NOW - 25 * MINUTE }),
+  ];
+  const guardedPick = selectForSleep(guarded, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: 1 }, "critical");
+  // Excluded tabs neither sleep nor hold a warm slot: the newest eligible tab
+  // is protected and "cold" still sleeps.
+  check("keep-warm never overrides an exclusion", guardedPick.map((t) => t.id).join(",") === "cold");
+
+  const crowded = [];
+  for (let i = 0; i < 12; i += 1) {
+    crowded.push(tabState({ id: `m${i}`, last_active_ms: NOW - (5 + i) * MINUTE }));
+  }
+  const capPick = selectForSleep(crowded, NOW, { idle_timeout_ms: MINUTE }, "none", 4);
+  check("the batch cap still applies after keep-warm", capPick.map((t) => t.id).join(",") === "m11,m10,m9,m8");
+
+  // The window is clamped to `eligible - 1`: it never protects the whole set.
+  const few = [
+    tabState({ id: "n0", last_active_ms: NOW - 8 * MINUTE }),
+    tabState({ id: "n1", last_active_ms: NOW - 9 * MINUTE }),
+    tabState({ id: "n2", last_active_ms: NOW - 10 * MINUTE }),
+  ];
+  check(
+    "fewer tabs than the window still reclaims the oldest",
+    selectForSleep(few, NOW, { idle_timeout_ms: MINUTE }).map((t) => t.id).join(",") === "n2",
+  );
+  check(
+    "keep_warm_count 0 protects nothing",
+    selectForSleep(few, NOW, { idle_timeout_ms: MINUTE, keep_warm_count: 0 })
+      .map((t) => t.id)
+      .join(",") === "n2,n1,n0",
+  );
+
+  check("an empty set selects nothing", selectForSleep([], NOW, { idle_timeout_ms: MINUTE }).length === 0);
+  check(
+    "a fully excluded set selects nothing",
+    selectForSleep(
+      [
+        tabState({ id: "a", last_active_ms: NOW - 90 * MINUTE, active: true }),
+        tabState({ id: "b", last_active_ms: NOW - 90 * MINUTE, audible: true }),
+        tabState({ id: "c", last_active_ms: NOW - 90 * MINUTE, pinned: true }),
+        tabState({ id: "d", last_active_ms: NOW - 90 * MINUTE, devtools_open: true }),
+        tabState({ id: "e", last_active_ms: NOW - 90 * MINUTE, discarded: true }),
+      ],
+      NOW,
+      { idle_timeout_ms: MINUTE },
+      "critical",
+    ).length === 0,
+  );
+  check("maxCount 0 selects nothing", selectForSleep(few, NOW, { idle_timeout_ms: MINUTE }, "none", 0).length === 0);
+
+  const exactly = [];
+  for (let i = 0; i < 6; i += 1) {
+    exactly.push(tabState({ id: `k${i}`, last_active_ms: NOW - (10 + i) * MINUTE }));
+  }
+  check(
+    "exactly the window size still releases the oldest",
+    selectForSleep(exactly, NOW, { idle_timeout_ms: MINUTE }).map((t) => t.id).join(",") === "k5",
+  );
 }
 
 // === Settings -> policy ==================================================
@@ -111,7 +243,24 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   const values = new Map();
   const read = (key, fallback) => values.get(key) ?? fallback;
   check("sleep defaults on", readPolicy(read).enabled === true);
-  check("after defaults to 15 minutes", readPolicy(read).idleMs === AFTER_MINUTES[15]);
+  check("after defaults to 5 minutes", readPolicy(read).idleMs === AFTER_MINUTES[5]);
+  check("the policy reports the keep-warm window", readPolicy(read).keep_warm_count === 6);
+  check(
+    "the idle default is one constant",
+    DEFAULT_IDLE_TIMEOUT_MS === 300_000 && AFTER_MINUTES[5] === DEFAULT_IDLE_TIMEOUT_MS,
+  );
+  // The same default ships in the build overlay and in the UI reset; these two
+  // checks are what stop the five literals drifting apart again.
+  const cfg = fs.readFileSync(path.join(ROOT, "overlay", "astra", "mozilla.cfg"), "utf8");
+  check(
+    "mozilla.cfg defaults the delay to 300000",
+    /defaultPref\(\s*"browser\.tabs\.min_inactive_duration_before_unload"\s*,\s*300000\s*\)/u.test(cfg),
+  );
+  const uiDefaults = fs.readFileSync(
+    path.join(ROOT, "ui", "app", "src", "domain", "preferences", "preferences.svelte.ts"),
+    "utf8",
+  );
+  check("the UI reset default is 5", /"performance\.after": "5"/u.test(uiDefaults));
 
   for (const [value, ms] of Object.entries(AFTER_MINUTES)) {
     values.set("performance.after", value);
@@ -119,6 +268,7 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   }
 
   values.set("performance.after", "15");
+  check("a stored 15 still means 15 minutes", readPolicy(read).idleMs === 15 * MINUTE);
   values.set("performance.sleep", "false");
   check("the sleep switch is honoured", readPolicy(read).enabled === false);
   values.set("performance.sleep", "true");
@@ -130,6 +280,8 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   check("keep-ready turns background unload off", readPolicy(read).background === false);
   values.set("performance.memory", "balanced");
   check("balanced keeps the full delay", readPolicy(read).pressure === "none" && readPolicy(read).background === true);
+  check("the batch cap is unconditional", readPolicy(read).batch === 4);
+  check("an empty reader still uses the 5-minute default", readPolicy(() => undefined).idleMs === 300_000);
 
   values.set("performance.exceptions", "https://www.Example.com/path\nnews.example\n\nexample.com\n");
   const exceptions = readPolicy(read).exceptions;
@@ -141,6 +293,39 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   check("a lookalike does not match", isExcepted("https://notexample.com/", exceptions) === false);
   check("an invalid URL never matches", isExcepted("about:blank", exceptions) === false);
   check("parseExceptions ignores junk", parseExceptions("   \njavascript:alert(1)").length === 0);
+}
+
+// === An absent pref reads as the same 5-minute default ===================
+{
+  // `Services.prefs` behaviour for an unset pref: the getter returns the
+  // fallback it was given, so this checks the fallback itself.
+  const absent = {
+    getIntPref: (_name, fallback) => fallback,
+    getBoolPref: (_name, fallback) => fallback,
+    getStringPref: (_name, fallback) => fallback,
+    setIntPref() {},
+    setBoolPref() {},
+    setStringPref() {},
+    clearUserPref() {},
+    prefHasUserValue: () => false,
+    addObserver() {},
+    removeObserver() {},
+  };
+  __resetSettingsForTests();
+  __setPrefsForTests(absent);
+  check("an unset performance.after pref reads as 5 minutes", Settings.current("performance.after") === "5");
+  check("the default policy uses the 5-minute delay", readPolicy().idleMs === 300_000);
+  check("the settings fallback matches the policy constant", readPolicy().idleMs === DEFAULT_IDLE_TIMEOUT_MS);
+
+  // A 300000 pref (what mozilla.cfg now ships) still maps to the "5" option.
+  __resetSettingsForTests();
+  __setPrefsForTests({
+    ...absent,
+    getIntPref: (name, fallback) =>
+      name === "browser.tabs.min_inactive_duration_before_unload" ? 300_000 : fallback,
+  });
+  check("a 300000 pref reads as 5 minutes", Settings.current("performance.after") === "5");
+  __resetSettingsForTests();
 }
 
 // === Driver: native discard path ========================================
@@ -297,13 +482,15 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   check("keep-ready discards nothing", result.slept.length === 0 && TabsMod.__tabsState().tabs.get(idle).discarded === false);
 }
 
-// --- save-memory halves the delay and caps one batch --------------------
+// --- save-memory halves the delay, the window still holds ---------------
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
   const idle = [];
-  for (let i = 0; i < 6; i += 1) {
-    idle.push(await addTab(`https://idle${i}.example/`, { idleMs: 4 * MINUTE }));
+  // Eight tabs inside the 5-minute delay: keeping warm 6 leaves exactly the
+  // two oldest as candidates, so K=0 (which would sleep 4) fails this.
+  for (let i = 0; i < 8; i += 1) {
+    idle.push(await addTab(`https://idle${i}.example/`, { idleMs: 4 * MINUTE + i * 6000 }));
   }
   __setBrowserForTests(() => browser(idle.map(nativeFor)));
   Settings.set({ key: "performance.after", value: "5" });
@@ -313,7 +500,71 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
   Settings.set({ key: "performance.memory", value: "save-memory" });
   const moderate = await Performance.tick(NOW);
   check("save-memory halves the delay", moderate.slept.length > 0);
-  check("one batch is capped", moderate.slept.length === 4);
+  check(
+    "the window still holds under pressure",
+    moderate.slept.join(",") === `${idle[7]},${idle[6]}`,
+  );
+  check(
+    "the keep-warm tabs stay awake under pressure",
+    idle.slice(0, 6).every((id) => TabsMod.__tabsState().tabs.get(id).discarded === false),
+  );
+}
+
+// --- the window and the batch cap, in the order the driver applies them --
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const idle = [];
+  for (let i = 0; i < 8; i += 1) {
+    idle.push(await addTab(`https://keep${i}.example/`, { idleMs: 10 * MINUTE + i * MINUTE }));
+  }
+  __setBrowserForTests(() => browser(idle.map(nativeFor)));
+  Settings.set({ key: "performance.after", value: "5" });
+  const result = await Performance.tick(NOW);
+  check(
+    "the window leaves the two oldest idle tabs, not all eight",
+    result.slept.join(",") === `${idle[7]},${idle[6]}`,
+  );
+  check(
+    "the keep-warm tabs stay awake",
+    idle.slice(0, 6).every((id) => TabsMod.__tabsState().tabs.get(id).discarded === false),
+  );
+}
+
+// --- a full tie: filter first, then slice --------------------------------
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const idle = [];
+  for (let i = 0; i < 10; i += 1) {
+    idle.push(await addTab(`https://tie${i}.example/`, { idleMs: 10 * MINUTE }));
+  }
+  __setBrowserForTests(() => browser(idle.map(nativeFor)));
+  Settings.set({ key: "performance.after", value: "5" });
+  const result = await Performance.tick(NOW);
+  // Ties rank by id ascending, so the window holds the six lowest ids and the
+  // four highest are the candidates. Slicing to the cap before filtering would
+  // leave 0, not 4.
+  const expected = [...idle].sort().slice(6);
+  check("a full tie still sleeps four tabs", result.slept.length === 4);
+  check("the tie fixtures are the four highest ids", result.slept.join(",") === expected.join(","));
+}
+
+// --- the batch cap is four every tick, at every memory mode -------------
+{
+  resetWorld();
+  await addTab("https://front.example/", { idleMs: 0, selected: true });
+  const idle = [];
+  for (let i = 0; i < 12; i += 1) {
+    idle.push(await addTab(`https://cap${i}.example/`, { idleMs: 10 * MINUTE + i * MINUTE }));
+  }
+  __setBrowserForTests(() => browser(idle.map(nativeFor)));
+  Settings.set({ key: "performance.after", value: "5" });
+  const result = await Performance.tick(NOW);
+  check(
+    "balanced sleeps four a tick, not six",
+    result.slept.join(",") === `${idle[11]},${idle[10]},${idle[9]},${idle[8]}`,
+  );
 }
 
 // --- the driver timer is released ---------------------------------------
@@ -335,19 +586,25 @@ async function addTab(url, { idleMs = 16 * MINUTE, selected = false } = {}) {
 {
   resetWorld();
   await addTab("https://front.example/", { idleMs: 0, selected: true });
-  const marked = await addTab("https://webrtc.example/");
-  const pip = await addTab("https://pip.example/");
+  // Older than the one reclaimable tab: only the exclusion keeps them awake.
+  const marked = await addTab("https://webrtc.example/", { idleMs: 90 * MINUTE });
+  const pip = await addTab("https://pip.example/", { idleMs: 91 * MINUTE });
+  const spare = await addTab("https://spare.example/");
   const markedNative = nativeFor(marked);
   markedNative.attrs.add("undiscardable");
   const pipNative = nativeFor(pip);
   pipNative.attrs.add("pictureinpicture");
-  __setBrowserForTests(() => browser([markedNative, pipNative]));
+  __setBrowserForTests(() => browser([markedNative, pipNative, nativeFor(spare)]));
   const result = await Performance.tick(NOW);
-  check("an extension-marked tab stays awake", result.slept.length === 0);
+  check(
+    "an extension-marked tab stays awake",
+    result.slept.includes(marked) === false && TabsMod.__tabsState().tabs.get(marked).discarded === false,
+  );
   check(
     "a picture-in-picture tab stays awake",
-    TabsMod.__tabsState().tabs.get(pip).discarded === false,
+    result.slept.includes(pip) === false && TabsMod.__tabsState().tabs.get(pip).discarded === false,
   );
+  check("the tick still reclaimed the one eligible tab", result.slept.length === 1 && result.slept[0] === spare);
 }
 
 // --- a private tab never sleeps ------------------------------------------
