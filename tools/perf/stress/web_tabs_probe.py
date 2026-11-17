@@ -18,15 +18,22 @@ What it does, in order:
    site so nothing is served from cache.
 3. Walks every tab once. Astra's background tabs are lazy (`Content.sys.mjs`
    `pending`), so creating 50 tabs alone loads nothing; activation is what
-   makes each page load, and that is the load a person actually pays.
-4. Mutates nothing else: video tabs are muted through `Tabs.setMuted`, the
-   window stays headed, and the platform sampler records the browser process
-   tree only (never a pre-existing Firefox on the machine).
+   makes each page load, and that is the load a person actually pays. The cold
+   `activate_ms` series includes the walk dwell; a `REWALK` pass over tabs the
+   browser has already discarded measures warm wake and restore latency after
+   the dwell.
+4. Mutates nothing else apart from the run's own controls: video tabs are
+   muted through `Tabs.setMuted`, `--pause-video` also pauses them, and
+   `--idle-hold` leaves the window untouched so the sleeping driver can
+   discard tabs. The window stays headed, and the platform sampler records the
+   browser process tree only (never a pre-existing Firefox on the machine).
 
 Phases written to `<out>/result.json` and sliced in `REPORT.md`:
 `baseline` (one blank tab), `open+walk` (cold loading), `steady` (all tabs
-loaded, video playing), `video` (background-decode suspension off, players
-re-walked), `closed` (reclaim after closing every tab).
+loaded, video playing), `idle_hold` (with `--idle-hold`: no interaction,
+discarded/awake counts on every sample row), `video` (background-decode
+suspension off, players re-walked), `closed` (reclaim curve after closing every
+tab, for `--close-wait` seconds).
 
 Platform notes:
 
@@ -42,6 +49,7 @@ Exit codes: 0 PASS, 1 FAIL, 2 SKIP (no built binary). Stdlib only.
 import argparse
 import base64
 import functools
+import hashlib
 import http.server
 import json
 import os
@@ -135,7 +143,6 @@ PREFS = {
     "media.block-autoplay-until-in-foreground": False,
     # No speaker output while 17 players start; per-tab mute is applied too.
     "media.volume_scale": 0.0,
-    "dom.ipc.processCount": 8,
 }
 
 # --- Marionette -------------------------------------------------------------
@@ -261,6 +268,55 @@ const done = arguments[arguments.length - 1];
 })()
 """
 
+TAB_COUNTS = """
+return JSON.stringify((() => {
+  const tabs = [...gBrowser.tabs];
+  const discarded = tabs.filter((t) => t.hasAttribute('discarded'));
+  return { total: tabs.length, discarded: discarded.length,
+           discarded_ids: discarded.map((t) => t.getAttribute('astra-tab-id')),
+           awake: tabs.length - discarded.length };
+})())
+"""
+
+REWALK = """
+const done = arguments[arguments.length - 1];
+(async () => {
+  const ids = arguments[0];
+  const dwell = arguments[1];
+  const out = [];
+  for (const id of ids) {
+    const tab = [...gBrowser.tabs].find((t) => t.getAttribute('astra-tab-id') === id);
+    if (!tab) { out.push({ id, missing: true }); continue; }
+    if (!tab.hasAttribute('discarded')) { out.push({ id, skipped: 'not-discarded' }); continue; }
+    gBrowser.selectedTab = tab;
+    await new Promise((r) => setTimeout(r, dwell));
+    const a = performance.now();
+    while (tab.hasAttribute('discarded') && performance.now() - a < 10000) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const wake = performance.now() - a;
+    while (performance.now() - a < 20000) {
+      let loading = false;
+      const b = tab.linkedBrowser;
+      try { loading = b.webProgress ? b.webProgress.isLoadingDocument === true : false; } catch (e) {}
+      if (!loading && !tab.hasAttribute('discarded')) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const total = performance.now() - a;
+    const restored = !tab.hasAttribute('discarded');
+    let loading = false;
+    try {
+      const b = tab.linkedBrowser;
+      loading = b.webProgress ? b.webProgress.isLoadingDocument === true : false;
+    } catch (e) {}
+    out.push({ id, restored, loading, warm_wake_ms: Math.round(wake),
+               warm_load_ms: Math.round(total - wake),
+               warm_activate_ms: restored && !loading ? Math.round(total) : null });
+  }
+  done(JSON.stringify(out));
+})()
+"""
+
 LOAD_POLL = """
 const done = arguments[arguments.length - 1];
 (async () => {
@@ -286,6 +342,28 @@ const done = arguments[arguments.length - 1];
     if (rows.length > 0 && loading === 0 && untitled <= 2 && Date.now() - t0 > 8000) break;
   }
   done(JSON.stringify(res));
+})()
+"""
+
+PAUSE_VIDEO = """
+const done = arguments[arguments.length - 1];
+(async () => {
+  const ids = arguments[0];
+  const out = [];
+  for (const id of ids) {
+    const tab = [...gBrowser.tabs].find((t) => t.getAttribute('astra-tab-id') === id);
+    if (!tab) { out.push({ id, missing: true }); continue; }
+    const b = tab.linkedBrowser;
+    let ctrl = null;
+    try { ctrl = b.browsingContext ? b.browsingContext.mediaController : null; } catch (e) { ctrl = null; }
+    if (!ctrl) { out.push({ id, active: false, paused: null }); continue; }
+    let active = false, playing = false;
+    try { active = ctrl.isActive === true; playing = ctrl.isPlaying === true; } catch (e) {}
+    let paused = false;
+    try { ctrl.pause(); paused = ctrl.isPlaying === false; } catch (e) {}
+    out.push({ id, active, was_playing: playing, paused, muted: b.audioMuted === true });
+  }
+  done(JSON.stringify(out));
 })()
 """
 
@@ -371,7 +449,12 @@ MEDIA_VIEW = """return JSON.stringify((() => {
 CLOSE_ALL = """
 const done = arguments[arguments.length - 1];
 (async () => {
-  gBrowser.removeAllTabsBut(gBrowser.tabs[0]);
+  const blank = gBrowser.addTab("about:blank", {
+    triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+    skipAnimation: true,
+  });
+  gBrowser.selectedTab = blank;
+  gBrowser.removeAllTabsBut(blank);
   await new Promise((r) => setTimeout(r, 500));
   done(JSON.stringify({ tabs: gBrowser.tabs.length }));
 })()
@@ -510,6 +593,7 @@ class WindowsSampler:
         self.stopfile = os.path.join(outdir, "stop.signal")
         self.script = os.path.join(outdir, "sampler.ps1")
         self.proc = None
+        self.root_pid = None
 
     def start(self):
         with open(self.script, "w", encoding="utf-8") as fh:
@@ -770,7 +854,97 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def summarize(result, rows, workers):
+def provenance(binary):
+    def git(*argv):
+        try:
+            out = subprocess.run(["git", "-C", ROOT, *argv], capture_output=True,
+                                 text=True, encoding="utf-8", errors="replace", timeout=20)
+            return out.stdout.strip() if out.returncode == 0 else None
+        except Exception:  # noqa: BLE001 - provenance is best effort
+            return None
+
+    def stat(path):
+        try:
+            st = os.stat(path)
+            return {"mtime": round(st.st_mtime, 3), "size": st.st_size}
+        except OSError:
+            return None
+
+    digest = hashlib.sha256()
+    try:
+        with open(os.path.abspath(__file__), "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        sha = digest.hexdigest()
+    except OSError:
+        sha = None
+    status = git("status", "--porcelain")
+    return {
+        "git_head": git("rev-parse", "HEAD"),
+        "git_status": status,
+        "git_clean": (status == "") if status is not None else None,
+        "binary": stat(binary),
+        "probe": stat(os.path.abspath(__file__)),
+        "probe_sha256": sha,
+    }
+
+
+def annotate_hold(rows, observations, phases):
+    """Stamp each sampler row in the idle hold with its discarded/awake counts.
+
+    The counts come from a chrome read at most 5 s old; the sampler itself is
+    untouched.
+    """
+    start = phases.get("idle_hold")
+    if not observations or not start:
+        return 0
+    end = phases.get("idle_hold_end") or start
+    obs = sorted(observations, key=lambda o: o["ts"])
+    stamped = 0
+    for row in rows:
+        ts = row["ts"] / 1000.0
+        if not start <= ts <= end:
+            continue
+        pick = obs[0]
+        for o in obs:
+            if o["ts"] <= ts:
+                pick = o
+            else:
+                break
+        row["discarded_count"] = pick.get("discarded")
+        row["awake_count"] = pick.get("awake")
+        stamped += 1
+    return stamped
+
+
+def reclaim_curve(result, rows):
+    ph = result.get("phases", {})
+    close, end = ph.get("close"), ph.get("end")
+    if not close:
+        return None
+    before = [r["priv_mb"] for r in rows
+              if r["ts"] / 1000.0 < close and r.get("priv_mb") is not None]
+    window = [r for r in rows
+              if r.get("priv_mb") is not None and close <= r["ts"] / 1000.0 <= (end or close)]
+    base = before[-1] if before else (window[0]["priv_mb"] if window else None)
+    if base is None or not window:
+        return None
+    points = [{"t_s": round(r["ts"] / 1000.0 - close, 1), "ts": round(r["ts"] / 1000.0, 3),
+               "priv_mb": r["priv_mb"],
+               "pct_of_before": round(100.0 * r["priv_mb"] / base, 1)} for r in window]
+    hit = next((p for p in points if p["pct_of_before"] <= 10.0), None)
+    return {
+        "before_priv_mb": base,
+        "close_ts": round(close, 3),
+        "wait_s": round((end or close) - close, 1),
+        "points": points,
+        "first_ts_under_10pct": hit["ts"] if hit else None,
+        "first_s_under_10pct": hit["t_s"] if hit else None,
+        "final_priv_mb": points[-1]["priv_mb"],
+    }
+
+
+def summarize(result, rows, workers, root_pid=None):
     ph = result["phases"]
 
     def window(a, b):
@@ -781,18 +955,27 @@ def summarize(result, rows, workers):
         return fn(vals) if vals else 0
 
     out = {}
-    for name, (a, b) in {
+    windows = {
         "baseline": ("launch", "open"),
         "open+load": ("open", "loaded"),
-        "steady": ("steady", "video_phase"),
+        "steady": ("steady", "idle_hold" if "idle_hold" in ph else "video_phase"),
+        "idle_hold": ("idle_hold", "idle_hold_end"),
         "video": ("video_phase", "video_phase_end"),
         "closed": ("close", "end"),
-    }.items():
+    }
+    for name, (a, b) in windows.items():
+        if a not in ph:
+            continue
         w = window(a, b)
         if not w:
             continue
         gpu = [((r.get("gpu") or {}).get("total", 0)) for r in w]
         vdec = [((r.get("gpu") or {}).get("engines") or {}).get("videodecode", 0) for r in w]
+        parent = [p["priv_mb"] for r in w for p in (r.get("proc") or [])
+                  if root_pid is not None and p.get("pid") == root_pid
+                  and p.get("priv_mb") is not None]
+        discarded = [r["discarded_count"] for r in w if r.get("discarded_count") is not None]
+        awake = [r["awake_count"] for r in w if r.get("awake_count") is not None]
         out[name] = {
             "samples": len(w), "seconds": round((w[-1]["ts"] - w[0]["ts"]) / 1000, 1),
             "priv_mb_med": round(top(w, "priv_mb", lambda v: sorted(v)[len(v) // 2]), 1),
@@ -811,42 +994,103 @@ def summarize(result, rows, workers):
             "handles_max": top(w, "handles", max),
             "net_kbps_max": round(top(w, "net_kbps", max), 1),
         }
+        if parent:
+            out[name]["parent_priv_mb"] = round(sorted(parent)[len(parent) // 2], 1)
+            out[name]["parent_priv_mb_max"] = round(max(parent), 1)
+        if discarded:
+            out[name]["discarded_count"] = discarded[-1]
+            out[name]["awake_count"] = awake[-1]
+            out[name]["discarded_count_max"] = max(discarded)
     return out
 
 
 def report_md(result, phases, outdir):
     t = result.get("timings", {})
+    prov = result.get("provenance") or {}
+    binary_info = prov.get("binary") or {}
+    probe_info = prov.get("probe") or {}
+    if prov.get("git_clean") is None:
+        git_state = "unknown"
+    elif prov.get("git_clean"):
+        git_state = "clean"
+    else:
+        git_state = "dirty (see result.json)"
+
+    def parent_cell(p):
+        if p.get("parent_priv_mb") is None:
+            return "-"
+        return f"{p['parent_priv_mb']}/{p['parent_priv_mb_max']}"
+
     lines = [
         "# Web-tab stress",
         "",
         "| | |",
         "|---|---|",
         f"| build | `{result.get('binary')}` |",
+        f"| provenance | git {prov.get('git_head')}, "
+        f"{git_state}, binary "
+        f"{binary_info.get('size')} bytes @ {binary_info.get('mtime')}, probe sha256 "
+        f"{prov.get('probe_sha256')} @ {probe_info.get('mtime')} |",
         f"| profile | fresh (cold cache), {result.get('cache_mb_after')} MB / "
         f"{result.get('cache_entries_after')} entries written |",
+        f"| content processes | `dom.ipc.processCount` = {result.get('ipc_process_count')} "
+        f"(read from the build) |",
         f"| tabs | {result.get('opened')} opened, {result.get('walked')} walked, "
         f"{len(result.get('tabs_final', []))} at steady |",
         f"| open (host) | {t.get('open_ms')} ms |",
         f"| walk | {t.get('walk_s')} s |",
-        f"| activate | median {t.get('activate_med')} ms, p95 {t.get('activate_p95')} ms, "
-        f"max {t.get('activate_max')} ms |",
+        f"| activate (cold) | median {t.get('activate_med')} ms, p95 {t.get('activate_p95')} ms, "
+        f"max {t.get('activate_max')} ms (includes the walk dwell) |",
+    ]
+    if t.get("warm_activate_ms"):
+        lines.append(f"| activate (warm) | median {t.get('warm_activate_med')} ms, "
+                     f"p95 {t.get('warm_activate_p95')} ms, max {t.get('warm_activate_max')} ms "
+                     f"(discarded tabs, clock after the dwell) |")
+    lines += [
         f"| videos | {result.get('video_tabs')} tabs, "
-        f"{result.get('muted_ok')}/{result.get('video_tabs')} muted |",
+        f"{result.get('muted_ok')}/{result.get('video_tabs')} muted"
+        + (f", {result.get('paused_ok')}/{result.get('video_tabs')} paused"
+           if result.get("pause_video") else "") + " |",
         f"| chrome UI | median frame {t.get('frame_med')} ms, p99 {t.get('frame_p99')} ms, "
         f"max {t.get('frame_max')} ms |",
         f"| tab switch | {', '.join(str(x) for x in t.get('switch_ms', []))} ms |",
         "",
         "## Phases (Astra process tree only)",
         "",
-        "| phase | s | private MB (med/max) | working set MB | CPU cores (med/max) | % machine | "
-        "GPU % | video decode % | procs | net KB/s |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| phase | s | private MB (med/max) | parent MB (med/max) | working set MB | "
+        "CPU cores (med/max) | % machine | GPU % | video decode % | discarded | awake | "
+        "procs | net KB/s |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, p in phases.items():
+        discarded = p.get("discarded_count")
+        awake = p.get("awake_count")
         lines.append(
-            f"| {name} | {p['seconds']} | {p['priv_mb_med']}/{p['priv_mb_max']} | {p['ws_mb_max']} | "
+            f"| {name} | {p['seconds']} | {p['priv_mb_med']}/{p['priv_mb_max']} | "
+            f"{parent_cell(p)} | {p['ws_mb_max']} | "
             f"{p['cpu_cores_med']}/{p['cpu_cores_max']} | {p['cpu_pct_of_machine_max']} | "
-            f"{p['gpu_max']} | {p['video_decode_max']} | {p['procs_max']} | {p['net_kbps_max']} |")
+            f"{p['gpu_max']} | {p['video_decode_max']} | "
+            f"{'-' if discarded is None else discarded} | "
+            f"{'-' if awake is None else awake} | "
+            f"{p['procs_max']} | {p['net_kbps_max']} |")
+    hold = result.get("idle_hold")
+    if hold:
+        last = hold["observations"][-1]
+        lines += ["", f"Idle hold: {hold['seconds']} s untouched, {last.get('discarded')} discarded / "
+                  f"{last.get('awake')} awake at the end "
+                  f"({last.get('total')} tabs), {hold.get('rows_annotated', 0)} rows stamped."]
+    reclaim = result.get("reclaim")
+    if reclaim:
+        under = reclaim["first_ts_under_10pct"] is not None
+        lines += ["", "## Reclaim after closing every tab", "",
+                  f"Before {reclaim['before_priv_mb']} MB, sampled for {reclaim['wait_s']} s; "
+                  + (f"first sample under 10 % at {reclaim['first_ts_under_10pct']} "
+                     f"({reclaim['first_s_under_10pct']} s after close); "
+                     if under else "no sample reached 10 %; ")
+                  + f"final {reclaim['final_priv_mb']} MB.", "",
+                  "| t (s) | private MB | % of before |", "|---|---|---|"]
+        for p in reclaim["points"]:
+            lines.append(f"| {p['t_s']} | {p['priv_mb']} | {p['pct_of_before']} |")
     visible = result.get("probes", {}).get("stage_video")
     if visible:
         v = visible.get("video") or {}
@@ -868,6 +1112,12 @@ def main():
     ap.add_argument("--steady", type=int, default=45, help="seconds at steady state")
     ap.add_argument("--video", type=int, default=25, help="seconds with background video suspension off")
     ap.add_argument("--dwell", type=int, default=700, help="ms to dwell on each tab while walking")
+    ap.add_argument("--idle-hold", type=int, default=0,
+                    help="seconds to leave the window untouched after steady (sleeping tabs)")
+    ap.add_argument("--close-wait", type=int, default=20,
+                    help="seconds to sample the reclaim after closing every tab")
+    ap.add_argument("--pause-video", action="store_true",
+                    help="pause every video tab after the load poll")
     ap.add_argument("--port", type=int, default=2901)
     ap.add_argument("--out", default=None, help="output directory (default out/web-tabs-<stamp>)")
     ap.add_argument("--keep-profile", action="store_true")
@@ -888,20 +1138,27 @@ def main():
     httpd, stage_video = serve_fixtures()
     result = {
         "binary": binary, "profile": profile, "urls": len(urls), "phases": {},
-        "probes": {}, "timings": {},
+        "probes": {}, "timings": {}, "pause_video": args.pause_video,
+        "provenance": provenance(binary),
     }
     workers = os.cpu_count() or 1
     proc = log = m = None
+    root_pid = None
     try:
         result["reaped_before"] = sampler.reap()
         proc, log = launch(binary, profile, args.port)
-        if hasattr(sampler, "root_pid"):
-            sampler.root_pid = proc.pid
+        root_pid = proc.pid
+        sampler.root_pid = root_pid
         result["phases"]["launch"] = time.time()
         sampler.start()
         m = Marionette(args.port, timeout=180)
         m.cmd("WebDriver:NewSession", {"capabilities": {}})
         m.cmd("WebDriver:SetTimeouts", {"script": 600000, "implicit": 0, "pageLoad": 180000})
+        ipc = json.loads(m.chrome("""return JSON.stringify((() => {
+          try { return { value: Services.prefs.getIntPref('dom.ipc.processCount') }; }
+          catch (e) { return { error: String(e) }; }
+        })())"""))
+        result["ipc_process_count"] = ipc.get("value")
         time.sleep(8)
         result["phases"]["baseline"] = time.time()
         time.sleep(8)
@@ -949,6 +1206,9 @@ def main():
         video_ids = [tid for url, tid in zip([t["url"] for t in tabs], ids)
                      if any(h in url for h in VIDEO_HINTS)]
         result["video_tabs"] = len(video_ids)
+        if args.pause_video:
+            result["probes"]["paused"] = json.loads(m.chrome_async(PAUSE_VIDEO, [video_ids]))
+            result["paused_ok"] = sum(1 for x in result["probes"]["paused"] if x.get("paused"))
         result["probes"]["muted"] = json.loads(m.chrome_async(MUTE, [video_ids]))
         result["muted_ok"] = sum(1 for x in result["probes"]["muted"] if x.get("muted"))
 
@@ -956,10 +1216,46 @@ def main():
         result["phases"]["steady"] = time.time()
         time.sleep(max(1, args.steady))
 
+        if args.idle_hold > 0:
+            result["phases"]["idle_hold"] = time.time()
+            observations = []
+            deadline = time.time() + args.idle_hold
+            while True:
+                started = time.time()
+                counts = json.loads(m.chrome(TAB_COUNTS))
+                counts["ts"] = round(started, 3)
+                observations.append(counts)
+                left = deadline - time.time()
+                if left <= 0:
+                    break
+                time.sleep(min(5.0, left))
+            counts = json.loads(m.chrome(TAB_COUNTS))
+            counts["ts"] = round(time.time(), 3)
+            observations.append(counts)
+            result["phases"]["idle_hold_end"] = time.time()
+            result["idle_hold"] = {"seconds": args.idle_hold, "observations": observations}
+
         result["probes"]["chrome_frames"] = json.loads(m.chrome_async(CHROME_FRAMES, [6000]))
-        result["probes"]["switch_ms"] = json.loads(m.chrome_async(SWITCH))
         result["probes"]["tab_pids"] = json.loads(m.chrome_async(TAB_PIDS))
         result["probes"]["media_view"] = json.loads(m.chrome(MEDIA_VIEW))
+
+        counts = json.loads(m.chrome(TAB_COUNTS))
+        result["probes"]["tab_counts_after_steady"] = counts
+        discarded_ids = counts.get("discarded_ids") or []
+        warm_walk = []
+        if discarded_ids:
+            warm_walk = json.loads(m.chrome_async(REWALK, [discarded_ids, args.dwell], 900000))
+        result["probes"]["warm_walk"] = warm_walk
+        warm = [w["warm_activate_ms"] for w in warm_walk if w.get("warm_activate_ms") is not None]
+        result["timings"]["warm_activate_ms"] = warm
+        if warm:
+            warm_sorted = sorted(warm)
+            result["timings"].update({
+                "warm_activate_med": warm_sorted[len(warm_sorted) // 2],
+                "warm_activate_p95": warm_sorted[int(len(warm_sorted) * 0.95)],
+                "warm_activate_max": warm_sorted[-1],
+            })
+        result["probes"]["switch_ms"] = json.loads(m.chrome_async(SWITCH))
 
         m.chrome_async("""const done = arguments[arguments.length - 1];
           (async () => { gBrowser.selectedTab = gBrowser.tabs[0];
@@ -1013,8 +1309,8 @@ def main():
         result["cache_mb_after"] = round(size / 1e6, 1)
 
         result["phases"]["close"] = time.time()
-        m.chrome_async(CLOSE_ALL)
-        time.sleep(15)
+        result["probes"]["close"] = json.loads(m.chrome_async(CLOSE_ALL))
+        time.sleep(max(0, args.close_wait))
         result["phases"]["end"] = time.time()
         result["ok"] = True
     except Exception as exc:  # noqa: BLE001
@@ -1044,7 +1340,15 @@ def main():
         except Exception:  # noqa: BLE001
             pass
         rows = sampler.rows()
-        phases = summarize(result, rows, workers)
+        stamped = annotate_hold(rows, (result.get("idle_hold") or {}).get("observations"),
+                                result["phases"])
+        if stamped:
+            with open(sampler.samples, "w", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(row) + "\n")
+            result["idle_hold"]["rows_annotated"] = stamped
+        result["reclaim"] = reclaim_curve(result, rows)
+        phases = summarize(result, rows, workers, root_pid)
         result["phases_summary"] = phases
         with open(os.path.join(outdir, "result.json"), "w", encoding="utf-8") as fh:
             json.dump(result, fh, indent=2)
