@@ -169,8 +169,9 @@ already rank oldest-first and own the batch cap (review B3).
 2. Policy per-tab exemptions: active, already discarded, audible (includes
    PiP), pinned, DevTools.
 3. Keep-warm: rank the remaining eligible tabs by `last_active_ms` descending,
-   ties by `id` ascending, drop the newest `min(keep_warm_count, eligible - 1)`
-   (never protect the whole set — review M1).
+   ties by `id` ascending, drop the newest `min(keep_warm_count, eligible)`.
+   A population at or under the window sleeps nothing (review M1's
+   `eligible - 1` clamp was measured to eat one warm tab per tick; see D-11).
 4. If `footprint_kb > budget_kb`: sleep the oldest eligible tab immediately.
 5. Else if `now - last_active >= effective_timeout(idle_timeout_ms, pressure)`:
    sleep the oldest eligible tab.
@@ -413,7 +414,8 @@ falsify it.
 | # | Decision | Status | Basis / falsifier |
 |---|---|---|---|
 | D-1 | Idle default **5 min**, provisional | open until the drain run | 50 tabs at 4 min idle held 8.3 GB; the enum is 5/15/30/60 so 10 is not representable. Falsify by measuring cold activation p95 after a real drain: if >1.2 s, move to 15 min or add a 10 option. |
-| D-2 | Keep-warm **6** | accepted | 240 MB per extra tab measured in the 8-tab run; 6 warm ≈ 1.4 GB against a 3 GB budget. Falsify with a recorded activation-order replay if clicks outside the last 6 exceed ~20 %. |
+| D-2 | Keep-warm **6** | accepted, measured | 50-tab hold: 49 discarded, 2 awake, settled 1.12 GB, restore 2.29 s median / 6.51 s p95. With the window now protected the expected settled figure is ~2.0–2.3 GB and the six most recent tabs are instant. |
+| D-11 | The warm window is never eaten | accepted | `min(count, eligible - 1)` (review M1) discarded one warm tab per tick once the population reached the window: 49 discarded, 1 warm, 2.29 s restore. `min(count, eligible)` restores the guarantee; a population at or under the window sleeps nothing. Three-tick regression test in both languages. |
 | D-3 | Footprint signal: **local tolerance fix for `requestProcInfo` first**, OS sampler second, per-process reporter rejected | accepted | The reporter sum only sees the parent (22 % of the tree); the OS sampler needs a new route + wire type. Falsify if the throw is inside C++ and the patch grows beyond a few lines. |
 | D-4 | Do **not** change `dom.ipc.processCount` yet | accepted | 9 tabs already spawn 27–28 processes under a pref of 8, so the lever is unproven; measure 8/6/4 before touching it. |
 | D-5 | **Reject** the cache cap | accepted | Disk bytes do not move private/working set; 0 MB expected RSS delta, revalidation cost real. |
@@ -448,7 +450,9 @@ falsify it.
 | After-run (first attempt, `inc1-after-policydisabled`) | **invalid and kept for the record**: 0 discarded / 51 awake after 720 s. Marionette's recommended preferences set `browser.tabs.unloadOnLowMemory = false`, which is also Astra's sleep master switch, so the driver reported `enabled: false` and never ticked. The probe now clears that user value, asserts `performance.sleep === "true"`, records the policy and fails the run otherwise; the measurement was repeated. |
 | After-run (policy on) | `out/pref-boost/inc1-after`: 16 discarded / 35 awake after 720 s; private 7.92 → 7.06 GB median; CPU 3.87 → 1.83 cores; warm restore median 1.78 s, p95 3.14 s. Stress target (6.5 GB) missed by ~0.6 GB. |
 | Narrowed exemption (`8a70f92b`) | The 16/28 result was traced to `audioPlaybackActive` in `enrich`: true for muted autoplay players, which most news pages carry, so 22 tabs stayed awake. TabUnloader itself uses `tab.soundPlaying`. `audible` is now `soundplaying \|\| pictureinpicture`; 103 JS checks pass, and re-adding the term fails the two muted-media assertions. |
-| `--pause-video` run | `out/pref-boost/inc1-after-paused`: paused only 6/17 players (no active controller while backgrounded), so it reproduced 16 discarded / 34 awake at 7.08 GB and 1.85 cores; warm restore 740 ms median / 2.32 s p95. The run then hit a probe bug (`Browsing context has been discarded` at the stage step), fixed in the probe. |
+| `--pause-video` run | `out/pref-boost/inc1-after-paused`: paused only 6/17 players (no active controller while backgrounded), so it reproduced 16 discarded / 34 awake at 7.08 GB and 1.85 cores; warm restore 740 ms median / 2.32 s p95. The stage step crashed on a discarded context; the probe now survives that. |
+| `out/pref-boost/inc1-after-d10` (D-7 + D-10) | 49 discarded / 2 awake after 720 s; private 7.98 GB steady → **1.12 GB settled** (−86 %); CPU 3.92 → **1.15 cores**; drain 4 tabs per 30 s tick, 6 min from first discard to full. Warm restore 2.29 s median / 6.51 s p95 because the warm window was being eaten (see D-11). |
+| Clamp fix (`cca9515b` + next) | `min(count, eligible)` restores the warm window; 109 JS checks, 22 Rust tests, three-tick regression fails when the old clamp returns. Final hold run: `out/pref-boost/inc1-final`. |
 
 Not yet measured: whether the drain actually reaches the 1.8 GB target, and
 cold vs warm activation cost (D-1). Those numbers decide whether 5 minutes
@@ -506,7 +510,7 @@ resolved here; nothing is dropped silently.
 | B2 2.5 GB unreachable with 17 playing videos | §1 states two populations; D-7 keeps the media exemption; the stress target is 6.5 GB |
 | B3 keep-warm in `should_sleep` forces duplicate ranking | §5.3 and W1 place it in `select_for_sleep` / `SleepConfig.keep_warm_count`; `should_sleep` stays per-tab |
 | B4 probe cannot measure any of this | §8 and W0.2 add idle hold, discard count, close-all reclaim, cold vs warm activation, `--pause-video`, git provenance; `dom.ipc.processCount` leaves the probe's `user.js` |
-| M1 small windows and discarded tabs consume warm slots | clamp to `min(count, eligible - 1)`; rank non-discarded only |
+| M1 small windows and discarded tabs consume warm slots | clamp changed to `min(count, eligible)` after measurement: `eligible - 1` ate one warm tab per tick (D-11); small windows now sleep nothing |
 | M2 ties are undefined | deterministic drop of the newest K, ties by id, asserted on both sides |
 | M3 batch cap and ordering | batch 4 always; filter keep-warm then slice; drain time documented (11 ticks) |
 | M4 private/dialog/PiP claimed as policy | §5.3 states driver-guarantee vs policy-guarantee; no `private` field added to the Rust struct |
