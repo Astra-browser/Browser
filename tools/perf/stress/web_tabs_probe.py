@@ -283,10 +283,13 @@ DISCARD_AUDIT = """
 return JSON.stringify([...gBrowser.tabs].map((t, i) => {
   const b = t.linkedBrowser;
   let url = "";
+  let hasBeforeUnload = null;
   try { url = (b.currentURI || {}).spec || ""; } catch (e) {}
+  try { hasBeforeUnload = b.hasBeforeUnload === true; } catch (e) {}
   return { index: i, id: t.getAttribute('astra-tab-id') || "", url,
            selected: t.selected === true, discarded: t.hasAttribute('discarded'),
-           soundplaying: t.hasAttribute('soundplaying'), muted: t.hasAttribute('muted') };
+           soundplaying: t.hasAttribute('soundplaying'), muted: t.hasAttribute('muted'),
+           hasBeforeUnload, undiscardable: t.hasAttribute('undiscardable') };
 }))
 """
 
@@ -985,6 +988,25 @@ def reclaim_curve(result, rows):
     }
 
 
+def ordered_handles(handles, index, limit=6):
+    """Window handles to try for a tab index, preferred handle first.
+
+    An index outside the handle list falls back to the start of the list; the
+    caller rejects a wrong tab by its URL before probing.
+    """
+    ordered = []
+    if limit <= 0:
+        return ordered
+    if isinstance(index, int) and 0 <= index < len(handles) and handles[index] is not None:
+        ordered.append(handles[index])
+    for handle in handles:
+        if len(ordered) >= limit:
+            break
+        if handle is not None and handle not in ordered:
+            ordered.append(handle)
+    return ordered
+
+
 def classify_audit(audit, walk):
     walked = [w.get("id") for w in walk if w.get("id")]
     # sleeping.rs DEFAULT_KEEP_WARM_COUNT: the six most recently active tabs
@@ -1144,11 +1166,18 @@ def report_md(result, phases, outdir):
     audit = result.get("discard_audit")
     if audit:
         counts = result.get("discard_audit_counts") or {}
+        other = [r for r in audit if r.get("reason") == "other"]
+        unload = sum(1 for r in other if r.get("hasBeforeUnload"))
+        undiscardable = sum(1 for r in other
+                            if not r.get("hasBeforeUnload") and r.get("undiscardable"))
+        unknown = sum(1 for r in other
+                      if not r.get("hasBeforeUnload") and not r.get("undiscardable"))
         lines += ["", "## Discard audit (end of idle hold)", "",
                   "| reason | tabs |", "|---|---|"]
-        for reason in ("discarded", "audible", "warm", "other"):
+        for reason in ("discarded", "audible", "warm"):
             lines.append(f"| {reason} | {counts.get(reason, 0)} |")
-        other = [r for r in audit if r.get("reason") == "other"]
+        lines.append(f"| other | {counts.get('other', 0)} (beforeunload {unload}, "
+                     f"undiscardable {undiscardable}, unknown {unknown}) |")
         if other:
             lines += ["", "Awake and unexplained: " + ", ".join(
                 f"`{r['id']}` {r['url'][:60]}" for r in other[:10])]
@@ -1372,16 +1401,10 @@ def main():
             else:
                 m.chrome(STAGE_LOAD, [stage_video])
                 m.cmd("Marionette:SetContext", {"value": "content"})
-                handles = m.cmd("WebDriver:GetWindowHandles")["value"]
-                index = stage.get("index", 0)
-                ordered = []
-                if 0 <= index < len(handles):
-                    ordered.append(handles[index])
-                for handle in handles:
-                    if len(ordered) >= 6:
-                        break
-                    if handle not in ordered:
-                        ordered.append(handle)
+                raw = m.cmd("WebDriver:GetWindowHandles")
+                # GetWindowHandles is one of Marionette's bare-response commands.
+                handles = raw.get("value", []) if isinstance(raw, dict) else raw
+                ordered = ordered_handles(handles, stage.get("index", 0))
                 target = stage_video.split("?")[0]
                 opened = False
                 for position, handle in enumerate(ordered):
