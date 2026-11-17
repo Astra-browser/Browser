@@ -416,6 +416,8 @@ falsify it.
 | D-1 | Idle default **5 min**, provisional | open until the drain run | 50 tabs at 4 min idle held 8.3 GB; the enum is 5/15/30/60 so 10 is not representable. Falsify by measuring cold activation p95 after a real drain: if >1.2 s, move to 15 min or add a 10 option. |
 | D-2 | Keep-warm **6** | accepted, measured | 50-tab hold: 49 discarded, 2 awake, settled 1.12 GB, restore 2.29 s median / 6.51 s p95. With the window now protected the expected settled figure is ~2.0–2.3 GB and the six most recent tabs are instant. |
 | D-11 | The warm window is never eaten | accepted | `min(count, eligible - 1)` (review M1) discarded one warm tab per tick once the population reached the window: 49 discarded, 1 warm, 2.29 s restore. `min(count, eligible)` restores the guarantee; a population at or under the window sleeps nothing. Three-tick regression test in both languages. |
+| D-12 | Media and calls are never slept | accepted | `audible` now means media or call in progress: `soundplaying \|\| pip \|\| browsingContext.mediaController.isActive \|\| currentWindowGlobal.hasActivePeerConnections()`. `audioPlaybackActive` stays out so muted autoplay ads remain discardable. 111 checks, each signal mutation-tested. Cost: a 17-player stress run is back to ~6.5–7 GB because the players are protected; the 2.5 GB target applies to the non-media population. |
+| D-13 | A paused media session stays exempt | accepted | `isActive` remains true for a paused-but-not-dismissed player; protecting it avoids losing the resume position. The narrower predicate (`isActive && isPlaying`) would make paused sessions discardable after the idle timeout; revisit if the probe shows paused sessions mattering. |
 | D-3 | Footprint signal: **local tolerance fix for `requestProcInfo` first**, OS sampler second, per-process reporter rejected | accepted | The reporter sum only sees the parent (22 % of the tree); the OS sampler needs a new route + wire type. Falsify if the throw is inside C++ and the patch grows beyond a few lines. |
 | D-4 | Do **not** change `dom.ipc.processCount` yet | accepted | 9 tabs already spawn 27–28 processes under a pref of 8, so the lever is unproven; measure 8/6/4 before touching it. |
 | D-5 | **Reject** the cache cap | accepted | Disk bytes do not move private/working set; 0 MB expected RSS delta, revalidation cost real. |
@@ -458,8 +460,11 @@ Not yet measured: whether the drain actually reaches the 1.8 GB target, and
 cold vs warm activation cost (D-1). Those numbers decide whether 5 minutes
 stays.
 
-**Increment 1 verdict:** the target state is reached — 1.89 GB with 50 tabs,
-6 warm and 43 discarded. What remains before a merge proposal is not more
+**Increment 1 verdict:** the target state is reached for the non-media
+population — 1.89 GB with 50 tabs, 6 warm and 43 discarded. Media and call tabs
+are protected by D-12, so a stress run whose 17 players are genuinely playing
+settles higher (~6.5–7 GB); the 2.5 GB target is stated for the population
+without active playback. What remains before a merge proposal is not more
 policy work: a real `build --faster` (the dist file sync is labelled as such),
 the owner's approval, and increments 2–4 (baseline trim, event coalescing, the
 leak gate, and the separate master pref from D-8).
