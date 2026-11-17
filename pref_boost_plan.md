@@ -452,14 +452,19 @@ falsify it.
 | Narrowed exemption (`8a70f92b`) | The 16/28 result was traced to `audioPlaybackActive` in `enrich`: true for muted autoplay players, which most news pages carry, so 22 tabs stayed awake. TabUnloader itself uses `tab.soundPlaying`. `audible` is now `soundplaying \|\| pictureinpicture`; 103 JS checks pass, and re-adding the term fails the two muted-media assertions. |
 | `--pause-video` run | `out/pref-boost/inc1-after-paused`: paused only 6/17 players (no active controller while backgrounded), so it reproduced 16 discarded / 34 awake at 7.08 GB and 1.85 cores; warm restore 740 ms median / 2.32 s p95. The stage step crashed on a discarded context; the probe now survives that. |
 | `out/pref-boost/inc1-after-d10` (D-7 + D-10) | 49 discarded / 2 awake after 720 s; private 7.98 GB steady → **1.12 GB settled** (−86 %); CPU 3.92 → **1.15 cores**; drain 4 tabs per 30 s tick, 6 min from first discard to full. Warm restore 2.29 s median / 6.51 s p95 because the warm window was being eaten (see D-11). |
-| Clamp fix (`cca9515b` + next) | `min(count, eligible)` restores the warm window; 109 JS checks, 22 Rust tests, three-tick regression fails when the old clamp returns. Final hold run: `out/pref-boost/inc1-final`. |
+| `out/pref-boost/inc1-final` (window protected) | 43 discarded / 8 awake (6 warm, about:blank, 1 imgur) after 720 s; **settled 1.89 GB** private vs 7.97 steady and 8.09 with no policy; CPU **1.32 cores** vs 3.81; UI p99 18 ms, max 34 ms; reclaim 9.15 GB → 1.19 GB. Restore of a *discarded* tab is 2.70 s median / 6.71 s p95; the 6 warm tabs are instant by construction. **2.5 GB target met** at 1.89 GB. |
 
 Not yet measured: whether the drain actually reaches the 1.8 GB target, and
 cold vs warm activation cost (D-1). Those numbers decide whether 5 minutes
 stays.
 
-## 14. Build environment findings (2026-11-17)
+**Increment 1 verdict:** the target state is reached — 1.89 GB with 50 tabs,
+6 warm and 43 discarded. What remains before a merge proposal is not more
+policy work: a real `build --faster` (the dist file sync is labelled as such),
+the owner's approval, and increments 2–4 (baseline trim, event coalescing, the
+leak gate, and the separate master pref from D-8).
 
+## 14. Build environment findings (2026-11-17)
 Two defects blocked a normal `mach build faster` on this machine. Both are
 reported, neither is worked around silently.
 
