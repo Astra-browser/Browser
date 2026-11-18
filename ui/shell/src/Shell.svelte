@@ -651,6 +651,11 @@
     // interim mounts stay wired (live contract tests drive them); they hide
     // on host-ready and return only if the app fails (P3-T16).
     if (frameRoot) frameRoot.dataset.bootFrame = String(Math.round(performance.now()));
+    // The app's tab model is part of its boot. On a startup page the engine
+    // reaches about:newtab before the later native mount, so no projection
+    // exists yet and the app can wait forever on the splash. Seed the model
+    // first; the later bootstrap is idempotent.
+    void host.Tabs.bootstrap({ request_id: newRequestId() }).catch(() => {});
     appApi = mountAppFrame(appMount, host, {
       window_id: ownWindowId,
       // Records the mode the app actually booted in (P3-T15 contract seam:
