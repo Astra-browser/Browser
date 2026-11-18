@@ -17,6 +17,7 @@
     isCompact,
     isHidden,
     setPanelExtent,
+    sidebarDragWidth,
     sidebarResizeActive,
     sidebarResizeSettlement,
     toggleMode,
@@ -36,11 +37,17 @@
     toolPanel,
     browserBody,
     dock,
+    nav,
+    field,
   }: {
     settingsNavigation: Snippet;
     toolPanel: Snippet<[tools.ToolKind]>;
     browserBody: Snippet<[boolean]>;
     dock: Snippet<[boolean]>;
+    /** The page's own controls, drawn at the column's head. */
+    nav?: Snippet;
+    /** The one address field, drawn at the column's head. */
+    field?: Snippet;
   } = $props();
   let settings = $derived(browserPage.currentPage() === "settings");
   const SETTINGS_PANEL = 264;
@@ -246,10 +253,10 @@
   const slides = () => !reducedMotion();
   /** Once out, the card stays a moment whatever the pointer does: it is
    *  still arriving, and a hand settling onto it should not send it back. */
-  const SETTLE_MS = 520;
+  const SETTLE_MS = 240;
   /** Leaving the card gives it a moment: a pointer overshooting its edge
    *  and coming straight back should not see it go and return. */
-  const LINGER_MS = 280;
+  const LINGER_MS = 140;
   let opened = 0;
   let linger: ReturnType<typeof setTimeout> | undefined;
   let lowered: ReturnType<typeof setTimeout> | undefined;
@@ -297,7 +304,10 @@
     const settling = Math.max(0, opened + SETTLE_MS - performance.now());
     linger = setTimeout(
       () => {
-        if (pointerIn || atEdge || needed()) return;
+        // The pointer's own hover is the final word: a frame that is raised
+        // and clipped mid-slide can lose a enter, and a card must never slide
+        // out from under a hand that is resting on it.
+        if (pointerIn || atEdge || needed() || aside?.matches(":hover")) return;
         if (CUT_TO_CARD) {
           // The cut sets off first, so the card never runs past it.
           void commands.sidebarPeek(false, false, slides());
@@ -331,6 +341,17 @@
     };
     window.addEventListener("astra:sidebar-edge", edge);
     return () => window.removeEventListener("astra:sidebar-edge", edge);
+  });
+  // A hand that reaches the edge before the column has finished going away is
+  // still a hand at the edge. The card used to need a second hover once the
+  // hide settled, which read as the reveal missing the first time.
+  $effect(() => {
+    const settled = away;
+    const near = atEdge;
+    if (!settled || !near) return;
+    untrack(() => {
+      if (!peeking) peek();
+    });
   });
   $effect(() => {
     const wanted = attention.wanted();
@@ -441,7 +462,8 @@
         : effectiveWidth(),
   );
   // The card holds the column; native insets the page by exactly the column.
-  let width = $derived(columnWidth);
+  // While the handle is held, the column shows the pointer's width at once.
+  let width = $derived(sidebarDragWidth() ?? columnWidth);
   // Settings' sections are as much a part of the column as the rail beside
   // them, so the width the shell insets the page by has to carry the panel
   // too: otherwise the page stands under the settings panel and the inset
@@ -512,15 +534,13 @@
     if (command.id === "sidebar.toggleCompact") queueMicrotask(toggleShape);
   });
 
-  /** Long enough for the column to go and come back as the card. */
-  const HIDING_SHOWN_MS = 1600;
-
   function toggleShape() {
     if (tools.activeTool() !== null) return tools.close();
+    // Put away, and that is all: the column goes and stays gone until the
+    // pointer reaches the window's edge. It used to come straight back out as
+    // the card and leave again with the pointer, which read as the button
+    // failing to take.
     toggleMode();
-    // Put away from its own button, the column comes straight back as the
-    // card it now is, and leaves with the pointer as any card does.
-    if (isHidden()) attention.pulse(HIDING_SHOWN_MS);
   }
 </script>
 
@@ -557,10 +577,15 @@
   data-header-fresh={headerFresh}
   data-pointer-in={pointerIn || attention.wanted()}
   onpointerenter={entered}
-  onpointermove={() => {
+  onpointermove={(event) => {
     // An arrival from the page's own view, or while another window had the
     // keyboard, can come without an enter; the first move inside counts.
     if (!pointerIn) entered();
+    // Held out for the edge, then used: a hand this far into the column is not
+    // at the edge any more, so the card is released by leaving the column
+    // rather than by the edge it was asked from. Without this a hand that
+    // bottomed out against the window's left edge kept the card out for good.
+    if (atEdge && event.clientX > 24) atEdge = false;
   }}
   onpointerleave={() => {
     pointerIn = false;
@@ -570,7 +595,7 @@
 >
   <div class="sidebar-main">
     {#if !navigating && !railPage && tools.activeTool() === null}<SidebarResizeHandle
-        width={columnWidth}
+        {width}
         disabled={reshaping || hidden}
       />{/if}
     <!-- Settings stands beside the rail with no head: its panel runs the full
@@ -579,7 +604,9 @@
     {#if !settings && (!compact || headerCompact)}<SidebarHeader
         compact={headerCompact}
         pageControls={!inWork}
-        >{#snippet utilities()}<UtilityBar ontoggle={toggleShape} />{/snippet}</SidebarHeader
+        {nav}
+        {field}
+        ontoggle={toggleShape}>{#snippet utilities()}<UtilityBar />{/snippet}</SidebarHeader
       >{/if}
     {#if compact && (!paneled || (settings && settingsExtent === 0))}<div
         class="sidebar-compact-utilities"
@@ -632,6 +659,14 @@
     }
   }
 
+  /* The column is one composited layer while it can move, and only then: a
+     permanent layer over the whole tab list costs more than it saves. Asking
+     for it up front is what keeps the first frame of a slide from rasterising
+     a card, its frost and a 36px shadow. */
+  .browser-sidebar:is([data-hidden], [data-leaving], [data-handing], [data-armed]) {
+    will-change: translate;
+  }
+
   /* Hidden, the column is a card that waits beside the window and slides
      over the page. It wears the sky's frost, a picture stretched rather than
      a blur drawn, so bringing it out costs one transform. */
@@ -667,7 +702,11 @@
   }
 
   .browser-sidebar[data-hidden][data-armed] {
-    transition: translate var(--motion-page) var(--ease-emphasized);
+    /* Chrome, not content: the card is the thing the hand is moving, so it
+       answers at the control pace instead of the page pace. It used to take
+       the page's 400 ms, which read as the window lagging behind the pointer;
+       the page underneath still travels for its own length. */
+    transition: translate var(--motion-base) var(--ease-out);
   }
 
   /* Cut to, the card wears the corners Windows gives its pages, so its own
@@ -730,13 +769,26 @@
     container-type: inline-size;
   }
 
+  /* The panel's head: the tools on one row, spread evenly across the panel so
+     they read as the panel's own band rather than a cluster in a corner.
+     The band is deliberately not an inline-size container: the column's own
+     narrow rule (a centred 4-column grid) is for a 240px column sharing its
+     row with the shield, and applied here it broke seven tools into a ragged
+     4 + 3 block floating in the middle of the head. */
   .sidebar-tool-utilities {
     display: flex;
     flex: none;
     align-items: center;
-    padding: 4px 10px 3px;
-    border-block-end: 1px solid var(--color-border);
-    container-type: inline-size;
+    padding: 8px 12px 7px;
+  }
+
+  .sidebar-tool-utilities :global(.utility-bar) {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    justify-items: center;
+    inline-size: 100%;
+    gap: 0;
   }
 
   .sidebar-tool-panel {

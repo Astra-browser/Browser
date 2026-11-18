@@ -7,7 +7,7 @@
 // normal window), so a regression here is a privacy bug, not a layout bug.
 //
 // Usage: node tests/contract/window_scope.mjs
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -15,9 +15,9 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Tabs = await import(path.join(HOST, "Tabs.sys.mjs"));
-const Windows = await import(path.join(HOST, "Windows.sys.mjs"));
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const Tabs = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const Windows = await import(pathToFileURL(path.join(HOST, "Windows.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 const TabsApi = Tabs.Tabs;
 const { __syncHistory, __historyFor, __restoreSelection, __mruForTests } = Tabs;

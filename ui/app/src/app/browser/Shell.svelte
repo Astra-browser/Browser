@@ -39,10 +39,7 @@
   import { selectionGlide } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
   import { requestTab } from "$session/work-tab.svelte";
-  import {
-    expanded as sidebarWidth,
-    isHidden as sidebarHidden,
-  } from "$session/sidebar-mode.svelte";
+  import { expanded as sidebarWidth, isCompact } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack, type Component, type Snippet } from "svelte";
   import { clearRequest } from "$domain/site-data";
@@ -75,7 +72,7 @@
     SidebarNotice,
     UtilityTray,
   } from "$features/sidebar";
-  import { ContentBar } from "$features/toolbar";
+  import { ContentBar, PageNav } from "$features/toolbar";
   import { IS_WINDOWS } from "$shared/platform";
   import { flags } from "$shared/flags";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
@@ -427,13 +424,28 @@
       attributeFilter: ["hidden", "style", "data-open", "data-state", "open"],
     });
     syncPopups();
-    // The shell owns the top-edge strip while the page covers this frame, so
-    // its hover reaches the bar the same way a pointer on the bar does.
+    // The shell owns the strips the page covers while it is in front: the top
+    // edge reaches the bar, the window's left gutter reaches the column's
+    // card. Both arrive here and travel on as the events the app already
+    // listens for, so there is one owner for each state.
     const onShellMessage = (event: MessageEvent) => {
-      const data = event.data as { ns?: string; kind?: string; hover?: boolean } | null;
-      if (data?.ns !== "astra-shell" || data.kind !== "bar-hover") return;
-      if (data.hover === true) revealEnter();
-      else revealLeave();
+      const data = event.data as {
+        ns?: string;
+        kind?: string;
+        hover?: boolean;
+        near?: boolean;
+      } | null;
+      if (data?.ns !== "astra-shell") return;
+      if (data.kind === "bar-hover") {
+        if (data.hover === true) revealEnter();
+        else revealLeave();
+        return;
+      }
+      if (data.kind === "sidebar-edge") {
+        window.dispatchEvent(
+          new CustomEvent("astra:sidebar-edge", { detail: { near: data.near === true } }),
+        );
+      }
     };
     window.addEventListener("message", onShellMessage);
     return () => {
@@ -563,8 +575,21 @@
     const url = tabs.activeTab()?.url ?? null;
     return url !== null && url !== "" && url !== "about:blank";
   });
+  // The column draws the page controls and the one address field while it is
+  // in its full shape. Put away, the card *is* the column: the same head has
+  // to slide out with it, or the card comes out headless — a column with no
+  // way back and no address, which is what the peek used to look like. The
+  // bar above the page therefore belongs to the shapes where the column is a
+  // rail or standing beside a panel, and to a bar pinned there on purpose.
+  let columnCompact = $derived(
+    isCompact() ||
+      toolHost.activeTool() !== null ||
+      ["settings", "tasks", "notes", "work"].includes(browserPage.currentPage() ?? ""),
+  );
+  let sidebarOwnsBar = $derived(!columnCompact && barMode !== "always");
   let barVisible = $derived(
-    barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused,
+    !sidebarOwnsBar &&
+      (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),
   );
   // The bar floats whenever it is not pinned to a row: over a web page in
   // `auto`, and everywhere in `hidden`.
@@ -688,11 +713,6 @@
     if (inWork) requestTab(id);
     else tabs.activate(id);
   }
-
-  /** The edge strip asks for the card; the column's own listener answers. */
-  function dispatchSidebarEdge(near: boolean) {
-    window.dispatchEvent(new CustomEvent("astra:sidebar-edge", { detail: { near } }));
-  }
 </script>
 
 <!-- The player of a tab playing behind the page in front; its code loads the
@@ -702,6 +722,37 @@
 )}{#if mediaPlayer.view()}{#await loadMediaPlayer() then { default: MediaPlayer }}<MediaPlayer
         {compact}
       />{/await}{/if}{/snippet}
+
+<!-- The page's controls and the one address field, composed once here and
+     rendered wherever the window puts them: the column's head while it is in
+     its full shape, the bar above the page otherwise. A snippet is only
+     mounted where it is drawn, so the field exists once either way. -->
+{#snippet pageNav()}<PageNav buttonSize={30} iconSize={16} />{/snippet}
+{#snippet addressField()}
+  <AddressField>
+    {#snippet trailing(page)}
+      <UtilityTray
+        label={page === null
+          ? m.utilities()
+          : page.warning
+            ? m.site_info_label_status({ status: page.warning })
+            : m.site_info_label()}
+        warning={page?.warning}
+        onopen={() => raiseForTray(true)}
+        onclose={() => raiseForTray(false)}
+      >
+        {#snippet children(open)}
+          {#snippet siteHead(name: string | null, control?: Snippet)}
+            <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+          {/snippet}
+          <BlockerShield {open} head={page ? siteHead : undefined} />
+          <ExtensionsSection />
+          <SiteDetails {page} {open} />
+        {/snippet}
+      </UtilityTray>
+    {/snippet}
+  </AddressField>
+{/snippet}
 
 <!-- The chrome view starts at the window's corner in every shape and draws
      the gutter itself, which stays a place to drag the window by. -->
@@ -716,25 +767,16 @@
 >
   <a href="#astra-stage" class="skip-link">{m.ui_skip_to_content()}</a>
   <!--
-    The window's left edge while the column is away. It lives here, beside the
-    column, because a fixed child of the card would be positioned by the card's
-    own transform and travel off screen with it. Reaching it asks the card out;
-    leaving lets it go. Nothing is laid out again: the card is out of the row
-    while hidden, so the page never moves.
+    The window's left gutter is the shell's to watch, not the app's: the app
+    frame starts 8px in, so a strip drawn here covered 8..24 and reported
+    "left the edge" the moment the pointer reached the window's real edge. The
+    shell's own strip covers 0..16 and posts `sidebar-edge`; this document only
+    listens for it.
   -->
-  {#if sidebarHidden()}
-    <div
-      class="sidebar-edge"
-      role="presentation"
-      aria-hidden="true"
-      onpointerenter={() => dispatchSidebarEdge(true)}
-      onpointerover={() => dispatchSidebarEdge(true)}
-      onpointerleave={() => dispatchSidebarEdge(false)}
-      onpointerout={() => dispatchSidebarEdge(false)}
-    ></div>
-  {/if}
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
   <Sidebar
+    nav={sidebarOwnsBar ? pageNav : undefined}
+    field={sidebarOwnsBar ? addressField : undefined}
     >{#snippet browserBody(compact)}
       {#if !compact && !inWork}<StoreInstallBanner />{/if}
       {#if compact && (inWork || paneled)}
@@ -885,58 +927,37 @@
       >{/snippet}</Sidebar
   >
   <div class="stage-column" data-bar-overlay={barOverPage}>
-    <!-- The page's own bar: navigation and the one address field, above the
-         stage and never in the sidebar. The field is composed here, with the
-         tray that acts on the page it names, and the bar only places it.
-         It stays in the tree on every surface: the home page and internal
-         pages keep it in a row, and a web page floats it over the page when
-         the person pinned it or reached for the top edge. -->
-    <div
-      class="stage-bar"
-      role="toolbar"
-      tabindex="-1"
-      aria-label={m.ui_navigation()}
-      data-hidden={!barVisible}
-      data-mode={barMode}
-      bind:this={barElement}
-      onpointerenter={barEnter}
-      onpointerleave={barLeave}
-      onfocusin={() => (barFocused = true)}
-      onfocusout={(event) => {
-        const next = event.relatedTarget;
-        if (next instanceof Node && barElement?.contains(next)) return;
-        barFocused = false;
-      }}
-    >
-      <ContentBar>
-        {#snippet field()}
-          <AddressField>
-            {#snippet trailing(page)}
-              <UtilityTray
-                label={page === null
-                  ? m.utilities()
-                  : page.warning
-                    ? m.site_info_label_status({ status: page.warning })
-                    : m.site_info_label()}
-                warning={page?.warning}
-                onopen={() => raiseForTray(true)}
-                onclose={() => raiseForTray(false)}
-              >
-                {#snippet children(open)}
-                  {#snippet siteHead(name: string | null, control?: Snippet)}
-                    <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
-                  {/snippet}
-                  <BlockerShield {open} head={page ? siteHead : undefined} />
-                  <ExtensionsSection />
-                  <SiteDetails {page} {open} />
-                {/snippet}
-              </UtilityTray>
-            {/snippet}
-          </AddressField>
-        {/snippet}
-      </ContentBar>
-    </div>
-    {#if barOverPage}
+    {#if !sidebarOwnsBar}
+      <!-- The page's own bar: navigation and the one address field, above the
+           stage. The field is composed once at the top of this file, with the
+           tray that acts on the page it names, and the bar only places it.
+           It stays in the tree on every surface: internal pages keep it in a
+           row, and a web page floats it over the page when the person pinned
+           it or reached for the top edge. -->
+      <div
+        class="stage-bar"
+        role="toolbar"
+        tabindex="-1"
+        aria-label={m.ui_navigation()}
+        data-drag-region
+        data-hidden={!barVisible}
+        data-mode={barMode}
+        bind:this={barElement}
+        onpointerenter={barEnter}
+        onpointerleave={barLeave}
+        onfocusin={() => (barFocused = true)}
+        onfocusout={(event) => {
+          const next = event.relatedTarget;
+          if (next instanceof Node && barElement?.contains(next)) return;
+          barFocused = false;
+        }}
+      >
+        <ContentBar>
+          {#snippet field()}{@render addressField()}{/snippet}
+        </ContentBar>
+      </div>
+    {/if}
+    {#if barOverPage && !sidebarOwnsBar}
       <!-- The strip that brings a floating bar back. It stays in the tree
            while the bar is shown so keyboard focus is not dropped; when the
            bar is down it sits beneath it and takes no pointer. -->
@@ -1127,31 +1148,6 @@
 <ContextMenu />
 
 <style>
-  /* The reach: a strip at the window's left edge while the column is away.
-     Out of the row, above the page and under the card, so asking for the card
-     never lays anything out again. Wide enough to find, narrow enough that a
-     page's own left edge is still usable. */
-  .sidebar-edge {
-    position: fixed;
-    inset-block: 8px;
-    inset-inline-start: 0;
-    z-index: 29;
-    inline-size: 10px;
-    border-start-end-radius: var(--radius-capsule);
-    border-end-end-radius: var(--radius-capsule);
-    transition: background-color var(--motion-base) var(--ease-out);
-  }
-
-  .sidebar-edge:hover {
-    background: var(--row-hover);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sidebar-edge {
-      transition: none;
-    }
-  }
-
   /* Keyboard-only way past the chrome: hidden until it takes focus, then a
      chip over the column. Fixed so it never disturbs the shell's layout. */
   .skip-link {
@@ -1200,16 +1196,21 @@
   /* A floating bar is laid over the page instead of taking a row. The page
      keeps the whole stage's rectangle; the bar travels on its own layer with
      a real ground so what passes under it stays readable, and the shell
-     raises/clips the frame to this strip. */
+     raises/clips the frame to this strip.
+
+     Its ground is opaque: a 94%-opaque chrome plus a 14px backdrop blur
+     bought a slightly softer edge, but a blur over a strip that the page
+     slides under is re-computed every frame of every slide — the sidebar's
+     peek made the whole window feel slow. The bar covers the page, so an
+     opaque ground is the honest material anyway. */
   .stage-column[data-bar-overlay="true"] .stage-bar {
     position: absolute;
     z-index: 30;
     inset-block-start: 0;
     inset-inline: 0;
-    background: color-mix(in srgb, var(--color-chrome) 94%, transparent);
+    background: var(--color-chrome);
     border-block-end: 1px solid var(--color-border);
     box-shadow: var(--shadow-float);
-    backdrop-filter: blur(14px);
     transition:
       transform var(--motion-base) var(--ease-out),
       opacity var(--motion-fast) var(--ease-out);

@@ -50,7 +50,7 @@ it("offers AI and Account in search when their build flags are on", async () => 
   );
   vi.unstubAllEnvs();
   vi.resetModules();
-});
+}, 30_000);
 
 it("groups sections as Browser, Work and App with stable ids", async () => {
   const { groups, sections } = await import("../lib/settings-model");

@@ -13,18 +13,18 @@
 //
 // Usage: node tests/contract/zoom_home_material.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Tabs, Navigation, Commands, Zoom, Settings, System } = HostAPI;
-const ZoomMod = await import(path.join(HOST, "Zoom.sys.mjs"));
-const SystemMod = await import(path.join(HOST, "System.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const { __setPrefsForTests } = await import(path.join(HOST, "Settings.sys.mjs"));
+const ZoomMod = await import(pathToFileURL(path.join(HOST, "Zoom.sys.mjs")).href);
+const SystemMod = await import(pathToFileURL(path.join(HOST, "System.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const { __setPrefsForTests } = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;
@@ -371,6 +371,21 @@ function levelsOf(res) {
   await Commands.run({ id: "nav.home" });
   const afterNewTab = (await Tabs.get({ request_id: "h-5", astra_tab_id: tab.astra_tab_id })).tab;
   check("about:newtab means the New Tab surface", afterNewTab.url === "about:blank", afterNewTab.url);
+
+  // Asking for the New Tab again is a settled no-op, not a load nothing can
+  // finish (the engine cannot reload an empty stage).
+  const blankTab = await Tabs.create({ request_id: "h-6", url: "about:blank", background: true });
+  const again = await Navigation.loadURL({
+    request_id: "h-7",
+    astra_tab_id: blankTab.astra_tab_id,
+    url: "about:blank",
+  });
+  const settled = (await Tabs.get({ request_id: "h-8", astra_tab_id: blankTab.astra_tab_id })).tab;
+  check(
+    "re-asking for the New Tab leaves the tab settled",
+    again.accepted === true && settled.loading !== true,
+    settled.loading,
+  );
 }
 
 // === Window material =====================================================

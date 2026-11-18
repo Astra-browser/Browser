@@ -5,12 +5,10 @@
 // Usage: node tests/contract/load_state.mjs
 import assert from "node:assert/strict";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { loadWatchStep } = await import(
-  path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")
-);
+const { loadWatchStep } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")).href);
 
 let passed = 0;
 function check(name, actual, expected) {

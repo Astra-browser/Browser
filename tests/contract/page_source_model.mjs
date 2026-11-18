@@ -8,13 +8,13 @@
 //
 // Usage: node tests/contract/page_source_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { PageSource, setDriver, pageSource, MAX_SOURCE_CHARS, __resetPageSourceForTests } =
-  await import(path.join(HOST, "PageSource.sys.mjs"));
+  await import(pathToFileURL(path.join(HOST, "PageSource.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

@@ -15,13 +15,13 @@
 // Usage: node tests/contract/work_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Work, __resetWorkForTests } = await import(path.join(HOST, "Work.sys.mjs"));
+const { Work, __resetWorkForTests } = await import(pathToFileURL(path.join(HOST, "Work.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

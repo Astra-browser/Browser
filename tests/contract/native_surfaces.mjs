@@ -6,7 +6,7 @@
 //
 // Usage: node tests/contract/native_surfaces.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -25,12 +25,12 @@ function check(name, cond) {
   }
 }
 
-const SplitView = await import(path.join(HOST, "SplitView.sys.mjs"));
-const SpaceHistory = await import(path.join(HOST, "SpaceHistory.sys.mjs"));
-const SpaceExtensions = await import(path.join(HOST, "SpaceExtensions.sys.mjs"));
-const SpaceClone = await import(path.join(HOST, "SpaceClone.sys.mjs"));
-const Peek = await import(path.join(HOST, "Peek.sys.mjs"));
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const SplitView = await import(pathToFileURL(path.join(HOST, "SplitView.sys.mjs")).href);
+const SpaceHistory = await import(pathToFileURL(path.join(HOST, "SpaceHistory.sys.mjs")).href);
+const SpaceExtensions = await import(pathToFileURL(path.join(HOST, "SpaceExtensions.sys.mjs")).href);
+const SpaceClone = await import(pathToFileURL(path.join(HOST, "SpaceClone.sys.mjs")).href);
+const Peek = await import(pathToFileURL(path.join(HOST, "Peek.sys.mjs")).href);
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 HostAPI.__resetForTests();
 
 // --- pure model ------------------------------------------------------------

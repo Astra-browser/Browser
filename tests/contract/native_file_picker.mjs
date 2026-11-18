@@ -12,7 +12,7 @@
 // Usage: node tests/contract/native_file_picker.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(
   path.dirname(path.dirname(fileURLToPath(import.meta.url))),
@@ -87,7 +87,7 @@ globalThis.Ci = {
   },
 };
 
-const { Downloads } = await import(path.join(HOST, "Downloads.sys.mjs"));
+const { Downloads } = await import(pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href);
 const reply = await Downloads.call({
   profile: "00000000000000000000000001",
   call: { kind: "choose_directory" },

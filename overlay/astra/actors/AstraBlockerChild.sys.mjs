@@ -5,23 +5,39 @@
 // Child half of the page blocker: injects the CSS selectors and scriptlet
 // payload the engine returned for this document, then re-asks as new
 // classes/ids appear. The parent performs the lookup; this module only
-// touches the page. It owns one observer, one style element and one debounce
-// timer per document, all released when the document goes away.
+// touches the page. It owns one observer, one agent sheet (or a fallback
+// style node) and one throttle timer per document, all released when the
+// document goes away.
 
 const STYLE_ID = "astra-blocker-style";
 const MAX_SELECTORS = 4096;
+const MAX_SHEET_CHUNK = 120_000;
 const MAX_SEEN = 512;
 const MAX_PROCEDURAL = 256;
-const DEBOUNCE_MS = 500;
+const MAX_MUTATION_NODES = 2048;
+// Minimum spacing between two parent lookups for one document. A batch that
+// brings a class/id the document has never shown is answered immediately
+// instead -- that is new information, and an ad container injected after load
+// must be hidden on the frame it appears -- up to this many times per
+// document; after that the floor bounds the cost of a page that mints new
+// class names forever.
+const REFRESH_FLOOR_MS = 500;
+const IMMEDIATE_BATCHES = 32;
 
 export class AstraBlockerChild extends JSWindowActorChild {
   #style = null;
   #observer = null;
   #timer = null;
+  #sheetUris = [];
+  #sheetCss = "";
   #url = "";
   #started = false;
   #seenClasses = new Set();
   #seenIds = new Set();
+  #pendingClasses = new Set();
+  #pendingIds = new Set();
+  #lastRefresh = 0;
+  #immediate = IMMEDIATE_BATCHES;
   #procedural = [];
   #scriptInjected = false;
   #request = 0;
@@ -53,6 +69,12 @@ export class AstraBlockerChild extends JSWindowActorChild {
     }
     this.#observer = null;
     this.#style = null;
+    this.#dropSheets();
+    this.#sheetCss = "";
+    this.#pendingClasses.clear();
+    this.#pendingIds.clear();
+    this.#lastRefresh = 0;
+    this.#immediate = IMMEDIATE_BATCHES;
     this.#started = false;
   }
 
@@ -78,8 +100,8 @@ export class AstraBlockerChild extends JSWindowActorChild {
     this.#apply(doc, reply);
 
     if (typeof this.contentWindow?.MutationObserver === "function") {
-      this.#observer = new this.contentWindow.MutationObserver(() => {
-        this.#schedule(doc);
+      this.#observer = new this.contentWindow.MutationObserver((records) => {
+        this.#schedule(doc, collectMutated(records));
       });
       this.#observer.observe(doc.documentElement, {
         subtree: true,
@@ -90,19 +112,58 @@ export class AstraBlockerChild extends JSWindowActorChild {
     }
     // The first walk already seeded the sets; reuse it instead of walking
     // the document a second time before the first generic query.
+    this.#lastRefresh = now(this.contentWindow);
     if (observed.classes.length || observed.ids.length) {
       void this.#refresh(doc, observed);
     }
   }
 
-  #schedule(doc) {
+  /**
+   * Coalesce one mutation batch into the next parent lookup. A batch that
+   * brings a class or id the document has never shown is looked up at once
+   * (an injected ad container must be hidden on the frame it appears);
+   * everything else waits out the floor so a busy page costs at most two
+   * lookups per second.
+   */
+  #schedule(doc, observed) {
+    let unseen = false;
+    for (const name of observed.classes) {
+      if (!this.#seenClasses.has(name)) unseen = true;
+      this.#pendingClasses.add(name);
+    }
+    for (const name of observed.ids) {
+      if (!this.#seenIds.has(name)) unseen = true;
+      this.#pendingIds.add(name);
+    }
+    if (unseen && this.#immediate > 0) {
+      this.#immediate -= 1;
+      this.#flush(doc);
+      return;
+    }
+    const wait = this.#lastRefresh + REFRESH_FLOOR_MS - now(this.contentWindow);
+    if (wait <= 0) {
+      this.#flush(doc);
+      return;
+    }
     if (this.#timer !== null) return;
     const timer = this.contentWindow?.setTimeout(() => {
       this.#timer = null;
       if (!this.#started) return;
-      void this.#refresh(doc);
-    }, DEBOUNCE_MS);
+      this.#flush(doc);
+    }, wait);
     if (timer !== undefined) this.#timer = timer;
+  }
+
+  #flush(doc) {
+    if (!this.#started) return;
+    const observed = {
+      classes: [...this.#pendingClasses],
+      ids: [...this.#pendingIds],
+    };
+    this.#pendingClasses.clear();
+    this.#pendingIds.clear();
+    this.#lastRefresh = now(this.contentWindow);
+    void this.#refresh(doc, observed);
   }
 
   async #refresh(doc, preObserved = null) {
@@ -167,16 +228,21 @@ export class AstraBlockerChild extends JSWindowActorChild {
     const css = selectors
       .map((selector) => `${selector}{display:none!important;}`)
       .join("\n");
-    if (css) {
-      if (!this.#style || !this.#style.isConnected) {
-        this.#style = doc.createElement("style");
-        this.#style.id = STYLE_ID;
-        this.#style.setAttribute("data-astra-blocker", "1");
-        (doc.head || doc.documentElement).append(this.#style);
+    if (!this.#applySheet(css)) {
+      // No `windowUtils` seam (or the sheet was refused): fall back to a
+      // document style node. A page with a strict `style-src` rejects that
+      // node, which is exactly why the agent sheet path comes first.
+      if (css) {
+        if (!this.#style || !this.#style.isConnected) {
+          this.#style = doc.createElement("style");
+          this.#style.id = STYLE_ID;
+          this.#style.setAttribute("data-astra-blocker", "1");
+          (doc.head || doc.documentElement).append(this.#style);
+        }
+        this.#style.textContent = css;
+      } else if (this.#style) {
+        this.#style.textContent = "";
       }
-      this.#style.textContent = css;
-    } else if (this.#style) {
-      this.#style.textContent = "";
     }
 
     if (
@@ -194,6 +260,117 @@ export class AstraBlockerChild extends JSWindowActorChild {
     }
     this.#applyProcedural(doc);
   }
+
+  /**
+   * Install the cosmetic CSS as an agent sheet on the document's window.
+   *
+   * A `<style>` node lives in the page's origin, so a page that ships
+   * `Content-Security-Policy: style-src` (the benchmark below does) silently
+   * drops it and no selector ever applies. `windowUtils` sheets are chrome
+   * side, bypass that policy, and their `!important` declarations outrank the
+   * page's own. Returns false when the seam is unavailable so the caller can
+   * use the style node instead.
+   */
+  #applySheet(css) {
+    if (css === this.#sheetCss) return true;
+    let utils;
+    try {
+      utils = this.contentWindow?.windowUtils;
+    } catch {
+      return false;
+    }
+    if (!utils) return false;
+    this.#dropSheets();
+    if (!css) {
+      this.#sheetCss = "";
+      return true;
+    }
+    try {
+      const type = Ci.nsIDOMWindowUtils.AGENT_SHEET;
+      let chunk = "";
+      const flush = () => {
+        if (!chunk) return;
+        const uri = `data:text/css;charset=utf-8,${encodeURIComponent(chunk)}`;
+        utils.loadSheetUsingURIString(uri, type);
+        this.#sheetUris.push(uri);
+        chunk = "";
+      };
+      for (const line of css.split("\n")) {
+        if (chunk.length + line.length > MAX_SHEET_CHUNK) flush();
+        chunk += (chunk ? "\n" : "") + line;
+      }
+      flush();
+      this.#sheetCss = css;
+      return true;
+    } catch {
+      this.#dropSheets();
+      return false;
+    }
+  }
+
+  #dropSheets() {
+    const utils = this.contentWindow?.windowUtils;
+    for (const uri of this.#sheetUris) {
+      try {
+        utils?.removeSheetUsingURIString(uri, Ci.nsIDOMWindowUtils.AGENT_SHEET);
+      } catch {
+        // Already gone with the window.
+      }
+    }
+    this.#sheetUris = [];
+  }
+}
+
+/**
+ * Classes and ids carried by one mutation batch: the elements that were added
+ * and, for attribute changes, the element whose class/id changed. Scanning
+ * only the new subtrees keeps the first batch cheap enough to run on the frame
+ * the node appears, unlike a full document walk.
+ */
+function collectMutated(records) {
+  const classes = new Set();
+  const ids = new Set();
+  let budget = MAX_MUTATION_NODES;
+  const addElement = (element) => {
+    if (!element || element.nodeType !== 1 || budget <= 0) return;
+    budget -= 1;
+    if (element.id) ids.add(element.id);
+    const className = element.getAttribute?.("class");
+    if (className) {
+      for (const name of className.split(/\s+/u)) {
+        if (name) classes.add(name);
+      }
+    }
+  };
+  const addSubtree = (root) => {
+    if (!root || budget <= 0) return;
+    addElement(root);
+    const matches = root.querySelectorAll?.("[id],[class]") ?? [];
+    for (const element of matches) {
+      if (budget <= 0) return;
+      addElement(element);
+    }
+    if (root.nodeType === 1 && root.shadowRoot) addSubtree(root.shadowRoot);
+  };
+  for (const record of records) {
+    if (budget <= 0) break;
+    if (record.type === "attributes") {
+      addElement(record.target);
+    } else {
+      for (const node of record.addedNodes) addSubtree(node);
+    }
+  }
+  return { classes: [...classes], ids: [...ids] };
+}
+
+/** Monotonic time in the page's realm, with a wall-clock fallback. */
+function now(win) {
+  try {
+    if (typeof win?.performance?.now === "function") return win.performance.now();
+  } catch {
+    // The window is gone; fall through.
+  }
+  return Date.now();
 }
 
 /** Classes and ids currently present, bounded. */

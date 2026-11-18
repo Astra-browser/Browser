@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from "svelte";
   import * as m from "$shared/i18n/messages";
   import { maximized, windowAction } from "$shared/lib/window-control";
@@ -25,11 +25,14 @@
   /** How far down from the top edge it reaches. */
   const DEPTH = 44;
 
+  let { always = false }: { always?: boolean } = $props();
+
   let shown = $state(false);
   let root = $state<HTMLElement>();
   let isMaximized = $state(false);
 
   onMount(() => {
+    if (always) return;
     const near = (x: number, y: number) => x >= window.innerWidth - REACH && y <= DEPTH;
     const move = (event: PointerEvent) => {
       // A touch has no hover; the buttons are reached by tapping them instead.
@@ -69,7 +72,8 @@
 <div
   bind:this={root}
   class="window-controls"
-  data-shown={shown}
+  data-shown={shown || always}
+  data-always={always}
   role="group"
   aria-label={m.ui_window_controls()}
 >
@@ -132,6 +136,10 @@
     transition:
       opacity var(--motion-base) var(--ease-out),
       translate var(--motion-base) var(--ease-out);
+  }
+
+  .window-controls[data-always="true"] {
+    inset-block-start: 16px;
   }
 
   /* Focus is a request to see them, exactly as the pointer is. */

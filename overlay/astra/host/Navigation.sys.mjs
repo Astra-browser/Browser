@@ -106,6 +106,17 @@ export const Navigation = {
       return { ...err(request_id, "invalid_url", "nothing to navigate to"), accepted: false };
     }
     url = target.url;
+    // Pressing Enter on the address already in the bar is a reload, not a
+    // second visit: a duplicated entry makes Back look like it does nothing.
+    // A fresh tab's head is its New Tab, so the first real page replaces it
+    // instead of stacking on top of a blank the person can never revisit.
+    const head = __historyFor(id);
+    const reloading = !!head && head.index >= 0 && head.entries[head.index] === url;
+    // The New Tab is already the empty stage: asking for it again is not a
+    // load, and starting one nothing finishes leaves the tab spinning forever.
+    if (reloading && url === "about:blank") {
+      return { ...ok(request_id, { astra_tab_id: id, url }), accepted: true, operation_id: null };
+    }
     // The row and the stage show a load from the first moment, so a slow page
     // is visibly loading instead of a blank window.
     const { tabs } = __tabsState();
@@ -113,12 +124,6 @@ export const Navigation = {
     if (loadingTab) loadingTab.loading = true;
     emit("nav.started", { astra_tab_id: id, url });
     emit("tab.updated", { astra_tab_id: id, url, loading: true });
-    // Pressing Enter on the address already in the bar is a reload, not a
-    // second visit: a duplicated entry makes Back look like it does nothing.
-    // A fresh tab's head is its New Tab, so the first real page replaces it
-    // instead of stacking on top of a blank the person can never revisit.
-    const head = __historyFor(id);
-    const reloading = !!head && head.index >= 0 && head.entries[head.index] === url;
     if (!reloading) {
       pushOrReplaceHistory(id, url);
     }

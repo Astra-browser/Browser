@@ -6,7 +6,9 @@
   import { commands } from "$shared/ipc/bindings";
   import { loadSpaceEditor } from "$features/tabs";
   import { profiles } from "$domain/profiles";
+  import { surface } from "$domain/surface";
   import { tabs } from "$domain/tabs";
+  import { pendingSpaceEditor, requestSpaceEditor } from "../../lib/space-editor-request.svelte";
   import * as m from "$shared/i18n/messages";
   import Button from "$shared/ui/Button";
   import Icon from "$shared/ui/Icon";
@@ -50,20 +52,37 @@
   }
 
   // A profile switch changes the list under the page; a dialog for the
-  // profile left behind must not linger on another one.
-  const shownProfile = $derived(current?.id ?? null);
+  // profile left behind must not linger on another one. Loading the first
+  // profile is not a switch, so it never closes a dialog the page opened.
+  let knownProfile: string | null = null;
   $effect(() => {
-    void shownProfile;
+    const next = current?.id ?? null;
+    if (next === null || next === knownProfile) return;
+    const switched = knownProfile !== null;
+    knownProfile = next;
+    if (!switched) return;
     editorOpen = false;
     editorSpace = null;
     busy = null;
     failed = null;
   });
 
+  // A create request can outlive this page: the new space arrives with the
+  // surface rebuilt. Open the editor as soon as the space is in the list.
+  $effect(() => {
+    const id = pendingSpaceEditor();
+    if (id === null) return;
+    const found = mine.find((space) => space.id === id);
+    if (!found) return;
+    requestSpaceEditor(null);
+    edit(found, true);
+  });
+
   async function create() {
     if (current === null) return;
     failed = null;
     const before = new Set(mine.map((space) => space.id));
+    const owner = current.id;
     const result = await tabs.createSpace("", {
       icon: null,
       color: mine.length % SPACE_COLOR_COUNT,
@@ -73,11 +92,31 @@
       failed = m.spaces_settings_new_failed();
       return;
     }
+    // Creating a space brings its own New Tab to the front, which parks this
+    // Settings page behind it. The person asked for a space from Settings, not
+    // to leave Settings, so put the page back in front before the editor opens
+    // on the space that was just made.
     await tick();
-    const created = tabs
-      .spaces()
-      .find((space) => space.profile_id === current.id && !before.has(space.id));
-    if (created) edit(created, true);
+    surface.selectPage();
+    // The list arrives with the host's change announcement, which can land a
+    // turn after the admission: wait for the new row rather than reading once.
+    let created: SpaceView | null = null;
+    for (let attempt = 0; attempt < 40 && created === null; attempt++) {
+      created =
+        tabs.spaces().find((space) => space.profile_id === owner && !before.has(space.id)) ?? null;
+      if (created === null) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        await tick();
+      }
+    }
+    if (created === null) {
+      failed = m.spaces_settings_new_failed();
+      return;
+    }
+    // The switch may rebuild this surface, so leave the request where the next
+    // instance reads it as well as opening it here.
+    requestSpaceEditor(created.id);
+    edit(created, true);
   }
 
   async function switchTo(space: SpaceView) {

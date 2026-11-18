@@ -12,16 +12,14 @@
 //
 // Usage: node tests/contract/browsing_data_host.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { BrowsingData, __setBrowsingDataBackend } = await import(
-  path.join(HOST, "BrowsingData.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { BrowsingData, __setBrowsingDataBackend } = await import(pathToFileURL(path.join(HOST, "BrowsingData.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

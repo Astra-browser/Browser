@@ -20,7 +20,7 @@
 // Usage: node tests/contract/slots_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -30,8 +30,8 @@ const ROOT = path.dirname(
 const SLOTS = path.join(ROOT, "overlay", "astra", "chrome", "slots");
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const Slots = await import(path.join(SLOTS, "Slots.sys.mjs"));
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const Slots = await import(pathToFileURL(path.join(SLOTS, "Slots.sys.mjs")).href);
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Tabs, Navigation, Panes, __resetForTests } = HostAPI;
 
 // --- Minimal fake DOM (only the surface mountSlots touches) ---

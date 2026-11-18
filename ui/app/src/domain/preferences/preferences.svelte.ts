@@ -68,6 +68,10 @@ const defaults = {
   "time.enabled": "true",
   "work.favourite-models": "",
   "zoom.default": "100",
+  // The launcher owns its recorder, so its shortcut is a preference of its own
+  // rather than a Keyboard row.
+  "launcher.shortcut": "CmdOrCtrl+Shift+Space",
+  "launcher.double-tap": "off",
   "privacy.smartscreen": "true",
   "privacy.drm": "true",
   "privacy.cleanup": "false",

@@ -1,0 +1,41 @@
+Patch-Id: ASTRA-0017
+Title: Paint the Astra ground instead of the Firefox pre-XUL silhouette
+Tier: P2
+Upstream-Files: mozglue/misc/PreXULSkeletonUI.cpp
+Intent: Astra's first frame is its own dark ground; the Windows pre-XUL skeleton's Firefox toolbar/tab silhouettes are a false frame and its light theme flashes white before XUL. Flatten the skeleton to the product background while keeping the early window.
+Risk: low (Windows-only pre-XUL paint, no Linux/macOS code path)
+Test: forge lint, forge import --check; startup capture shows a solid Astra ground with no Firefox toolbar silhouette or white frame
+Verified-On: 153.6.0
+Removal-Plan: none anticipated; replace with an Astra-owned native splash if one is built
+---
+diff --git a/mozglue/misc/PreXULSkeletonUI.cpp b/mozglue/misc/PreXULSkeletonUI.cpp
+index 2135283774..734ddf21f1 100644
+--- a/mozglue/misc/PreXULSkeletonUI.cpp
++++ b/mozglue/misc/PreXULSkeletonUI.cpp
+@@ -702,8 +702,25 @@ bool FillRectWithColor(HDC hdc, LPCRECT rect, uint32_t mozColor) {
+ 
+ Result<Ok, PreXULSkeletonUIError> DrawSkeletonUI(
+     HWND hWnd, CSSPixelSpan urlbarCSSSpan, CSSPixelSpan searchbarCSSSpan,
+-    Vector<CSSPixelSpan>& springs, const ThemeColors& currentTheme,
++    Vector<CSSPixelSpan>& springs, const ThemeColors& currentThemeArg,
+     const EnumSet<SkeletonUIFlag, uint32_t>& flags) {
++  // Astra paints its own chrome; the Firefox toolbar silhouette would be a
++  // false first frame. Keep the pre-XUL window as the product's dark ground
++  // until the app frame paints.
++  ThemeColors astraTheme = currentThemeArg;
++  astraTheme.backgroundColor = 0x1c1b22;
++  astraTheme.toolbarForegroundColor = astraTheme.backgroundColor;
++  astraTheme.titlebarColor = astraTheme.backgroundColor;
++  astraTheme.tabColor = astraTheme.backgroundColor;
++  astraTheme.tabOutlineColor = astraTheme.backgroundColor;
++  astraTheme.chromeContentDividerColor = astraTheme.backgroundColor;
++  astraTheme.urlbarColor = astraTheme.backgroundColor;
++  astraTheme.urlbarBorderColor = astraTheme.backgroundColor;
++  astraTheme.animationColor = astraTheme.backgroundColor;
++  const ThemeColors& currentTheme = astraTheme;
++  urlbarCSSSpan = {0, 0};
++  searchbarCSSSpan = {0, 0};
++  springs.clear();
+   // NOTE: we opt here to paint a pixel buffer for the application chrome by
+   // hand, without using native UI library methods. Why do we do this?
+   //

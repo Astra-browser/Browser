@@ -14,7 +14,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 
@@ -57,8 +57,8 @@ check("update.googleapis.com has owner sign-off", /owner_signoff\s*=\s*true/.tes
 // --- host wiring ---------------------------------------------------------
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Settings, __resetSettingsForTests, __setPrefsForTests, __setContentPrefsForTests } =
-  await import(path.join(HOST, "Settings.sys.mjs"));
-const { __resetEventsForTests } = await import(path.join(HOST, "Events.sys.mjs"));
+  await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
+const { __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 const values = new Map();
 const prefs = {

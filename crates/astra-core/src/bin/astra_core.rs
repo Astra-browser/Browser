@@ -27,7 +27,10 @@
 
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
+use astra_core::hotkey::HotkeyService;
 use astra_core::session::SessionSnapshot;
 use astra_proto::{
     check_version, decode_frame, encode_frame, Envelope, Kind, ProtoError, PROTOCOL_VERSION,
@@ -82,11 +85,36 @@ fn read_exact_n<R: Read>(r: &mut R, n: usize) -> io::Result<Option<Vec<u8>>> {
     Ok(Some(buf))
 }
 
-fn respond(out: &mut impl Write, env: &Envelope) {
+/// The one stdout every writer shares. The hotkey thread reports presses while
+/// the main thread answers requests, so a frame is written under the lock that
+/// keeps the two from interleaving.
+type Out = Arc<Mutex<io::Stdout>>;
+
+fn respond(out: &Out, env: &Envelope) {
     let frame = encode_frame(env);
-    if out.write_all(&frame).is_err() || out.flush().is_err() {
+    let mut handle = match out.lock() {
+        Ok(handle) => handle,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if handle.write_all(&frame).is_err() || handle.flush().is_err() {
         std::process::exit(1);
     }
+}
+
+/// Reports something the browser did not ask for, such as a hotkey press.
+fn event(out: &Out, name: &str, payload: Value) {
+    static EVENT_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = EVENT_SEQ.fetch_add(1, Ordering::Relaxed);
+    let envelope = Envelope {
+        v: PROTOCOL_VERSION,
+        id: format!("evt-{seq}"),
+        kind: Kind::Evt,
+        name: name.to_owned(),
+        seq: Some(seq),
+        payload,
+        error: None,
+    };
+    respond(out, &envelope);
 }
 
 fn ok(env: &Envelope, payload: Value) -> Envelope {
@@ -128,8 +156,7 @@ fn extension_source(payload: &Value) -> astra_extensions::Source {
     }
 }
 
-fn name_of(payload: &Value) -> &str {
-    payload
+fn name_of(payload: &Value) -> &str {    payload
         .get("name")
         .and_then(Value::as_str)
         .filter(|name| !name.is_empty())
@@ -225,6 +252,41 @@ fn handle(store: &Store, env: &Envelope) -> Envelope {
     }
 }
 
+/// `launcher.set { accelerator }` -> `{ registered, reason? }`.
+///
+/// Registration is the desktop's answer, not ours: another application holding
+/// the key is reported so Settings can say so instead of pretending.
+fn launcher_set(hotkey: &mut HotkeyService, out: &Out, env: &Envelope) -> Envelope {
+    let accelerator = env
+        .payload
+        .get("accelerator")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if accelerator.is_empty() {
+        // An empty accelerator is "stand down while the recorder listens".
+        hotkey.clear();
+        return ok(env, json!({ "registered": false, "reason": "cleared" }));
+    }
+    let sink = Arc::clone(out);
+    let press = move || event(&sink, "launcher.toggle", json!({}));
+    let shortcut = match astra_core::hotkey::parse(accelerator) {
+        Ok(shortcut) => shortcut,
+        Err(reason) => {
+            return ok(
+                env,
+                json!({ "registered": false, "reason": reason.to_string() }),
+            )
+        }
+    };
+    match hotkey.set(shortcut, press) {
+        Ok(()) => ok(env, json!({ "registered": true })),
+        Err(reason) => ok(
+            env,
+            json!({ "registered": false, "reason": reason.to_string() }),
+        ),
+    }
+}
+
 fn main() {
     let args = match parse_args() {
         Ok(args) => args,
@@ -256,7 +318,8 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut inp = stdin.lock();
-    let mut out = stdout.lock();
+    let out: Out = Arc::new(Mutex::new(stdout));
+    let mut hotkey = HotkeyService::new();
     let mut pending: Vec<u8> = Vec::new();
 
     loop {
@@ -275,7 +338,12 @@ fn main() {
         match decode_frame(&mut pending) {
             Ok(Some(env)) => {
                 let shutdown = env.name == "core.shutdown";
-                respond(&mut out, &handle(&store, &env));
+                let response = if env.name == "launcher.set" {
+                    launcher_set(&mut hotkey, &out, &env)
+                } else {
+                    handle(&store, &env)
+                };
+                respond(&out, &response);
                 if shutdown {
                     std::process::exit(0);
                 }
@@ -292,7 +360,7 @@ fn main() {
                     payload: Value::Null,
                     error: Some(error),
                 };
-                respond(&mut out, &res);
+                respond(&out, &res);
                 std::process::exit(1);
             }
         }

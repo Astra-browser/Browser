@@ -11,16 +11,14 @@
 //
 // Usage: node tests/contract/settings_native.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Settings, __resetSettingsForTests, __setPrefsForTests, __setContentPrefsForTests } =
-  await import(path.join(HOST, "Settings.sys.mjs"));
-const { addEventListener, __resetEventsForTests } = await import(
-  path.join(HOST, "Events.sys.mjs")
-);
+  await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

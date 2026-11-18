@@ -37,8 +37,9 @@ redesigned:
 
 A wrapper may set width and position. It may not change height, radius,
 typography, colours, suggestions, the site tray, focus behaviour or the
-submitted result. The sidebar must not render an address field; the bar lives
-on the main page.
+submitted result. While the column is in its full shape the same field is
+drawn at the column's head (see §6), composed once by the shell; the bar keeps
+it where the column is a rail, a panel, or put away.
 
 ## 3. Lanes
 
@@ -85,11 +86,34 @@ python3 tools/state-check.py && bash tools/brand-lint.sh
 ```
 
 Live: `./tools/run-dev.sh` then `tools/marionette-probe/ui-consistency-probe.py`
-at wide, narrow and private sizes. The probe must show the main-page bar, the
-unchanged search field, no address field in the sidebar, the tab list, the rail
-and the native page starting below the bar.
+at wide, narrow and private sizes. The probe must show the unchanged search
+field, the tab list, the rail and the native page starting at the stage's own
+top edge when the column is in its full shape (see §6).
 
-## 6. Out of scope
+## 6. Column head (UI v2, D-52)
+
+The column's head carries the page's controls and the one address field:
+
+```
+| back  forward  reload  home   ...   put-away |   nav row
+| the address field                        shield |   field row
+| media downloads notes spaces sleeping ext theme |   utility row
+```
+
+- `features/toolbar/components/PageNav.svelte` is the one navigation group;
+  the bar and the column head both mount it, so disabled states and the
+  history menus cannot drift.
+- `Shell.svelte` composes the field once and hands it to whichever place
+  draws it. The bar is not rendered at all while the column is in its full
+  shape, so there is one field, never two.
+- The bar returns when the column is a rail (Work, Tasks, Notes, a tool
+  panel), when it is put away (the floating bar over a page), and when
+  `ui.main-bar` is pinned to `always`.
+- The host still insets a native page by the bar's row only when the bar is in
+  the row; with the column's own head the page starts at the stage's 8px edge,
+  which the shell already does for the floating bar (`data-astra-bar`).
+
+## 7. Out of scope
 
 - Boost and Easel: no Astra backend exists; do not fake them.
 - Account, sync, billing and update services.

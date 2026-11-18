@@ -25,11 +25,11 @@
   h2 {
     margin: 0 0 10px;
     padding-inline: 16px;
-    color: var(--color-text);
-    font-size: 15px;
+    color: var(--color-muted);
+    font-size: 13px;
     font-weight: 600;
-    line-height: 20px;
-    letter-spacing: -0.012em;
+    line-height: 18px;
+    letter-spacing: 0;
   }
 
   /* No outline: the card now steps a real distance off the page, and a

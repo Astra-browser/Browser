@@ -1,4 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
+﻿/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -33,19 +33,23 @@
 // - `about_info` answers Astra's own product version, the OS product string
 //   the engine reports and the CPU arch. The version is the pref the branding
 //   renderer writes from `branding/astra.toml` (never the Firefox pin), and
-//   any of the three facts missing answers `null` — About shows nothing rather
+//   any of the three facts missing answers `null` â€” About shows nothing rather
 //   than a placeholder version it would be read as real.
 // - `update_status` and `update_check` answer `{ state: "unavailable" }`: no
 //   updater is connected, so nothing is checked, downloaded or installed and
-//   no version is named. `update_check` is advisory — it starts nothing and
+//   no version is named. `update_check` is advisory â€” it starts nothing and
 //   never answers `checking` or `ready` for work it did not do.
-// - `default_browser_status` answers `null`. Whether Astra is the default
-//   browser is the system's answer, and neither yes nor no can be read from
-//   here.
-// - `login_item_status` answers `supported: false`, with `enabled` and
-//   `needs_approval` false: this build cannot register a login item, and
-//   General settings hides the row on `supported: false` rather than showing
-//   a switch that could not do anything.
+// - `default_browser_status` reads Windows' own `UserChoice` ProgId. Astra is
+//   the default only when that value names Astra's `AstraURL`. On other
+//   platforms it answers `null`, so neither yes nor no is claimed. The request
+//   opens Windows Settings; Windows owns the final choice and the answer is
+//   read back, never assumed.
+// - `login_item_status` reads and writes the per-user Windows `Run` value.
+//   Other platforms answer `supported: false` so General hides the row.
+// - `windows_reputation_managed` reads the SmartScreen policy values; without
+//   the registry it answers `null`, which the Settings card renders as its
+//   launch fallback. `windows_diagnostics_settings` opens Windows' feedback
+//   page and answers whether the system accepted the request.
 // - `set_content_color_scheme` maps the app's light/dark/system choice onto
 //   Firefox's `layout.css.prefers-color-scheme.content-override` pref
 //   (1/0/2). Content reads that mirrored pref, so a page's
@@ -70,9 +74,31 @@ const WINDOWS_MICA_PREF = "widget.windows.mica";
  *  is accepted but draws nothing, so it is not offered. */
 const MICA_MIN_BUILD = 22621;
 
-/** Test-only platform/pref seams (Node has neither Services nor a window). */
+/** Windows registry paths this module reads. */
+const USER_CHOICE_HTTP =
+  "Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice";
+const RUN_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const RUN_VALUE = "Astra";
+const SMARTSCREEN_POLICY_PATHS = [
+  ["HKLM", "Software\\Policies\\Microsoft\\Windows\\System"],
+  ["HKCU", "Software\\Policies\\Microsoft\\Windows\\System"],
+  ["HKLM", "Software\\Policies\\Microsoft\\Windows\\Defender\\SmartScreen"],
+  ["HKCU", "Software\\Policies\\Microsoft\\Windows\\Defender\\SmartScreen"],
+];
+const SMARTSCREEN_POLICY_VALUES = [
+  "EnableSmartScreen",
+  "ShellSmartScreenLevel",
+  "ConfigureAppInstallControlEnabled",
+];
+const ASTRA_PROGID = "astraurl";
+/** Where About sends a person when an update reports a manual download. */
+const UPDATE_PAGE = "https://gitlab.com/kyoiske/astra/-/releases";
+
+/** Test-only platform/pref/registry seams (Node has neither Services nor a
+ *  window). */
 let injectedPlatform = null;
 let injectedPrefs = null;
+let injectedWindows = null;
 
 export function __setPlatformForTests(platform) {
   injectedPlatform = platform ?? null;
@@ -82,9 +108,15 @@ export function __setSystemPrefsForTests(prefs) {
   injectedPrefs = prefs ?? null;
 }
 
+/** Replace the Windows registry/settings bridge in Node contract tests. */
+export function __setWindowsForTests(windows) {
+  injectedWindows = windows ?? null;
+}
+
 export function __resetSystemForTests() {
   injectedPlatform = null;
   injectedPrefs = null;
+  injectedWindows = null;
 }
 
 /** The running OS and its build, or empty strings outside chrome. */
@@ -169,6 +201,178 @@ function servicesForUse() {
     // A partial or hostile global is the same as no chrome.
   }
   return null;
+}
+
+/** The registry hive constant for a path written as "HKCU" or "HKLM". */
+function registryRoot(root) {
+  const Ci = globalThis.Ci;
+  return root === "HKLM"
+    ? Ci.nsIWindowsRegKey.ROOT_KEY_LOCAL_MACHINE
+    : Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER;
+}
+
+/** Open Windows' own Settings page for a URI. Explorer is the system's own
+ *  handler for `ms-settings:`; the answer is only "the launch was accepted". */
+function openWindowsSettings(uri) {
+  try {
+    const { Cc, Ci } = globalThis;
+    const env = Cc["@mozilla.org/process/environment;1"].getService(
+      Ci.nsIEnvironment,
+    );
+    const winDir = env.get("WINDIR");
+    if (!winDir) return false;
+    const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+    file.initWithPath(winDir);
+    file.append("explorer.exe");
+    if (!file.exists()) return false;
+    const process = Cc["@mozilla.org/process/util;1"].createInstance(
+      Ci.nsIProcess,
+    );
+    process.init(file);
+    const args = [uri];
+    process.run(false, args, args.length);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The real Windows registry/settings bridge. */
+function createWindowsBridge(services) {
+  const { Cc, Ci } = globalThis;
+  const service = () =>
+    Cc["@mozilla.org/windows-registry-key;1"].createInstance(
+      Ci.nsIWindowsRegKey,
+    );
+
+  function withKey(root, path, access, body) {
+    let key = null;
+    try {
+      key = service();
+      if (access === Ci.nsIWindowsRegKey.ACCESS_ALL) {
+        key.create(registryRoot(root), path, access);
+      } else {
+        key.open(registryRoot(root), path, access);
+      }
+      return body(key);
+    } catch {
+      return null;
+    } finally {
+      try {
+        key?.close();
+      } catch {
+        // A key that never opened has nothing to close.
+      }
+    }
+  }
+
+  return {
+    readString(root, path, name) {
+      return withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_READ, (key) =>
+        key.hasValue(name) ? key.readStringValue(name) : null,
+      );
+    },
+    readInt(root, path, name) {
+      return withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_READ, (key) =>
+        key.hasValue(name) ? key.readIntValue(name) : null,
+      );
+    },
+    exists(root, path) {
+      return (
+        withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_READ, () => true) === true
+      );
+    },
+    writeString(root, path, name, value) {
+      return (
+        withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_ALL, (key) => {
+          key.writeStringValue(name, String(value));
+          return true;
+        }) === true
+      );
+    },
+    removeValue(root, path, name) {
+      return (
+        withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_ALL, (key) => {
+          if (key.hasValue(name)) key.removeValue(name);
+          return true;
+        }) === true
+      );
+    },
+    removeKey(root, path) {
+      const split = path.lastIndexOf("\\");
+      if (split <= 0) return false;
+      const parent = path.slice(0, split);
+      const leaf = path.slice(split + 1);
+      return (
+        withKey(root, parent, Ci.nsIWindowsRegKey.ACCESS_ALL, (key) => {
+          if (key.hasChild(leaf)) key.removeChild(leaf);
+          return true;
+        }) === true
+      );
+    },
+    packaged() {
+      try {
+        const exe = services.dirsvc.get("XREExeF", Ci.nsIFile).path;
+        return !/[\\/]obj-[^\\/]+[\\/]/u.test(exe);
+      } catch {
+        return false;
+      }
+    },
+    exePath() {
+      try {
+        return services.dirsvc.get("XREExeF", Ci.nsIFile).path;
+      } catch {
+        return null;
+      }
+    },
+    profilePath() {
+      try {
+        return services.dirsvc.get("ProfD", Ci.nsIFile).path;
+      } catch {
+        return null;
+      }
+    },
+    openSettings(uri) {
+      return openWindowsSettings(uri);
+    },
+  };
+}
+
+/** The Windows bridge, a test double, or null on a platform without one. */
+function windowsForUse() {
+  if (injectedWindows) return injectedWindows;
+  const services = servicesForUse();
+  if (!services) return null;
+  const os = String(services.appinfo?.OS ?? "").toLowerCase();
+  if (os !== "winnt") return null;
+  try {
+    return createWindowsBridge(services);
+  } catch {
+    return null;
+  }
+}
+
+/** Read Windows' default-browser answer from `UserChoice`. */
+function defaultBrowserFor(windows) {
+  const progId = windows.readString("HKCU", USER_CHOICE_HTTP, "ProgId");
+  return {
+    is_default:
+      typeof progId === "string" && progId.trim().toLowerCase() === ASTRA_PROGID,
+    can_request: windows.packaged() === true,
+  };
+}
+
+/** Read the per-user login item's current state. */
+function loginItemFor(windows) {
+  if (windows.packaged() !== true) {
+    return { supported: false, enabled: false, needs_approval: false };
+  }
+  const command = windows.readString("HKCU", RUN_KEY, RUN_VALUE);
+  return {
+    supported: true,
+    enabled: typeof command === "string" && command.trim() !== "",
+    needs_approval: false,
+  };
 }
 
 /** Where the profile's own logs live, or the profile directory itself. */
@@ -425,14 +629,99 @@ export const System = {
     return noUpdater();
   },
 
-  // `DefaultBrowserStatus | null`: not known, so neither claim is made.
-  async defaultBrowserStatus() {
-    return null;
+  /**
+   * Opens the release page in a new tab. The About row that asks for it only
+   * appears when an update reports a manual download, and this build has no
+   * updater, so the call is a guard rather than a common path.
+   */
+  async openSoftwareUpdate() {
+    try {
+      const { Search } = await import("./Search.sys.mjs");
+      const result = await Search.openUrl({ url: UPDATE_PAGE, new_tab: true });
+      return result?.accepted === true;
+    } catch {
+      return false;
+    }
   },
 
-  // `LoginItemStatus`: this build cannot register one, so the row is hidden.
+  /**
+   * `DefaultBrowserStatus | null`: Windows' own `UserChoice` ProgId decides.
+   * `can_request` is false for a development build, which Windows cannot
+   * register; `null` on a platform this module cannot read.
+   */
+  async defaultBrowserStatus() {
+    const windows = windowsForUse();
+    if (!windows) return null;
+    return defaultBrowserFor(windows);
+  },
+
+  /** Open Windows' default-apps page; the system owns the final choice. */
+  async defaultBrowserRequest() {
+    const windows = windowsForUse();
+    if (!windows) return null;
+    const status = defaultBrowserFor(windows);
+    if (status.can_request) windows.openSettings("ms-settings:defaultapps");
+    return status;
+  },
+
+  /**
+   * `LoginItemStatus`: the per-user Windows `Run` value. Other platforms and
+   * development builds answer `supported: false`, so General hides the row.
+   */
   async loginItemStatus() {
-    return { supported: false, enabled: false, needs_approval: false };
+    const windows = windowsForUse();
+    if (!windows) return { supported: false, enabled: false, needs_approval: false };
+    return loginItemFor(windows);
+  },
+
+  /** Register or remove the per-user login item, then report what is held. */
+  async loginItemSet(payload = {}) {
+    const windows = windowsForUse();
+    if (!windows) return { supported: false, enabled: false, needs_approval: false };
+    const enabled = field(payload, "enabled");
+    if (enabled === true) {
+      const exe = windows.exePath();
+      if (exe) {
+        const profile = windows.profilePath();
+        const command = profile
+          ? `"${exe}" -profile "${profile}" -no-remote`
+          : `"${exe}"`;
+        windows.writeString("HKCU", RUN_KEY, RUN_VALUE, command);
+      }
+    } else if (enabled === false) {
+      windows.removeValue("HKCU", RUN_KEY, RUN_VALUE);
+    }
+    return loginItemFor(windows);
+  },
+
+  /** Open Windows' Startup Apps page, where a disabled entry can be allowed. */
+  async loginItemOpenSettings() {
+    const windows = windowsForUse();
+    if (!windows) return false;
+    return windows.openSettings("ms-settings:startupapps");
+  },
+
+  /**
+   * `boolean | null`: whether SmartScreen is held by policy. `null` where no
+   * registry is reachable, which the Settings card renders as its fallback.
+   */
+  async windowsReputationManaged() {
+    const windows = windowsForUse();
+    if (!windows) return null;
+    for (const [root, path] of SMARTSCREEN_POLICY_PATHS) {
+      for (const name of SMARTSCREEN_POLICY_VALUES) {
+        if (windows.readInt(root, path, name) !== null) return true;
+        if (windows.readString(root, path, name) !== null) return true;
+      }
+    }
+    return false;
+  },
+
+  /** Open Windows' diagnostics/feedback privacy page. */
+  async windowsDiagnosticsSettings() {
+    const windows = windowsForUse();
+    if (!windows) return false;
+    return windows.openSettings("ms-settings:privacy-feedback");
   },
 
   /**

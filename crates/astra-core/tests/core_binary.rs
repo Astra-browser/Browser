@@ -295,3 +295,26 @@ fn requires_a_database_path() {
         .expect("spawn without --db");
     assert_eq!(status.code(), Some(2));
 }
+
+#[test]
+fn launcher_shortcut_registration_answers_the_caller() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut core = Core::start(&dir.path().join("core.sqlite"));
+    let handshake = core.call("boot.handshake", json!({ "core_version": 1 }));
+    assert!(handshake.error.is_none());
+
+    // A key that is not an accelerator is refused by the parser, so the
+    // answer does not depend on what else is running on the machine.
+    let bad = core.call("launcher.set", json!({ "accelerator": "Nonsense+K" }));
+    assert_eq!(bad.payload["registered"], json!(false));
+    assert_eq!(bad.payload["reason"], json!("invalid"));
+
+    let no_modifier = core.call("launcher.set", json!({ "accelerator": "Shift+Y" }));
+    assert_eq!(no_modifier.payload["reason"], json!("needs_modifier"));
+
+    // The recorder stands the hotkey down through the same command.
+    let cleared = core.call("launcher.set", json!({ "accelerator": "" }));
+    assert_eq!(cleared.payload["reason"], json!("cleared"));
+
+    assert_eq!(core.shutdown(), 0);
+}

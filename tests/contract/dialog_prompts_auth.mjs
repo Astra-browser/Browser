@@ -10,17 +10,15 @@
 //
 // Usage: node tests/contract/dialog_prompts_auth.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const { DialogPrompts } = await import(path.join(HOST, "DialogPrompts.sys.mjs"));
-const { Tabs, __resetTabsForTests } = await import(path.join(HOST, "Tabs.sys.mjs"));
-const { __resetOperationsForTests, Operations } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { DialogPrompts } = await import(pathToFileURL(path.join(HOST, "DialogPrompts.sys.mjs")).href);
+const { Tabs, __resetTabsForTests } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const { __resetOperationsForTests, Operations } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

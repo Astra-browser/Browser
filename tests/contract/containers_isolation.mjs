@@ -26,7 +26,7 @@
 // Usage: node tests/contract/containers_isolation.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -34,10 +34,8 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(path.join(HOST, "HostAPI.sys.mjs"));
-const { Containers, __userContextIdFor, __resetContainersForTests } = await import(
-  path.join(HOST, "Containers.sys.mjs")
-);
+const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
+const { Containers, __userContextIdFor, __resetContainersForTests } = await import(pathToFileURL(path.join(HOST, "Containers.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

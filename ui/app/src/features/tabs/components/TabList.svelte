@@ -318,11 +318,10 @@
     padding-inline: var(--tab-inset);
     padding-block-end: var(--tab-gap);
     color: var(--color-faint);
-    font-size: var(--text-caption);
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-size: var(--text-label);
+    font-weight: 500;
+    letter-spacing: 0;
     line-height: 1.4;
-    text-transform: uppercase;
   }
 
   /* The dock owns the band's inset, so its site row adds none of its own. */

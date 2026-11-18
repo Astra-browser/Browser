@@ -1092,7 +1092,13 @@ export const Content = {
         if (blank) {
           // The New Tab is a real history place now: loading it is how Back
           // reaches it when the engine has no earlier entry to traverse to.
-          browser?.loadURI("about:blank", { triggeringPrincipal: principal });
+          // `webNavigation.loadURI` takes an nsIURI, not a string, so a blank
+          // string here threw and left the tab loading forever.
+          if (browser?.currentURI?.spec === "about:blank") {
+            __applyExternalUpdate(id, { loading: false });
+            return;
+          }
+          browser?.fixupAndLoadURIString("about:blank", { triggeringPrincipal: principal });
         } else {
           browser?.fixupAndLoadURIString(url, { triggeringPrincipal: principal });
         }

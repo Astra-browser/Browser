@@ -112,6 +112,159 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   Product builds set `WASI_SYSROOT` and remove the baseline-only
   `--without-wasm-sandboxed-libraries` line.
 
+### First patched build and live probes (2026-11-14)
+
+- `forge import --os windows` applied ASTRA-0001..0013, skipped 0014, and
+  treated 0015/0016 as already applied.
+- `forge overlay --os windows` staged the overlay, blocker and Astra branding;
+  passkeys stayed absent.
+- `mach configure` with `--with-branding=astra/branding` and
+  `--with-wasi-sysroot=D:/astra-build/wasi-34/wasi-sysroot-34.0` passed.
+- Patched `mach build` **PASS** 2026-11-14 13:05, wall 15:08, thin Rust LTO;
+  `xul.dll` 182,513,664 bytes.
+- `tools/marionette-probe/version-probe.py <windows firefox.exe>` **8/8 PASS**:
+  Astra version 0.1.745, `about_info` reports `Windows_NT 10.0` / `x86_64`,
+  app booted, Settings -> About shows `Version 0.1.745`.
+- `tools/windows/sidecar-probe.py` **5/5 PASS**: the shell finds
+  `astra-core.exe` beside the browser, reports `data-core=running`, the process
+  is alive, `ProfD/astra/core.sqlite` is created, and the sidecar stops with the
+  browser.
+- `mach build faster` after an overlay is **10-13 s**.
+- `tools/windows/settings-probe.py` **105/105 PASS**: 14 Settings pages render
+  with no alerts, 20 representative controls change and persist, and no new
+  unrouted Settings binding. The chart is in `docs/astra/SETTINGS_AUDIT.md`.
+  Every finding from the first pass is fixed and verified there: the Windows
+  privacy routes, the identity card, Spaces "New Space", the Windows download
+  policy, and the launcher (an in-chrome overlay plus a `RegisterHotKey` thread
+  in `astra-core` that opens it from any app).
+
+### Headed visual probe (2026-11-14)
+
+`tools/marionette-probe/headed-probe.py` is OS-aware now: it picks
+`engine/obj-astra-windows/dist/bin/firefox.exe` on Windows, launches a visible
+window, waits for the app frame, and captures the real top-level window through
+Win32 `PrintWindow` (GDI, stdlib only) in addition to Marionette's own
+screenshot. Linux keeps the Hyprland `grim` path and the
+`obj-astra-linux` default; `--binary`, `--port` and `--keep-open` are explicit.
+
+Live run on the Windows build: **10/10 PASS**. `appReady=host`, shell relay 132
+messages with no error, frame 1266x853, sidebar 240x837, address field and tab
+row present, zero real console errors; capture 1600x1075 at 125% DPI
+(2201 colours, 31.6% locally varied pixels). Evidence in
+`out/headed-windows/` (`window.png`, `shot.png`, `snap.json`).
+
+### Blocker, tabs and Settings surface probes (2026-11-14)
+
+The core surface probes now choose the platform build and work from the
+repository root on either OS:
+
+| Probe | Windows result | What it proves |
+|---|---|---|
+| `tools/marionette-probe/blocker-probe.py` | **21/21 PASS** | seed install reaches `active` (200,392 rules, 81 lists), catalog/configure round-trip, the native hook cancels the ad image on a loopback page, the actor hides the cosmetic element, counters/reset work, and the Settings blocker section renders |
+| `tools/marionette-probe/tabs-probe.py` | **PASS** | address search loads in tab 1, a new tab starts blank, tab 2 takes its own address, the model has both rows, and switching back restores tab 1's live page |
+| `tools/marionette-probe/settings-native-probe.py` | **50/50 PASS** | every mapped preference writes through the Host API, reads back, reaches the app, and does not invent Firefox prefs for Astra-only settings |
+
+The tabs probe now reads the selected native tab (`gBrowser.selectedBrowser`)
+instead of relying on the Linux slot marker, and the scripts use
+`shutil.rmtree` plus the platform binary name. Linux keeps the same checks and
+the `obj-astra-linux` default.
+
+### Windows package and per-user installer (2026-11-14)
+
+`tools/package-windows.ps1` builds the portable archive from a finished
+`engine/obj-astra-windows/dist/bin` without rebuilding or mutating `engine/`.
+The staging copy is removed afterwards (use `-KeepStage` to inspect it), so
+`brand-lint` does not scan a duplicate browser tree:
+
+- `Astra-0.1.745-windows-x86_64.zip` - 135,269,859 bytes
+  (`sha256 f054d5b0dedc9adb939df7826015ff9a25ec750e2d54100f89ee70c510624620`).
+  It carries the full product tree, `astra-core.exe`, `astra.exe` (the engine
+  launcher under the product name), `astra.cmd` (profile in `%APPDATA%\Astra`),
+  `README.md`, `BUILD.txt` and the overlay files. Extracted on a clean
+  directory, `version-probe.py` reports **8/8 PASS** on the extracted
+  `astra.exe`; `firefox.exe` stays beside it for compatibility and never
+  shares Windows' stock-Firefox application identity.
+- `Astra-0.1.745-windows-x86_64-setup.exe` - 89,063,389 bytes
+  (`sha256 deb0d477548ffa5538c583fda35e633a73fd2df95029b12ecb18e551a0fd6ad2`),
+  NSIS 3.13, per-user
+  (`RequestExecutionLevel user`, `%LOCALAPPDATA%\Programs\Astra`), no service
+  and no machine-wide registry writes. It creates Start Menu and desktop
+  shortcuts, an uninstaller, an install record, an Astra ProgId for HTML and
+  URL handling, `RegisteredApplications` + `Capabilities` for Windows Default
+  apps, `OpenWithProgids` entries (never a forced default) and an
+  `AppUserModelID` (`Astra.Browser`) under `Applications\astra.exe`.
+
+`tools/windows/installer-test.ps1 -Setup ... -RunProbe` installs to a throwaway
+directory, checks the payload, shortcuts, profile directory and registry
+contract, runs the live version probe against the installed binary, then
+silently uninstalls and verifies that files, shortcuts and registry keys are
+gone. Live result: **31/31 PASS** (14 install checks + 8 live probe checks +
+9 uninstall checks).
+
+Limits: the artifacts are unsigned (no Authenticode certificate on this
+machine); Windows owns the default-browser choice, so the installer registers
+Astra and links to `ms-settings:defaultapps` instead of forcing it; the
+installer leaves `%APPDATA%\Astra` intact on uninstall; the updater remains
+off (U-09). NSIS is installed through `winget` (`NSIS.NSIS` 3.13).
+
+### System routes: default browser, login item, Windows privacy (2026-11-15)
+
+The Settings rows that would otherwise answer `unknown_command` now have real
+Windows Host API methods in `overlay/astra/host/System.sys.mjs`:
+
+| Route | What it does | UI |
+|---|---|---|
+| `default_browser_status` | reads `HKCU\...\UrlAssociations\http\UserChoice\ProgId`; Astra is default only for `AstraURL`; `can_request` is true for an installed build | General shows **Set as default** and reads the answer again on window focus |
+| `default_browser_request` | opens `ms-settings:defaultapps`; Windows keeps the final choice | the button is wired; no false claim is made |
+| `login_item_status` / `login_item_set` | reads and writes `HKCU\...\CurrentVersion\Run\Astra` with the real exe and profile; development trees answer `supported: false` | General login row appears only when the build can register |
+| `login_item_open_settings` | opens `ms-settings:startupapps` | the approval button is wired |
+| `windows_reputation_managed` | reads SmartScreen policy values; `null` where no registry is reachable | Privacy card shows managed or its honest fallback instead of an error |
+| `windows_diagnostics_settings` | opens `ms-settings:privacy-feedback` | the diagnostics button is wired |
+
+**Verification:** `node tests/contract/system_model.mjs` **120/120** (including
+Windows registry doubles and dev-vs-packaged behavior); `wire_coverage` **51/51**
+(160 routes); live `tools/windows/system-probe.py` **15/15** against the
+installed build: default-browser answer false/`can_request` true, login item
+written and removed, General callout rendered with **Set as default**, Privacy
+group rendered with no route error. The three `ms-settings:` launches were
+accepted with `--settings`.
+
+**Windows contract harness:** 56 contract suites imported host modules through
+`path.join()`; Node treats `E:\...` as a URL scheme and refused the import. The
+imports now use `pathToFileURL(...).href`, so **63 of 64** contract suites pass
+on Windows. The remaining `sidecar_spike.mjs` needs the separate
+`out/sidecar-stub` binary it always required; it is not a Windows regression.
+
+### Window frame, first paint and capture helper (2026-11-15)
+
+The installed build had no Windows caption controls and no effective drag
+region: the shell titlebar is retired when the app owns the window, the app's
+`WindowControlsOverlay` was excluded on Windows, and `-moz-window-dragging` on
+HTML elements in the shell document is ignored by the Windows widget.
+
+| Surface | What changed | Evidence |
+|---|---|---|
+| Caption controls | `WindowControlsOverlay` renders on Windows and stays visible (`always`); the top offset clears the drag strip | live `frame-probe.py`: 3 controls at `y=16`, 26x26 each |
+| Window drag | four **XUL** `box` edges are created in the shell document with inline `-moz-window-dragging: drag`; HTML elements do not create a region | `WM_NCHITTEST` on the installed window: `HTCAPTION` (2) at `y=8..15`, `HTCLIENT` from `y=16` |
+| Control actions | maximize/restore through the existing `Frame.dispatchWindowControl` seam | live clicks: `window.windowState` 3 -> 1 -> 3 |
+| First frame | The Windows pre-XUL skeleton is disabled (`browser.startup.preXulSkeletonUI=false`): it is Firefox's native window shell and painted a native titlebar plus a saved size before Astra. `ASTRA-0017` still flattens the skeleton if it is ever enabled; `ASTRA-0018` puts the ground on the window element; `ASTRA-0019` clears a new Windows window to `#1c1b22`; the shell shows an Astra boot mark until the app announces ready | installed startup capture: no native titlebar, no size change; dark ground at 1.24 s, boot mark at 1.64 s, UI at 2.8-3.0 s (before the last two changes) |
+| Warm launch | the Rust sidecar starts beside the app frame and metadata waits for it; the shell records `bootStart/host/core/frame/ready` on `.astra-frame` | actual profile: shell 0.98 s, host 1.05 s, frame 1.06 s, core 1.21 s, app ready 1.60 s |
+| First launch | the installer runs one hidden `--headless --screenshot` warm-up against `%APPDATA%\Astra\Profiles\default` before finishing | before warm-up: 8-14 s (Windows first scan + profile creation); after: 1.60 s app-ready on the same profile |
+
+`tools/windows/frame-probe.py` is the live frame check (controls, drag edges,
+geometry, optional drag). `tools/windows/window-shot.py` is the window-only
+capture helper: it finds the Astra top-level window and copies it with Win32
+`PrintWindow`, never the desktop, and never raises or focuses it. Use
+`--list` or `--count N --interval S` for a frame sequence.
+
+**Verification:** `bun run --filter @astra/frame typecheck` 0 errors/0
+warnings, `lint`, `stylelint` and `format:check` clean; `node --test
+ui/shell/src` 76/76; shell/content-slot contracts PASS; `forge lint` 19/19 and
+`import --check` clean; footprint 3,989 P2/P3 lines (budget 4,000). The full UI
+unit run is 1,249/1,252 with one known Windows timezone failure in
+`notes/tests/sections.test.ts` (pre-existing, listed in §4.4 of the master
+plan).
+
 ### sccache (verified 2026-11-14)
 
 - One detached sccache 0.19.0 server listens on `127.0.0.1:4226`; its parent
@@ -122,12 +275,30 @@ fixes. `forge doctor --os linux` and `forge config --os linux` remain green.
   `SCCACHE_ERROR_LOG`, `SCCACHE_IDLE_TIMEOUT=0` and pre-starts the server.
 - `tools/windows/sccache-smoke.ps1` PASS: C/C++ hit, Rust hit, 16 concurrent
   compiles, server alive afterwards.
-- Real engine build evidence: 46 compiles executed, 45 cache writes, 0 cache
-  errors, 0 compilation failures. The first pass is misses; the next build of
-  the same sources hits.
+- Real engine build evidence: the baseline first pass executed 1,985 compiles
+  and wrote 1,952 objects with 0 cache errors. The patched build executed 510
+  compiles with **458 hits and 43 misses (91.42%)**, 0 cache errors and 0
+  compilation failures.
+- The first pass over new sources is misses; the next build of the same
+  sources hits.
 - The earlier "connection forcibly closed" errors happened when a forced
   build-tree stop also killed the server. Do not `taskkill /T` the sccache
   server; `forge build` now starts it detached and keeps it idle-alive.
+
+### Dev Rust LTO (thin)
+
+The first patched `gkrust` with fat LTO crashed at 97:43 with
+`0xC0000409` (STATUS_STACK_BUFFER_OVERRUN) after reaching ~11.6 GB. Dev builds
+use thin LTO instead:
+
+```powershell
+.\tools\windows\thin-lto.ps1            # dev: -Clto=thin
+.\tools\windows\thin-lto.ps1 -Revert    # release: -Clto (fat)
+```
+
+The helper edits only `engine/config/makefiles/rust.mk`. `forge fetch` replaces
+the engine tree, so re-run it after a fetch. Thin LTO shortens the `gkrust`
+link and keeps its peak near 6 GB; release builds must stay on fat LTO.
 
 ## What remains UNVERIFIED (intentionally left for later)
 

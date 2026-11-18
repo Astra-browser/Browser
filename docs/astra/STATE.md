@@ -11,6 +11,41 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Adblock Tester: 93 → 100 (2026-11-15)
+
+The owner's export from <https://adblocktester.pages.dev/> scored 93 (410/443,
+33 open). The 33 split into three causes, all closed:
+
+| Cause | Fix | File |
+|---|---|---|
+| 29 subdomains (`log.tiktokv.com`, `sstats.adobe.com`, `net.rayjump.com`, `pixel.reddit.com`, `api.raygun.io`, `cookie-cdn.cookiepro.com`, …) that community lists match only for one request type, so a `fetch(no-cors)` reached them | reviewed inventory + generated `||host^$important` section (one rule per host, every type) | `blocker/lists/adblocktester-hosts.json`, `blocker/lists/astra-telemetry.txt` (`! >>> adblocktester-strict`), same generator: `blocker/tools/superadblock.py` (now writes both sections) |
+| `/advertisement.js` and `/analytics.js` local baits | two `$script` heuristics beside `/ads.js`, `/pagead.js` | `blocker/lists/astra-telemetry.txt` |
+| both cosmetic baits inserted after load were visible | five generic class/id rules **plus** the real bug: the page's `style-src` CSP dropped the actor's `<style>` node, so no cosmetic CSS ever applied. CSS now loads as an `AGENT_SHEET` through `windowUtils`; a batch carrying an unseen class/id is looked up immediately (32/document) and scans mutation records instead of the whole document | `overlay/astra/actors/AstraBlockerChild.sys.mjs` |
+
+**Verification:** `adblocktester-probe.py --runs 3` → 443/443, score 100, zero
+open rows on three consecutive runs of the packaged Windows build (200 862
+compiled rules); `cargo test -p astra-blocker` 22/22 including the new
+`benchmark_hosts` (every inventoried host blocked for six request types,
+nested `myanalytics.js` untouched, cosmetic names resolve from a bare hint);
+`blocker_coverage` 22/22; `blocker-probe` PASS (new assertion: the page sees no
+style node); `superadblock-probe` still 482/482 headline 100. Docs:
+`docs/astra/BLOCKER.md`. The probe is registered in `tools/perf/full-suite.sh`;
+`superadblock-probe.py` now resolves the Windows build like the other probes.
+
+## UI v2 lane (D-52, from 2026-11-15)
+
+Layout only, taken from the owner's reference (New Tab, Search, Settings):
+the column's head carries the page controls and the one address field, New
+Tab reads name → day → field, Settings reads at a 680px measure. Palette,
+fonts and every frozen search surface are unchanged. Branch `ui-v2`; not
+merged — the owner reviews and confirms it first.
+
+| Task | Branch | What | Verified |
+|---|---|---|---|
+| Column head | `ui-v2` | `PageNav` extracted from `ContentBar`; `Shell` composes the field once and renders it in the column's head or the bar; `SidebarHeader` three bands | svelte-check 0, eslint 0, stylelint 0, `NewTabLook`/`ShellA11y`/`BarHover`/`ShellLook`/`SidebarLook`/`SettingsInset`/`NarrowChrome`/`ThemeLook` component suites pass; golden screenshots of shell/newtab/settings in both themes |
+| New Tab group | `ui-v2` | name, time and date, then the field; the page is no longer cut by a notch | `layout` unit 7/7, `NewTabLook` 4/4 |
+| Settings measure | `ui-v2` | 680px column, 30px title, quiet group caption | golden screenshot (settings, dark) |
+
 ## Windows 11 x64 port (D-51, from 2026-11-14)
 
 Plan: `docs/astra/WINDOWS_MASTER_PLAN.md`. Integration branch `windows-port`;
@@ -19,6 +54,47 @@ GitLab and GitHub. Locked owner decisions: full native build + all surfaces,
 objdir/caches on `D:\astra-build`, Windows 11 x64, Windows Hello passkeys,
 per-task branches, stock-first RAM budget, Linux paths unchanged, headed live
 probes. Task rows are added here when each task starts.
+
+| Task | Branch | What | Verified |
+|---|---|---|---|
+| W1 visual boot | `win/w1-headed-visual-probe` | OS-aware `headed-probe.py`: visible Windows launch, app-frame/relay/chrome assertions, Win32 `PrintWindow` capture | 10/10 PASS on the packaged Windows build (1600x1075 at 125% DPI) |
+| W1 surface probes | `win/w1-surface-probes` | platform build selection for blocker/tabs/settings probes; tabs reads `gBrowser.selectedBrowser` | blocker 21/21, tabs PASS, settings-native 50/50 on Windows |
+| W4 package/installer | `win/w4-portable-installer` | `package-windows.ps1` portable zip + NSIS per-user setup; `installer-test.ps1`; ships `astra.exe` as the product launcher | zip extracts and version-probes 8/8; installer 31/31 including live probe and clean uninstall |
+| W3 system routes | `win/w3-system-windows` | real Windows default-browser, login-item, SmartScreen-policy and diagnostics routes; General/Privacy rows wired; contract imports are file URLs on Windows | system_model 120/120, wire 51/51, live system-probe 15/15; 63/64 contract suites pass on Windows |
+| W1 window frame | `fix/windows-window-frame` | visible Windows caption controls, XUL window-drag edges, Astra boot mark and dark first paint; window-only capture helper | frame-probe 7/7, `WM_NCHITTEST` HTCAPTION at top gutter, controls 3→1→3, startup dark at 1.28 s / UI 2.99 s |
+
+## Settings audit: Import/Export were dead on this engine (2026-11-15)
+
+**Symptom:** Settings → General reported *No other browsers found on this
+device* on a machine with Edge installed, and both export buttons failed.
+
+**Root cause:** `Migration.sys.mjs` imported `IOUtils` from
+`resource://gre/modules/IOUtils.sys.mjs`, which this engine no longer ships:
+`IOUtils` is a chrome WebIDL global (see `dom/docs/ioutils_migration.md`). The
+failed import made `modules()` return `null`, so import sources were always
+empty and export always answered `failed`.
+
+**Fix:** read `IOUtils` from the chrome global; offer only migrators with real
+`getMigrateData()` for their profile (an empty browser is no longer listed, and
+the test-only migrator is skipped); export bookmarks as Netscape HTML and
+history as CSV, matching the copy in Settings.
+
+| Surface | What works now | Files |
+|---|---|---|
+| Import browser data | Microsoft Edge is detected with its profile and readable kinds; an empty/test source is not listed | `overlay/astra/host/Migration.sys.mjs` |
+| Export bookmarks | A Netscape bookmark file other browsers import | same |
+| Export history | One CSV row per visit: `date,title,address` | same |
+
+**Verification:** `node tests/contract/migration_model.mjs` 23/23 (including
+the HTML/CSV shape and the empty/test-source cases); `tabs_settings` 50/50;
+`zoom_home_material` 47/47; `wire_coverage` 62/62; live settings audit on the
+rebuilt Windows dev build 94 controls / 0 failed. `Migration.importSources()`
+returns `Microsoft Edge / Profile 1 / history` instead of `[]`; a live effect
+pass covers 44 checks (accent, fonts, density, motion, contrast, material, page
+bar, downloads ask, language, proxy, home, zoom, switch-to-open, close buttons,
+New Tab wordmark/greeting/clock/trackers) and an 8-check theme pass covers
+editing a colour and importing a shared theme. Those reported rows are not
+defects.
 
 ## Owner release: alpha 0.1.745 distro packages (2026-11-11)
 
@@ -1019,6 +1095,12 @@ Everything below was re-run against the freshly packed dev build.
   artifacts (`SelectiveStyles`, clipboard, work/semantic) still fail on the
   documented missing `content_style.js` and friends. They are not part of the
   canonical gate.
+
+## Owner report: Home lands on the New Tab (2026-11-15)
+
+| Surface | Fix | Wiring / files | Live evidence |
+|---|---|---|---|
+| Home button | Clicking Home from a page left the old page in front with the tab spinning forever. The blank-stage load called `browser.loadURI("about:blank", …)`, but ESR 153's `nsIWebNavigation.loadURI` takes an `nsIURI`, not a string: the call threw, the error was swallowed, and neither `nav.committed` nor the `busy` edge ever settled the tab. The blank stage now loads through `fixupAndLoadURIString`, and asking for the New Tab when it is already the current head is a settled no-op instead of a load nothing can finish. | `overlay/astra/host/Content.sys.mjs` (`loadIn` blank branch), `overlay/astra/host/Navigation.sys.mjs` (`loadURL` blank no-op) | `tests/contract/zoom_home_material.mjs` (47 checks, incl. the settled no-op); Windows dev-build Marionette: Home from a loopback page → `about:blank`, New Tab surface, favicon spinner gone at 0.5 s; Home again on the New Tab → no spinner. `tools/marionette-probe/material-zoom-home-probe.py` now checks both |
 
 ## Owner report: floating page bar + in-window profiles (2026-11-07)
 

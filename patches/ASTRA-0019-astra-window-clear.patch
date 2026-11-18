@@ -1,0 +1,29 @@
+Patch-Id: ASTRA-0019
+Title: Clear the Windows browser window to the Astra ground
+Tier: P2
+Upstream-Files: widget/windows/nsWindow.cpp
+Intent: The first Show() clears a new top-level window with the chrome theme's Window colour, which is white on a light system before Astra's dark ground loads. Use the product ground so the pre-XUL window is never a white flash.
+Risk: low (top-level window clear colour; all content paints over it)
+Test: forge lint, forge import --check; startup capture shows the dark Astra ground from the first frame
+Verified-On: 153.6.0
+Removal-Plan: none anticipated
+---
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 8a73e6fba9..d97aae34a6 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -1708,12 +1708,9 @@ void nsWindow::Show(bool aState) {
+           ::DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &state, sizeof(state));
+         };
+ 
+-        // Clear the window using a theme-appropriate color.
++        // Astra's window ground, painted before the chrome stylesheet can.
+         constexpr static const auto ClearWindow = [](HWND hwnd) {
+-          // default background color from current theme
+-          auto const bgcolor = LookAndFeel::Color(
+-              StyleSystemColor::Window, PreferenceSheet::ColorSchemeForChrome(),
+-              LookAndFeel::UseStandins::No, NS_RGB(0, 0, 0));
++          auto const bgcolor = NS_RGB(0x1c, 0x1b, 0x22);
+ 
+           HBRUSH brush = ::CreateSolidBrush(NSRGB_2_COLOREF(bgcolor));
+           if (NS_WARN_IF(!brush)) {

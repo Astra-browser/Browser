@@ -21,8 +21,11 @@ Exit: 0 PASS, 1 FAIL.
 import json, os, socket, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
+BINARY = "firefox.exe" if os.name == "nt" else "firefox"
+FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
+    ROOT, "engine", OBJDIR, "dist", "bin", BINARY)
 PORT = 2891
 HITS = {"ad": 0, "page": 0}
 
@@ -213,6 +216,10 @@ try:
     """)
     print("ACTOR", actor, "STYLE", style)
     check("cosmetic rule hid the element", hidden == "none", f"display={hidden}")
+    check(
+        "cosmetic CSS bypasses the page origin (no page style node)",
+        style is False,
+    )
     check("page image element still exists", img is True)
 
     stats = json.loads(m.js(

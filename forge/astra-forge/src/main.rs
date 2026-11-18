@@ -660,8 +660,11 @@ fn patch_content_present(engine: &Path, patch: &Path) -> bool {
         };
         let mut target = None;
         let mut added: Vec<&str> = Vec::new();
+        let mut is_new_file = false;
         for line in chunk.lines() {
-            if let Some(rest) = line.strip_prefix("+++ b/") {
+            if line.starts_with("new file mode") {
+                is_new_file = true;
+            } else if let Some(rest) = line.strip_prefix("+++ b/") {
                 target = Some(rest.trim().to_string());
             } else if let Some(rest) = line.strip_prefix('+') {
                 if !line.starts_with("+++") && !rest.trim().is_empty() {
@@ -674,6 +677,16 @@ fn patch_content_present(engine: &Path, patch: &Path) -> bool {
             continue;
         }
         let path = engine.join(&target);
+        if is_new_file {
+            // A patch-created file can be edited after it lands (e.g. the
+            // Windows blocker DNS fix). Its existence, not the original
+            // body, proves the patch already ran.
+            if !path.is_file() {
+                return false;
+            }
+            saw_added = true;
+            continue;
+        }
         let Ok(current) = fs::read_to_string(&path) else {
             return false;
         };

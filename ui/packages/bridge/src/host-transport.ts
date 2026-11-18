@@ -35,6 +35,7 @@ export interface HostModules {
   Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Zoom: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Launcher: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Profiles: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -44,6 +45,7 @@ export interface HostModules {
   Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  Favicons: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Migration: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -207,6 +209,12 @@ const ROUTES: Record<string, Route> = {
   update_check: ["System", "updateCheck"],
   default_browser_status: ["System", "defaultBrowserStatus"],
   login_item_status: ["System", "loginItemStatus"],
+  login_item_set: ["System", "loginItemSet"],
+  login_item_open_settings: ["System", "loginItemOpenSettings"],
+  open_software_update: ["System", "openSoftwareUpdate"],
+  windows_reputation_managed: ["System", "windowsReputationManaged"],
+  windows_diagnostics_settings: ["System", "windowsDiagnosticsSettings"],
+  favicon_probe: ["Favicons", "probe"],
   ui_info: ["System", "uiInfo"],
   resource_call: ["Resources", "call"],
   page_source: ["PageSource", "pageSource", { id: "tab_id" }],
@@ -220,6 +228,11 @@ const ROUTES: Record<string, Route> = {
   newtab_cancel: ["Search", "newtabCancel"],
   launcher_search: ["Search", "launcherSearch"],
   launcher_run: ["Search", "launcherRun"],
+  launcher_trigger: ["Launcher", "trigger"],
+  launcher_set_shortcut: ["Launcher", "setShortcut"],
+  launcher_record_shortcut: ["Launcher", "recordShortcut"],
+  launcher_set_double_tap: ["Launcher", "setDoubleTap"],
+  launcher_open_accessibility: ["Launcher", "openAccessibility"],
   spaces_create: ["Tabs", "createSpace"],
   spaces_update: ["Tabs", "updateSpace"],
   spaces_delete: ["Tabs", "deleteSpace"],

@@ -9,14 +9,16 @@
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 const UI = path.join(ROOT, "ui");
 
-const host = await import(path.join(HOST, "HostAPI.sys.mjs"));
+const host = await import(
+  pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
+);
 const transport = await readFile(
   path.join(UI, "packages", "bridge", "src", "host-transport.ts"),
   "utf8",
@@ -129,6 +131,21 @@ for (const name of [
   "operation_status",
   "operations_reconcile",
   "operation_acknowledge",
+  // Settings surfaces that must reach their host module rather than fail in
+  // the card: the Windows privacy rows and the login item.
+  "windows_reputation_managed",
+  "windows_diagnostics_settings",
+  "login_item_set",
+  "login_item_open_settings",
+  "open_software_update",
+  "favicon_probe",
+  // The launcher surface: its shortcut card and the entry points that ask for
+  // it (the address field, the sidebar button, its own accelerator).
+  "launcher_trigger",
+  "launcher_set_shortcut",
+  "launcher_record_shortcut",
+  "launcher_set_double_tap",
+  "launcher_open_accessibility",
 ]) {
   check(`${name} is routed`, routes.some((route) => route.name === name));
 }

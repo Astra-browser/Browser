@@ -5,13 +5,13 @@
 //
 // Usage: node tests/contract/chrome_extensions.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
-const mod = await import(path.join(HOST, "ChromeExtensions.sys.mjs"));
-const { WebExtensions } = await import(path.join(HOST, "WebExtensions.sys.mjs"));
+const mod = await import(pathToFileURL(path.join(HOST, "ChromeExtensions.sys.mjs")).href);
+const { WebExtensions } = await import(pathToFileURL(path.join(HOST, "WebExtensions.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;
@@ -154,7 +154,7 @@ check("the Chrome module is reachable from the Host API", typeof mod.ChromeExten
 
 // The app opens its Extensions page from this command; it must be admitted by
 // the host command table, not only handled by the app after the fact.
-const { Commands } = await import(path.join(HOST, "Commands.sys.mjs"));
+const { Commands } = await import(pathToFileURL(path.join(HOST, "Commands.sys.mjs")).href);
 const manage = await Commands.run({ id: "extensions.manage" });
 check("extensions.manage is admitted", manage?.accepted === true, manage);
 

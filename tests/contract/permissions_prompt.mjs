@@ -16,19 +16,15 @@
 // Usage: node tests/contract/permissions_prompt.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Permissions, KINDS, KIND_BY_ENGINE_TYPE, ENGINE_PERMISSION_NAME } = await import(
-  path.join(HOST, "Permissions.sys.mjs")
-);
-const { Operations, __resetOperationsForTests } = await import(
-  path.join(HOST, "Operations.sys.mjs")
-);
-const Events = await import(path.join(HOST, "Events.sys.mjs"));
+const { Permissions, KINDS, KIND_BY_ENGINE_TYPE, ENGINE_PERMISSION_NAME } = await import(pathToFileURL(path.join(HOST, "Permissions.sys.mjs")).href);
+const { Operations, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
+const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 const schema = JSON.parse(
   await readFile(path.join(HOST, "schemas", "permissions.json"), "utf8"),

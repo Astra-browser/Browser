@@ -9,7 +9,7 @@
 //
 // Usage: node tests/contract/favicons_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -25,9 +25,9 @@ const {
   __setFaviconBackend,
   __setFaviconEventSink,
   __resetFaviconsForTests,
-} = await import(path.join(HOST, "Favicons.sys.mjs"));
-const TabsMod = await import(path.join(HOST, "Tabs.sys.mjs"));
-const NavMod = await import(path.join(HOST, "Navigation.sys.mjs"));
+} = await import(pathToFileURL(path.join(HOST, "Favicons.sys.mjs")).href);
+const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
+const NavMod = await import(pathToFileURL(path.join(HOST, "Navigation.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;

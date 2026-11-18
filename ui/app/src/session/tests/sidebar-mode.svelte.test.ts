@@ -26,8 +26,11 @@ const {
   finishSidebarResize,
   cancelSidebarResize,
   expanded,
+  previewSidebarResize,
+  publishSidebarResize,
   publishedWidth,
   resolveDragWidth,
+  sidebarDragWidth,
   adoptMode,
   holdShown,
   setPanelExtent,
@@ -135,31 +138,64 @@ describe("which width changes the page travels with", () => {
     expect(last()[1]).toBe(true);
   });
 
-  it("keeps the sidebar and layout fixed while a guide moves, then commits once, travelling", () => {
+  it("follows the pointer live and only settles the shape on release", () => {
     const originalWidth = expanded();
     const originalMode = sidebarMode();
     const before = native.width.mock.calls.length;
     beginSidebarResize();
-    applyDragWidth(315);
+    expect(sidebarDragWidth()).toBe(originalWidth);
+
+    previewSidebarResize(315);
+    expect(sidebarDragWidth()).toBe(315);
+    // The shape is untouched while the handle is held...
     expect(expanded()).toBe(originalWidth);
     expect(sidebarMode()).toBe(originalMode);
-    expect(native.width.mock.calls.length).toBe(before);
-    finishSidebarResize(315);
-    expect(native.width.mock.calls.length).toBe(before + 1);
-    expect(last()).toEqual([total(315), true]);
+
+    // ...and the page is told where the live edge is, without travel.
+    publishSidebarResize();
+    expect(last()).toEqual([total(315), false]);
+
+    previewSidebarResize(340);
+    publishSidebarResize();
+    expect(last()).toEqual([total(340), false]);
+
+    finishSidebarResize(340);
+    expect(sidebarDragWidth()).toBeNull();
+    expect(expanded()).toBe(340);
+    // One last publication settles the final shape, travelling.
+    expect(last()).toEqual([total(340), true]);
+    expect(native.width.mock.calls.length).toBe(before + 3);
   });
 
-  it("cancellation leaves the original shape untouched and emits no layout", () => {
+  it("keeps the live edge inside the column's bounds", () => {
+    beginSidebarResize();
+    previewSidebarResize(0);
+    expect(sidebarDragWidth()).toBe(MIN_EXPANDED_WIDTH);
+    previewSidebarResize(MAX_EXPANDED_WIDTH + 200);
+    expect(sidebarDragWidth()).toBe(MAX_EXPANDED_WIDTH);
+    finishSidebarResize(MIN_EXPANDED_WIDTH);
+    expect(sidebarDragWidth()).toBeNull();
+  });
+
+  it("cancellation puts the page back at the shape the column never left", () => {
     const originalMode = sidebarMode();
     const originalWidth = expanded();
     const before = native.width.mock.calls.length;
     beginSidebarResize();
-    applyDragWidth(SNAP_THRESHOLD - 1);
+    previewSidebarResize(300);
+    publishSidebarResize();
+    expect(last()).toEqual([total(300), false]);
+
     cancelSidebarResize();
-    finishSidebarResize(300);
+    // The live width was published, so cancelling restores the committed one.
+    expect(last()).toEqual([total(originalWidth), false]);
+    expect(sidebarDragWidth()).toBeNull();
     expect(sidebarMode()).toBe(originalMode);
     expect(expanded()).toBe(originalWidth);
-    expect(native.width.mock.calls.length).toBe(before);
+
+    finishSidebarResize(300);
+    expect(last()).toEqual([total(originalWidth), false]);
+    expect(native.width.mock.calls.length).toBe(before + 2);
   });
 
   it("lands an overshooting release on the nearest bound instead of dropping it", () => {
@@ -178,15 +214,17 @@ describe("which width changes the page travels with", () => {
     expect(native.width.mock.calls.length).toBe(before);
   });
 
-  it("a deliberate toggle retires a guide before a stale pointer release", () => {
+  it("a deliberate toggle retires a held pointer before its stale release", () => {
     const before = native.width.mock.calls.length;
     beginSidebarResize();
-    applyDragWidth(SNAP_THRESHOLD - 1);
+    previewSidebarResize(SNAP_THRESHOLD - 1);
+    publishSidebarResize();
     expect(sidebarMode()).toBe("default");
     toggleMode();
+    // Toggling restores the committed width, then travels to the new shape.
     cancelSidebarResize();
     finishSidebarResize(300);
-    expect(native.width.mock.calls.length).toBe(before + 1);
+    expect(native.width.mock.calls.length).toBe(before + 3);
     expect(sidebarMode()).toBe("hidden");
     expect(last()[1]).toBe(true);
     toggleMode();

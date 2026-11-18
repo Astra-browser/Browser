@@ -11,7 +11,7 @@
 // Usage: node tests/contract/dialogs_events.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -19,8 +19,8 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Dialogs, __resetDialogsForTests } = await import(path.join(HOST, "Dialogs.sys.mjs"));
-const EventsMod = await import(path.join(HOST, "Events.sys.mjs"));
+const { Dialogs, __resetDialogsForTests } = await import(pathToFileURL(path.join(HOST, "Dialogs.sys.mjs")).href);
+const EventsMod = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 const { addEventListener } = EventsMod;
 
 const schema = JSON.parse(

@@ -17,7 +17,7 @@
 //
 // Usage: node tests/contract/downloads_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const ROOT = path.dirname(
@@ -25,7 +25,7 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Downloads } = await import(path.join(HOST, "Downloads.sys.mjs"));
+const { Downloads } = await import(pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href);
 
 let passed = 0;
 let failed = 0;
@@ -212,9 +212,7 @@ for (const kind of ["entries", "teleport", ""]) {
 
 // === Native seam: the list, preferences and writes are the engine's ========
 {
-  const { __setDownloadsNative, __resetDownloadsForTests } = await import(
-    path.join(HOST, "Downloads.sys.mjs")
-  );
+  const { __setDownloadsNative, __resetDownloadsForTests } = await import(pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href);
   const reset = () => {
     __resetDownloadsForTests();
   };

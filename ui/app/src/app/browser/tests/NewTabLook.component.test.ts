@@ -126,7 +126,7 @@ const result = (title: string, kind: SearchResult["kind"] = "tab"): SearchResult
   action: { type: "OpenUrl", url: `https://rust-lang.org/${encodeURIComponent(title)}` },
 });
 
-test("the field hangs from the top, and the name and the day stand in the sky", async () => {
+test("the name, the day and the field stand in one group, the field last", async () => {
   const screen = await setup({ "ui.newtab-clock-format": "12h", "focus.goal": "240" });
   await skied(screen);
   await expect.element(screen.getByRole("img", { name: "Astra" })).toBeVisible();
@@ -136,10 +136,15 @@ test("the field hangs from the top, and the name and the day stand in the sky", 
 
   const pane = screen.container.querySelector(".newtab")!.getBoundingClientRect();
   const field = screen.container.querySelector(".ui-search")!.getBoundingClientRect();
-  expect(field.top - pane.top).toBeLessThan(12);
-  // The page is the sky less the notch the field hangs in.
+  const clock = screen.container.querySelector(".when")!.getBoundingClientRect();
+  // The group reads name, day, field: the field stands under the line rather
+  // than hanging from the page's top edge.
+  expect(field.top).toBeGreaterThan(clock.bottom);
+  expect(field.width).toBeGreaterThan(420);
+  expect(Math.abs(field.left + field.width / 2 - (pane.left + pane.width / 2))).toBeLessThan(2);
+  // The page is the sky and nothing is cut out of it.
   const ground = screen.container.querySelector<HTMLElement>(".page")!;
-  expect(ground.style.clipPath).toMatch(/A ?18 18 0 0 0/u);
+  expect(ground.style.clipPath).not.toMatch(/A\s*18/u);
   const sky = screen.container.querySelector<HTMLElement>(".sky")!;
   expect(sky.style.backgroundImage).toMatch(/sky-day|sky-night/u);
 

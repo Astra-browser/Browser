@@ -215,6 +215,34 @@ def main():
         )
         m.shot("home-saved.png")
 
+        # Home from a page must land on the New Tab and settle. The blank stage
+        # was loaded with a string where the engine takes an nsIURI, so the
+        # call threw and the tab spun forever.
+        m.js(setting("tabs.startup-pages", ""))
+        m.js(setting("tabs.home", ""))
+        m.js(host('Commands.run({id: "nav.home"})'))
+
+        def home_tab():
+            return m.js(host("Tabs.get({astra_tab_id: " + json.dumps(tab_id) + "})")).get("tab", {})
+
+        def settled_blank():
+            snap = home_tab()
+            blank = snap.get("url") == "about:blank" and snap.get("loading") is False
+            return snap if blank else None
+
+        blank = wait(settled_blank, 10)
+        check("Home from a page lands on the New Tab and settles", blank is not None, home_tab())
+        m.shot("home-newtab.png")
+
+        m.js(host('Commands.run({id: "nav.home"})'))
+        time.sleep(0.5)
+        again = home_tab()
+        check(
+            "Home again on the New Tab does not start a load",
+            again.get("url") == "about:blank" and again.get("loading") is False,
+            again,
+        )
+
         # --- Zoom persistence and the real level list ---------------------
         m.js(host('Tabs.create({url: "https://zoom-probe.example/page"})'))
         m.js(host('Commands.run({id: "zoom.in"})'))

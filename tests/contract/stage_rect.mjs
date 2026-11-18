@@ -5,12 +5,10 @@
 // P4 stage dock contract: pure geometry and visibility state.
 import { strict as assert } from "node:assert";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { stageRectOf, stageStateFor, stageStyle } = await import(
-  path.join(ROOT, "ui", "shell", "src", "content", "stage-rect.js")
-);
+const { stageRectOf, stageStateFor, stageStyle } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "content", "stage-rect.js")).href);
 
 let passed = 0;
 let failed = 0;
