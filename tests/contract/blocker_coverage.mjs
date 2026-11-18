@@ -304,6 +304,16 @@ check(
     /addFromPrincipal/.test(blockerSource) &&
     /setNativeSiteException/.test(blockerSource),
 );
+// CNAME uncloaking must read the async record's canonical name. Calling the
+// native `cname()` seam from `onLookupComplete` performs a synchronous system
+// DNS query on the chrome main thread, which freezes the window on the first
+// page load when the resolver does not answer CNAME queries.
+check(
+  "CNAME uncloaking never runs a synchronous resolver query",
+  !/native\.cname\s*\??\.\(/.test(blockerSource) &&
+    /record\?\.canonicalName/.test(blockerSource),
+  "Blocker.sys.mjs must read record.canonicalName, never call native.cname()",
+);
 
 const REQUIRED_PREFS = [
   ["privacy.fingerprintingProtection", "true"],

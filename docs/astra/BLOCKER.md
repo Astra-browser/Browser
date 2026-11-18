@@ -100,7 +100,7 @@ hook moved) → `forge build --jobs 2` → `blocker-probe.py`.
 `tools/marionette-probe/shields-probe.py` PASS covers: `$removeparam` (server
 sees the cleaned URL), `$redirect` (1×1 GIF, original URL never requested),
 bounce unwrapping (Google redirector lands on the loopback destination), CNAME
-enforcement and the system-resolver CNAME chain, per-site Block Scripts, custom
+enforcement from Gecko's async canonical name, per-site Block Scripts, custom
 user rules, cookie modes, per-site cookie block/allow, forget-on-close data
 clear, fingerprint target sets, Accept-Language spoofing and bounce-tracking
 purge mode. `tests/contract/privacy_host.mjs` adds 22 checks over a fake chrome.
@@ -149,14 +149,17 @@ dependencies are missing from the bundle.
 ## Deferred / limits (honest)
 
 - **CNAME uncloaking is first-party-only and the first request can pass.** The
-  Host resolves a first-party subdomain's CNAME chain (Gecko canonical name,
-  then a direct system `res_query` fallback) and marks it when the chain ends
-  in a tracker. The request that triggered the lookup is already in flight;
-  every later request to that host is cancelled. Third-party CNAMEs are not
-  resolved (they are not a first-party disguise and would add DNS work to every
-  subresource). The direct system-resolver query is one blocking call per
-  first-party host and is cached for six hours; a page with many first-party
-  subdomains can therefore add resolver latency on the first visit.
+  Host resolves a first-party subdomain's CNAME chain from Gecko's async
+  `nsIDNSRecord.canonicalName` and marks it when the chain ends in a tracker.
+  The request that triggered the lookup is already in flight; every later
+  request to that host is cancelled. Third-party CNAMEs are not resolved (they
+  are not a first-party disguise and would add DNS work to every subresource).
+  When the platform returns no canonical name the host stays uncloaked (fail
+  open); the Host must **never** ask the engine for a synchronous CNAME record
+  here. `DnsQuery_W(RR_CNAME)` blocks for the resolver's full timeout on hosts
+  that have no CNAME (11 s on the owner's network), and that callback runs on
+  the chrome main thread — it froze the whole window on the first page load
+  (fixed in 0.1.753; `blocker_coverage` now rejects the call).
 - **Block Scripts uses two native layers.** The channel hook cancels every
   script request; an `http-on-examine-response` observer adds
   `Content-Security-Policy: script-src 'none'` to documents so inline scripts

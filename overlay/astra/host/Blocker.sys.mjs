@@ -300,6 +300,9 @@ function resolveNative() {
         JSON.parse(
           service.checkUrl(String(url), String(source), String(type)) || "{}",
         ),
+      // Diagnostic seam only. `CnameJson` performs a synchronous resolver
+      // query, so it must never be called on the chrome main thread; the
+      // uncloaking path reads the async record's canonical name instead.
       cname: (host) => JSON.parse(service.cname(String(host)) || "{}"),
       setCloakedHost: (host, blocked) => service.setCloakedHost(host, blocked),
       isCloaked: (host) => service.isCloaked(host) === true,
@@ -862,16 +865,13 @@ function resolveCloakedHost(host, sourceHost) {
           canonical = "";
         }
         const targets = canonical ? [canonical] : [];
-        if (targets.length === 0) {
-          // Platforms whose getaddrinfo does not expose a canonical name get
-          // one CNAME RR query from the system resolver.
-          try {
-            const answer = native.cname?.(key) ?? {};
-            if (Array.isArray(answer.chain)) targets.push(...answer.chain);
-          } catch {
-            // Leave the host uncloaked on a resolver failure.
-          }
-        }
+        // Never ask the engine for a CNAME record here. That seam performs a
+        // synchronous system DNS query, and this callback runs on the chrome
+        // main thread: on a resolver that does not answer CNAME queries it
+        // blocks for the whole timeout (11 s here) and freezes the window on
+        // the first page load. The async lookup above asked for
+        // RESOLVE_CANONICAL_NAME, so use what it carries and fail open
+        // (uncloaked) when the platform does not expose one.
         try {
           let cloaked = false;
           for (const target of targets) {

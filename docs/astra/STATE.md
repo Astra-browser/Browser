@@ -11,6 +11,50 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: first-navigation "Not Responding" — root cause and fix (2026-11-19)
+
+The 10–11 s whole-window freeze after launching and loading the first real page
+was **not** session restore, cache, the profile, Mica or the app frame. It was
+the ad blocker's CNAME-uncloaking fallback running a **synchronous system DNS
+query on the chrome main thread**.
+
+| Evidence | Value |
+|---|---|
+| Installed 0.1.752, copy of the real profile, first Google search | chrome round-trip gap **11 132 ms** (boot itself max 35 ms) |
+| Gecko profiler, chrome process, 1 ms samples | **300 of 385** stall samples at one native frame |
+| Symbolized stack | `onLookupComplete` (`Blocker.sys.mjs:855`) → `Blocker.cname` (`303`) → `nsIAstraBlockerService.cname` → `AstraBlockerService.cpp:108` → `astra_blocker_engine/src/lib.rs:1344` → `DnsQuery_W` |
+| `service.cname("accounts.google.com")` on the main thread | **11 085 ms** |
+| Windows `Resolve-DnsName -Type CNAME` from PowerShell, same host | **11 082 ms** — the resolver's own timeout for a host that has no CNAME |
+
+`resolveCloakedHost` already performs the correct async
+`nsIDNSService.asyncResolve(..., RESOLVE_CANONICAL_NAME | RESOLVE_BYPASS_CACHE)`.
+When the returned record did not carry a canonical name, it fell back to
+`native.cname()`, which calls `DnsQuery_W(RR_CNAME)` synchronously. On this
+network that call only ends when the resolver times out, and because it runs in
+the `http-on-modify-request` DNS callback it blocks the UI thread — Windows
+marks the window "Not Responding". It happened on the first page and not later
+because the first host resolution pays the timeout; it affected Google,
+YouTube and split views because they all resolve a first-party host.
+
+**Fix:** the fallback is gone. Uncloaking reads the async record's
+`canonicalName` and fails open (host stays uncloaked) when the platform does not
+provide one. The native `cname()` seam stays only as a diagnostic and is
+documented as main-thread-forbidden. `blocker_coverage` now fails if
+`native.cname()` returns to the product path.
+
+**Verification (installed 0.1.753, real profile copy, Windows 11):**
+the exact reproducer that took 11 132 ms measures **156 ms**; four cold launch
+→ first-search cycles plus shield off/on and a Google + YouTube split show
+max 258 ms round trip and **zero gaps ≥ 400 ms**. `blocker_coverage` 25/25
+(including the new guard), `blocker_host` 97/97, `telemetry_blocklist` 40/40,
+`state-check` and `brand-lint` clean. Artifacts:
+`Astra-0.1.753-windows-x86_64.zip` (`68d8a184…`) and
+`Astra-0.1.753-windows-x86_64-setup.exe` (`c18cd137…`).
+
+**Not addressed here:** the Windows passkey provider choice, browser-wide UI
+scale, the caption pill/top-bar rework, and the live probes still listed as
+deferred below.
+
 ## Owner bug batch (2026-11-18, branch `fix/owner-batch-2026-11-18`)
 
 Root causes fixed in the host and app, with contract/unit evidence:
