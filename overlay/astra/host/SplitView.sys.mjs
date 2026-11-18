@@ -1031,6 +1031,19 @@ async function warmPanes(binding, splitview, sourceId) {
   for (const paneTab of splitview.tabs) {
     const id = idOf(binding, paneTab);
     if (!id || id === sourceId) continue;
+    let uri = "";
+    try {
+      uri = paneTab.linkedBrowser?.currentURI?.spec ?? "";
+    } catch {
+      uri = "";
+    }
+    // Only a pane still on the blank starting document needs a selection to
+    // commit its URL. Selecting every loaded pane made a split switch the
+    // front document twice while pages were arriving, which is the freeze the
+    // owner sees after dragging a tab into a split.
+    if (uri && uri !== "about:blank" && !uri.startsWith("chrome://browser/content/blanktab")) {
+      continue;
+    }
     try {
       await Tabs.select({ request_id: `split-warm-${id}`, astra_tab_id: id });
     } catch {

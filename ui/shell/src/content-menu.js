@@ -515,10 +515,22 @@ export function installContentMenu(
           const other = (list.tabs ?? []).find(
             (tab) => tab.astra_tab_id !== id && /^https?:/u.test(tab.url ?? ""),
           );
-          if (!other) return { accepted: false };
+          let otherId = other?.astra_tab_id ?? "";
+          if (!otherId) {
+            // A split needs a second pane. From a single-tab window, put a
+            // New Tab in the other pane so the action is visible and ready
+            // for a drag.
+            const made = await host.Tabs.create({
+              request_id: "ctx-split-new",
+              url: "about:blank",
+              background: false,
+            });
+            otherId = made?.astra_tab_id ?? "";
+          }
+          if (!otherId) return { accepted: false };
           const reply = await host.SplitView.open({
             source: id,
-            other: other.astra_tab_id,
+            other: otherId,
           });
           return { accepted: !reply?.error, split: reply?.split === true };
         }
