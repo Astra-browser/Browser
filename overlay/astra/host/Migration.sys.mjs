@@ -20,6 +20,12 @@
 
 import { emit } from "./Events.sys.mjs";
 
+const FILE_SOURCE = "astra-file";
+const FILE_PROFILES = [
+  { id: "bookmarks", name: "Bookmarks (HTML)" },
+  { id: "history", name: "History (CSV)" },
+];
+
 const NAMES = {
   chrome: "Google Chrome",
   "chrome-beta": "Google Chrome Beta",
@@ -44,11 +50,13 @@ let running = null;
 function chromeScope() {
   try {
     const scopes = [globalThis];
-    if (globalThis.window && globalThis.window !== globalThis) scopes.push(globalThis.window);
+    if (globalThis.window && globalThis.window !== globalThis)
+      scopes.push(globalThis.window);
     const view = globalThis.document?.defaultView;
     if (view && !scopes.includes(view)) scopes.push(view);
     for (const scope of scopes) {
-      if (scope?.ChromeUtils?.importESModule && (scope.Services || scope.Cc)) return scope;
+      if (scope?.ChromeUtils?.importESModule && (scope.Services || scope.Cc))
+        return scope;
     }
   } catch {
     // A partial or hostile global is the same as no chrome.
@@ -108,6 +116,23 @@ function bit(mu, name) {
   return Number(mu.resourceTypes?.[name] ?? 0);
 }
 
+/**
+ * A migrator's profile argument is the object `getSourceProfiles()` returned,
+ * not the id alone: Chrome reads `aProfile.id` and falls back to the user-data
+ * root when it is missing, which finds no bookmarks or history.
+ */
+function profileArg(profile) {
+  if (
+    profile === null ||
+    profile === undefined ||
+    profile === "" ||
+    profile === "default"
+  ) {
+    return null;
+  }
+  return { id: String(profile), name: String(profile) };
+}
+
 function kindOf(mu, type) {
   if (type === bit(mu, "BOOKMARKS")) return "bookmarks";
   if (type === bit(mu, "HISTORY")) return "history";
@@ -122,7 +147,9 @@ function displayName(key) {
 /** Places dates are microseconds since the epoch; HTML wants seconds. */
 function addedSeconds(dateAdded) {
   const micros = Number(dateAdded);
-  return Number.isFinite(micros) && micros > 0 ? String(Math.floor(micros / 1_000_000)) : "";
+  return Number.isFinite(micros) && micros > 0
+    ? String(Math.floor(micros / 1_000_000))
+    : "";
 }
 
 function escapeHtml(text) {
@@ -147,7 +174,9 @@ function bookmarksHtml(node) {
   const walk = (entry, depth) => {
     for (const child of entry?.children ?? []) {
       if (child.type === 2) {
-        lines.push(`${indent(depth)}<DT><H3>${escapeHtml(child.title ?? "")}</H3>`);
+        lines.push(
+          `${indent(depth)}<DT><H3>${escapeHtml(child.title ?? "")}</H3>`,
+        );
         lines.push(`${indent(depth)}<DL><p>`);
         walk(child, depth + 1);
         lines.push(`${indent(depth)}</DL><p>`);
@@ -176,10 +205,181 @@ function historyCsv(visits) {
   const lines = ["date,title,address"];
   for (const visit of visits) {
     const micros = Number(visit.visit_date);
-    const date = Number.isFinite(micros) && micros > 0 ? new Date(micros / 1000).toISOString() : "";
-    lines.push(`${csvCell(date)},${csvCell(visit.title)},${csvCell(visit.url)}`);
+    const date =
+      Number.isFinite(micros) && micros > 0
+        ? new Date(micros / 1000).toISOString()
+        : "";
+    lines.push(
+      `${csvCell(date)},${csvCell(visit.title)},${csvCell(visit.url)}`,
+    );
   }
   return lines.join("\r\n") + "\r\n";
+}
+
+/** RFC 4180 rows, including quoted commas, quotes and newlines. */
+function csvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        cell += character;
+      }
+      continue;
+    }
+    if (character === '"') {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (character === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (character !== "\r") {
+      cell += character;
+    }
+  }
+  if (cell !== "" || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function historyPages(text) {
+  const rows = csvRows(text);
+  if (rows.length < 2) return [];
+  const header = rows[0].map((cell) => cell.trim().toLowerCase());
+  const dateAt = header.indexOf("date");
+  const titleAt = header.indexOf("title");
+  const urlAt = header.indexOf("address");
+  if (dateAt < 0 || urlAt < 0) return [];
+  const pages = [];
+  for (const row of rows.slice(1)) {
+    const url = String(row[urlAt] ?? "").trim();
+    if (url === "") continue;
+    try {
+      new URL(url);
+    } catch {
+      continue;
+    }
+    const parsed = new Date(String(row[dateAt] ?? ""));
+    if (Number.isNaN(parsed.getTime())) continue;
+    pages.push({
+      url,
+      title: titleAt < 0 ? "" : String(row[titleAt] ?? ""),
+      visits: [{ date: parsed }],
+    });
+  }
+  return pages;
+}
+
+async function chooseFile(
+  scope,
+  { title, defaultName, defaultExtension, filterLabel },
+) {
+  try {
+    const picker = scope.Cc["@mozilla.org/filepicker;1"].createInstance(
+      scope.Ci.nsIFilePicker,
+    );
+    const win = scope.Services.wm.getMostRecentWindow("navigator:browser");
+    const context = win?.browsingContext ?? null;
+    if (!context) return "";
+    picker.init(context, title, scope.Ci.nsIFilePicker.modeOpen);
+    picker.defaultString = defaultName;
+    picker.defaultExtension = defaultExtension;
+    picker.appendFilter(filterLabel, `*.${defaultExtension}`);
+    const result = await new Promise((resolve) => picker.open(resolve));
+    if (result !== scope.Ci.nsIFilePicker.returnOK) return "";
+    return picker.file?.path ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Import a file Astra itself exported, so a person can move a profile. */
+async function importFile(profile, kinds) {
+  if (running) return false;
+  const kind =
+    profile === "history"
+      ? "history"
+      : profile === "bookmarks"
+        ? "bookmarks"
+        : "";
+  if (kind === "" || !Array.isArray(kinds) || !kinds.includes(kind))
+    return false;
+  const scope = chromeScope();
+  if (!scope) return false;
+  const services = scope.Services;
+  const io = ioutils(scope);
+  const { PlacesUtils } = modules(scope) ?? {};
+  if (!services || !io || !PlacesUtils) return false;
+
+  const context = {
+    job: jobOf(FILE_SOURCE, profile, [kind]),
+    cancelled: false,
+  };
+  running = context;
+  context.job.kinds[0].state = "running";
+  publish(context);
+
+  try {
+    const path = await chooseFile(scope, {
+      title: kind === "bookmarks" ? "Import bookmarks" : "Import history",
+      defaultName: kind === "bookmarks" ? "bookmarks.html" : "history.csv",
+      defaultExtension: kind === "bookmarks" ? "html" : "csv",
+      filterLabel: kind === "bookmarks" ? "HTML" : "CSV",
+    });
+    if (path === "") {
+      context.job.kinds[0].state = "skipped";
+      context.job.finished = true;
+      publish(context);
+      return true;
+    }
+    let count = 0;
+    if (kind === "bookmarks") {
+      const { BookmarkHTMLUtils } = scope.ChromeUtils.importESModule(
+        "resource://gre/modules/BookmarkHTMLUtils.sys.mjs",
+      );
+      count =
+        Number(
+          await BookmarkHTMLUtils.importFromFile(path, { replace: false }),
+        ) || 0;
+    } else {
+      const text = await io.readUTF8(path);
+      const pages = historyPages(text);
+      for (let index = 0; index < pages.length; index += 200) {
+        await PlacesUtils.history.insertMany(pages.slice(index, index + 200));
+      }
+      count = pages.length;
+    }
+    const row = context.job.kinds[0];
+    row.state = "done";
+    row.done = count;
+    row.total = count;
+    context.job.finished = true;
+    publish(context);
+    return true;
+  } catch {
+    const row = context.job.kinds[0];
+    row.state = "failed";
+    row.problem = "unreadable";
+    context.job.finished = true;
+    publish(context);
+    return false;
+  } finally {
+    if (running === context) running = null;
+  }
 }
 
 export const Migration = {
@@ -222,20 +422,30 @@ export const Migration = {
       } catch {
         profiles = [];
       }
-      if (profiles.length === 0) profiles = [{ id: "default", name: "Default" }];
+      if (profiles.length === 0)
+        profiles = [{ id: "default", name: "Default" }];
       // What this source can actually give: the engine's own per-profile
       // answer, not the global capability bits, so an empty browser is not
-      // offered as if it held data.
+      // offered as if it held data. Every readable profile contributes to the
+      // kinds, because the picker lets a person choose any one of them.
       let data = 0;
-      try {
-        data = Number(
-          await migrator.getMigrateData(
-            profiles[0].id === "default" ? null : profiles[0],
-          ),
-        );
-      } catch {
-        data = 0;
+      const readable = [];
+      for (const candidate of profiles) {
+        let profileData = 0;
+        try {
+          profileData = Number(
+            await migrator.getMigrateData(
+              candidate.id === "default" ? null : candidate,
+            ),
+          );
+        } catch {
+          profileData = 0;
+        }
+        if (profileData === 0) continue;
+        readable.push(candidate);
+        data |= profileData;
       }
+      if (readable.length === 0) continue;
       const kinds = [];
       if ((data & bit(mu, "BOOKMARKS")) !== 0) kinds.push("bookmarks");
       if ((data & bit(mu, "HISTORY")) !== 0) kinds.push("history");
@@ -244,16 +454,25 @@ export const Migration = {
         id: key,
         browser: key,
         name: displayName(key),
-        profiles,
+        profiles: readable,
         kinds,
         needs_permission: false,
       });
     }
+    out.push({
+      id: FILE_SOURCE,
+      browser: "astra",
+      name: "Astra export file",
+      profiles: FILE_PROFILES,
+      kinds: ["bookmarks", "history"],
+      needs_permission: false,
+    });
     return out;
   },
 
   /** Start one migration. Progress arrives on `import-progress`. */
   async importStart({ source = "", profile = "default", kinds = [] } = {}) {
+    if (source === FILE_SOURCE) return importFile(profile, kinds);
     const scope = chromeScope();
     const loaded = scope ? modules(scope) : null;
     const mu = loaded?.MigrationUtils;
@@ -293,10 +512,11 @@ export const Migration = {
     };
 
     try {
-      await migrator.migrate(items, false, profile === "default" ? null : profile, progress);
+      await migrator.migrate(items, false, profileArg(profile), progress);
       if (!context.cancelled) {
         for (const row of context.job.kinds) {
-          if (row.state === "queued" || row.state === "running") row.state = "done";
+          if (row.state === "queued" || row.state === "running")
+            row.state = "done";
         }
         context.job.finished = true;
         publish(context);
@@ -391,14 +611,23 @@ export const Migration = {
       const win = services.wm.getMostRecentWindow("navigator:browser");
       const context = win?.browsingContext ?? null;
       if (!context) return "failed";
-      picker.init(context, "Export browser data", scope.Ci.nsIFilePicker.modeSave);
+      picker.init(
+        context,
+        "Export browser data",
+        scope.Ci.nsIFilePicker.modeSave,
+      );
       const extension = kind === "bookmarks" ? "html" : "csv";
       picker.defaultString = `astra-${kind}.${extension}`;
       picker.defaultExtension = extension;
-      picker.appendFilter(kind === "bookmarks" ? "HTML" : "CSV", `*.${extension}`);
+      picker.appendFilter(
+        kind === "bookmarks" ? "HTML" : "CSV",
+        `*.${extension}`,
+      );
       const result = await new Promise((resolve) => picker.open(resolve));
-      if (result !== scope.Ci.nsIFilePicker.returnOK &&
-          result !== scope.Ci.nsIFilePicker.returnReplace) {
+      if (
+        result !== scope.Ci.nsIFilePicker.returnOK &&
+        result !== scope.Ci.nsIFilePicker.returnReplace
+      ) {
         return "cancelled";
       }
       target = picker.file?.path ?? "";
