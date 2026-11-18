@@ -330,7 +330,7 @@
   }
 
   :global(.rail-item[aria-current="page"]) {
-    background: color-mix(in srgb, var(--color-accent) 14%, var(--row-active));
+    background: var(--row-active);
     box-shadow: var(--row-rim);
   }
 

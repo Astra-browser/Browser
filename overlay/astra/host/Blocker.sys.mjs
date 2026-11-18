@@ -1840,13 +1840,10 @@ export function install() {
     if (typeof Services !== "undefined" && Services?.prefs?.addObserver) {
       Services.prefs.addObserver(PREF, OBSERVER);
       Services.prefs.addObserver(CNAME_PREF, OBSERVER);
-      let hadUserChoice = true;
       try {
-        hadUserChoice = Services.prefs.prefHasUserValue(PREF);
         if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
-          // Do not arm the C++ gate before the rules exist: a restored page
-          // would load with protection "on" and nothing to block with.
-          Services.prefs.getDefaultBranch("").setBoolPref(PREF, false);
+          // Define the gate the C++ hook reads; a user value still wins.
+          Services.prefs.getDefaultBranch("").setBoolPref(PREF, DEFAULT_ENABLED);
         }
       } catch {
         // A locked default is fine: the read below reports what exists.
@@ -1858,16 +1855,6 @@ export function install() {
       scheduleRefresh();
       scheduleStartupRefresh();
       _installed = true;
-      // Compile and install once, then arm the gate for a profile that never
-      // made an explicit choice. A profile that turned protection off stays off.
-      void ensureInstalled(getBackend())
-        .then((result) => {
-          if (result?.ok && !hadUserChoice) writeEnabled(getBackend(), true);
-          publish();
-        })
-        .catch(() => {
-          // The shield reports the failure on its next status read.
-        });
     }
   } catch {
     _installed = false;

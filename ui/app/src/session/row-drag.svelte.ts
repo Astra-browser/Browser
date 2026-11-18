@@ -91,9 +91,16 @@ export class RowDrag {
   move(event: PointerEvent) {
     const start = this.#down;
     if (start === null) return;
+    // A release that the frame never saw (another surface took the pointer)
+    // must not leave a press armed; the next hover would otherwise begin a
+    // drag from a button that is no longer held.
+    if ((event.buttons & 1) === 0) {
+      this.#reset();
+      return;
+    }
     if (
       !this.#dragging &&
-      Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y) > 4
+      Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y) > 9
     ) {
       const target = event.currentTarget;
       if (target instanceof HTMLElement) {

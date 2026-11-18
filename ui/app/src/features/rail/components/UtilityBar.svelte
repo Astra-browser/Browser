@@ -424,7 +424,7 @@
 
   /* The expanded column never goes below its one-row minimum. The grid is for
      the narrow rail and a compact header, not for a settled expanded column. */
-  @container (max-width: 240px) {
+  @container (max-width: 220px) {
     .utility-bar:not([data-compact]) {
       display: grid;
       flex: 1;
