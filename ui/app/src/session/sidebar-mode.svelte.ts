@@ -9,7 +9,9 @@ const PUT_AWAY: SidebarMode = "hidden";
 
 /** The rail width. Native admits it as a real sidebar width, not a mode flag. */
 export const COMPACT_WIDTH = 56;
-export const MIN_EXPANDED_WIDTH = 180;
+// Eight utility plates plus their gaps and the header inset: below this the
+// bar wraps and the column stops being the designed one-row rail.
+export const MIN_EXPANDED_WIDTH = 252;
 export const MAX_EXPANDED_WIDTH = 460;
 
 /**
@@ -23,7 +25,7 @@ const MODE_SETTING = "sidebar.mode";
 
 let mode = $state.raw<SidebarMode>("default");
 let desiredMode: SidebarMode = "default";
-let expandedWidth = $state.raw(240);
+let expandedWidth = $state.raw(260);
 let drag: { mode: SidebarMode; desired: SidebarMode; expanded: number; pending: number } | null =
   null;
 /**

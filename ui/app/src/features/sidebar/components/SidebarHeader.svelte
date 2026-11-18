@@ -264,5 +264,6 @@
     align-items: center;
     min-inline-size: 0;
     padding-block-start: 2px;
+    container-type: inline-size;
   }
 </style>

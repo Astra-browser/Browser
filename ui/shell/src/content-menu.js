@@ -25,7 +25,10 @@ export function isContentBrowser(win, browser) {
   if (!browser || typeof browser.hasAttribute !== "function") {
     return false;
   }
-  if (browser.hasAttribute("data-astra-browser") || browser.hasAttribute("data-astra-browser-parked")) {
+  if (
+    browser.hasAttribute("data-astra-browser") ||
+    browser.hasAttribute("data-astra-browser-parked")
+  ) {
     return true;
   }
   // The native deck docks `gBrowser`'s selected browser over the Astra content
@@ -64,8 +67,12 @@ function screenPoint(win, context) {
   }
   // The app frame starts at the window's content origin, which is
   // `mozInnerScreen*`, not the outer window position (decorations sit between).
-  const originX = Number.isFinite(win.mozInnerScreenX) ? win.mozInnerScreenX : win.screenX;
-  const originY = Number.isFinite(win.mozInnerScreenY) ? win.mozInnerScreenY : win.screenY;
+  const originX = Number.isFinite(win.mozInnerScreenX)
+    ? win.mozInnerScreenX
+    : win.screenX;
+  const originY = Number.isFinite(win.mozInnerScreenY)
+    ? win.mozInnerScreenY
+    : win.screenY;
   return { x: Math.round(screenX - originX), y: Math.round(screenY - originY) };
 }
 
@@ -135,15 +142,29 @@ function buildItems(menu, browser) {
   }
 
   if (menu.onVideo || menu.onAudio) {
-    add(item(isPlaying(browser) ? "media.pause" : "media.play", isPlaying(browser) ? "Pause" : "Play"));
-    add(item(browser.audioMuted ? "media.unmute" : "media.mute", browser.audioMuted ? "Unmute" : "Mute"));
+    add(
+      item(
+        isPlaying(browser) ? "media.pause" : "media.play",
+        isPlaying(browser) ? "Pause" : "Play",
+      ),
+    );
+    add(
+      item(
+        browser.audioMuted ? "media.unmute" : "media.mute",
+        browser.audioMuted ? "Unmute" : "Mute",
+      ),
+    );
     add(item("media.loop", "Loop"));
     add(item("media.controls", "Show Controls"));
     add(item("media.fullscreen", "Full Screen"));
     if (menu.onPiPVideo) add(item("media.pip", "Watch in Picture-in-Picture"));
     gap();
   } else if (menu.onImage && menu.mediaURL) {
-    add(item("image.open", "Open Image in New Tab"), item("image.copy", "Copy Image Address"), item("image.save", "Save Image As…"));
+    add(
+      item("image.open", "Open Image in New Tab"),
+      item("image.copy", "Copy Image Address"),
+      item("image.save", "Save Image As…"),
+    );
     gap();
   }
 
@@ -153,11 +174,17 @@ function buildItems(menu, browser) {
   );
   gap();
 
-  if (menu.isContentSelected && menu.selectedText) {
-    add(item("page.copy", "Copy"));
+  const editable = menu.isEditable === true || menu.onTextInput === true;
+  const selected =
+    (menu.isContentSelected || menu.isTextSelected) && !!menu.selectedText;
+  add(
+    item("page.copy", "Copy", { disabled: !selected }),
+    item("page.cut", "Cut", { disabled: !editable }),
+    item("page.paste", "Paste", { disabled: !editable }),
+  );
+  if (selected)
     add(item("page.search", "Search Google for “…”", { hint: "Google" }));
-    gap();
-  }
+  gap();
 
   add(
     item("page.bookmark", "Bookmark This Page"),
@@ -240,7 +267,12 @@ export function devTabFor(win, browser) {
  *  `toolId` names a tool (the page menu's Inspect): the toolbox opens — or is
  *  raised — on that tool. Without a tool (F12, Ctrl+Shift+I from the product
  *  keymap) the command toggles, the way the browser's own DevTools key does. */
-export async function showDevTools(win, browser, toolId, { reason = "ContextMenu" } = {}) {
+export async function showDevTools(
+  win,
+  browser,
+  toolId,
+  { reason = "ContextMenu" } = {},
+) {
   if (!browser) {
     return { accepted: false };
   }
@@ -280,11 +312,13 @@ export async function showDevTools(win, browser, toolId, { reason = "ContextMenu
  * @param {{host: object, postToApp: (message: object) => void, tabIdOf: (browser: Element) => string|null}} deps
  * @returns {{run: (id: string) => Promise<object>, destroy: () => void}}
  */
-export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) {
+export function installContentMenu(
+  win,
+  { host, showMenu, isFromApp, tabIdOf },
+) {
   const doc = win.document;
   const popup = doc.getElementById("contentAreaContextMenu");
-  const fromApp =
-    typeof isFromApp === "function" ? isFromApp : () => false;
+  const fromApp = typeof isFromApp === "function" ? isFromApp : () => false;
   /** The one engine menu the open Astra menu is acting on. */
   let current = null;
   /** A menu the person walks away from must not keep the page's state alive:
@@ -403,105 +437,131 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
     const { menu, browser } = ctx;
     try {
       switch (id) {
-      case "link.open":
-        return newTab(menu.linkURL);
-      case "link.openSplit": {
-        const target = (() => {
-          try {
-            return win.Services.prefs.getStringPref("astra.settings.split.link-target", "split");
-          } catch {
-            return "split";
-          }
-        })();
-        if (target === "tab") return newTab(menu.linkURL);
-        const reply = await host.SplitView.openUrl({
-          url: menu.linkURL,
-          mode: "split",
-          placement: "right",
-        });
-        return { accepted: !reply?.error, split: reply?.split === true };
-      }
-      case "link.preview": {
-        const reply = await host.Peek.open({
-          url: menu.linkURL,
-          title: menu.linkTextStr,
-          source: "context-menu",
-        });
-        return { accepted: !reply?.error };
-      }
-      case "link.openWindow":
-        return openWindow({ url: menu.linkURL });
-      case "link.openPrivate":
-        return openWindow({ url: menu.linkURL, private: true });
-      case "link.copy":
-        copy(menu.linkURL);
-        return NOTHING;
-      case "link.bookmark":
-        return bookmark({ url: menu.linkURL, title: menu.linkTextStr });
-      case "image.open":
-        return newTab(menu.mediaURL);
-      case "image.copy":
-        copy(menu.mediaURL);
-        return NOTHING;
-      case "media.play":
-        return mediaCommand(menu, "play");
-      case "media.pause":
-        return mediaCommand(menu, "pause");
-      case "media.mute":
-        return mediaCommand(menu, "mute");
-      case "media.unmute":
-        return mediaCommand(menu, "unmute");
-      case "media.loop":
-        return mediaCommand(menu, "loop");
-      case "media.controls":
-        return mediaCommand(menu, "showcontrols");
-      case "media.fullscreen":
-        return mediaCommand(menu, "fullscreen");
-      case "media.pip":
-        return mediaCommand(menu, "pictureinpicture");
-      case "page.preview": {
-        const id = tabIdOf(browser);
-        if (!id) return { accepted: false };
-        const reply = await host.Peek.open({ tab_id: id, source: "context-menu" });
-        return { accepted: !reply?.error };
-      }
-      case "page.split": {
-        const id = tabIdOf(browser);
-        if (!id) return { accepted: false };
-        const list = await host.Tabs.list({ request_id: "ctx-split" });
-        const other = (list.tabs ?? []).find(
-          (tab) => tab.astra_tab_id !== id && /^https?:/u.test(tab.url ?? ""),
-        );
-        if (!other) return { accepted: false };
-        const reply = await host.SplitView.open({ source: id, other: other.astra_tab_id });
-        return { accepted: !reply?.error, split: reply?.split === true };
-      }
-      case "page.copy":
-        win.goDoCommand?.("cmd_copy");
-        return NOTHING;
-      case "page.selectAll":
-        win.goDoCommand?.("cmd_selectAll");
-        return NOTHING;
-      case "page.search":
-        return search(menu.selectedText);
-      case "page.bookmark":
-        return bookmark({ url: browser.currentURI?.spec ?? "", title: browser.contentTitle ?? "" });
-      case "page.save":
-        try {
-          win.saveBrowser(browser);
-          return { accepted: true };
-        } catch {
-          return { accepted: false };
+        case "link.open":
+          return newTab(menu.linkURL);
+        case "link.openSplit": {
+          const target = (() => {
+            try {
+              return win.Services.prefs.getStringPref(
+                "astra.settings.split.link-target",
+                "split",
+              );
+            } catch {
+              return "split";
+            }
+          })();
+          if (target === "tab") return newTab(menu.linkURL);
+          const reply = await host.SplitView.openUrl({
+            url: menu.linkURL,
+            mode: "split",
+            placement: "right",
+          });
+          return { accepted: !reply?.error, split: reply?.split === true };
         }
-      case "page.viewSource":
-        host.emit?.("ui-command", "browser.source");
-        return NOTHING;
-      case "page.devtools":
-        return showDevTools(win, browser, "inspector");
-      case "page.reload":
-        return reloadTab(browser);
-      default:
-        return { accepted: false };
+        case "link.preview": {
+          const reply = await host.Peek.open({
+            url: menu.linkURL,
+            title: menu.linkTextStr,
+            source: "context-menu",
+          });
+          return { accepted: !reply?.error };
+        }
+        case "link.openWindow":
+          return openWindow({ url: menu.linkURL });
+        case "link.openPrivate":
+          return openWindow({ url: menu.linkURL, private: true });
+        case "link.copy":
+          copy(menu.linkURL);
+          return NOTHING;
+        case "link.bookmark":
+          return bookmark({ url: menu.linkURL, title: menu.linkTextStr });
+        case "image.open":
+          return newTab(menu.mediaURL);
+        case "image.copy":
+          copy(menu.mediaURL);
+          return NOTHING;
+        case "image.save":
+          menu.saveImage?.();
+          return NOTHING;
+        case "media.play":
+          return mediaCommand(menu, "play");
+        case "media.pause":
+          return mediaCommand(menu, "pause");
+        case "media.mute":
+          return mediaCommand(menu, "mute");
+        case "media.unmute":
+          return mediaCommand(menu, "unmute");
+        case "media.loop":
+          return mediaCommand(menu, "loop");
+        case "media.controls":
+          return mediaCommand(menu, "showcontrols");
+        case "media.fullscreen":
+          return mediaCommand(menu, "fullscreen");
+        case "media.pip":
+          return mediaCommand(menu, "pictureinpicture");
+        case "page.preview": {
+          const id = tabIdOf(browser);
+          if (!id) return { accepted: false };
+          const reply = await host.Peek.open({
+            tab_id: id,
+            source: "context-menu",
+          });
+          return { accepted: !reply?.error };
+        }
+        case "page.split": {
+          const id = tabIdOf(browser);
+          if (!id) return { accepted: false };
+          const list = await host.Tabs.list({ request_id: "ctx-split" });
+          const other = (list.tabs ?? []).find(
+            (tab) => tab.astra_tab_id !== id && /^https?:/u.test(tab.url ?? ""),
+          );
+          if (!other) return { accepted: false };
+          const reply = await host.SplitView.open({
+            source: id,
+            other: other.astra_tab_id,
+          });
+          return { accepted: !reply?.error, split: reply?.split === true };
+        }
+        case "page.copy":
+          // The menu took focus from the page; the selection it was built for
+          // is still the text the person meant to copy.
+          copy(menu.selectedText);
+          return NOTHING;
+        case "page.cut":
+          browser.focus?.();
+          win.goDoCommand?.("cmd_cut");
+          return NOTHING;
+        case "page.paste":
+          browser.focus?.();
+          win.goDoCommand?.("cmd_paste");
+          return NOTHING;
+        case "page.selectAll":
+          browser.focus?.();
+          win.goDoCommand?.("cmd_selectAll");
+          return NOTHING;
+        case "page.search":
+          return search(menu.selectedText);
+        case "page.bookmark":
+          return bookmark({
+            url: browser.currentURI?.spec ?? "",
+            title: browser.contentTitle ?? "",
+          });
+        case "page.save":
+          try {
+            win.saveBrowser(browser);
+            return { accepted: true };
+          } catch {
+            return { accepted: false };
+          }
+        case "page.viewSource":
+          host.emit?.("ui-command", "browser.source");
+          return NOTHING;
+        case "page.devtools":
+          return showDevTools(win, browser, "inspector");
+        case "page.reload":
+          return reloadTab(browser);
+        default:
+          return { accepted: false };
       }
     } finally {
       // The engine menu is done once a row runs; keep nothing alive.
@@ -512,19 +572,22 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
   function onPopupShowing(event) {
     if (destroyed || event.target !== popup) return;
     const menu = win.gContextMenu;
-    if (!menu || !menu.shouldDisplay) return;
-    const browser = menu.browser;
+    const browser = menu?.browser ?? win.gBrowser?.selectedBrowser ?? null;
     if (!isContentBrowser(win, browser)) return;
-    // The engine's menu never paints. The Astra menu is the only one.
+    // A page can default-prevent its own contextmenu, or the engine can have
+    // no model for this target. Native chrome must still not answer, and
+    // returning here left the person with no menu at all: draw the generic
+    // page menu from the browser instead.
     event.preventDefault();
-    const { x, y } = screenPoint(win, menu.contentData?.context);
-    current = { menu, browser };
+    const { x, y } = screenPoint(win, menu?.contentData?.context);
+    const model = menu?.shouldDisplay ? menu : {};
+    current = { menu: model, browser };
     arm();
     if (typeof showMenu === "function") {
       showMenu({
         x,
         y,
-        items: buildItems(menu, browser),
+        items: buildItems(model, browser),
         choose: (id) => run(id),
       });
     }
@@ -537,7 +600,8 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
 
   const onMessage = (event) => {
     const data = event.data;
-    if (destroyed || !data || typeof data !== "object" || data.ns !== SHELL_NS) return;
+    if (destroyed || !data || typeof data !== "object" || data.ns !== SHELL_NS)
+      return;
     if (!fromApp(event)) return;
     if (data.kind !== "menu-run" || typeof data.id !== "string") return;
     void run(data.id);
@@ -563,7 +627,8 @@ export function installContentMenu(win, { host, showMenu, isFromApp, tabIdOf }) 
 /** Actions the app's own chrome menu asks for; the shell owns the chrome. */
 export async function runChromeAction(win, host, id, { browser = null } = {}) {
   const openWindow = (options) => {
-    if (typeof win.OpenBrowserWindow === "function") return win.OpenBrowserWindow(options);
+    if (typeof win.OpenBrowserWindow === "function")
+      return win.OpenBrowserWindow(options);
     const { BrowserWindowTracker } = win.ChromeUtils.importESModule(
       "resource:///modules/BrowserWindowTracker.sys.mjs",
     );
@@ -616,7 +681,10 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
     case "window.fullscreen": {
       const id = host.__bindCurrentWindow?.(win) || "win-1";
       try {
-        const cur = await host.Windows.get({ request_id: `win-${Date.now()}`, window_id: id });
+        const cur = await host.Windows.get({
+          request_id: `win-${Date.now()}`,
+          window_id: id,
+        });
         if (cur?.error) {
           return { accepted: false };
         }
@@ -644,7 +712,9 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
     case "page.print":
       try {
         if (!browser) return { accepted: false };
-        win.PrintUtils.startPrintWindow(browser.browsingContext, { printToFile: false });
+        win.PrintUtils.startPrintWindow(browser.browsingContext, {
+          printToFile: false,
+        });
         return { accepted: true };
       } catch {
         return { accepted: false };
@@ -653,11 +723,27 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
       host.emit?.("ui-command", "browser.source");
       return { accepted: true };
     case "page.selectAll":
-      win.goDoCommand?.("cmd_selectAll");
-      return { accepted: true };
     case "page.copy":
-      win.goDoCommand?.("cmd_copy");
+    case "page.cut":
+    case "page.paste": {
+      // The chrome shortcut arrives after focus left the page. Put it back
+      // before the engine command, or it copies the menu instead of the page.
+      try {
+        browser?.focus?.();
+      } catch {
+        // The page may have gone; the command is still the honest attempt.
+      }
+      const command =
+        id === "page.selectAll"
+          ? "cmd_selectAll"
+          : id === "page.cut"
+            ? "cmd_cut"
+            : id === "page.paste"
+              ? "cmd_paste"
+              : "cmd_copy";
+      win.goDoCommand?.(command);
       return { accepted: true };
+    }
     case "bookmark.current":
     case "bookmark.add": {
       if (isPrivateWindow(win)) return { accepted: false };

@@ -16,15 +16,27 @@
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+const ROOT = path.dirname(
+  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
+);
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
+const HostAPI = await import(
+  pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
+);
 const { Tabs, Navigation, Commands, Zoom, Settings, System } = HostAPI;
-const ZoomMod = await import(pathToFileURL(path.join(HOST, "Zoom.sys.mjs")).href);
-const SystemMod = await import(pathToFileURL(path.join(HOST, "System.sys.mjs")).href);
-const TabsMod = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
-const { __setPrefsForTests } = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
+const ZoomMod = await import(
+  pathToFileURL(path.join(HOST, "Zoom.sys.mjs")).href
+);
+const SystemMod = await import(
+  pathToFileURL(path.join(HOST, "System.sys.mjs")).href
+);
+const TabsMod = await import(
+  pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href
+);
+const { __setPrefsForTests } = await import(
+  pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href
+);
 
 let passed = 0;
 let failed = 0;
@@ -42,12 +54,16 @@ function check(name, cond, detail = "") {
 const values = new Map();
 const observers = new Set();
 function notify(name) {
-  for (const observer of observers) observer.observe(null, "nsPref:changed", name);
+  for (const observer of observers)
+    observer.observe(null, "nsPref:changed", name);
 }
 const prefs = {
-  getBoolPref: (name, fallback) => (values.has(name) ? values.get(name) : fallback),
-  getIntPref: (name, fallback) => (values.has(name) ? values.get(name) : fallback),
-  getStringPref: (name, fallback) => (values.has(name) ? values.get(name) : fallback),
+  getBoolPref: (name, fallback) =>
+    values.has(name) ? values.get(name) : fallback,
+  getIntPref: (name, fallback) =>
+    values.has(name) ? values.get(name) : fallback,
+  getStringPref: (name, fallback) =>
+    values.has(name) ? values.get(name) : fallback,
   setBoolPref: (name, value) => {
     values.set(name, value === true);
     notify(name);
@@ -75,13 +91,21 @@ const contentPrefs = {
   global: undefined,
   getByName(_name, _context, callback) {
     for (const [domain, value] of zoomStore) {
-      callback.handleResult({ domain, name: "browser.content.full-zoom", value });
+      callback.handleResult({
+        domain,
+        name: "browser.content.full-zoom",
+        value,
+      });
     }
     callback.handleCompletion(0);
   },
   getGlobal(_name, _context, callback) {
     if (this.global !== undefined) {
-      callback.handleResult({ domain: "", name: "browser.content.full-zoom", value: this.global });
+      callback.handleResult({
+        domain: "",
+        name: "browser.content.full-zoom",
+        value: this.global,
+      });
     }
     callback.handleCompletion(0);
   },
@@ -140,7 +164,11 @@ function levelsOf(res) {
     expected_profile: "default",
     call: { kind: "levels" },
   });
-  check("zoom_call levels answers a levels view", listed?.kind === "levels", JSON.stringify(listed));
+  check(
+    "zoom_call levels answers a levels view",
+    listed?.kind === "levels",
+    JSON.stringify(listed),
+  );
   check(
     "zoom_call lists the real sites in order",
     levelsOf(listed)
@@ -148,7 +176,10 @@ function levelsOf(res) {
       .join(",") === "github.com:80,nytimes.com:125",
     JSON.stringify(levelsOf(listed)),
   );
-  check("the global default zoom is not listed as a site", levelsOf(listed).length === 2);
+  check(
+    "the global default zoom is not listed as a site",
+    levelsOf(listed).length === 2,
+  );
 
   const forgotten = await Zoom.call({
     request_id: "z-2",
@@ -165,7 +196,10 @@ function levelsOf(res) {
     expected_profile: "default",
     call: { kind: "forget", site: "not a site" },
   });
-  check("zoom_call forget rejects an invalid site", badSite?.kind === "error" && badSite.error === "invalid");
+  check(
+    "zoom_call forget rejects an invalid site",
+    badSite?.kind === "error" && badSite.error === "invalid",
+  );
 
   zoomStore.set("example.org", 1.5);
   contentPrefs.global = 1.25;
@@ -178,7 +212,10 @@ function levelsOf(res) {
     "zoom_call forget_all clears every site",
     zoomStore.size === 0 && levelsOf(cleared).length === 0,
   );
-  check("reset all keeps the global default zoom", Math.abs(contentPrefs.global - 1.25) < 0.0001);
+  check(
+    "reset all keeps the global default zoom",
+    Math.abs(contentPrefs.global - 1.25) < 0.0001,
+  );
 
   // Removing the store entry is not enough: FullZoom keeps the value it has
   // already applied to a live page, so the page must be reset through the
@@ -248,7 +285,10 @@ function levelsOf(res) {
     expected_profile: "incognito",
     call: { kind: "levels" },
   });
-  check("a private profile reads no site levels", levelsOf(privateRead).length === 0);
+  check(
+    "a private profile reads no site levels",
+    levelsOf(privateRead).length === 0,
+  );
   const privateClear = await Zoom.call({
     request_id: "z-6",
     expected_profile: "incognito",
@@ -259,8 +299,15 @@ function levelsOf(res) {
     privateClear?.kind === "levels" && zoomStore.has("kept.example"),
   );
 
-  const badKind = await Zoom.call({ request_id: "z-7", expected_profile: "default", call: { kind: "wat" } });
-  check("an unknown zoom call is invalid", badKind?.kind === "error" && badKind.error === "invalid");
+  const badKind = await Zoom.call({
+    request_id: "z-7",
+    expected_profile: "default",
+    call: { kind: "wat" },
+  });
+  check(
+    "an unknown zoom call is invalid",
+    badKind?.kind === "error" && badKind.error === "invalid",
+  );
 }
 
 // === Persisting a zoom change ===========================================
@@ -268,22 +315,34 @@ function levelsOf(res) {
   resetHost();
   values.set("browser.zoom.siteSpecific", true);
 
-  check("persist writes a site level", await Zoom.persist({ url: "https://zoom.example/page", zoom: 1.5 }));
-  check("persist stores the fraction", Math.abs(zoomStore.get("zoom.example") - 1.5) < 0.0001);
-  check("persist at 100% removes the site override", await Zoom.persist({ url: "https://zoom.example/page", zoom: 1 }));
+  check(
+    "persist writes a site level",
+    await Zoom.persist({ url: "https://zoom.example/page", zoom: 1.5 }),
+  );
+  check(
+    "persist stores the fraction",
+    Math.abs(zoomStore.get("zoom.example") - 1.5) < 0.0001,
+  );
+  check(
+    "persist at 100% removes the site override",
+    await Zoom.persist({ url: "https://zoom.example/page", zoom: 1 }),
+  );
   check("the override is gone", !zoomStore.has("zoom.example"));
 
   check(
     "a private tab never writes",
-    (await Zoom.persist({ url: "https://private.example/", zoom: 1.5, private: true })) === false &&
-      !zoomStore.has("private.example"),
+    (await Zoom.persist({
+      url: "https://private.example/",
+      zoom: 1.5,
+      private: true,
+    })) === false && !zoomStore.has("private.example"),
   );
 
   values.set("browser.zoom.siteSpecific", false);
   check(
     "site-specific off never writes",
-    (await Zoom.persist({ url: "https://global.example/", zoom: 1.5 })) === false &&
-      !zoomStore.has("global.example"),
+    (await Zoom.persist({ url: "https://global.example/", zoom: 1.5 })) ===
+      false && !zoomStore.has("global.example"),
   );
 
   values.set("browser.zoom.siteSpecific", true);
@@ -293,7 +352,10 @@ function levelsOf(res) {
   );
 
   // zoom.in/out/reset go through Commands, which persists the active tab.
-  const tab = await Tabs.create({ request_id: "z-8", url: "https://command.example/page" });
+  const tab = await Tabs.create({
+    request_id: "z-8",
+    url: "https://command.example/page",
+  });
   const zoomed = await Commands.run({ id: "zoom.in" });
   check("zoom.in is admitted", zoomed.accepted === true);
   check(
@@ -306,27 +368,48 @@ function levelsOf(res) {
   contentPrefs.global = 1.25;
   const resetZoom = await Commands.run({ id: "zoom.reset" });
   check("zoom.reset is admitted", resetZoom.accepted === true);
-  check("zoom.reset removed the site override", !zoomStore.has("command.example"));
+  check(
+    "zoom.reset removed the site override",
+    !zoomStore.has("command.example"),
+  );
   const resetLevel = await Navigation.getZoom({
     request_id: "z-9",
     astra_tab_id: tab.astra_tab_id,
   });
-  check("zoom.reset lands on the default zoom", Math.abs(resetLevel.zoom - 1.25) < 0.0001, String(resetLevel.zoom));
+  check(
+    "zoom.reset lands on the default zoom",
+    Math.abs(resetLevel.zoom - 1.25) < 0.0001,
+    String(resetLevel.zoom),
+  );
 
   TabsMod.__markPrivate(tab.astra_tab_id, true);
   await Commands.run({ id: "zoom.in" });
-  check("a private window's zoom change never reaches the store", !zoomStore.has("command.example"));
+  check(
+    "a private window's zoom change never reaches the store",
+    !zoomStore.has("command.example"),
+  );
 
   // A step past the engine's range stores the clamped level, not the request.
-  const edge = await Tabs.create({ request_id: "z-10", url: "https://edge.example/" });
-  await Navigation.setZoom({ request_id: "z-11", astra_tab_id: edge.astra_tab_id, zoom: 2.95 });
+  const edge = await Tabs.create({
+    request_id: "z-10",
+    url: "https://edge.example/",
+  });
+  await Navigation.setZoom({
+    request_id: "z-11",
+    astra_tab_id: edge.astra_tab_id,
+    zoom: 2.95,
+  });
   await Commands.run({ id: "zoom.in" });
   check(
     "a zoom step past the maximum stores the clamped level",
     Math.abs(zoomStore.get("edge.example") - 3) < 0.0001,
     String(zoomStore.get("edge.example")),
   );
-  await Navigation.setZoom({ request_id: "z-12", astra_tab_id: edge.astra_tab_id, zoom: 0.3 });
+  await Navigation.setZoom({
+    request_id: "z-12",
+    astra_tab_id: edge.astra_tab_id,
+    zoom: 0.3,
+  });
   await Commands.run({ id: "zoom.out" });
   check(
     "a zoom step past the minimum stores the clamped level",
@@ -338,7 +421,10 @@ function levelsOf(res) {
 // === Home command ========================================================
 {
   resetHost();
-  const tab = await Tabs.create({ request_id: "h-1", url: "https://before.example/" });
+  const tab = await Tabs.create({
+    request_id: "h-1",
+    url: "https://before.example/",
+  });
 
   const supported = await Commands.supported();
   check("nav.home is an advertised command", supported.includes("nav.home"));
@@ -346,14 +432,25 @@ function levelsOf(res) {
   await Settings.set({ key: "tabs.home", value: "https://home.example/start" });
   const home = await Commands.run({ id: "nav.home" });
   check("nav.home is admitted", home.accepted === true);
-  const afterHome = (await Tabs.get({ request_id: "h-2", astra_tab_id: tab.astra_tab_id })).tab;
-  check("nav.home opens the saved home page", afterHome.url === "https://home.example/start", afterHome.url);
+  const afterHome = (
+    await Tabs.get({ request_id: "h-2", astra_tab_id: tab.astra_tab_id })
+  ).tab;
+  check(
+    "nav.home opens the saved home page",
+    afterHome.url === "https://home.example/start",
+    afterHome.url,
+  );
 
   // Clearing the choice falls back to the first startup page.
   await Settings.set({ key: "tabs.home", value: "" });
-  prefs.setStringPref("browser.startup.homepage", "https://startup.example/|https://second.example/");
+  prefs.setStringPref(
+    "browser.startup.homepage",
+    "https://startup.example/|https://second.example/",
+  );
   await Commands.run({ id: "nav.home" });
-  const afterStartup = (await Tabs.get({ request_id: "h-3", astra_tab_id: tab.astra_tab_id })).tab;
+  const afterStartup = (
+    await Tabs.get({ request_id: "h-3", astra_tab_id: tab.astra_tab_id })
+  ).tab;
   check(
     "nav.home falls back to the first startup page",
     afterStartup.url === "https://startup.example/",
@@ -363,24 +460,42 @@ function levelsOf(res) {
   // With neither, Astra's New Tab (about:blank) is the page.
   prefs.clearUserPref("browser.startup.homepage");
   await Commands.run({ id: "nav.home" });
-  const afterBlank = (await Tabs.get({ request_id: "h-4", astra_tab_id: tab.astra_tab_id })).tab;
-  check("nav.home falls back to the New Tab", afterBlank.url === "about:blank", afterBlank.url);
+  const afterBlank = (
+    await Tabs.get({ request_id: "h-4", astra_tab_id: tab.astra_tab_id })
+  ).tab;
+  check(
+    "nav.home falls back to the New Tab",
+    afterBlank.url === "about:blank",
+    afterBlank.url,
+  );
 
   // An explicit about:newtab is Astra's New Tab too, not a search.
   await Settings.set({ key: "tabs.home", value: "about:newtab" });
   await Commands.run({ id: "nav.home" });
-  const afterNewTab = (await Tabs.get({ request_id: "h-5", astra_tab_id: tab.astra_tab_id })).tab;
-  check("about:newtab means the New Tab surface", afterNewTab.url === "about:blank", afterNewTab.url);
+  const afterNewTab = (
+    await Tabs.get({ request_id: "h-5", astra_tab_id: tab.astra_tab_id })
+  ).tab;
+  check(
+    "about:newtab means the New Tab surface",
+    afterNewTab.url === "about:blank",
+    afterNewTab.url,
+  );
 
   // Asking for the New Tab again is a settled no-op, not a load nothing can
   // finish (the engine cannot reload an empty stage).
-  const blankTab = await Tabs.create({ request_id: "h-6", url: "about:blank", background: true });
+  const blankTab = await Tabs.create({
+    request_id: "h-6",
+    url: "about:blank",
+    background: true,
+  });
   const again = await Navigation.loadURL({
     request_id: "h-7",
     astra_tab_id: blankTab.astra_tab_id,
     url: "about:blank",
   });
-  const settled = (await Tabs.get({ request_id: "h-8", astra_tab_id: blankTab.astra_tab_id })).tab;
+  const settled = (
+    await Tabs.get({ request_id: "h-8", astra_tab_id: blankTab.astra_tab_id })
+  ).tab;
   check(
     "re-asking for the New Tab leaves the tab settled",
     again.accepted === true && settled.loading !== true,
@@ -394,7 +509,11 @@ function levelsOf(res) {
   SystemMod.__setPlatformForTests({ os: "Linux", build: "6.8.0" });
   await Settings.set({ key: "ui.material", value: "liquid_glass" });
   const linux = await System.uiInfo();
-  check("Linux reports the opaque tier", linux.material === "none", linux.material);
+  check(
+    "Linux reports the opaque tier",
+    linux.material === "none",
+    linux.material,
+  );
   check(
     "Linux offers only the solid tier",
     JSON.stringify(linux.materials) === JSON.stringify(["none"]),
@@ -407,36 +526,71 @@ function levelsOf(res) {
 
   SystemMod.__setPlatformForTests({ os: "Darwin", build: "24.0.0" });
   const mac = await System.uiInfo();
-  check("macOS reports only a tier this build can draw", mac.material === "none");
-  check("macOS offers only the solid tier", JSON.stringify(mac.materials) === JSON.stringify(["none"]));
+  check(
+    "macOS reports only a tier this build can draw",
+    mac.material === "none",
+  );
+  check(
+    "macOS offers only the solid tier",
+    JSON.stringify(mac.materials) === JSON.stringify(["none"]),
+  );
 
   // Windows before 22H2 has no Mica.
   SystemMod.__setPlatformForTests({ os: "WINNT", build: "19045" });
   values.set("astra.settings.ui.material", "auto");
   const oldWindows = await System.uiInfo();
-  check("Windows 10 offers only the solid tier", JSON.stringify(oldWindows.materials) === JSON.stringify(["none"]));
-  check("Windows 10 resolves automatic to solid", oldWindows.material === "none");
+  check(
+    "Windows 10 offers only the solid tier",
+    JSON.stringify(oldWindows.materials) === JSON.stringify(["none"]),
+  );
+  check(
+    "Windows 10 resolves automatic to solid",
+    oldWindows.material === "none",
+  );
 
   // Windows 11 22H2+ installs Mica through the widget switch.
   SystemMod.__setPlatformForTests({ os: "WINNT", build: "22631" });
   const automatic = await System.uiInfo();
-  check("Windows 11 offers solid and Mica", JSON.stringify(automatic.materials) === JSON.stringify(["none", "mica"]));
-  check("automatic resolves to Mica on Windows 11", automatic.material === "mica", automatic.material);
-  check("Mica is applied through the widget pref", values.get("widget.windows.mica") === true);
+  check(
+    "Windows 11 offers solid and Mica",
+    JSON.stringify(automatic.materials) === JSON.stringify(["none", "mica"]),
+  );
+  check(
+    "automatic resolves to Mica on Windows 11",
+    automatic.material === "mica",
+    automatic.material,
+  );
+  check(
+    "Mica is applied through the widget pref",
+    values.get("widget.windows.mica") === true,
+  );
+  SystemMod.__setPlatformForTests({ os: "WINNT", build: "22631.4890" });
+  const dotted = await System.uiInfo();
+  check(
+    "a dotted Windows build is read by its build group",
+    dotted.material === "mica" &&
+      JSON.stringify(dotted.materials) === JSON.stringify(["none", "mica"]),
+  );
 
   await Settings.set({ key: "ui.material", value: "none" });
   const solid = await System.uiInfo();
   check("choosing solid resolves to solid", solid.material === "none");
-  check("solid turns the Mica switch off", values.get("widget.windows.mica") === false);
+  check(
+    "solid turns the Mica switch off",
+    values.get("widget.windows.mica") === false,
+  );
 
   // A stored tier the platform does not have is never announced.
   await Settings.set({ key: "ui.material", value: "liquid_glass" });
   const unsupported = await System.uiInfo();
   check(
     "an unsupported stored tier falls back to solid",
-    unsupported.material === "none" && values.get("widget.windows.mica") === false,
+    unsupported.material === "none" &&
+      values.get("widget.windows.mica") === false,
   );
 }
 
-console.log(`\nzoom/home/material: ${failed === 0 ? "PASS" : "FAIL"} (${passed} checks, ${failed} failed)`);
+console.log(
+  `\nzoom/home/material: ${failed === 0 ? "PASS" : "FAIL"} (${passed} checks, ${failed} failed)`,
+);
 process.exit(failed === 0 ? 0 : 1);

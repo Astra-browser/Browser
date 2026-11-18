@@ -119,7 +119,11 @@ const SOURCE_PHASES = new Set([
   "shutdown",
 ]);
 
-const PROVENANCE = new Set(["release_bundle", "tuf_repository", "official_https"]);
+const PROVENANCE = new Set([
+  "release_bundle",
+  "tuf_repository",
+  "official_https",
+]);
 
 const COVERAGE_FIELDS = [
   "source_rules",
@@ -214,7 +218,9 @@ function mintGeneration() {
       buffer[i] = Math.floor(Math.random() * 256);
     }
   }
-  const salt = Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const salt = Array.from(buffer, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
   return `${counter}${salt}`;
 }
 
@@ -272,7 +278,9 @@ function safeSourcePhase(value) {
 function resolveNative() {
   try {
     if (typeof Cc === "undefined" || typeof Ci === "undefined") return null;
-    const service = Cc["@astra/blocker;1"]?.getService(Ci.nsIAstraBlockerService);
+    const service = Cc["@astra/blocker;1"]?.getService(
+      Ci.nsIAstraBlockerService,
+    );
     if (!service) return null;
     return {
       installRules: (rules) => service.installRules(rules),
@@ -282,11 +290,16 @@ function resolveNative() {
       isSiteEnabled: (host) => service.isSiteEnabled(host) === true,
       setSitePolicy: (host, enabled, aggressive, scripts) =>
         service.setSitePolicy(host, enabled, aggressive, scripts),
-      sitePolicy: (host) => JSON.parse(service.sitePolicy(String(host)) || "{}"),
-      classifyHost: (host) => JSON.parse(service.classifyHost(String(host)) || "{}"),
-      classifyBounce: (url) => JSON.parse(service.classifyBounce(String(url)) || "{}"),
+      sitePolicy: (host) =>
+        JSON.parse(service.sitePolicy(String(host)) || "{}"),
+      classifyHost: (host) =>
+        JSON.parse(service.classifyHost(String(host)) || "{}"),
+      classifyBounce: (url) =>
+        JSON.parse(service.classifyBounce(String(url)) || "{}"),
       checkUrl: (url, source, type) =>
-        JSON.parse(service.checkUrl(String(url), String(source), String(type)) || "{}"),
+        JSON.parse(
+          service.checkUrl(String(url), String(source), String(type)) || "{}",
+        ),
       cname: (host) => JSON.parse(service.cname(String(host)) || "{}"),
       setCloakedHost: (host, blocked) => service.setCloakedHost(host, blocked),
       isCloaked: (host) => service.isCloaked(host) === true,
@@ -432,7 +445,8 @@ async function readResourceText(url) {
     if (!response.ok) throw new Error(`http_${response.status}`);
     return await response.text();
   }
-  const { NetUtil } = importGecko("resource://gre/modules/NetUtil.sys.mjs") ?? {};
+  const { NetUtil } =
+    importGecko("resource://gre/modules/NetUtil.sys.mjs") ?? {};
   if (!NetUtil) throw new Error("no_netutil");
   return await new Promise((resolve, reject) => {
     NetUtil.asyncFetch(
@@ -456,7 +470,10 @@ async function readResourceText(url) {
 }
 
 async function readResourceGzipText(url) {
-  if (typeof fetch !== "function" || typeof DecompressionStream !== "function") {
+  if (
+    typeof fetch !== "function" ||
+    typeof DecompressionStream !== "function"
+  ) {
     throw new Error("gzip_unavailable");
   }
   const response = await fetch(url, { credentials: "omit" });
@@ -503,10 +520,19 @@ async function readCapped(response, max) {
 function isPrivateHost(host) {
   const key = normalizeHostKey(host);
   if (!key) return true;
-  if (key === "localhost" || key.endsWith(".localhost") || key.endsWith(".local")) {
+  if (
+    key === "localhost" ||
+    key.endsWith(".localhost") ||
+    key.endsWith(".local")
+  ) {
     return true;
   }
-  if (key === "::1" || key === "[::1]" || key.startsWith("fc") || key.startsWith("fd")) {
+  if (
+    key === "::1" ||
+    key === "[::1]" ||
+    key.startsWith("fc") ||
+    key.startsWith("fd")
+  ) {
     return true;
   }
   if (/^\d+\.\d+\.\d+\.\d+$/u.test(key)) {
@@ -570,9 +596,11 @@ function cachePaths() {
   // cache directory disabled. Read the globals first and keep the module form
   // only as a fallback for an engine that still ships it.
   const PathUtils =
-    globalThis.PathUtils ?? importGecko("resource://gre/modules/PathUtils.sys.mjs")?.PathUtils;
+    globalThis.PathUtils ??
+    importGecko("resource://gre/modules/PathUtils.sys.mjs")?.PathUtils;
   const IOUtils =
-    globalThis.IOUtils ?? importGecko("resource://gre/modules/IOUtils.sys.mjs")?.IOUtils;
+    globalThis.IOUtils ??
+    importGecko("resource://gre/modules/IOUtils.sys.mjs")?.IOUtils;
   if (!PathUtils || !IOUtils) return null;
   const dir = PathUtils.join(PathUtils.profileDir, "astra", "blocker", "lists");
   return { IOUtils, PathUtils, dir };
@@ -726,7 +754,9 @@ function readSitePolicies() {
 }
 
 function writeSitePolicy(host, policy) {
-  const key = String(host ?? "").trim().toLowerCase();
+  const key = String(host ?? "")
+    .trim()
+    .toLowerCase();
   if (!key) return false;
   const all = readSitePolicies();
   if (!policy.enabled && !policy.aggressive && !policy.scripts) {
@@ -751,7 +781,10 @@ let _cloakCache = new Map();
 const CLOAK_CACHE_MAX = 512;
 
 function normalizeHostKey(host) {
-  return String(host ?? "").trim().toLowerCase().replace(/\.$/u, "");
+  return String(host ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.$/u, "");
 }
 
 function cnameSpoofingEnabled() {
@@ -1043,7 +1076,9 @@ async function loadOneList(entry, { refresh = false } = {}) {
 async function buildBundle({ refresh = false } = {}) {
   const catalog = await loadCatalog();
   const ids = selectedListIds(catalog).slice(0, MAX_LISTS);
-  const byId = new Map(ids.map((id) => [id, catalog.lists.find((l) => l.id === id)]));
+  const byId = new Map(
+    ids.map((id) => [id, catalog.lists.find((l) => l.id === id)]),
+  );
   for (const entry of readCustomLists()) {
     byId.set(`custom:${entry.id}`, {
       id: `custom:${entry.id}`,
@@ -1061,25 +1096,28 @@ async function buildBundle({ refresh = false } = {}) {
   // Bounded concurrency: four sources at a time keeps the network and the
   // parse buffers small; a slow subscription cannot stall the rest.
   const queue = [...byId.values()].filter(Boolean);
-  const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
-    while (queue.length > 0) {
-      const entry = queue.shift();
-      const loaded = await loadOneList(entry, { refresh });
-      if (!loaded.text) {
-        missing.push(entry.id);
-        continue;
+  const workers = Array.from(
+    { length: Math.min(4, queue.length) },
+    async () => {
+      while (queue.length > 0) {
+        const entry = queue.shift();
+        const loaded = await loadOneList(entry, { refresh });
+        if (!loaded.text) {
+          missing.push(entry.id);
+          continue;
+        }
+        if (totalBytes + loaded.bytes > MAX_BUNDLE_BYTES) continue;
+        totalBytes += loaded.bytes;
+        totalRules += countRules(loaded.text);
+        sources.push(loaded);
+        manifest[loaded.id] = {
+          bytes: loaded.bytes,
+          from: loaded.from,
+          sha256: (await sha256Hex(loaded.text)).slice(0, 64),
+        };
       }
-      if (totalBytes + loaded.bytes > MAX_BUNDLE_BYTES) continue;
-      totalBytes += loaded.bytes;
-      totalRules += countRules(loaded.text);
-      sources.push(loaded);
-      manifest[loaded.id] = {
-        bytes: loaded.bytes,
-        from: loaded.from,
-        sha256: (await sha256Hex(loaded.text)).slice(0, 64),
-      };
-    }
-  });
+    },
+  );
   await Promise.all(workers);
 
   if (sources.length === 0) {
@@ -1097,9 +1135,7 @@ async function buildBundle({ refresh = false } = {}) {
   const rules = sources
     .map((source) => `! ==== astra:${source.id} ====\n${source.text}`)
     .join("\n")
-    .concat(
-      userRules.trim() ? `\n! ==== astra:user ====\n${userRules}\n` : "",
-    );
+    .concat(userRules.trim() ? `\n! ==== astra:user ====\n${userRules}\n` : "");
   return {
     ok: true,
     failure: null,
@@ -1182,7 +1218,9 @@ function readSiteExceptions() {
 }
 
 function writeSiteException(host, paused) {
-  const site = String(host ?? "").trim().toLowerCase();
+  const site = String(host ?? "")
+    .trim()
+    .toLowerCase();
   if (!site) return false;
   const current = new Set(readSiteExceptions());
   if (paused) current.add(site);
@@ -1201,7 +1239,9 @@ function writeSiteException(host, paused) {
  * top-level principal (and `trackingprotection-pb` in private windows).
  */
 function setNativeSiteException(host, paused) {
-  const site = String(host ?? "").trim().toLowerCase();
+  const site = String(host ?? "")
+    .trim()
+    .toLowerCase();
   if (!site) return;
   try {
     const uri = Services.io.newURI(`https://${site}`);
@@ -1318,7 +1358,7 @@ function liveBackend() {
         Services.wm.getMostRecentWindow("navigator:browser");
       if (!win) return false;
       const { PrivateBrowsingUtils } = ChromeUtils.importESModule(
-        "resource://gre/modules/PrivateBrowsingUtils.sys.mjs"
+        "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
       );
       return PrivateBrowsingUtils.isWindowPrivate(win) === true;
     } catch {
@@ -1451,7 +1491,10 @@ function liveBackend() {
       if (site === "") return null;
       let tab = "";
       try {
-        tab = win.gBrowser.getTabForBrowser?.(browser)?.getAttribute?.("astra-tab-id") ?? "";
+        tab =
+          win.gBrowser
+            .getTabForBrowser?.(browser)
+            ?.getAttribute?.("astra-tab-id") ?? "";
       } catch {
         tab = "";
       }
@@ -1797,10 +1840,13 @@ export function install() {
     if (typeof Services !== "undefined" && Services?.prefs?.addObserver) {
       Services.prefs.addObserver(PREF, OBSERVER);
       Services.prefs.addObserver(CNAME_PREF, OBSERVER);
+      let hadUserChoice = true;
       try {
+        hadUserChoice = Services.prefs.prefHasUserValue(PREF);
         if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
-          // Define the gate the C++ hook reads; a user value still wins.
-          Services.prefs.getDefaultBranch("").setBoolPref(PREF, DEFAULT_ENABLED);
+          // Do not arm the C++ gate before the rules exist: a restored page
+          // would load with protection "on" and nothing to block with.
+          Services.prefs.getDefaultBranch("").setBoolPref(PREF, false);
         }
       } catch {
         // A locked default is fine: the read below reports what exists.
@@ -1812,6 +1858,16 @@ export function install() {
       scheduleRefresh();
       scheduleStartupRefresh();
       _installed = true;
+      // Compile and install once, then arm the gate for a profile that never
+      // made an explicit choice. A profile that turned protection off stays off.
+      void ensureInstalled(getBackend())
+        .then((result) => {
+          if (result?.ok && !hadUserChoice) writeEnabled(getBackend(), true);
+          publish();
+        })
+        .catch(() => {
+          // The shield reports the failure on its next status read.
+        });
     }
   } catch {
     _installed = false;
@@ -1827,7 +1883,10 @@ function scheduleRefresh() {
   const chrome = chromeScope();
   if (!chrome) return;
   if (prefBool(AUTO_UPDATE_PREF, true) !== true) return;
-  const hours = Math.min(720, Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)));
+  const hours = Math.min(
+    720,
+    Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)),
+  );
   if (hours <= 0) return;
   // Clamp to the 32-bit timer ceiling; a chained timer re-arms for longer
   // intervals instead of wrapping to a near-zero delay.
@@ -1843,7 +1902,10 @@ function scheduleStartupRefresh() {
   if (_startupTimer !== null) return;
   const chrome = chromeScope();
   if (!chrome || prefBool(AUTO_UPDATE_PREF, true) !== true) return;
-  const hours = Math.min(720, Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)));
+  const hours = Math.min(
+    720,
+    Math.max(0, prefInt(SCHEDULE_PREF, DEFAULT_UPDATE_HOURS)),
+  );
   if (hours <= 0) return;
   const now = Math.floor(Date.now() / 1000);
   const last = prefInt(LAST_UPDATE_PREF, 0);
@@ -1947,7 +2009,8 @@ function validContext(context) {
 }
 
 async function retryGeneration(backend, failedGeneration) {
-  if (!HEX16.test(failedGeneration)) return { ok: false, reason: "invalid_input" };
+  if (!HEX16.test(failedGeneration))
+    return { ok: false, reason: "invalid_input" };
   if (!nativeState(backend).available) {
     return { ok: false, reason: "native_dispatch_rejected" };
   }
@@ -2074,12 +2137,14 @@ export const Blocker = {
     const backend = getBackend();
     const result = await retryGeneration(backend, failed_generation);
     publish();
-    if (result.ok) return admit({ outcome: "applied", reason: "mutation_applied" });
+    if (result.ok)
+      return admit({ outcome: "applied", reason: "mutation_applied" });
     return refuse(result.reason ?? "native_work_pending");
   },
 
   /** Pause/resume this site, or retry the site's failed generation. */
-  async siteChange({ context = null, action = null } = {}) {    install();
+  async siteChange({ context = null, action = null } = {}) {
+    install();
     if (!validContext(context) || !action || typeof action.kind !== "string") {
       return refuse("invalid_input");
     }
@@ -2305,12 +2370,14 @@ export const Blocker = {
           custom_lists.length > 32 ||
           custom_lists.some(
             (entry) =>
-              (typeof entry !== "string" && (!entry || typeof entry !== "object")) ||
+              (typeof entry !== "string" &&
+                (!entry || typeof entry !== "object")) ||
               (typeof entry === "string"
                 ? !/^https:\/\/[^\s]+$/iu.test(entry)
                 : typeof entry.url !== "string" ||
                   !/^https:\/\/[^\s]+$/iu.test(entry.url) ||
-                  (entry.title !== undefined && typeof entry.title !== "string")),
+                  (entry.title !== undefined &&
+                    typeof entry.title !== "string")),
           ))) ||
       (user_rules !== null &&
         (typeof user_rules !== "string" || user_rules.length > 262_144))
@@ -2376,8 +2443,7 @@ export const Blocker = {
           return refuse("store_admission_rejected");
         }
         listsChanged =
-          ids.length !== previous.size ||
-          ids.some((id) => !previous.has(id));
+          ids.length !== previous.size || ids.some((id) => !previous.has(id));
       }
       if (mode !== null) {
         Services.prefs.setIntPref(MODE_PREF, mode === "aggressive" ? 1 : 0);

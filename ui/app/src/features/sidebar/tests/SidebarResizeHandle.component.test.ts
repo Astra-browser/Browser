@@ -31,25 +31,26 @@ const at = (x: number) =>
 
 test("the column follows the pointer while it is held, then settles on release", async () => {
   sidebar.setMode("default");
-  const screen = await render(SidebarResizeHandle, { width: 240 });
+  const start = sidebar.effectiveWidth();
+  const screen = await render(SidebarResizeHandle, { width: start });
   const handle = screen.container.querySelector<HTMLElement>('[role="separator"]');
   expect(handle).not.toBeNull();
   if (!handle) return;
 
   handle.dispatchEvent(new PointerEvent("pointerdown", at(500)));
-  expect(sidebar.sidebarDragWidth()).toBe(240);
+  expect(sidebar.sidebarDragWidth()).toBe(start);
 
   handle.dispatchEvent(new PointerEvent("pointermove", at(560)));
-  expect(sidebar.sidebarDragWidth()).toBe(300);
-  await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[0]).toBe(300);
+  expect(sidebar.sidebarDragWidth()).toBe(start + 60);
+  await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[0]).toBe(start + 60);
   expect(native.setWidth.mock.calls.at(-1)?.[1]).toBe(false);
 
   handle.dispatchEvent(new PointerEvent("pointermove", at(600)));
-  expect(sidebar.sidebarDragWidth()).toBe(340);
+  expect(sidebar.sidebarDragWidth()).toBe(start + 100);
 
   handle.dispatchEvent(new PointerEvent("pointerup", at(600)));
   expect(sidebar.sidebarDragWidth()).toBeNull();
-  expect(sidebar.expanded()).toBe(340);
+  expect(sidebar.expanded()).toBe(start + 100);
   await expect.poll(() => native.setWidth.mock.calls.at(-1)?.[1]).toBe(true);
 
   screen.unmount();

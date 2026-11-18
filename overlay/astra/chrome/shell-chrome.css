@@ -44,6 +44,13 @@
   background: #1c1b22;
 }
 
+/* The window material is behind the chrome; an opaque shell root blocks it.
+   The app itself paints the wash that keeps text legible over Mica. */
+:root[data-astra-material]:not([data-astra-material="none"]) #main-window,
+:root[data-astra-material]:not([data-astra-material="none"]) #astra-root {
+  background: transparent !important;
+}
+
 /* A page's own fullscreen request (video players, presentations) makes the
  * engine set `inDOMFullscreen` on the window root. The Astra chrome is not
  * the native chrome those upstream rules hide, so hide it here and give the
@@ -92,7 +99,8 @@ split-view-footer {
 }
 
 #tabbrowser-tabbox .astra-pane-resizer {
-  border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-inline-start: 1px solid
+    color-mix(in srgb, currentColor 22%, transparent);
   background: transparent;
   outline: none;
   -moz-window-dragging: no-drag;
@@ -108,4 +116,20 @@ split-view-footer {
 #tabbrowser-tabpanels[splitview] .split-view-panel > .browserContainer {
   border-radius: 12px;
   overflow: clip;
+}
+
+/* A normal page sits on the app's rounded card, but the native deck is a
+   separate layer: without its own clip it paints square over the corners as
+   soon as a site commits. */
+#tabbrowser-tabbox {
+  border-radius: 12px;
+  overflow: clip;
+  clip-path: inset(0 round 12px);
+}
+
+@media (-moz-platform: windows) {
+  #tabbrowser-tabbox {
+    border-radius: 8px;
+    clip-path: inset(0 round 8px);
+  }
 }

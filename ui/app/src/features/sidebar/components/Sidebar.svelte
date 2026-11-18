@@ -361,15 +361,21 @@
       else if (peeking && !pointerIn && !atEdge) release();
     });
   });
-  $effect(() => {
-    if (away) return;
+  /** Put the card away whenever the column changes surface: a new tab or an
+   *  internal page has no live page to show through, and a card left armed
+   *  there kept the window transparent and swallowed the page. */
+  function lowerCard() {
     clearTimeout(linger);
     clearTimeout(lowered);
-    untrack(() => {
-      if (peeking) void commands.sidebarPeek(false, false, false);
-      peeking = false;
-      chromeOverPage(false);
-    });
+    lowered = undefined;
+    if (peeking) void commands.sidebarPeek(false, false, false);
+    peeking = false;
+    chromeOverPage(false);
+    atEdge = false;
+  }
+  $effect(() => {
+    void away;
+    untrack(lowerCard);
   });
   $effect(() => () => {
     clearTimeout(linger);
@@ -571,6 +577,7 @@
   aria-label={m.ui_browser_sidebar()}
   style:width={`${width}px`}
   style:--sidebar-width={`${columnWidth}px`}
+  style:--sidebar-live-width={`${width}px`}
   data-menu-material="opaque"
   data-reshaping={reshaping}
   data-sidebar-resize-settling={resizeSettling}
@@ -619,14 +626,14 @@
       data-glide-host
       data-launch={motion.launchState()}
     >
-      {#key compact}<div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
-          {#if IS_MAC && compact && !headerCompact}<div
-              class="sidebar-lights"
-              aria-hidden="true"
-            ></div>{/if}
-          {@render browserBody(compact)}
-          {@render dock(compact)}
-        </div>{/key}
+      <div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
+        {#if IS_MAC && compact && !headerCompact}<div
+            class="sidebar-lights"
+            aria-hidden="true"
+          ></div>{/if}
+        {@render browserBody(compact)}
+        {@render dock(compact)}
+      </div>
       {#if settings && settingsExtent > 0}<div class="sidebar-tool-host">
           <div class="sidebar-tool-utilities"><UtilityBar /></div>
           <div class="sidebar-tool-panel">{@render settingsNavigation()}</div>

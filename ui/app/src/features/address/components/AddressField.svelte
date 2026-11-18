@@ -387,13 +387,7 @@
   compact mode it is present and correct but unpainted, and the launcher is the
   visible way to reach it.
 -->
-<form
-  bind:this={form}
-  class="relative shrink-0"
-  class:pb-2={!compact}
-  onsubmit={submit}
-  role="search"
->
+<form bind:this={form} class="relative shrink-0" onsubmit={submit} role="search">
   <!--
     A refused navigation rings the field, following the shared Field
     convention. The message is announced rather than drawn: a block of text

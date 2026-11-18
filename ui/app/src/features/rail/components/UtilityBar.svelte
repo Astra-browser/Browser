@@ -422,12 +422,9 @@
     transform-origin: top left;
   }
 
-  /* The column can be dragged from 180px up to 460px. When the row cannot fit
-     every plate (including the shield the header keeps beside the bar), it
-     becomes a deliberate four-column grid rather than a ragged flex wrap: two
-     even rows, centred, with the hairline put away. The same rule keeps the
-     bar inside the column at every width instead of spilling or clipping. */
-  @container (max-width: 260px) {
+  /* The expanded column never goes below its one-row minimum. The grid is for
+     the narrow rail and a compact header, not for a settled expanded column. */
+  @container (max-width: 240px) {
     .utility-bar:not([data-compact]) {
       display: grid;
       flex: 1;

@@ -49,7 +49,11 @@ function ok(request_id, data = {}) {
 }
 
 function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
+  return {
+    request_id,
+    host_api_version: HOST_API_VERSION,
+    error: { code, message },
+  };
 }
 
 function services() {
@@ -84,7 +88,10 @@ function settingString(name, fallback) {
 
 /** The product's pane cap, clamped by the engine's own maximum. */
 function configuredPanes() {
-  return paneCount(Number(settingString("astra.settings.split.max-panes", String(MAX_PANES))), 2);
+  return paneCount(
+    Number(settingString("astra.settings.split.max-panes", String(MAX_PANES))),
+    2,
+  );
 }
 
 function splitEnabled() {
@@ -109,7 +116,10 @@ function isPrivateWindow(win) {
     // Fall through to the document marker.
   }
   try {
-    return win?.document?.documentElement?.getAttribute("privatebrowsingmode") === "temporary";
+    return (
+      win?.document?.documentElement?.getAttribute("privatebrowsingmode") ===
+      "temporary"
+    );
   } catch {
     return false;
   }
@@ -147,7 +157,11 @@ export function validArrangement(value) {
   if (!value || typeof value !== "object") return null;
   if (typeof value.id !== "string" || value.id === "") return null;
   if (typeof value.name !== "string" || value.name.trim() === "") return null;
-  if (!Array.isArray(value.panes) || value.panes.length < 2 || value.panes.length > MAX_PANES) {
+  if (
+    !Array.isArray(value.panes) ||
+    value.panes.length < 2 ||
+    value.panes.length > MAX_PANES
+  ) {
     return null;
   }
   const panes = [];
@@ -185,7 +199,8 @@ function bindingFor(window_id) {
   // A direct (non-relayed) caller has no window id. Resolve the focused
   // window, never "the first window that happens to be bound".
   try {
-    const focused = services()?.wm?.getMostRecentWindow("navigator:browser") ?? null;
+    const focused =
+      services()?.wm?.getMostRecentWindow("navigator:browser") ?? null;
     for (const binding of _bindings.values()) {
       if (binding.win === focused && focused.closed !== true) return binding;
     }
@@ -196,7 +211,8 @@ function bindingFor(window_id) {
 }
 
 function nativeTab(binding, astraTabId) {
-  if (!binding || typeof astraTabId !== "string" || astraTabId === "") return null;
+  if (!binding || typeof astraTabId !== "string" || astraTabId === "")
+    return null;
   return binding.tabOf.get(astraTabId) ?? null;
 }
 
@@ -236,7 +252,9 @@ function ratiosOf(splitview) {
     });
     const sum = widths.reduce((total, width) => total + width, 0);
     ratios =
-      sum > 0 ? widths.map((width) => width / sum) : panels.map(() => 1 / panels.length);
+      sum > 0
+        ? widths.map((width) => width / sum)
+        : panels.map(() => 1 / panels.length);
     _paneRatios.set(splitview, ratios);
   }
   return ratios;
@@ -370,7 +388,8 @@ function scheduleRatioCapture(binding) {
     binding.win.requestAnimationFrame(() => {
       try {
         const flushed = binding.win.promiseDocumentFlushed?.(() => {});
-        if (flushed && typeof flushed.then === "function") flushed.then(run, run);
+        if (flushed && typeof flushed.then === "function")
+          flushed.then(run, run);
         else run();
       } catch {
         run();
@@ -555,7 +574,10 @@ function bindResizer(binding, entry) {
     const splitview = selectedTab(binding)?.splitview ?? null;
     const all = splitview?.panels ?? [];
     if (splitview && all.length >= 2) {
-      _paneRatios.set(splitview, all.map(() => 1 / all.length));
+      _paneRatios.set(
+        splitview,
+        all.map(() => 1 / all.length),
+      );
       binding.ratio = 0.5;
     }
     applyPaneWidths(binding);
@@ -580,11 +602,21 @@ function rememberPairRatios(binding, left, right, leftWidth, rightWidth) {
   widths[at + 1] = Math.max(0, rightWidth);
   const total = widths.reduce((sum, width) => sum + width, 0);
   if (total <= 0) return;
-  _paneRatios.set(splitview, widths.map((width) => width / total));
+  _paneRatios.set(
+    splitview,
+    widths.map((width) => width / total),
+  );
   binding.captureHoldUntil = Date.now() + 800;
 }
 
-function resizePair(left, right, nextLeft, startLeft = 0, startRight = 0, binding = null) {
+function resizePair(
+  left,
+  right,
+  nextLeft,
+  startLeft = 0,
+  startRight = 0,
+  binding = null,
+) {
   if (!left || !right) return;
   const leftWidth = startLeft || left.getBoundingClientRect().width;
   const rightWidth = startRight || right.getBoundingClientRect().width;
@@ -628,7 +660,8 @@ function scheduleReflow(binding) {
     binding.win.requestAnimationFrame(() => {
       try {
         const flushed = binding.win.promiseDocumentFlushed?.(() => {});
-        if (flushed && typeof flushed.then === "function") flushed.then(run, run);
+        if (flushed && typeof flushed.then === "function")
+          flushed.then(run, run);
         else run();
       } catch {
         run();
@@ -645,7 +678,9 @@ function refresh(binding) {
     const splitview = tab?.splitview ?? null;
     syncResizers(binding, splitview);
     scheduleReflow(binding);
-    const members = splitview ? splitview.tabs.map((t) => idOf(binding, t)).filter(Boolean) : [];
+    const members = splitview
+      ? splitview.tabs.map((t) => idOf(binding, t)).filter(Boolean)
+      : [];
     const allGroups = splitViewsIn(binding)
       .map((sv) => ({
         members: sv.tabs.map((t) => idOf(binding, t)).filter(Boolean),
@@ -872,8 +907,11 @@ function systemPrincipal() {
 function containerFor(binding) {
   const selected = selectedTab(binding);
   return {
-    userContextId: Number.isSafeInteger(selected?.userContextId) ? selected.userContextId : 0,
-    principal: systemPrincipal() ?? selected?.linkedBrowser?.contentPrincipal ?? null,
+    userContextId: Number.isSafeInteger(selected?.userContextId)
+      ? selected.userContextId
+      : 0,
+    principal:
+      systemPrincipal() ?? selected?.linkedBrowser?.contentPrincipal ?? null,
   };
 }
 
@@ -887,11 +925,18 @@ function materialisePinned(binding, tab) {
     // A pinned tab still restoring.
   }
   if (!/^https?:/u.test(url)) return null;
-  const made = addNativeTab(binding, url, { userContextId: tab.userContextId ?? 0, background: true });
+  const made = addNativeTab(binding, url, {
+    userContextId: tab.userContextId ?? 0,
+    background: true,
+  });
   return made ?? null;
 }
 
-function addNativeTab(binding, url, { userContextId = 0, background = true } = {}) {
+function addNativeTab(
+  binding,
+  url,
+  { userContextId = 0, background = true } = {},
+) {
   const { gb } = binding;
   if (!gb || typeof gb.addTab !== "function") return null;
   const principal = systemPrincipal();
@@ -905,7 +950,10 @@ function addNativeTab(binding, url, { userContextId = 0, background = true } = {
     tab = gb.addTab(url, options);
   } catch {
     try {
-      tab = gb.addTab(url, { inBackground: background === true, triggeringPrincipal: principal });
+      tab = gb.addTab(url, {
+        inBackground: background === true,
+        triggeringPrincipal: principal,
+      });
     } catch {
       return null;
     }
@@ -932,7 +980,11 @@ function ensurePaneLoaded(binding, tab) {
   if (!tab || !/^https?:/u.test(url ?? "")) return;
   try {
     const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
-    if (spec && spec !== "about:blank" && !spec.startsWith("chrome://browser/content/blanktab")) {
+    if (
+      spec &&
+      spec !== "about:blank" &&
+      !spec.startsWith("chrome://browser/content/blanktab")
+    ) {
       return;
     }
     tab.linkedBrowser?.fixupAndLoadURIString(url, {
@@ -952,10 +1004,13 @@ function addToSplit(binding, tabs) {
   const existing = tabs[0]?.splitview ?? null;
   if (existing) {
     const current = existing.tabs;
-    if (current.length + tabs.slice(1).length > configuredPanes()) return null;
-    existing.addTabs(tabs.slice(1));
+    const added = tabs.slice(1).filter((tab) => !current.includes(tab));
+    if (added.length === 0) return existing;
+    if (current.length + added.length > configuredPanes()) return null;
+    existing.addTabs(added);
     return existing;
   }
+  if (tabs.some((tab) => tab.splitview)) return null;
   try {
     return gb.addTabSplitView(tabs, { trigger: null });
   } catch {
@@ -984,7 +1039,10 @@ async function warmPanes(binding, splitview, sourceId) {
   }
   if (sourceId) {
     try {
-      await Tabs.select({ request_id: `split-source-${sourceId}`, astra_tab_id: sourceId });
+      await Tabs.select({
+        request_id: `split-source-${sourceId}`,
+        astra_tab_id: sourceId,
+      });
     } catch {
       // Keep the native selection.
     }
@@ -1016,7 +1074,11 @@ function resetRatio(binding) {
   binding.ratio = 0.5;
   for (const splitview of splitViewsIn(binding)) {
     const panels = splitview.panels ?? [];
-    if (panels.length >= 2) _paneRatios.set(splitview, panels.map(() => 1 / panels.length));
+    if (panels.length >= 2)
+      _paneRatios.set(
+        splitview,
+        panels.map(() => 1 / panels.length),
+      );
     for (const panel of panels) clearPanelWidth(panel);
   }
   applyPaneWidths(binding);
@@ -1066,22 +1128,90 @@ export function matchPane(panes, openTabs) {
 
 export const SplitView = {
   /** Split the focused pane with another live tab (the tab menu's action). */
-  async open({ request_id = "", other = "", source = "", window_id = "", placement = "right" } = {}) {
-    if (!splitEnabled()) return err(request_id, "disabled", "split view is turned off");
+  async open({
+    request_id = "",
+    other = "",
+    source = "",
+    window_id = "",
+    placement = "right",
+  } = {}) {
+    if (!splitEnabled())
+      return err(request_id, "disabled", "split view is turned off");
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     let sourceTab = nativeTab(binding, source) ?? selectedTab(binding);
     sourceTab = materialisePinned(binding, sourceTab);
     const otherTab = materialisePinned(binding, nativeTab(binding, other));
-    if (!sourceTab || !otherTab) return err(request_id, "no_such_tab", "both panes need a live tab");
-    if (sourceTab === otherTab) return err(request_id, "same_tab", "a tab cannot split with itself");
+    if (!sourceTab || !otherTab)
+      return err(request_id, "no_such_tab", "both panes need a live tab");
+    if (sourceTab === otherTab)
+      return err(request_id, "same_tab", "a tab cannot split with itself");
     if (!sameSpace(binding, sourceTab, otherTab)) {
-      return err(request_id, "space_mismatch", "a split view never spans spaces");
+      return err(
+        request_id,
+        "space_mismatch",
+        "a split view never spans spaces",
+      );
     }
-    const ordered =
-      placement === "left" ? [otherTab, sourceTab] : [sourceTab, otherTab];
-    const splitview = addToSplit(binding, ordered);
-    if (!splitview) return err(request_id, "split_refused", "the engine refused this split view");
+    // A tab that is already in a split is never added twice: joining that
+    // split means selecting the existing view, and two different splits are
+    // not merged behind the person's back.
+    const sourceSplit = sourceTab.splitview ?? null;
+    const otherSplit = otherTab.splitview ?? null;
+    if (sourceSplit && otherSplit) {
+      if (sourceSplit !== otherSplit) {
+        return err(
+          request_id,
+          "already_in_split",
+          "both tabs are already in a split view",
+        );
+      }
+      focusTab(binding, sourceTab);
+      return ok(request_id, {
+        split: true,
+        members: sourceSplit.tabs
+          .map((tab) => idOf(binding, tab))
+          .filter(Boolean),
+        panes: sourceSplit.tabs.length,
+        already: true,
+      });
+    }
+    let splitview = null;
+    if (sourceSplit || otherSplit) {
+      const existing = sourceSplit ?? otherSplit;
+      const outsider = sourceSplit ? otherTab : sourceTab;
+      if (existing.tabs.includes(outsider)) {
+        splitview = existing;
+      } else if (existing.tabs.length + 1 <= configuredPanes()) {
+        try {
+          existing.addTabs([outsider]);
+          splitview = existing;
+        } catch {
+          return err(
+            request_id,
+            "split_refused",
+            "the engine refused this pane",
+          );
+        }
+      } else {
+        return err(
+          request_id,
+          "pane_limit",
+          `at most ${configuredPanes()} panes`,
+        );
+      }
+    } else {
+      const ordered =
+        placement === "left" ? [otherTab, sourceTab] : [sourceTab, otherTab];
+      splitview = addToSplit(binding, ordered);
+    }
+    if (!splitview)
+      return err(
+        request_id,
+        "split_refused",
+        "the engine refused this split view",
+      );
     await warmPanes(binding, splitview, idOf(binding, sourceTab));
     focusTab(binding, sourceTab);
     applyRatio(binding, binding.ratio);
@@ -1094,18 +1224,31 @@ export const SplitView = {
   },
 
   /** Open a URL as a new tab or as a pane beside the front tab. */
-  async openUrl({ request_id = "", url = "", mode = "split", placement = "right", pane = "", window_id = "" } = {}) {
+  async openUrl({
+    request_id = "",
+    url = "",
+    mode = "split",
+    placement = "right",
+    pane = "",
+    window_id = "",
+  } = {}) {
     if (mode !== "tab" && !splitEnabled()) {
       return err(request_id, "disabled", "split view is turned off");
     }
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
-    if (typeof url !== "string" || url === "") return err(request_id, "invalid_url", "url is required");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
+    if (typeof url !== "string" || url === "")
+      return err(request_id, "invalid_url", "url is required");
     let targetUrl = url;
     try {
       const parsed = new URL(url);
       if (!["http:", "https:"].includes(parsed.protocol)) {
-        return err(request_id, "invalid_url", "only http(s) URLs can open in a tab or pane");
+        return err(
+          request_id,
+          "invalid_url",
+          "only http(s) URLs can open in a tab or pane",
+        );
       }
       targetUrl = parsed.href;
     } catch {
@@ -1113,8 +1256,12 @@ export const SplitView = {
     }
     if (mode === "tab") {
       const { userContextId } = containerFor(binding);
-      const tab = addNativeTab(binding, targetUrl, { userContextId, background: false });
-      if (!tab) return err(request_id, "tab_refused", "the engine refused the tab");
+      const tab = addNativeTab(binding, targetUrl, {
+        userContextId,
+        background: false,
+      });
+      if (!tab)
+        return err(request_id, "tab_refused", "the engine refused the tab");
       focusTab(binding, tab);
       scheduleRefresh(binding);
       return ok(request_id, { opened: true, astra_tab_id: idOf(binding, tab) });
@@ -1122,19 +1269,33 @@ export const SplitView = {
     // Refuse before creating a tab: a rejected fourth pane must not steal the
     // front tab or add an orphan tab to the strip.
     const prospectiveSource = nativeTab(binding, pane) ?? selectedTab(binding);
-    if (prospectiveSource?.splitview && prospectiveSource.splitview.tabs.length >= configuredPanes()) {
-      return err(request_id, "pane_limit", `at most ${configuredPanes()} panes`);
+    if (
+      prospectiveSource?.splitview &&
+      prospectiveSource.splitview.tabs.length >= configuredPanes()
+    ) {
+      return err(
+        request_id,
+        "pane_limit",
+        `at most ${configuredPanes()} panes`,
+      );
     }
     // A split pane keeps the front tab's container, so a link from a private
     // or space tab cannot land in a different partition.
     const { userContextId } = containerFor(binding);
-    const made = addNativeTab(binding, targetUrl, { userContextId, background: true });
-    if (!made) return err(request_id, "tab_refused", "the engine refused the pane tab");
+    const made = addNativeTab(binding, targetUrl, {
+      userContextId,
+      background: true,
+    });
+    if (!made)
+      return err(request_id, "tab_refused", "the engine refused the pane tab");
     const source = nativeTab(binding, pane) ?? selectedTab(binding);
     if (!source || source === made) {
       focusTab(binding, made);
       scheduleRefresh(binding);
-      return ok(request_id, { opened: true, astra_tab_id: idOf(binding, made) });
+      return ok(request_id, {
+        opened: true,
+        astra_tab_id: idOf(binding, made),
+      });
     }
     const ordered = placement === "left" ? [made, source] : [source, made];
     const splitview = addToSplit(binding, ordered);
@@ -1143,7 +1304,11 @@ export const SplitView = {
       // pane exists.
       focusTab(binding, made);
       scheduleRefresh(binding);
-      return ok(request_id, { opened: true, split: false, astra_tab_id: idOf(binding, made) });
+      return ok(request_id, {
+        opened: true,
+        split: false,
+        astra_tab_id: idOf(binding, made),
+      });
     }
     focusTab(binding, source);
     applyRatio(binding, binding.ratio);
@@ -1157,9 +1322,16 @@ export const SplitView = {
   },
 
   /** Replace one pane's tab without closing the tab that was there. */
-  async replace({ request_id = "", pane = "", other = "", url = "", window_id = "" } = {}) {
+  async replace({
+    request_id = "",
+    pane = "",
+    other = "",
+    url = "",
+    window_id = "",
+  } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const paneTab = nativeTab(binding, pane) ?? selectedTab(binding);
     if (!paneTab) return err(request_id, "no_such_tab", "the pane is gone");
     const splitview = paneTab.splitview ?? null;
@@ -1169,12 +1341,21 @@ export const SplitView = {
     let replacement = nativeTab(binding, other);
     if (!replacement && typeof url === "string" && url !== "") {
       const { userContextId } = containerFor(binding);
-      replacement = addNativeTab(binding, url, { userContextId, background: true });
+      replacement = addNativeTab(binding, url, {
+        userContextId,
+        background: true,
+      });
     }
-    if (!replacement) return err(request_id, "no_such_tab", "no replacement tab");
-    if (replacement === paneTab) return err(request_id, "same_tab", "the replacement is the pane");
+    if (!replacement)
+      return err(request_id, "no_such_tab", "no replacement tab");
+    if (replacement === paneTab)
+      return err(request_id, "same_tab", "the replacement is the pane");
     if (!sameSpace(binding, paneTab, replacement)) {
-      return err(request_id, "space_mismatch", "a split view never spans spaces");
+      return err(
+        request_id,
+        "space_mismatch",
+        "a split view never spans spaces",
+      );
     }
     const members = splitview.tabs.filter((tab) => tab !== paneTab);
     if (members.includes(replacement)) {
@@ -1187,20 +1368,30 @@ export const SplitView = {
       // The wrapper may already be gone.
     }
     const rebuilt = addToSplit(binding, members);
-    if (!rebuilt) return err(request_id, "split_refused", "the engine refused the replacement");
+    if (!rebuilt)
+      return err(
+        request_id,
+        "split_refused",
+        "the engine refused the replacement",
+      );
     if (paneTab.selected) focusTab(binding, replacement);
     applyRatio(binding, binding.ratio);
     scheduleRefresh(binding);
-    return ok(request_id, { replaced: true, members: members.map((tab) => idOf(binding, tab)) });
+    return ok(request_id, {
+      replaced: true,
+      members: members.map((tab) => idOf(binding, tab)),
+    });
   },
 
   /** Remove one tab from its split, leaving the tab open in the strip. */
   async leave({ request_id = "", id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const tab = nativeTab(binding, id);
     const splitview = tab?.splitview ?? null;
-    if (!tab || !splitview) return err(request_id, "not_split", "that tab is not in a split view");
+    if (!tab || !splitview)
+      return err(request_id, "not_split", "that tab is not in a split view");
     const remaining = splitview.tabs.filter((member) => member !== tab);
     try {
       splitview.unsplitTabs("astra_leave");
@@ -1208,17 +1399,25 @@ export const SplitView = {
       return err(request_id, "split_refused", "the engine refused to unsplit");
     }
     if (remaining.length >= 2 && !addToSplit(binding, remaining)) {
-      return err(request_id, "split_refused", "the remaining panes could not stay split");
+      return err(
+        request_id,
+        "split_refused",
+        "the remaining panes could not stay split",
+      );
     }
     if (tab.selected) focusTab(binding, remaining[0] ?? tab);
     scheduleRefresh(binding);
-    return ok(request_id, { left: true, members: remaining.map((member) => idOf(binding, member)) });
+    return ok(request_id, {
+      left: true,
+      members: remaining.map((member) => idOf(binding, member)),
+    });
   },
 
   /** End the split above the front tab; every tab stays open. */
   async unsplit({ request_id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const splitview = selectedTab(binding)?.splitview ?? null;
     if (!splitview) return ok(request_id, { unsplit: false, members: [] });
     const members = splitview.tabs.map((tab) => idOf(binding, tab));
@@ -1231,9 +1430,11 @@ export const SplitView = {
   /** Make one pane the focused tab (the page that owns the address bar). */
   async focus({ request_id = "", id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const tab = nativeTab(binding, id);
-    if (!tab) return err(request_id, "no_such_tab", "that pane has no live tab");
+    if (!tab)
+      return err(request_id, "no_such_tab", "that pane has no live tab");
     focusTab(binding, tab);
     scheduleRefresh(binding);
     return ok(request_id, { focused: id });
@@ -1242,9 +1443,11 @@ export const SplitView = {
   /** Set the first divider share (0.05..0.95). */
   async ratio({ request_id = "", ratio = null, window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const applied = applyRatio(binding, ratio);
-    if (applied === null) return err(request_id, "bad_ratio", "ratio must be finite");
+    if (applied === null)
+      return err(request_id, "bad_ratio", "ratio must be finite");
     return ok(request_id, { ratio: applied });
   },
 
@@ -1257,11 +1460,14 @@ export const SplitView = {
     if (!binding) return ok(request_id, { edge: null, accepted: false });
     const width = Number(binding.win?.innerWidth) || 0;
     const point = Number(x);
-    if (width <= 0 || !Number.isFinite(point)) return ok(request_id, { edge: null, accepted: false });
+    if (width <= 0 || !Number.isFinite(point))
+      return ok(request_id, { edge: null, accepted: false });
     let left = 0;
     let right = width;
     try {
-      const rect = binding.win.document.querySelector("[data-astra-content]")?.getBoundingClientRect();
+      const rect = binding.win.document
+        .querySelector("[data-astra-content]")
+        ?.getBoundingClientRect();
       if (rect && rect.width > 0) {
         left = rect.left;
         right = rect.right;
@@ -1270,7 +1476,12 @@ export const SplitView = {
       // Window bounds.
     }
     const edgeWidth = Math.min(120, Math.round((right - left) * 0.12));
-    const edge = point <= left + edgeWidth ? "left" : point >= right - edgeWidth ? "right" : null;
+    const edge =
+      point <= left + edgeWidth
+        ? "left"
+        : point >= right - edgeWidth
+          ? "right"
+          : null;
     return ok(request_id, { edge, accepted: edge !== null });
   },
 
@@ -1278,12 +1489,22 @@ export const SplitView = {
    * Tab dragged onto the page's left/right edge becomes a pane. The app sends
    * frame coordinates; a drop in the middle is not a split.
    */
-  async drop({ request_id = "", id = "", x = null, y = null, window_id = "" } = {}) {
-    if (!splitEnabled() || !settingBool("astra.settings.split.drag-edge", true)) {
+  async drop({
+    request_id = "",
+    id = "",
+    x = null,
+    y = null,
+    window_id = "",
+  } = {}) {
+    if (
+      !splitEnabled() ||
+      !settingBool("astra.settings.split.drag-edge", true)
+    ) {
       return ok(request_id, { accepted: false, reason: "disabled" });
     }
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const tab = nativeTab(binding, id);
     if (!tab) return err(request_id, "no_such_tab", "the dragged tab is gone");
     const width = Number(binding.win?.innerWidth) || 0;
@@ -1308,9 +1529,11 @@ export const SplitView = {
     const edge = Math.min(120, Math.round((right - left) * 0.12));
     const placement =
       point <= left + edge ? "left" : point >= right - edge ? "right" : null;
-    if (placement === null) return ok(request_id, { accepted: false, reason: "not_edge" });
+    if (placement === null)
+      return ok(request_id, { accepted: false, reason: "not_edge" });
     const source = selectedTab(binding);
-    if (!source || source === tab) return ok(request_id, { accepted: false, reason: "same_tab" });
+    if (!source || source === tab)
+      return ok(request_id, { accepted: false, reason: "same_tab" });
     // If the front tab is already in a split, the dragged tab joins that
     // split instead of pulling the front tab into a new two-pane one.
     const existing = source.splitview ?? tab.splitview ?? null;
@@ -1330,7 +1553,8 @@ export const SplitView = {
       const ordered = placement === "left" ? [tab, source] : [source, tab];
       splitview = addToSplit(binding, ordered);
     }
-    if (!splitview) return ok(request_id, { accepted: false, reason: "split_refused" });
+    if (!splitview)
+      return ok(request_id, { accepted: false, reason: "split_refused" });
     await warmPanes(binding, splitview, idOf(binding, source));
     focusTab(binding, source);
     scheduleRefresh(binding);
@@ -1344,9 +1568,14 @@ export const SplitView = {
   /** Save the front split as a named arrangement (never in a private window). */
   async bookmarkSave({ request_id = "", name = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     if (isPrivateWindow(binding.win)) {
-      return err(request_id, "private_context", "a private window keeps no arrangement");
+      return err(
+        request_id,
+        "private_context",
+        "a private window keeps no arrangement",
+      );
     }
     const splitview = selectedTab(binding)?.splitview ?? null;
     if (!splitview || splitview.tabs.length < 2) {
@@ -1360,14 +1589,21 @@ export const SplitView = {
     // routed through this module, so a stored `binding.ratio` can be stale.
     try {
       const panels = splitview.panels;
-      const total = panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0);
+      const total = panels.reduce(
+        (sum, panel) => sum + panel.getBoundingClientRect().width,
+        0,
+      );
       if (total > 0 && panels[0]) {
-        binding.ratio = clampRatio(panels[0].getBoundingClientRect().width / total) ?? binding.ratio;
+        binding.ratio =
+          clampRatio(panels[0].getBoundingClientRect().width / total) ??
+          binding.ratio;
       }
     } catch {
       // Keep the last known ratio.
     }
-    const label = String(name ?? "").trim() || panes.map((pane) => pane.title || pane.url).join(" · ");
+    const label =
+      String(name ?? "").trim() ||
+      panes.map((pane) => pane.title || pane.url).join(" · ");
     const arrangement = validArrangement({
       id: newId(),
       name: label,
@@ -1376,18 +1612,31 @@ export const SplitView = {
       panes,
       created_at: Date.now(),
     });
-    if (!arrangement) return err(request_id, "invalid", "the arrangement is not valid");
-    const rows = [arrangement, ...readStore(binding)].filter(Boolean).slice(0, MAX_ARRANGEMENTS);
-    if (!writeStore(rows)) return err(request_id, "store_failed", "the arrangement could not be saved");
+    if (!arrangement)
+      return err(request_id, "invalid", "the arrangement is not valid");
+    const rows = [arrangement, ...readStore(binding)]
+      .filter(Boolean)
+      .slice(0, MAX_ARRANGEMENTS);
+    if (!writeStore(rows))
+      return err(
+        request_id,
+        "store_failed",
+        "the arrangement could not be saved",
+      );
     emit("split.arrangements-changed", {});
     return ok(request_id, { saved: true, arrangement });
   },
 
   async bookmarkList({ request_id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     if (isPrivateWindow(binding.win)) {
-      return err(request_id, "private_context", "a private window keeps no arrangement");
+      return err(
+        request_id,
+        "private_context",
+        "a private window keeps no arrangement",
+      );
     }
     const rows = readStore(binding).map(validArrangement).filter(Boolean);
     return ok(request_id, { version: STORE_VERSION, arrangements: rows });
@@ -1395,9 +1644,14 @@ export const SplitView = {
 
   async bookmarkDelete({ request_id = "", id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     if (isPrivateWindow(binding.win)) {
-      return err(request_id, "private_context", "a private window keeps no arrangement");
+      return err(
+        request_id,
+        "private_context",
+        "a private window keeps no arrangement",
+      );
     }
     const rows = readStore(binding).filter((row) => row?.id !== id);
     writeStore(rows);
@@ -1412,15 +1666,25 @@ export const SplitView = {
    */
   async bookmarkRestore({ request_id = "", id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     if (isPrivateWindow(binding.win)) {
-      return err(request_id, "private_context", "a private window restores no arrangement");
+      return err(
+        request_id,
+        "private_context",
+        "a private window restores no arrangement",
+      );
     }
     const rows = readStore(binding).map(validArrangement).filter(Boolean);
     const arrangement = rows.find((row) => row.id === id);
-    if (!arrangement) return err(request_id, "no_such_arrangement", "unknown arrangement");
+    if (!arrangement)
+      return err(request_id, "no_such_arrangement", "unknown arrangement");
     if (arrangement.space_id && arrangement.space_id !== __activeSpaceId()) {
-      return err(request_id, "space_mismatch", "switch to the arrangement's space first");
+      return err(
+        request_id,
+        "space_mismatch",
+        "switch to the arrangement's space first",
+      );
     }
     const { userContextId } = containerFor(binding);
     const openTabs = [];
@@ -1434,7 +1698,8 @@ export const SplitView = {
       } catch {
         url = "";
       }
-      if (/^https?:/u.test(url)) openTabs.push({ astra_tab_id: astra, tab, url });
+      if (/^https?:/u.test(url))
+        openTabs.push({ astra_tab_id: astra, tab, url });
     }
     const matches = matchPane(arrangement.panes, openTabs);
     const chosen = [];
@@ -1443,11 +1708,18 @@ export const SplitView = {
         chosen.push(match.tab);
         continue;
       }
-      const made = addNativeTab(binding, match.url, { userContextId, background: true });
+      const made = addNativeTab(binding, match.url, {
+        userContextId,
+        background: true,
+      });
       if (made) chosen.push(made);
     }
     if (chosen.length < 2) {
-      return err(request_id, "incomplete", "fewer than two panes could be opened");
+      return err(
+        request_id,
+        "incomplete",
+        "fewer than two panes could be opened",
+      );
     }
     for (const splitview of splitViewsIn(binding)) {
       // Only a split that owns one of the panes we are about to place is
@@ -1460,7 +1732,12 @@ export const SplitView = {
       }
     }
     const splitview = addToSplit(binding, chosen.slice(0, MAX_PANES));
-    if (!splitview) return err(request_id, "split_refused", "the engine refused the arrangement");
+    if (!splitview)
+      return err(
+        request_id,
+        "split_refused",
+        "the engine refused the arrangement",
+      );
     binding.ratio = arrangement.ratio;
     applyRatio(binding, arrangement.ratio);
     focusTab(binding, chosen[0]);
@@ -1474,9 +1751,12 @@ export const SplitView = {
   /** The live split for the front tab, for a panel or a probe. */
   async state({ request_id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
-    if (!binding) return err(request_id, "no_window", "no chrome window is bound");
+    if (!binding)
+      return err(request_id, "no_window", "no chrome window is bound");
     const splitview = selectedTab(binding)?.splitview ?? null;
-    const members = splitview ? splitview.tabs.map((tab) => idOf(binding, tab)).filter(Boolean) : [];
+    const members = splitview
+      ? splitview.tabs.map((tab) => idOf(binding, tab)).filter(Boolean)
+      : [];
     return ok(request_id, {
       members,
       ratio: binding.ratio,

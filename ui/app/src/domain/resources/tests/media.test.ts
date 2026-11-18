@@ -9,6 +9,7 @@ test("a picture is asked for at the width it is shown, and a large view asks for
   expect(mediaUrl(PROFILE, DIGEST)).toMatch(/\/01M3CTWDG20GFZPACD7905RSRJ\/a{64}\?w=720$/u);
   expect(mediaUrl(PROFILE, DIGEST, 1600)).toMatch(/\?w=1600$/u);
   expect(mediaUrl(PROFILE, "nope")).toBeNull();
+  expect(mediaUrl("default", DIGEST)).toMatch(/\/default\/a{64}\?w=720$/u);
 });
 
 test("record pictures retain exact local custody and never turn into a remote image fetch", () => {

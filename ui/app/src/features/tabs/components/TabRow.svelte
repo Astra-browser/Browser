@@ -214,7 +214,7 @@
   /* Only the current tab is fully lit, and it is the one row genuinely above
      the column. The rest sit a step back so the list reads as one surface. */
   .browse-tab[data-selected="true"] {
-    background: var(--row-active);
+    background: color-mix(in srgb, var(--color-accent) 14%, var(--row-active));
     color: var(--color-text);
     font-weight: var(--sidebar-row-weight-current);
   }

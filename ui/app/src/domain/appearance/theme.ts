@@ -40,6 +40,29 @@ let unlisten: (() => void) | null = null;
 export function applyUiPreferences(tint: string, reduceMotion: boolean) {
   document.documentElement.setAttribute("data-tint", tint);
   setReducedMotion(reduceMotion);
+  publishAppearance();
+}
+
+/** The shell document paints the window ground behind this frame, so it has
+ *  to hear the same material, theme, accent and density this root resolves. */
+function publishAppearance() {
+  const root = document.documentElement;
+  try {
+    if (window.parent === window) return;
+    window.parent.postMessage(
+      {
+        ns: "astra-shell",
+        kind: "appearance",
+        material: root.getAttribute("data-material") ?? "none",
+        theme: root.getAttribute("data-theme") === "light" ? "light" : "dark",
+        accent: root.getAttribute("data-tint") ?? "graphite",
+        density: root.getAttribute("data-density") ?? "comfortable",
+      },
+      "*",
+    );
+  } catch {
+    // A standalone preview has no shell to tell.
+  }
 }
 
 export function setReducedMotion(reduceMotion: boolean) {
@@ -116,16 +139,19 @@ function render() {
   root.setAttribute("data-font", customization.font);
   root.setAttribute("data-font-size", customization.fontSize);
   root.setAttribute("data-code-font", customization.codeFont);
+  publishAppearance();
 }
 
 export function applyLayout(axes: { density: "compact" | "comfortable"; contrast: boolean }) {
   document.documentElement.setAttribute("data-density", axes.density);
   document.documentElement.setAttribute("data-contrast", String(axes.contrast));
+  publishAppearance();
 }
 
 function apply() {
   const light = appearance === "light" || (appearance === "system" && media.matches);
   document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+  publishAppearance();
 }
 
 /**
@@ -139,6 +165,7 @@ function applyMaterial(material: string, materials?: readonly string[]) {
   if (Array.isArray(materials) && materials.length > 0) {
     root.setAttribute("data-materials", materials.join(","));
   }
+  publishAppearance();
 }
 
 async function initialize(generation: number) {

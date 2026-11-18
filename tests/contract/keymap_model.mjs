@@ -15,8 +15,11 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Keymap, __resetKeymapForTests, __keymapRecording, featureOf } = await import(pathToFileURL(path.join(HOST, "Keymap.sys.mjs")).href);
-const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
+const { Keymap, __resetKeymapForTests, __keymapRecording, featureOf } =
+  await import(pathToFileURL(path.join(HOST, "Keymap.sys.mjs")).href);
+const { addEventListener, __resetEventsForTests } = await import(
+  pathToFileURL(path.join(HOST, "Events.sys.mjs")).href
+);
 
 let passed = 0;
 let failed = 0;
@@ -48,56 +51,111 @@ const off = addEventListener((event) => {
   const mac = await Keymap.entries({ platform: "mac" });
 
   check("entries returns an array", Array.isArray(other) && Array.isArray(mac));
-  check("the registry is complete (85 commands)", other.length === 85);
+  check("the registry is complete (88 commands)", other.length === 88);
   check("both platforms list the same commands", mac.length === other.length);
 
   const ids = other.map((entry) => entry.id);
   check("every registry id is unique", new Set(ids).size === ids.length);
-  check("mac ids are unique", new Set(mac.map((entry) => entry.id)).size === mac.length);
-  check("mac and other list the same ids",
-    mac.every((entry, index) => entry.id === other[index].id));
+  check(
+    "mac ids are unique",
+    new Set(mac.map((entry) => entry.id)).size === mac.length,
+  );
+  check(
+    "mac and other list the same ids",
+    mac.every((entry, index) => entry.id === other[index].id),
+  );
 
   const sorted = [...ids].sort();
-  check("entries are sorted by id", ids.every((id, index) => id === sorted[index]));
+  check(
+    "entries are sorted by id",
+    ids.every((id, index) => id === sorted[index]),
+  );
 
-  check("every entry carries default_accelerator",
-    other.every((entry) => Object.hasOwn(entry, "default_accelerator")));
-  check("every entry carries the wire fields", other.every((entry) =>
-    typeof entry.id === "string" &&
-    typeof entry.title === "string" &&
-    typeof entry.group === "string" &&
-    Object.hasOwn(entry, "accelerator") &&
-    typeof entry.customizable === "boolean" &&
-    typeof entry.customized === "boolean"));
+  check(
+    "every entry carries default_accelerator",
+    other.every((entry) => Object.hasOwn(entry, "default_accelerator")),
+  );
+  check(
+    "every entry carries the wire fields",
+    other.every(
+      (entry) =>
+        typeof entry.id === "string" &&
+        typeof entry.title === "string" &&
+        typeof entry.group === "string" &&
+        Object.hasOwn(entry, "accelerator") &&
+        typeof entry.customizable === "boolean" &&
+        typeof entry.customized === "boolean",
+    ),
+  );
 
   // Defaults follow the platform, not one shared string.
-  check("tab.new default is Ctrl+T elsewhere",
-    byId(other, "tab.new").default_accelerator === "Ctrl+T");
-  check("tab.new default is Cmd+T on macOS",
-    byId(mac, "tab.new").default_accelerator === "Cmd+T");
-  check("browser.settings default is Ctrl+,",
-    byId(other, "browser.settings").default_accelerator === "Ctrl+,");
-  check("a macOS-only default is null elsewhere",
-    byId(other, "note.new").default_accelerator === null);
-  check("a macOS-only default is set on macOS",
-    byId(mac, "note.new").default_accelerator === "Cmd+Option+N");
-  check("an alternate without a macOS default is null there",
-    byId(mac, "nav.reload.alt").default_accelerator === null);
-  check("the same alternate has F5 elsewhere",
-    byId(other, "nav.reload.alt").default_accelerator === "F5");
-  check("Option is spelled for macOS",
-    byId(mac, "space.next").default_accelerator === "Cmd+Option+Right");
+  check(
+    "tab.new default is Ctrl+T elsewhere",
+    byId(other, "tab.new").default_accelerator === "Ctrl+T",
+  );
+  check(
+    "tab.new default is Cmd+T on macOS",
+    byId(mac, "tab.new").default_accelerator === "Cmd+T",
+  );
+  check(
+    "browser.settings default is Ctrl+,",
+    byId(other, "browser.settings").default_accelerator === "Ctrl+,",
+  );
+  check(
+    "a macOS-only default is null elsewhere",
+    byId(other, "note.new").default_accelerator === null,
+  );
+  check(
+    "a macOS-only default is set on macOS",
+    byId(mac, "note.new").default_accelerator === "Cmd+Option+N",
+  );
+  check(
+    "an alternate without a macOS default is null there",
+    byId(mac, "nav.reload.alt").default_accelerator === null,
+  );
+  check(
+    "the same alternate has F5 elsewhere",
+    byId(other, "nav.reload.alt").default_accelerator === "F5",
+  );
+  check(
+    "Option is spelled for macOS",
+    byId(mac, "space.next").default_accelerator === "Cmd+Option+Right",
+  );
 
   // Groups and alternates survive the port.
-  check("browser.settings is an app command", byId(other, "browser.settings").group === "app");
-  check("nav.reload.alt is a keys alternate", byId(other, "nav.reload.alt").group === "keys");
-  check("launcher.toggle is global", byId(other, "launcher.toggle").group === "global");
-  check("work.pane.close is a work binding", byId(other, "work.pane.close").group === "work");
-  check("the launcher is not customizable", byId(other, "launcher.toggle").customizable === false);
-  check("Work bindings are not customizable", byId(other, "work.pane.close").customizable === false);
-  check("ordinary commands are customizable", byId(other, "tab.new").customizable === true);
+  check(
+    "browser.settings is an app command",
+    byId(other, "browser.settings").group === "app",
+  );
+  check(
+    "nav.reload.alt is a keys alternate",
+    byId(other, "nav.reload.alt").group === "keys",
+  );
+  check(
+    "launcher.toggle is global",
+    byId(other, "launcher.toggle").group === "global",
+  );
+  check(
+    "work.pane.close is a work binding",
+    byId(other, "work.pane.close").group === "work",
+  );
+  check(
+    "the launcher is not customizable",
+    byId(other, "launcher.toggle").customizable === false,
+  );
+  check(
+    "Work bindings are not customizable",
+    byId(other, "work.pane.close").customizable === false,
+  );
+  check(
+    "ordinary commands are customizable",
+    byId(other, "tab.new").customizable === true,
+  );
   check("feature_of maps dictate to ai", featureOf("work.dictate") === "ai");
-  check("feature_of maps a work id to work", featureOf("work.pane.close") === "work");
+  check(
+    "feature_of maps a work id to work",
+    featureOf("work.pane.close") === "work",
+  );
   check("feature_of leaves tab.new alone", featureOf("tab.new") === null);
 }
 
@@ -105,12 +163,24 @@ const off = addEventListener((event) => {
 {
   check("no change has been emitted yet", changed.length === 0);
 
-  const applied = await Keymap.bind({ id: "tab.new", accelerator: "CmdOrCtrl+Shift+F9" });
+  const applied = await Keymap.bind({
+    id: "tab.new",
+    accelerator: "CmdOrCtrl+Shift+F9",
+  });
   check("bind applies", applied.kind === "applied");
   let entries = await Keymap.entries();
-  check("bind stores canonical text", byId(entries, "tab.new").accelerator === "Ctrl+Shift+F9");
-  check("bind marks the command customized", byId(entries, "tab.new").customized === true);
-  check("bind leaves the default intact", byId(entries, "tab.new").default_accelerator === "Ctrl+T");
+  check(
+    "bind stores canonical text",
+    byId(entries, "tab.new").accelerator === "Ctrl+Shift+F9",
+  );
+  check(
+    "bind marks the command customized",
+    byId(entries, "tab.new").customized === true,
+  );
+  check(
+    "bind leaves the default intact",
+    byId(entries, "tab.new").default_accelerator === "Ctrl+T",
+  );
   check("bind emitted keymap-changed", changed.length === 1);
   check("keymap-changed carries a version", changed[0]?.data?.version === 1);
 
@@ -118,14 +188,20 @@ const off = addEventListener((event) => {
   check("bind(null) applies", unbound.kind === "applied");
   entries = await Keymap.entries();
   check("bind(null) unbinds", byId(entries, "tab.new").accelerator === null);
-  check("unbinding still counts as customized", byId(entries, "tab.new").customized === true);
+  check(
+    "unbinding still counts as customized",
+    byId(entries, "tab.new").customized === true,
+  );
   check("unbinding emitted keymap-changed", changed.length === 2);
 
   const resetOne = await Keymap.reset({ id: "tab.new" });
   entries = await Keymap.entries();
-  check("reset(id) restores one default", resetOne === true
-    && byId(entries, "tab.new").accelerator === "Ctrl+T"
-    && byId(entries, "tab.new").customized === false);
+  check(
+    "reset(id) restores one default",
+    resetOne === true &&
+      byId(entries, "tab.new").accelerator === "Ctrl+T" &&
+      byId(entries, "tab.new").customized === false,
+  );
   check("reset(id) emitted keymap-changed", changed.length === 3);
 }
 
@@ -133,10 +209,19 @@ const off = addEventListener((event) => {
 {
   const refused = await Keymap.bind({ id: "tab.new", accelerator: "Ctrl+W" });
   check("a conflicting bind is refused", refused.kind === "conflict");
-  check("the conflict names the other command", refused.command === "tab.close");
+  check(
+    "the conflict names the other command",
+    refused.command === "tab.close",
+  );
   let entries = await Keymap.entries();
-  check("a refused bind leaves the target alone", byId(entries, "tab.new").accelerator === "Ctrl+T");
-  check("a refused bind leaves the holder alone", byId(entries, "tab.close").accelerator === "Ctrl+W");
+  check(
+    "a refused bind leaves the target alone",
+    byId(entries, "tab.new").accelerator === "Ctrl+T",
+  );
+  check(
+    "a refused bind leaves the holder alone",
+    byId(entries, "tab.close").accelerator === "Ctrl+W",
+  );
   check("a refused bind emits nothing", changed.length === 3);
 
   const replaced = await Keymap.bind({
@@ -146,9 +231,18 @@ const off = addEventListener((event) => {
   });
   check("replace applies", replaced.kind === "applied");
   entries = await Keymap.entries();
-  check("replace moves the key", byId(entries, "tab.new").accelerator === "Ctrl+W");
-  check("replace unbinds the other command", byId(entries, "tab.close").accelerator === null);
-  check("the displaced command is customized", byId(entries, "tab.close").customized === true);
+  check(
+    "replace moves the key",
+    byId(entries, "tab.new").accelerator === "Ctrl+W",
+  );
+  check(
+    "replace unbinds the other command",
+    byId(entries, "tab.close").accelerator === null,
+  );
+  check(
+    "the displaced command is customized",
+    byId(entries, "tab.close").customized === true,
+  );
   check("replace emitted keymap-changed", changed.length === 4);
 
   // A fixed command cannot give its key away.
@@ -157,15 +251,21 @@ const off = addEventListener((event) => {
     accelerator: "Escape",
     replace: true,
   });
-  check("a fixed holder keeps its key", fixedConflict.kind === "conflict"
-    && fixedConflict.command === "work.pane.close");
+  check(
+    "a fixed holder keeps its key",
+    fixedConflict.kind === "conflict" &&
+      fixedConflict.command === "work.pane.close",
+  );
 
   const resetAll = await Keymap.reset({ id: null });
   entries = await Keymap.entries();
-  check("reset(null) restores every default", resetAll === true
-    && byId(entries, "tab.new").accelerator === "Ctrl+T"
-    && byId(entries, "tab.close").accelerator === "Ctrl+W"
-    && entries.every((entry) => entry.customized === false));
+  check(
+    "reset(null) restores every default",
+    resetAll === true &&
+      byId(entries, "tab.new").accelerator === "Ctrl+T" &&
+      byId(entries, "tab.close").accelerator === "Ctrl+W" &&
+      entries.every((entry) => entry.customized === false),
+  );
   check("reset(null) emitted keymap-changed", changed.length === 5);
 }
 
@@ -173,13 +273,22 @@ const off = addEventListener((event) => {
 {
   for (const bad of ["", "a b", "x".repeat(65)]) {
     const refused = await Keymap.bind({ id: "tab.new", accelerator: bad });
-    check(`invalid accelerator ${JSON.stringify(bad)} is refused`, refused.kind === "invalid");
+    check(
+      `invalid accelerator ${JSON.stringify(bad)} is refused`,
+      refused.kind === "invalid",
+    );
   }
-  const malformed = await Keymap.bind({ id: "tab.new", accelerator: "Hyper+R" });
+  const malformed = await Keymap.bind({
+    id: "tab.new",
+    accelerator: "Hyper+R",
+  });
   check("an unknown modifier is refused", malformed.kind === "invalid");
   const unknown = await Keymap.bind({ id: "nope", accelerator: "Ctrl+K" });
   check("an unknown command id is refused", unknown.kind === "invalid");
-  const fixed = await Keymap.bind({ id: "launcher.toggle", accelerator: "Ctrl+K" });
+  const fixed = await Keymap.bind({
+    id: "launcher.toggle",
+    accelerator: "Ctrl+K",
+  });
   check("a fixed command refuses a bind", fixed.kind === "fixed");
   const fixedReset = await Keymap.reset({ id: "nope" });
   check("reset on an unknown id is false", fixedReset === false);
@@ -188,23 +297,39 @@ const off = addEventListener((event) => {
 
 // === Recording ===
 {
-  check("record starts recording", (await Keymap.record({ active: true })) === true);
+  check(
+    "record starts recording",
+    (await Keymap.record({ active: true })) === true,
+  );
   check("recording is honest", __keymapRecording() === true);
-  check("record ends recording", (await Keymap.record({ active: false })) === true);
+  check(
+    "record ends recording",
+    (await Keymap.record({ active: false })) === true,
+  );
   check("recording ended", __keymapRecording() === false);
 }
 
 // === Platform and auxiliary mouse buttons ===
 {
-  const mac = await Keymap.bind({ id: "tab.new", accelerator: "Cmd+K", platform: "mac" });
+  const mac = await Keymap.bind({
+    id: "tab.new",
+    accelerator: "Cmd+K",
+    platform: "mac",
+  });
   check("an explicit mac platform accepts Cmd", mac.kind === "applied");
   let entries = await Keymap.entries({ platform: "mac" });
-  check("the mac binding is stored", byId(entries, "tab.new").accelerator === "Cmd+K");
+  check(
+    "the mac binding is stored",
+    byId(entries, "tab.new").accelerator === "Cmd+K",
+  );
 
   const mouse = await Keymap.bind({ id: "tab.new", accelerator: "Mouse3" });
   check("an auxiliary mouse button binds", mouse.kind === "applied");
   entries = await Keymap.entries();
-  check("the mouse binding is stored", byId(entries, "tab.new").accelerator === "Mouse3");
+  check(
+    "the mouse binding is stored",
+    byId(entries, "tab.new").accelerator === "Mouse3",
+  );
   await Keymap.bind({ id: "tab.new", accelerator: null });
 }
 

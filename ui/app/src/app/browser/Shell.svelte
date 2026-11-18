@@ -39,7 +39,7 @@
   import { selectionGlide } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
   import { requestTab } from "$session/work-tab.svelte";
-  import { expanded as sidebarWidth, isCompact } from "$session/sidebar-mode.svelte";
+  import { expanded as sidebarWidth, isCompact, isHidden } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack, type Component, type Snippet } from "svelte";
   import { clearRequest } from "$domain/site-data";
@@ -328,7 +328,11 @@
   let trayRaised = $state(false);
   let popupRaised = $state(false);
   let popupOpen = $derived(trayRaised || popupRaised);
-  let frameRaised = $derived(popupOpen);
+  // Only a live page is a separate layer under this frame. Over the New Tab
+  // or an internal page the app already owns the pixels, so raising the frame
+  // and wiping its ground just makes the window's gradient jump.
+  let pageBehind = $derived(browserPage.currentPage() === null && !!tabs.activeTab()?.url);
+  let frameRaised = $derived(popupOpen && pageBehind);
   function raiseForTray(open: boolean) {
     trayRaised = open;
   }
@@ -348,7 +352,7 @@
   });
   let raisedPosted: boolean | null = null;
   $effect(() => {
-    const open = popupOpen;
+    const open = frameRaised;
     if (raisedPosted === open) return;
     raisedPosted = open;
     try {
@@ -503,13 +507,13 @@
       if (command.id === "focus.alert=focus") notices.show(m.focus_back_title(), "focus");
     });
   });
-  // A load started from the new tab keeps it on screen until the page
-  // commits, so the content pane never empties between the two.
-  let newTabLoad = $state<string | null>(null);
   let newTabShown = $derived.by(() => {
     const tab = tabs.activeTab();
     if (!tab || tab.url || (tab.content ?? "web") !== "web") return false;
-    return browserPage.currentPage() === null && (!tab.loading || newTabLoad === tab.id);
+    // A New Tab has no address; Home may report `loading` for a frame while
+    // it returns to that same blank page. Keep the surface mounted either
+    // way, so the stage never falls through to an empty black slot.
+    return browserPage.currentPage() === null;
   });
   // The page bar's visibility. `auto` keeps it on the home page and internal
   // pages and takes it away once a real web page is in front; `hidden` leaves
@@ -570,6 +574,26 @@
     releaseBar();
   }
   $effect(() => () => clearBarHide());
+  // A pinned bar never hides, so its hover/focus latches never get the
+  // `barVisible === false` reset. Changing the mode must start from a clean
+  // pointer state or the next hidden/auto mode stays latched open.
+  let lastBarMode: string | null = null;
+  $effect(() => {
+    const next = barMode;
+    if (next === lastBarMode) return;
+    if (lastBarMode === null) {
+      lastBarMode = next;
+      return;
+    }
+    lastBarMode = next;
+    untrack(() => {
+      clearBarHide();
+      barHover = false;
+      barFocused = false;
+      barRevealHover = false;
+      barPointerInside = false;
+    });
+  });
   let pageShown = $derived.by(() => {
     if (newTabShown || browserPage.currentPage() !== null) return false;
     const url = tabs.activeTab()?.url ?? null;
@@ -586,7 +610,9 @@
       toolHost.activeTool() !== null ||
       ["settings", "tasks", "notes", "work"].includes(browserPage.currentPage() ?? ""),
   );
-  let sidebarOwnsBar = $derived(!columnCompact && barMode !== "always");
+  // A hidden column has no head to carry the field; the floating bar is the
+  // only place the address can live while it is away.
+  let sidebarOwnsBar = $derived(!columnCompact && !isHidden() && barMode !== "always");
   let barVisible = $derived(
     !sidebarOwnsBar &&
       (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),
@@ -652,14 +678,6 @@
     return browserPage.currentPage() !== null || (tab?.url ?? null) !== null;
   });
 
-  $effect(() => {
-    const tab = tabs.activeTab();
-    const idle = !!tab && !tab.url && !tab.loading && (tab.content ?? "web") === "web";
-    untrack(() => {
-      if (idle) newTabLoad = tab.id;
-      else if (!tab || tab.url || tab.id !== newTabLoad) newTabLoad = null;
-    });
-  });
   // A tab with nothing to show (a first load that failed, a restored page
   // that did not load, a crash it could not recover from, a page the engine
   // replaced with an empty error document) says why in its pane.

@@ -55,9 +55,17 @@
     try {
       if (blocking.applied_enabled !== true) {
         await blocker.setEnabled(true);
+        // The page in front was served while protection was off; reload so
+        // the shield's "on" is true for what is actually on screen.
+        tabs.reloadActive();
       } else if (blocking.site?.ready && blocking.site.busy !== true) {
         await blockerSites.setProtected(blocking.site.paused === true);
+      } else {
+        await blocker.refresh();
       }
+      // The toggle's own reload briefly loses the live tab context; read the
+      // settled projection again instead of trusting the pre-click cache.
+      setTimeout(() => void blocker.refresh(), 300);
     } finally {
       busy = false;
     }

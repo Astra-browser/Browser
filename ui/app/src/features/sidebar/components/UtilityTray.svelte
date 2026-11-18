@@ -129,8 +129,11 @@
      on one line. */
   :global(.utilities-panel.ui-disclosure-panel) {
     inset-inline-end: -4px;
-    inline-size: var(--address-width, min(304px, var(--sidebar-width, 320px)));
-    max-width: none;
+    inline-size: var(
+      --address-width,
+      min(304px, var(--sidebar-live-width, var(--sidebar-width, 320px)))
+    );
+    max-width: calc(var(--sidebar-live-width, var(--sidebar-width, 320px)) - 8px);
     max-block-size: calc(100vh - 120px);
     padding: var(--menu-pad);
     overflow-y: auto;
