@@ -45,7 +45,10 @@ documented as main-thread-forbidden. `blocker_coverage` now fails if
 **Verification (installed 0.1.753, real profile copy, Windows 11):**
 the exact reproducer that took 11 132 ms measures **156 ms**; four cold launch
 → first-search cycles plus shield off/on and a Google + YouTube split show
-max 258 ms round trip and **zero gaps ≥ 400 ms**. `blocker_coverage` 25/25
+max 258 ms round trip and **zero gaps ≥ 400 ms**. Launch → first UI with the
+owner's restored session: **5.4 s / 4.82 s / 4.92 s** across three cold
+starts, worst chrome round trip 16 ms (the splash no longer waits on the
+resolver). `blocker_coverage` 25/25
 (including the new guard), `blocker_host` 97/97, `telemetry_blocklist` 40/40,
 `state-check` and `brand-lint` clean. Artifacts:
 `Astra-0.1.753-windows-x86_64.zip` (`68d8a184…`) and
