@@ -11,6 +11,38 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner bug batch (2026-11-18, branch `fix/owner-batch-2026-11-18`)
+
+Root causes fixed in the host and app, with contract/unit evidence:
+
+| Area | Root cause → fix | Verification |
+|---|---|---|
+| Import browser data | `migrate()` received the profile **id**, but Chromium reads `aProfile.id`; it searched the user-data root and failed with "couldn't read". Pass the listed profile object and union every readable profile. | `migration_model` 31/31 |
+| Firefox / Zen import | Only startup-only Firefox migrators exist; Zen has none. Added a host gecko-family reader over each installed profile's `places.sqlite` (bookmarks tree + history visits), offered next to Chrome-family sources. | contract mocks + `getRowsFromDBWithoutLocks` path; live Windows probe still required |
+| Import back Astra exports | Added an "Astra export file" source using the existing `import_start` route: Netscape HTML through `BookmarkHTMLUtils`, `date,title,address` CSV through `PlacesUtils.history.insertMany`; private windows refuse. | round-trip cases in `migration_model` |
+| Set as default | `default_browser_request` existed in the schema/binding but had **no host route**, so the UI got `unknown_command`. Routed to `System.defaultBrowserRequest`. | bridge test + `wire_coverage` 62/62 |
+| Search default | UI default Google, host default DuckDuckGo. Host now defaults Google, matching Settings. | `search_model` 63/63 |
+| New Tab background | `mediaUrl` rejected the tab projection's `"default"` profile (the store accepts it), so no `<img>` was ever created. Accept both ids. | `media.test` 21/21 |
+| Window material | Opaque shell ground hid Mica; dotted Windows builds were parsed by the revision group. Shell now paints transparent over a material and reads `22631.4890` as build 22631. | `zoom_home_material` 48/48 |
+| Hidden sidebar / peek | The full-stage frame mount still took pointer events outside the clipped card, and peek state survived a surface change, leaving a transparent window and a stuck card. Clip hit-testing to the frame, lower the card on every surface change, and make a hidden column hand the bar back to the stage. | `BarHover` 2/2, sidebar/app suites |
+| Sidebar minimum | 180 px could not fit the one-row utility bar; the container query made it a 4×2 grid. Minimum is 252 px and the extended header is a size container. | `SidebarResizeHandle` 2/2, `sidebar-mode` unit |
+| Page corners | Native `#tabbrowser-tabbox` painted square over the rounded app card. Added the native clip (8 px Windows / 12 px elsewhere). | static CSS; live screenshot deferred |
+| Split duplicate panes | Adding an already-split tab duplicated it. Existing split membership/limit is checked; two different splits are refused instead of merged. | split unit 12/12 |
+| Pinned tabs / spaces on quit | `Metadata.flush()` rewrote the stale snapshot, dropping the last debounce. It now saves current state first and falls back to the last accepted snapshot. | metadata host path; live restart probe deferred |
+| New Tab / Home flash | `newTabShown` unmounted while Home reported `loading` for a blank target. A blank web tab keeps its surface mounted. | `BarHover` + app tests |
+| Tools black flash | Opening a tool closed the current internal page first, remounting the whole stage twice. The panel now opens beside the page. | app unit suite |
+| Copy / cut / paste | Clipboard commands went to the focused app frame, not the page. Copy uses the captured selection; cut/paste/select-all refocus the browser; commands are rebindable and skip Astra's own editable fields. | `keymap_model` 69/69; live clipboard probe deferred |
+| Right-click with no engine model | The native popup was prevented but no Astra menu was drawn. A generic page menu is now drawn from the selected browser. | static path; live probe deferred |
+| Ad blocker toggles | Global enable did not reload; the toggle cache could stay stale across its own reload. Both paths reload, re-read after settlement, and the gate is armed only after rules compile. | blocker unit/contract suites; live YouTube probe deferred |
+| App shortcuts | Bindings were session-only and function keys were hardcoded. Overrides persist in `astra.keymap.overrides`, native keys are swept on change, and 4th/5th buttons stay DOM events. | `keymap_model` 69/69 |
+| Window gradient shift | Raising the frame wiped the window ground even over internal pages. It is raised only when a live page is behind the popup. | `BarHover` + app tests |
+
+**Still deferred (needs engine/build work, not faked here):** a Windows
+built-in-vs-Windows-Hello passkey provider switch (the Astra vault is
+Linux-only today), browser-wide UI scale with separate icon/text scales, the
+window-caption pill → hover-only top bar, and live Marionette verification of
+the gecko import, clipboard, ad-block and restart paths.
+
 ## Adblock Tester: 93 → 100 (2026-11-15)
 
 The owner's export from <https://adblocktester.pages.dev/> scored 93 (410/443,

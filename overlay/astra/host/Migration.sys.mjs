@@ -21,6 +21,25 @@
 import { emit } from "./Events.sys.mjs";
 
 const FILE_SOURCE = "astra-file";
+const GECKO_SOURCE = "gecko-";
+const GECKO_FAMILIES = [
+  {
+    id: "firefox",
+    name: "Firefox",
+    roots: [
+      "Mozilla/Firefox/Profiles",
+      ".mozilla/firefox",
+      "Library/Application Support/Firefox/Profiles",
+    ],
+  },
+  {
+    id: "zen",
+    name: "Zen",
+    roots: ["zen/Profiles", ".zen", "Library/Application Support/zen/Profiles"],
+  },
+];
+/** Detection is the only writer; importStart can only read a path it listed. */
+const geckoSources = new Map();
 const FILE_PROFILES = [
   { id: "bookmarks", name: "Bookmarks (HTML)" },
   { id: "history", name: "History (CSV)" },
@@ -85,6 +104,272 @@ function ioutils(scope) {
     return scope.IOUtils ?? globalThis.IOUtils ?? null;
   } catch {
     return null;
+  }
+}
+
+function joinPath(...parts) {
+  return parts
+    .filter((part) => typeof part === "string" && part !== "")
+    .map((part, index) =>
+      index === 0
+        ? part.replace(/[\\/]+$/u, "")
+        : part.replace(/^[\\/]+|[\\/]+$/gu, ""),
+    )
+    .join("/");
+}
+
+function baseName(path) {
+  const clean = String(path ?? "").replace(/[\\/]+$/u, "");
+  return clean.split(/[\\/]/u).pop() || clean;
+}
+
+function isPrivateWindow(scope, services) {
+  try {
+    const { PrivateBrowsingUtils } = scope.ChromeUtils.importESModule(
+      "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+    );
+    const win = services.wm.getMostRecentWindow("navigator:browser");
+    return PrivateBrowsingUtils.isWindowPrivate(win) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** The user-data roots for installed Firefox-family browsers on this OS. */
+function geckoRoots(scope, services, ci) {
+  let home = "";
+  let appData = "";
+  try {
+    home = services.dirsvc.get("Home", ci.nsIFile).path;
+  } catch {
+    home = "";
+  }
+  try {
+    appData = services.dirsvc.get("AppData", ci.nsIFile).path;
+  } catch {
+    appData = "";
+  }
+  const os = String(services.appinfo?.OS ?? "").toLowerCase();
+  const roots = [];
+  for (const family of GECKO_FAMILIES) {
+    for (const relative of family.roots) {
+      let root = "";
+      if (relative.startsWith("Mozilla/")) {
+        if (os === "winnt" && appData) root = joinPath(appData, relative);
+      } else if (relative.startsWith("zen/")) {
+        if (os === "winnt" && appData) root = joinPath(appData, relative);
+      } else if (relative.startsWith("Library/")) {
+        if (os === "darwin" && home) root = joinPath(home, relative);
+      } else if (relative.startsWith(".")) {
+        if (os !== "winnt" && os !== "darwin" && home)
+          root = joinPath(home, relative);
+      }
+      if (root !== "") roots.push({ family, root });
+    }
+  }
+  return roots;
+}
+
+/** Readable profiles from Firefox and Zen, without a startup-only migrator. */
+async function listGeckoSources(scope, io, services, ci) {
+  const out = [];
+  geckoSources.clear();
+  for (const { family, root } of geckoRoots(scope, services, ci)) {
+    let children = [];
+    try {
+      children = await io.getChildren(root, { ignoreAbsent: true });
+    } catch {
+      continue;
+    }
+    let index = 0;
+    for (const directory of children) {
+      const places = joinPath(directory, "places.sqlite");
+      try {
+        if (!(await io.exists(places))) continue;
+      } catch {
+        continue;
+      }
+      const id = `${GECKO_SOURCE}${family.id}-${index++}`;
+      const profile = { id: String(directory), name: baseName(directory) };
+      geckoSources.set(id, { family, profile, places });
+      out.push({
+        id,
+        browser: family.id,
+        name: family.name,
+        profiles: [profile],
+        kinds: ["bookmarks", "history"],
+        needs_permission: false,
+      });
+    }
+  }
+  return out;
+}
+
+function bookmarkTree(rows, mu) {
+  const byId = new Map();
+  const children = new Map();
+  for (const row of rows) {
+    const id = Number(row.getResultByName("id"));
+    const parent = Number(row.getResultByName("parent"));
+    const type = Number(row.getResultByName("type"));
+    if (
+      !Number.isFinite(id) ||
+      !Number.isFinite(parent) ||
+      !Number.isFinite(type)
+    )
+      continue;
+    if (type !== 1 && type !== 2) continue;
+    const title = String(row.getResultByName("title") ?? "");
+    const url = row.getResultByName("url");
+    byId.set(id, { type, title, url: typeof url === "string" ? url : "" });
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(id);
+  }
+  const build = (id, seen) => {
+    const row = byId.get(id);
+    if (!row || seen.has(id)) return null;
+    seen.add(id);
+    if (row.type === 2) {
+      return {
+        type: 2,
+        title: row.title,
+        children: (children.get(id) ?? [])
+          .map((child) => build(child, seen))
+          .filter(Boolean),
+      };
+    }
+    if (row.url === "") return null;
+    return { type: 1, title: row.title || row.url, url: row.url };
+  };
+  const roots = [2, 3, 4, 5];
+  const top = [];
+  for (const root of roots) {
+    for (const id of children.get(root) ?? []) {
+      const node = build(id, new Set());
+      if (node) top.push(node);
+    }
+  }
+  return top;
+}
+
+async function importGecko(sourceId, profile, kinds) {
+  if (running) return false;
+  const source = geckoSources.get(sourceId);
+  if (!source) return false;
+  const directory =
+    source.profiles.find((candidate) => candidate.id === profile)?.id ??
+    source.profile.id;
+  if (directory !== source.profile.id) return false;
+  const scope = chromeScope();
+  if (!scope) return false;
+  const services = scope.Services;
+  const io = ioutils(scope);
+  const loaded = modules(scope);
+  const mu = loaded?.MigrationUtils;
+  const PlacesUtils = loaded?.PlacesUtils;
+  if (!services || !io || !mu || !PlacesUtils) return false;
+  if (isPrivateWindow(scope, services)) return false;
+  const selected = Array.isArray(kinds)
+    ? kinds.filter((kind) => kind === "bookmarks" || kind === "history")
+    : [];
+  if (selected.length === 0) return false;
+
+  const context = {
+    job: jobOf(sourceId, directory, selected),
+    cancelled: false,
+  };
+  running = context;
+  publish(context);
+  const finish = () => {
+    context.job.finished = true;
+    publish(context);
+  };
+  try {
+    if (selected.includes("bookmarks")) {
+      const row = context.job.kinds.find((entry) => entry.kind === "bookmarks");
+      row.state = "running";
+      publish(context);
+      const rows = await mu.getRowsFromDBWithoutLocks(
+        source.places,
+        `${source.family.name} bookmarks`,
+        `SELECT b.id AS id, b.type AS type, b.title AS title, b.parent AS parent,
+                p.url AS url
+           FROM moz_bookmarks b
+           LEFT JOIN moz_places p ON p.id = b.fk
+          WHERE b.type IN (1, 2)`,
+      );
+      const tree = bookmarkTree(rows, mu);
+      const folder = await PlacesUtils.bookmarks.insert({
+        parentGuid: PlacesUtils.bookmarks.menuGuid,
+        type: PlacesUtils.bookmarks.TYPE_FOLDER,
+        title: source.family.name,
+      });
+      if (tree.length > 0) {
+        await PlacesUtils.bookmarks.insertTree({
+          guid: folder.guid,
+          children: tree,
+        });
+      }
+      row.state = "done";
+      row.done = rows.filter(
+        (entry) => Number(entry.getResultByName("type")) === 1,
+      ).length;
+      row.total = row.done;
+      publish(context);
+    }
+    if (selected.includes("history")) {
+      const row = context.job.kinds.find((entry) => entry.kind === "history");
+      row.state = "running";
+      publish(context);
+      const rows = await mu.getRowsFromDBWithoutLocks(
+        source.places,
+        `${source.family.name} history`,
+        `SELECT p.url AS url, p.title AS title, v.visit_date AS visit_date
+           FROM moz_historyvisits v
+           JOIN moz_places p ON p.id = v.place_id
+          WHERE p.hidden = 0
+          ORDER BY v.visit_date DESC
+          LIMIT 100000`,
+      );
+      const pages = new Map();
+      for (const entry of rows) {
+        const url = entry.getResultByName("url");
+        const micros = Number(entry.getResultByName("visit_date"));
+        if (typeof url !== "string" || !Number.isFinite(micros) || micros <= 0)
+          continue;
+        let page = pages.get(url);
+        if (!page) {
+          page = {
+            url,
+            title: String(entry.getResultByName("title") ?? ""),
+            visits: [],
+          };
+          pages.set(url, page);
+        }
+        page.visits.push({ date: new Date(micros / 1000) });
+      }
+      const list = [...pages.values()];
+      for (let index = 0; index < list.length; index += 200) {
+        await PlacesUtils.history.insertMany(list.slice(index, index + 200));
+      }
+      row.state = "done";
+      row.done = rows.length;
+      row.total = rows.length;
+      publish(context);
+    }
+    finish();
+    return true;
+  } catch {
+    for (const row of context.job.kinds) {
+      if (row.state !== "done") {
+        row.state = "failed";
+        row.problem = "unreadable";
+      }
+    }
+    finish();
+    return false;
+  } finally {
+    if (running === context) running = null;
   }
 }
 
@@ -324,6 +609,15 @@ async function importFile(profile, kinds) {
   const io = ioutils(scope);
   const { PlacesUtils } = modules(scope) ?? {};
   if (!services || !io || !PlacesUtils) return false;
+  try {
+    const { PrivateBrowsingUtils } = scope.ChromeUtils.importESModule(
+      "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+    );
+    const win = services.wm.getMostRecentWindow("navigator:browser");
+    if (PrivateBrowsingUtils.isWindowPrivate(win) === true) return false;
+  } catch {
+    // No private-window module: the import still has a normal target.
+  }
 
   const context = {
     job: jobOf(FILE_SOURCE, profile, [kind]),
@@ -459,6 +753,16 @@ export const Migration = {
         needs_permission: false,
       });
     }
+    const io = ioutils(scope);
+    if (io && scope.Ci) {
+      try {
+        out.push(
+          ...(await listGeckoSources(scope, io, scope.Services, scope.Ci)),
+        );
+      } catch {
+        // A missing AppData/home root is simply no Firefox-family source.
+      }
+    }
     out.push({
       id: FILE_SOURCE,
       browser: "astra",
@@ -473,6 +777,9 @@ export const Migration = {
   /** Start one migration. Progress arrives on `import-progress`. */
   async importStart({ source = "", profile = "default", kinds = [] } = {}) {
     if (source === FILE_SOURCE) return importFile(profile, kinds);
+    if (typeof source === "string" && source.startsWith(GECKO_SOURCE)) {
+      return importGecko(source, profile, kinds);
+    }
     const scope = chromeScope();
     const loaded = scope ? modules(scope) : null;
     const mu = loaded?.MigrationUtils;

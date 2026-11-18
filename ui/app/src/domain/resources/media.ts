@@ -5,7 +5,9 @@ import type {
 export type { MediaAssetV1 };
 
 const DIGEST = /^[0-9a-f]{64}$/;
-const PROFILE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+// The tab projection names the built-in profile "default"; the media store
+// accepts that id as well as a ULID (MediaImport's PROFILE).
+const PROFILE = /^(?:default|[0-9A-HJKMNP-TV-Z]{26})$/;
 const STEP_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // The host registers this scheme and serves the profile's own admitted blobs;
 // on Linux the old `http://astra-media.localhost` name had no listener.

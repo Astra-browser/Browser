@@ -279,7 +279,8 @@ function createWindowsBridge(services) {
     },
     exists(root, path) {
       return (
-        withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_READ, () => true) === true
+        withKey(root, path, Ci.nsIWindowsRegKey.ACCESS_READ, () => true) ===
+        true
       );
     },
     writeString(root, path, name, value) {
@@ -357,7 +358,8 @@ function defaultBrowserFor(windows) {
   const progId = windows.readString("HKCU", USER_CHOICE_HTTP, "ProgId");
   return {
     is_default:
-      typeof progId === "string" && progId.trim().toLowerCase() === ASTRA_PROGID,
+      typeof progId === "string" &&
+      progId.trim().toLowerCase() === ASTRA_PROGID,
     can_request: windows.packaged() === true,
   };
 }
@@ -428,10 +430,11 @@ function materialCapability() {
   const { os, build } = platformInfo();
   const system = os.toLowerCase();
   if (system === "winnt") {
-    // `build` is the release build number on Windows ("22631"), but be
-    // tolerant of a dotted form: the last group is the build.
+    // `build` is the release build number on Windows ("22631"), but a dotted
+    // form ("22631.4890") puts the revision last: the first group is the
+    // build that decides whether Mica exists.
     const groups = String(build).match(/\d+/gu) ?? [];
-    const number = groups.length > 0 ? Number(groups[groups.length - 1]) : NaN;
+    const number = groups.length > 0 ? Number(groups[0]) : NaN;
     if (Number.isFinite(number) && number >= MICA_MIN_BUILD) {
       return { os: system, available: ["none", "mica"], automatic: "mica" };
     }
@@ -569,10 +572,12 @@ export const System = {
       const prefs = services.prefs;
       let lists = 0;
       try {
-        const raw = prefs?.getStringPref("astra.blocker.installed", "{}") ?? "{}";
+        const raw =
+          prefs?.getStringPref("astra.blocker.installed", "{}") ?? "{}";
         const parsed = JSON.parse(raw);
         const source = parsed?.lists ?? parsed;
-        if (source && typeof source === "object") lists = Object.keys(source).length;
+        if (source && typeof source === "object")
+          lists = Object.keys(source).length;
       } catch {
         lists = 0;
       }
@@ -670,14 +675,16 @@ export const System = {
    */
   async loginItemStatus() {
     const windows = windowsForUse();
-    if (!windows) return { supported: false, enabled: false, needs_approval: false };
+    if (!windows)
+      return { supported: false, enabled: false, needs_approval: false };
     return loginItemFor(windows);
   },
 
   /** Register or remove the per-user login item, then report what is held. */
   async loginItemSet(payload = {}) {
     const windows = windowsForUse();
-    if (!windows) return { supported: false, enabled: false, needs_approval: false };
+    if (!windows)
+      return { supported: false, enabled: false, needs_approval: false };
     const enabled = field(payload, "enabled");
     if (enabled === true) {
       const exe = windows.exePath();

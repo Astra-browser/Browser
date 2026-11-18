@@ -77,6 +77,9 @@ const REGISTRY = [
   command("find.show", "Find…", same("CmdOrCtrl+F"), "edit"),
   command("find.next", "Find Next", same("CmdOrCtrl+G"), "edit"),
   command("find.previous", "Find Previous", same("CmdOrCtrl+Shift+G"), "edit"),
+  command("page.copy", "Copy", same("CmdOrCtrl+C"), "edit"),
+  command("page.cut", "Cut", same("CmdOrCtrl+X"), "edit"),
+  command("page.paste", "Paste", same("CmdOrCtrl+V"), "edit"),
   command("page.copyLink", "Copy Link", same("CmdOrCtrl+Shift+C"), "edit"),
   command("page.autofillPassword", "AutoFill Password…", NONE, "edit"),
   command(
@@ -134,21 +137,36 @@ const REGISTRY = [
     "history",
   ),
   // Alt+Arrow is text editing on macOS, where Command+[ and ] go back.
-  alternate("nav.back.alt", "Back (Alternate)", otherOnly("Alt+Left"), "nav.back"),
+  alternate(
+    "nav.back.alt",
+    "Back (Alternate)",
+    otherOnly("Alt+Left"),
+    "nav.back",
+  ),
   alternate(
     "nav.forward.alt",
     "Forward (Alternate)",
     otherOnly("Alt+Right"),
     "nav.forward",
   ),
-  command("tab.reopen", "Reopen Closed Tab", same("CmdOrCtrl+Shift+T"), "history"),
+  command(
+    "tab.reopen",
+    "Reopen Closed Tab",
+    same("CmdOrCtrl+Shift+T"),
+    "history",
+  ),
   command(
     "browser.history",
     "Show All History",
     split("CmdOrCtrl+Shift+Y", "Ctrl+Shift+H"),
     "history",
   ),
-  command("bookmark.add", "Bookmark This Page", same("CmdOrCtrl+D"), "bookmarks"),
+  command(
+    "bookmark.add",
+    "Bookmark This Page",
+    same("CmdOrCtrl+D"),
+    "bookmarks",
+  ),
   command(
     "tool.bookmarks",
     "Show Bookmarks",
@@ -173,14 +191,34 @@ const REGISTRY = [
   // along it. Ctrl+Alt stays clear of text: only letters and digits are
   // AltGr's.
   command("tab.above", "Select Tab Above", same("CmdOrCtrl+Alt+Up"), "window"),
-  command("tab.below", "Select Tab Below", same("CmdOrCtrl+Alt+Down"), "window"),
+  command(
+    "tab.below",
+    "Select Tab Below",
+    same("CmdOrCtrl+Alt+Down"),
+    "window",
+  ),
   // The tool panels, each on Shift and its own letter, as Bookmarks is.
   // Never Alt on Windows: Ctrl+Alt is AltGr on many layouts. History takes
   // the browser's own key; its full page moves to Shift.
-  command("tool.notes", "Notes", split("CmdOrCtrl+Shift+E", "Ctrl+Shift+E"), "window"),
+  command(
+    "tool.notes",
+    "Notes",
+    split("CmdOrCtrl+Shift+E", "Ctrl+Shift+E"),
+    "window",
+  ),
   command("tool.ai", "Ask Astra", same("CmdOrCtrl+E"), "window"),
-  command("tool.tasks", "Tasks", split("CmdOrCtrl+Shift+K", "Ctrl+Shift+K"), "window"),
-  command("tool.time", "Time", split("CmdOrCtrl+Shift+U", "Ctrl+Shift+F"), "window"),
+  command(
+    "tool.tasks",
+    "Tasks",
+    split("CmdOrCtrl+Shift+K", "Ctrl+Shift+K"),
+    "window",
+  ),
+  command(
+    "tool.time",
+    "Time",
+    split("CmdOrCtrl+Shift+U", "Ctrl+Shift+F"),
+    "window",
+  ),
   command("tool.history", "History", split("CmdOrCtrl+Y", "Ctrl+H"), "window"),
   command(
     "tool.downloads",
@@ -207,17 +245,67 @@ const REGISTRY = [
   command("tab.select.7", "Select Tab 7", same("CmdOrCtrl+7"), "keys"),
   command("tab.select.8", "Select Tab 8", same("CmdOrCtrl+8"), "keys"),
   command("tab.select.last", "Select Last Tab", same("CmdOrCtrl+9"), "keys"),
-  command("space.select.1", "Switch to Space 1", split("Ctrl+1", "Ctrl+Shift+1"), "keys"),
-  command("space.select.2", "Switch to Space 2", split("Ctrl+2", "Ctrl+Shift+2"), "keys"),
-  command("space.select.3", "Switch to Space 3", split("Ctrl+3", "Ctrl+Shift+3"), "keys"),
-  command("space.select.4", "Switch to Space 4", split("Ctrl+4", "Ctrl+Shift+4"), "keys"),
-  command("space.select.5", "Switch to Space 5", split("Ctrl+5", "Ctrl+Shift+5"), "keys"),
-  command("space.select.6", "Switch to Space 6", split("Ctrl+6", "Ctrl+Shift+6"), "keys"),
-  command("space.select.7", "Switch to Space 7", split("Ctrl+7", "Ctrl+Shift+7"), "keys"),
-  command("space.select.8", "Switch to Space 8", split("Ctrl+8", "Ctrl+Shift+8"), "keys"),
-  command("space.select.9", "Switch to Space 9", split("Ctrl+9", "Ctrl+Shift+9"), "keys"),
+  command(
+    "space.select.1",
+    "Switch to Space 1",
+    split("Ctrl+1", "Ctrl+Shift+1"),
+    "keys",
+  ),
+  command(
+    "space.select.2",
+    "Switch to Space 2",
+    split("Ctrl+2", "Ctrl+Shift+2"),
+    "keys",
+  ),
+  command(
+    "space.select.3",
+    "Switch to Space 3",
+    split("Ctrl+3", "Ctrl+Shift+3"),
+    "keys",
+  ),
+  command(
+    "space.select.4",
+    "Switch to Space 4",
+    split("Ctrl+4", "Ctrl+Shift+4"),
+    "keys",
+  ),
+  command(
+    "space.select.5",
+    "Switch to Space 5",
+    split("Ctrl+5", "Ctrl+Shift+5"),
+    "keys",
+  ),
+  command(
+    "space.select.6",
+    "Switch to Space 6",
+    split("Ctrl+6", "Ctrl+Shift+6"),
+    "keys",
+  ),
+  command(
+    "space.select.7",
+    "Switch to Space 7",
+    split("Ctrl+7", "Ctrl+Shift+7"),
+    "keys",
+  ),
+  command(
+    "space.select.8",
+    "Switch to Space 8",
+    split("Ctrl+8", "Ctrl+Shift+8"),
+    "keys",
+  ),
+  command(
+    "space.select.9",
+    "Switch to Space 9",
+    split("Ctrl+9", "Ctrl+Shift+9"),
+    "keys",
+  ),
   command("space.next", "Next Space", same("CmdOrCtrl+Alt+Right"), "keys"),
-  command("space.previous", "Previous Space", same("CmdOrCtrl+Alt+Left"), "keys"),
+  command(
+    "space.previous",
+    "Previous Space",
+    same("CmdOrCtrl+Alt+Left"),
+    "keys",
+  ),
   command("work.pane.close", "Close Pane", same("Escape"), "work"),
   command(
     "work.pane.openInBrowse",
@@ -350,7 +438,19 @@ const NAMED_KEYS = new Map([
   ["BACKQUOTE", "`"],
 ]);
 
-const PUNCTUATION = new Set([",", ".", "-", "=", "[", "]", ";", "'", "/", "\\", "`"]);
+const PUNCTUATION = new Set([
+  ",",
+  ".",
+  "-",
+  "=",
+  "[",
+  "]",
+  ";",
+  "'",
+  "/",
+  "\\",
+  "`",
+]);
 
 function keyToken(token) {
   const upper = token.toUpperCase();
@@ -386,7 +486,11 @@ function keyToken(token) {
 
 /** Canonical accelerator text for `platform`, or null when it is not one. */
 function canonicalAccelerator(text, platform = "other") {
-  if (typeof text !== "string" || text.length === 0 || text.length > MAX_ACCELERATOR_BYTES) {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_ACCELERATOR_BYTES
+  ) {
     return null;
   }
   const mac = platformOf(platform) === "mac";
@@ -469,9 +573,50 @@ function defaultAccelerator(spec, platform) {
 /** id -> canonical text, or null when the person unbound it. An id with no
  *  override uses its platform default. */
 const _overrides = new Map();
+const OVERRIDES_PREF = "astra.keymap.overrides";
+let _loaded = false;
 let _recording = false;
 
+function loadOverrides() {
+  if (_loaded) return;
+  _loaded = true;
+  try {
+    const raw = globalThis.Services?.prefs?.getStringPref(OVERRIDES_PREF, "");
+    if (typeof raw !== "string" || raw === "") return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
+    for (const [id, value] of Object.entries(parsed)) {
+      if (
+        typeof id === "string" &&
+        (typeof value === "string" || value === null)
+      ) {
+        _overrides.set(id, value);
+      }
+    }
+  } catch {
+    // A malformed preference falls back to the defaults.
+  }
+}
+
+function saveOverrides() {
+  try {
+    const prefs = globalThis.Services?.prefs;
+    if (!prefs) return;
+    if (_overrides.size === 0) {
+      prefs.clearUserPref(OVERRIDES_PREF);
+      return;
+    }
+    prefs.setStringPref(
+      OVERRIDES_PREF,
+      JSON.stringify(Object.fromEntries(_overrides)),
+    );
+  } catch {
+    // The in-memory map still applies for this session.
+  }
+}
+
 function binding(spec, platform) {
+  loadOverrides();
   if (_overrides.has(spec.id)) {
     return _overrides.get(spec.id);
   }
@@ -489,7 +634,10 @@ export const Keymap = {
    * grammar the registry uses.
    */
   canonical(text, platform = null) {
-    return canonicalAccelerator(text, platformOf(platform ?? currentPlatform()));
+    return canonicalAccelerator(
+      text,
+      platformOf(platform ?? currentPlatform()),
+    );
   },
 
   /**
@@ -511,7 +659,9 @@ export const Keymap = {
         customizable: customizable(spec),
         customized: accelerator !== fallback,
       };
-    }).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+    }).sort((left, right) =>
+      left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
+    );
   },
 
   /**
@@ -519,7 +669,12 @@ export const Keymap = {
    * command that holds the keys; `replace` takes them from that command in the
    * same change. Returns the KeymapOutcome the UI consumes.
    */
-  async bind({ id = "", accelerator = null, replace = false, platform = null } = {}) {
+  async bind({
+    id = "",
+    accelerator = null,
+    replace = false,
+    platform = null,
+  } = {}) {
     if (
       typeof id !== "string" ||
       id.length === 0 ||
@@ -537,7 +692,8 @@ export const Keymap = {
       return outcome("fixed");
     }
     const at = platformOf(platform ?? currentPlatform());
-    const canonical = accelerator === null ? null : canonicalAccelerator(accelerator, at);
+    const canonical =
+      accelerator === null ? null : canonicalAccelerator(accelerator, at);
     if (accelerator !== null && canonical === null) {
       return outcome("invalid");
     }
@@ -545,7 +701,8 @@ export const Keymap = {
     let displaced = null;
     if (canonical !== null) {
       const other = REGISTRY.find(
-        (candidate) => candidate.id !== id && binding(candidate, at) === canonical,
+        (candidate) =>
+          candidate.id !== id && binding(candidate, at) === canonical,
       );
       if (other !== undefined) {
         if (!replace || !customizable(other)) {
@@ -566,6 +723,7 @@ export const Keymap = {
     if (displaced !== null) {
       _overrides.set(displaced, null);
     }
+    saveOverrides();
     emit("keymap-changed", { version: 1 });
     return outcome("applied");
   },
@@ -575,18 +733,25 @@ export const Keymap = {
    * Returns false for an unknown id.
    */
   async reset({ id = null } = {}) {
+    loadOverrides();
     if (id === null || id === undefined) {
       _overrides.clear();
+      saveOverrides();
       emit("keymap-changed", { version: 1 });
       return true;
     }
-    if (typeof id !== "string" || id.length === 0 || id.length > MAX_COMMAND_ID_BYTES) {
+    if (
+      typeof id !== "string" ||
+      id.length === 0 ||
+      id.length > MAX_COMMAND_ID_BYTES
+    ) {
       return false;
     }
     if (get(id) === null) {
       return false;
     }
     _overrides.delete(id);
+    saveOverrides();
     emit("keymap-changed", { version: 1 });
     return true;
   },
@@ -611,5 +776,6 @@ export function __keymapRecording() {
 // Test-only reset so contract tests start from a clean slate.
 export function __resetKeymapForTests() {
   _overrides.clear();
+  _loaded = false;
   _recording = false;
 }

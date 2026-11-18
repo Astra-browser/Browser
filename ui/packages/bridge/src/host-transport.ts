@@ -208,6 +208,7 @@ const ROUTES: Record<string, Route> = {
   update_status: ["System", "updateStatus"],
   update_check: ["System", "updateCheck"],
   default_browser_status: ["System", "defaultBrowserStatus"],
+  default_browser_request: ["System", "defaultBrowserRequest"],
   login_item_status: ["System", "loginItemStatus"],
   login_item_set: ["System", "loginItemSet"],
   login_item_open_settings: ["System", "loginItemOpenSettings"],

@@ -17,11 +17,11 @@ function mockBridge() {
 }
 
 describe("surface coverage", () => {
-  test("covers all 275 commands and 35 events", () => {
-    expect(mockCommandNames()).toHaveLength(275);
-    expect(mockEventChannels()).toHaveLength(35);
-    expect(COMMANDS).toHaveLength(275);
-    expect(EVENTS).toHaveLength(35);
+  test("covers all 278 commands and 37 events", () => {
+    expect(mockCommandNames()).toHaveLength(278);
+    expect(mockEventChannels()).toHaveLength(37);
+    expect(COMMANDS).toHaveLength(278);
+    expect(EVENTS).toHaveLength(37);
   });
 
   test("mock answers every command without hanging", async () => {
@@ -209,6 +209,24 @@ describe("host transport", () => {
     const res = await b.invoke("tabs_open", { background: true });
     expect(res).toEqual({ astra_tab_id: "tab-9", url: undefined });
     expect(calls[0]).toMatchObject({ background: true, request_id: "req-1" });
+  });
+
+  test("routes the default-browser request to System", async () => {
+    let asked = 0;
+    const fake = {
+      System: {
+        defaultBrowserRequest: async () => {
+          asked += 1;
+          return { is_default: false, can_request: true };
+        },
+      },
+    };
+    const b = new Bridge({ mode: "host", dispatch: createHostDispatch(fake as never) });
+    await expect(b.invoke("default_browser_request")).resolves.toEqual({
+      is_default: false,
+      can_request: true,
+    });
+    expect(asked).toBe(1);
   });
 
   test("unrouted commands fail fast with unknown_command", async () => {

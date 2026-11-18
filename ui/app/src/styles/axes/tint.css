@@ -89,3 +89,11 @@
   --color-accent-hover: #c05fb8;
   --color-on-accent: #fff;
 }
+
+/* The light ladder's soft/on accents were written for the default blue; every
+   tint must carry its own switch track, soft fill and focus ring too. */
+:root[data-theme="light"][data-tint] {
+  --color-track-on: var(--color-accent);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  --color-ring: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}

@@ -55,7 +55,11 @@ const SAVE_EVENTS = new Set([
  * store alone. When the owner closes it releases the slot and the next window
  * can take over. Private windows never write.
  */
-export function ownerAllows({ private: isPrivate = false, owner = null, token = null } = {}) {
+export function ownerAllows({
+  private: isPrivate = false,
+  owner = null,
+  token = null,
+} = {}) {
   if (isPrivate === true) return false;
   return owner === null || owner === token;
 }
@@ -104,7 +108,9 @@ export function buildSnapshot({
       !privateWindows.has(tab.window_id) &&
       isPersistableUrl(tab.url),
   );
-  const positions = new Map(kept.map((tab, index) => [tab.astra_tab_id, index]));
+  const positions = new Map(
+    kept.map((tab, index) => [tab.astra_tab_id, index]),
+  );
   const windowIds = new Set(
     windows.filter((win) => win?.private !== true).map((win) => win.window_id),
   );
@@ -131,7 +137,8 @@ export function buildSnapshot({
     folders: [],
     windows: [...windowIds].map((window_id) => ({
       window_id,
-      focused: windows.find((win) => win.window_id === window_id)?.focused === true,
+      focused:
+        windows.find((win) => win.window_id === window_id)?.focused === true,
       title: windows.find((win) => win.window_id === window_id)?.title ?? "",
     })),
     tabs: kept.map((tab) => ({
@@ -167,7 +174,10 @@ export function planRestore(snapshot, liveTabs = []) {
     .filter((space) => typeof space?.uuid === "string" && space.uuid !== "")
     .map((space) => ({
       id: space.uuid,
-      name: typeof space.name === "string" && space.name !== "" ? space.name : space.uuid,
+      name:
+        typeof space.name === "string" && space.name !== ""
+          ? space.name
+          : space.uuid,
       icon: null,
       color: 0,
       theme: null,
@@ -213,12 +223,16 @@ export function planRestore(snapshot, liveTabs = []) {
       space_id: saved.space_uuid,
       pinned: saved.pinned === true,
     });
-    if (saved.astra_tab_id === snapshot.active_tab_id) active = live.astra_tab_id;
+    if (saved.astra_tab_id === snapshot.active_tab_id)
+      active = live.astra_tab_id;
   }
 
   const activeSpaceId =
-    assignments.find((entry) => entry.astra_tab_id === active)?.space_id ?? spaces[0].id;
-  const savedPersistable = savedTabs.filter((tab) => isPersistableUrl(tab?.url)).length;
+    assignments.find((entry) => entry.astra_tab_id === active)?.space_id ??
+    spaces[0].id;
+  const savedPersistable = savedTabs.filter((tab) =>
+    isPersistableUrl(tab?.url),
+  ).length;
   return {
     spaces,
     activeSpaceId,
@@ -270,7 +284,8 @@ function parseSnapshot(raw) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed?.version !== SNAPSHOT_VERSION) return null;
-    if (!Array.isArray(parsed.spaces) || !Array.isArray(parsed.tabs)) return null;
+    if (!Array.isArray(parsed.spaces) || !Array.isArray(parsed.tabs))
+      return null;
     return parsed;
   } catch {
     return null;
@@ -304,7 +319,10 @@ async function windowState() {
   if (listed?.error || !Array.isArray(listed?.windows)) return null;
   return {
     windows: listed.windows,
-    focused_window_id: typeof listed.focused_window_id === "string" ? listed.focused_window_id : "",
+    focused_window_id:
+      typeof listed.focused_window_id === "string"
+        ? listed.focused_window_id
+        : "",
   };
 }
 
@@ -335,7 +353,10 @@ export const Metadata = {
     if (reply?.error) {
       _available = false;
       _lastError = reply.error.code ?? "core_unavailable";
-      return { state: "unavailable", error: reply.error.code ?? "core_unavailable" };
+      return {
+        state: "unavailable",
+        error: reply.error.code ?? "core_unavailable",
+      };
     }
     _available = true;
     _lastError = null;
@@ -346,7 +367,11 @@ export const Metadata = {
       _lastError = "invalid_spaces";
       return { state: "invalid" };
     }
-    return { state: "loaded", spaces: plan.spaces.length, tabs: _snapshot.tabs.length };
+    return {
+      state: "loaded",
+      spaces: plan.spaces.length,
+      tabs: _snapshot.tabs.length,
+    };
   },
 
   /**
@@ -357,7 +382,10 @@ export const Metadata = {
     if (isPrivate === true) return { restored: false, reason: "private" };
     if (_private) return { restored: false, reason: "private" };
     if (!_available || _snapshot === null) {
-      return { restored: false, reason: _available ? "no_snapshot" : "unavailable" };
+      return {
+        restored: false,
+        reason: _available ? "no_snapshot" : "unavailable",
+      };
     }
     const listed = await Tabs.list({ request_id: "metadata-tabs" });
     const liveTabs = Array.isArray(listed?.tabs) ? listed.tabs : [];
@@ -376,7 +404,10 @@ export const Metadata = {
         moved += 1;
       }
       if (entry.pinned && tab?.pinned !== true) {
-        await Tabs.pin({ request_id: "metadata-restore-pin", astra_tab_id: entry.astra_tab_id });
+        await Tabs.pin({
+          request_id: "metadata-restore-pin",
+          astra_tab_id: entry.astra_tab_id,
+        });
         pinned += 1;
       }
     }
@@ -384,10 +415,15 @@ export const Metadata = {
     // Bring the saved active space forward once; a later retry only places a
     // tab that just committed and must not yank the person elsewhere.
     if (first && plan.activeSpaceId) {
-      await Tabs.switchSpace({ request_id: "metadata-restore-space", space: plan.activeSpaceId });
+      await Tabs.switchSpace({
+        request_id: "metadata-restore-space",
+        space: plan.activeSpaceId,
+      });
     }
     _restored = true;
-    _remaining = first ? plan.remaining : Math.max(0, _remaining - moved - pinned);
+    _remaining = first
+      ? plan.remaining
+      : Math.max(0, _remaining - moved - pinned);
     if (first) _restoreUntil = Date.now() + RESTORE_RETRY_MS;
     // Keep the snapshot: a tab that was still lazy when this ran gets another
     // chance when its URL commits.
@@ -396,8 +432,10 @@ export const Metadata = {
 
   /** Re-run the restore after a navigation, while the retry window is open. */
   retryRestore() {
-    if (_private || !_available || _snapshot === null || _remaining <= 0) return;
-    if (Date.now() > _restoreUntil || _restoreRetries >= RESTORE_MAX_RETRIES) return;
+    if (_private || !_available || _snapshot === null || _remaining <= 0)
+      return;
+    if (Date.now() > _restoreUntil || _restoreRetries >= RESTORE_MAX_RETRIES)
+      return;
     _restoreRetries += 1;
     if (_retryTimer !== null) return;
     _retryTimer = setTimeout(() => {
@@ -409,8 +447,11 @@ export const Metadata = {
   /** Write the current organisation. Never called before `prepare`. */
   async save({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (isPrivate === true || _private) return { saved: false, reason: "private" };
-    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+    if (isPrivate === true || _private)
+      return { saved: false, reason: "private" };
+    if (
+      !ownerAllows({ private: _private, owner: ownerToken(), token: _token })
+    ) {
       return { saved: false, reason: "not_owner" };
     }
     if (!_available) {
@@ -421,7 +462,9 @@ export const Metadata = {
       _lastError = "windows_unavailable";
       return { saved: false, reason: "windows_unavailable" };
     }
-    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+    if (
+      !ownerAllows({ private: _private, owner: ownerToken(), token: _token })
+    ) {
       return { saved: false, reason: "not_owner" };
     }
     const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
@@ -452,7 +495,11 @@ export const Metadata = {
     _lastSnapshot = snapshot;
     _lastSavedAt = Number(reply.payload?.updated_at) || null;
     _lastError = null;
-    return { saved: true, tabs: snapshot.tabs.length, spaces: snapshot.spaces.length };
+    return {
+      saved: true,
+      tabs: snapshot.tabs.length,
+      spaces: snapshot.spaces.length,
+    };
   },
 
   /**
@@ -462,13 +509,21 @@ export const Metadata = {
    */
   async flush({ private: isPrivate = false } = {}) {
     resetTimer();
-    if (isPrivate === true || _private) return { saved: false, reason: "private" };
-    if (!ownerAllows({ private: _private, owner: ownerToken(), token: _token })) {
+    if (isPrivate === true || _private)
+      return { saved: false, reason: "private" };
+    if (
+      !ownerAllows({ private: _private, owner: ownerToken(), token: _token })
+    ) {
       return { saved: false, reason: "not_owner" };
     }
     if (!_available) return { saved: false, reason: "unavailable" };
+    // Capture the current organisation, not the snapshot from before the
+    // last debounce: a pin or space changed just before quitting is exactly
+    // what the person expects to find next launch.
+    const current = await this.save();
+    if (current.saved) return current;
     if (_lastSnapshot === null) {
-      return this.save();
+      return current;
     }
     const reply = await Boot.coreCall({
       request_id: "metadata-flush",
@@ -481,11 +536,18 @@ export const Metadata = {
     }
     _lastSavedAt = Number(reply.payload?.updated_at) || _lastSavedAt;
     _lastError = null;
-    return { saved: true, tabs: _lastSnapshot.tabs.length, spaces: _lastSnapshot.spaces.length };
+    return {
+      saved: true,
+      tabs: _lastSnapshot.tabs.length,
+      spaces: _lastSnapshot.spaces.length,
+    };
   },
 
   /** Subscribe once and keep the store current after every organisation change. */
-  init({ private: isPrivate = _private, window_id: windowId = _windowId } = {}) {
+  init({
+    private: isPrivate = _private,
+    window_id: windowId = _windowId,
+  } = {}) {
     // A private window owns no organisation: it neither subscribes nor
     // claims the writer slot, and must not flip the normal window's flag.
     if (isPrivate === true) return;
@@ -497,9 +559,8 @@ export const Metadata = {
     _off = addEventListener((event) => {
       if (typeof event?.type !== "string") return;
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
-        if (event.type === "nav.committed") Metadata.retryRestore();
+      if (event.type === "nav.committed") Metadata.retryRestore();
       // A newly focused window takes over writing.
-
     });
     scheduleSave();
   },
@@ -510,7 +571,8 @@ export const Metadata = {
     if (window_id && _windowId && window_id !== _windowId) return false;
     const shared = sharedServices();
     try {
-      if (shared && shared.astraOrgOwner === _token) delete shared.astraOrgOwner;
+      if (shared && shared.astraOrgOwner === _token)
+        delete shared.astraOrgOwner;
     } catch {
       // A frozen Services object is not worth failing teardown over.
     }
@@ -544,7 +606,9 @@ export const Metadata = {
   status() {
     return {
       private: _private,
-      owner: _owner || ownerAllows({ private: _private, owner: ownerToken(), token: _token }),
+      owner:
+        _owner ||
+        ownerAllows({ private: _private, owner: ownerToken(), token: _token }),
       available: _available,
       restored: _restored,
       pending: _timer !== null,

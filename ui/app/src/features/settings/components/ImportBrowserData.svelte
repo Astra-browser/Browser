@@ -33,7 +33,13 @@
       source?.profiles[0]?.id ??
       null,
   );
-  let offered = $derived(kinds.filter((kind) => source?.kinds.includes(kind)));
+  let offered = $derived(
+    kinds.filter(
+      (kind) =>
+        source?.kinds.includes(kind) &&
+        (source.id !== "astra-file" || profileId === null || kind === profileId),
+    ),
+  );
   let running = $derived(browserImport.busy());
   let jobSource = $derived(found?.find((candidate) => candidate.id === job?.source) ?? null);
   let jobName = $derived(jobSource?.name ?? "");

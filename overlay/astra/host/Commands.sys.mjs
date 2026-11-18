@@ -24,7 +24,12 @@
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
-import { Tabs, __itemsSnapshot, __tabsState, __selectedInWindow } from "./Tabs.sys.mjs";
+import {
+  Tabs,
+  __itemsSnapshot,
+  __tabsState,
+  __selectedInWindow,
+} from "./Tabs.sys.mjs";
 import { Navigation } from "./Navigation.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
 import { Zoom } from "./Zoom.sys.mjs";
@@ -87,6 +92,8 @@ const SHELL_ACTIONS = new Set([
   "bookmark.add",
   "page.copy",
   "page.copyLink",
+  "page.cut",
+  "page.paste",
   "page.devtools",
   "page.devtools.alt",
   "page.print",
@@ -130,16 +137,22 @@ function selectedId(window_id = "") {
 async function tabIndexInSpace(window_id = "") {
   const list = await Tabs.list({ window_id });
   const tabs = list.tabs ?? [];
-  const current = tabs.find((tab) => tab.astra_tab_id === selectedId(window_id));
+  const current = tabs.find(
+    (tab) => tab.astra_tab_id === selectedId(window_id),
+  );
   if (!current) return null;
   const order = tabs.filter((tab) => tab.space_id === current.space_id);
-  return { order, at: order.findIndex((tab) => tab.astra_tab_id === selectedId(window_id)) };
+  return {
+    order,
+    at: order.findIndex((tab) => tab.astra_tab_id === selectedId(window_id)),
+  };
 }
 
 async function stepTab(direction, window_id = "") {
   const pos = await tabIndexInSpace(window_id);
   if (!pos || pos.at < 0) return admission(false);
-  const next = pos.order[(pos.at + direction + pos.order.length) % pos.order.length];
+  const next =
+    pos.order[(pos.at + direction + pos.order.length) % pos.order.length];
   if (!next) return admission(false);
   await Tabs.select({ astra_tab_id: next.astra_tab_id });
   return admission(true);
@@ -148,7 +161,8 @@ async function stepTab(direction, window_id = "") {
 async function selectTabAt(index, window_id = "") {
   const pos = await tabIndexInSpace(window_id);
   if (!pos) return admission(false);
-  const target = index === -1 ? pos.order[pos.order.length - 1] : pos.order[index];
+  const target =
+    index === -1 ? pos.order[pos.order.length - 1] : pos.order[index];
   if (!target) return admission(false);
   await Tabs.select({ astra_tab_id: target.astra_tab_id });
   return admission(true);
@@ -278,7 +292,9 @@ export const Commands = {
       emit("ui-command", "browser.settings");
       return admission(true);
     }
-    const section = id.startsWith("settings.") ? id.slice("settings.".length) : "";
+    const section = id.startsWith("settings.")
+      ? id.slice("settings.".length)
+      : "";
     if (SECTIONS.has(section)) {
       emit("ui-command", `settings.section.${section}`);
       emit("ui-command", "browser.settings");

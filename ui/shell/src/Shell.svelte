@@ -113,6 +113,8 @@
   const SHELL_COMMANDS = new Set([
     "bookmark.add",
     "page.copy",
+    "page.cut",
+    "page.paste",
     "page.devtools",
     "page.devtools.alt",
     "page.print",
@@ -465,6 +467,28 @@
       "key_toggleReaderMode",
       "key_togglePictureInPicture",
       "key_toggleMute",
+      "key_find",
+      "key_findAgain",
+      "key_findPrevious",
+      "key_viewSource",
+      "key_privatebrowsing",
+      "key_fullZoomReduce",
+      "key_fullZoomEnlarge",
+      "key_fullZoomReset",
+      "key_screenshot",
+      "manBookmarkKb",
+      "toggleSidebarKb",
+      "key_gotoHistory",
+      "key_stop",
+      "key_selectTab1",
+      "key_selectTab2",
+      "key_selectTab3",
+      "key_selectTab4",
+      "key_selectTab5",
+      "key_selectTab6",
+      "key_selectTab7",
+      "key_selectTab8",
+      "key_selectTab9",
       // DevTools registers its shortcuts as <key> elements at startup.
       "key_toggleToolboxF12",
       "key_toggleToolbox",
@@ -514,10 +538,11 @@
       } catch {
         // No keymap: the native keys stay as they are and the app still works.
       }
-      // Function keys the native keyset owns but the registry names differently.
-      globalKeys.set("F5", "nav.reload");
-      globalKeys.set("F11", "window.fullscreen");
-      globalKeys.set("F12", "page.devtools");
+      // Function keys the native keyset owns but the registry names
+      // differently. A person's own binding for the same chord wins.
+      if (!globalKeys.has("F5")) globalKeys.set("F5", "nav.reload");
+      if (!globalKeys.has("F11")) globalKeys.set("F11", "window.fullscreen");
+      if (!globalKeys.has("F12")) globalKeys.set("F12", "page.devtools");
     };
     await loadGlobalKeys();
     const disableNativeKeys = () => {
@@ -883,6 +908,22 @@
       };
     }
 
+    // Paint the shell's own ground from the tier the host resolved, so Mica
+    // shows through before the app has sent its first appearance message.
+    void host.System?.uiInfo?.()
+      .then((info) => {
+        const material = ["none", "vibrancy", "liquid_glass", "acrylic", "mica"].includes(
+          info?.material,
+        )
+          ? info.material
+          : "none";
+        frameRoot.dataset.astraMaterial = material;
+        if (win?.document?.documentElement) {
+          win.document.documentElement.dataset.astraMaterial = material;
+        }
+      })
+      .catch(() => {});
+
     const off = host.addEventListener((event) => {
       if (!event || typeof event.type !== "string") {
         return;
@@ -897,8 +938,9 @@
       }
       if (event.type === "keymap-changed") {
         // A rebind applies to the page and chrome keys immediately, not only
-        // after the window is reopened.
+        // after the window is reopened. Native <key> elements are swept too.
         void loadGlobalKeys();
+        disableNativeKeys();
       } else if (event.type === "window.fullscreen-changed") {
         if (event.data?.window_id === ownWindowId) {
           mirrorFullscreen(event.data?.fullscreen === true);
@@ -1158,6 +1200,19 @@
         setMenuOpen(false);
         return;
       }
+      if (data.kind === "appearance") {
+        const material = ["none", "vibrancy", "liquid_glass", "acrylic", "mica"].includes(
+          data.material,
+        )
+          ? data.material
+          : "none";
+        frameRoot.dataset.astraMaterial = material;
+        frameRoot.dataset.astraDensity = data.density === "compact" ? "compact" : "comfortable";
+        if (win?.document?.documentElement) {
+          win.document.documentElement.dataset.astraMaterial = material;
+        }
+        return;
+      }
       // The app names the surface that is actually in front. This is the
       // authority for `data-internal`: a page can still be open while a web
       // tab is the one shown (parking), and no host command says so.
@@ -1220,6 +1275,7 @@
       }
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
+      win.removeEventListener("mousedown", onGlobalMouse, true);
       win.removeEventListener("sizemodechange", onSizeMode);
       stageObserver?.disconnect();
       stageMutation?.disconnect();
@@ -1440,6 +1496,11 @@
   /* The attribute is set from the app's theme message, so the ancestor is
      global; a scoped selector here is pruned as unreachable. The light
      palette waits until the app is actually in front. */
+  /* A native material sits behind the whole window; the shell's own opaque
+     loading ground would hide it. The app paints its wash over the material. */
+  :global(.astra-frame[data-astra-material]:not([data-astra-material="none"])[data-app-booted="true"]) {
+    background: transparent !important;
+  }
   :global(.astra-frame[data-astra-theme="light"][data-app-booted="true"]) {
     --shell-loading-ground: #f1f1f3;
     --shell-loading-raised: #fffdf9;
@@ -1551,6 +1612,12 @@
        keeps the card's full rectangle and the bar slides over the top of it,
        so revealing the bar never moves the page. */
     transition: inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (-moz-platform: windows) {
+    .astra-frame[data-app-booted="true"] .astra-content,
+    .astra-frame[data-app-booted="pending"] .astra-content {
+      border-radius: 8px;
+    }
   }
   :global(.astra-frame[data-app-booted="true"][data-astra-bar="overlay"] .astra-content),
   :global(.astra-frame[data-app-booted="pending"][data-astra-bar="overlay"] .astra-content) {
@@ -1814,6 +1881,9 @@
     position: relative;
     z-index: 3;
     background: transparent;
+    /* The mount is the full stage; only the clipped frame below may take a
+       pointer. Without this the mount ate every page click outside the card. */
+    pointer-events: none;
   }
   /* A transparent frame still swallows every pointer event over the page: the
      window looked like it had an invisible sheet across it until the card went
@@ -1825,6 +1895,7 @@
     clip-path: inset(
       8px calc(100% - var(--astra-sidebar-card-width, 240px) - 24px) 8px 8px
     );
+    pointer-events: auto;
   }
   /* The floating page bar lives in the app frame, which normally sits under
      the page. Raise the frame while the bar floats and clip it to the bar's
@@ -1835,8 +1906,10 @@
     position: relative;
     z-index: 4;
     background: transparent;
+    pointer-events: none;
   }
   :global(.astra-frame[data-astra-bar-open="true"] .astra-app-frame) {
+    pointer-events: auto;
     /* Keep the column (and the window's left gutter) whole, and open only the
        bar's strip over the page. A single inset would also clip the sidebar,
        which the page never covers. A peeking hidden column widens the keep
@@ -1876,9 +1949,11 @@
     position: relative;
     z-index: 4;
     background: transparent;
+    pointer-events: none;
   }
   :global(.astra-frame[data-astra-menu-open="true"] .astra-app-frame) {
     clip-path: none;
+    pointer-events: auto;
   }
 
   /* A page peek keeps the frame raised only over its own card rectangle. The
@@ -1888,6 +1963,7 @@
     position: relative;
     z-index: 4;
     background: transparent;
+    pointer-events: none;
   }
 
   :global(.astra-frame[data-astra-peek-open="true"] .astra-app-frame) {
@@ -1895,6 +1971,7 @@
       var(--astra-peek-top, 0px) var(--astra-peek-right, 0px)
         var(--astra-peek-bottom, 0px) var(--astra-peek-left, 0px)
     );
+    pointer-events: auto;
   }
   .astra-app-mount > :global(.astra-app-frame) {
     flex: 1 1 auto;

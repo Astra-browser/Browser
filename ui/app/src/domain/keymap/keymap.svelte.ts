@@ -57,7 +57,37 @@ export function commandFor(event: KeyboardEvent, mac: boolean, pressed: string):
       entry.accelerator !== null &&
       sameAccelerator(entry.accelerator, pressed, mac),
   );
-  return hit?.id ?? null;
+  if (!hit) return null;
+  // Copy/cut/paste in one of Astra's own fields belong to that field, not to
+  // the page behind it. Let the browser's default editing command run.
+  if (
+    ["page.copy", "page.cut", "page.paste", "page.selectAll"].includes(hit.id) &&
+    isEditableTarget(event.target)
+  ) {
+    return null;
+  }
+  return hit.id;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  if (element instanceof HTMLInputElement) {
+    return ![
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ].includes(element.type);
+  }
+  return element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
 }
 
 /** `replace` takes the keys from whichever command holds them, in the same

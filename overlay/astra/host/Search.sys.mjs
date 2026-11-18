@@ -45,7 +45,8 @@ const ENGINES = {
   google: {
     name: "Google",
     url: "https://www.google.com/search?q=%s",
-    suggest: "https://suggestqueries.google.com/complete/search?client=chrome&q=%s",
+    suggest:
+      "https://suggestqueries.google.com/complete/search?client=chrome&q=%s",
   },
   bing: {
     name: "Bing",
@@ -57,16 +58,22 @@ const ENGINES = {
     url: "https://search.brave.com/search?q=%s",
     suggest: "https://search.brave.com/api/suggest?q=%s",
   },
-  startpage: { name: "Startpage", url: "https://www.startpage.com/sp/search?query=%s" },
+  startpage: {
+    name: "Startpage",
+    url: "https://www.startpage.com/sp/search?query=%s",
+  },
   ecosia: { name: "Ecosia", url: "https://www.ecosia.org/search?q=%s" },
   mojeek: { name: "Mojeek", url: "https://www.mojeek.com/search?q=%s" },
-  wikipedia: { name: "Wikipedia", url: "https://en.wikipedia.org/w/index.php?search=%s" },
+  wikipedia: {
+    name: "Wikipedia",
+    url: "https://en.wikipedia.org/w/index.php?search=%s",
+  },
 };
 
-// Google serves an image CAPTCHA to fresh/automated profiles; Astra does not
-// bypass a CAPTCHA. A privacy-first engine is the default, and Google stays a
-// selectable engine when the person chooses it.
-const DEFAULT_ENGINE = "duckduckgo";
+// The default is the engine the settings surface has always shown, so a fresh
+// profile searches where the picker says it does. Every other engine stays a
+// choice, and a stored choice always wins.
+const DEFAULT_ENGINE = "google";
 
 /** Leading `!` shortcuts, parsed before URL detection. */
 const BANGS = {
@@ -93,7 +100,11 @@ const NAVIGABLE = new Set(["http:", "https:"]);
  * as javascript: and data: already are.
  */
 function isBlankAbout(parsed) {
-  return parsed.protocol === "about:" && parsed.pathname === "blank" && parsed.host === "";
+  return (
+    parsed.protocol === "about:" &&
+    parsed.pathname === "blank" &&
+    parsed.host === ""
+  );
 }
 
 function engineSetting() {
@@ -125,7 +136,12 @@ export function engine() {
     try {
       const parsed = new URL(template.replace("%s", "x"));
       if (parsed.protocol === "https:") {
-        return { id: "custom", name: parsed.hostname, url: template, suggest: null };
+        return {
+          id: "custom",
+          name: parsed.hostname,
+          url: template,
+          suggest: null,
+        };
       }
     } catch {
       // Not a URL: fall through to the built-in table.
@@ -184,7 +200,8 @@ export function resolve(input) {
   // A development host is an address, not a scheme. `localhost:3000` and
   // `127.0.0.1:8080` are what a person types most often that look like
   // `scheme:port`; a loopback server is http, anything else keeps https.
-  const loopback = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(?:[/?#][^\s]*)?$/iu;
+  const loopback =
+    /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(?:[/?#][^\s]*)?$/iu;
   if (loopback.test(text)) {
     return { kind: "url", url: new URL(`http://${text}`).href };
   }
@@ -249,7 +266,8 @@ function chromeGlobal() {
 
 /** The engine's own suggest endpoint, when the local table declares one. */
 function tableSuggestUrl(current, text) {
-  if (current.id === "custom" || typeof current.suggest !== "string") return null;
+  if (current.id === "custom" || typeof current.suggest !== "string")
+    return null;
   return current.suggest.replace("%s", encodeURIComponent(text));
 }
 
@@ -262,7 +280,10 @@ function searchServiceSuggestUrl(current, text) {
     const search = (chromeGlobal().Services ?? globalThis.Services)?.search;
     const selected = search?.defaultEngine;
     if (!selected || selected.name !== current.name) return null;
-    const submission = selected.getSubmission(text, "application/x-suggestions+json");
+    const submission = selected.getSubmission(
+      text,
+      "application/x-suggestions+json",
+    );
     const spec = submission?.uri?.spec;
     return typeof spec === "string" && /^https:/iu.test(spec) ? spec : null;
   } catch {
@@ -271,7 +292,9 @@ function searchServiceSuggestUrl(current, text) {
 }
 
 function suggestUrl(current, text) {
-  return searchServiceSuggestUrl(current, text) ?? tableSuggestUrl(current, text);
+  return (
+    searchServiceSuggestUrl(current, text) ?? tableSuggestUrl(current, text)
+  );
 }
 
 /**
@@ -298,7 +321,8 @@ export function parseSuggestions(payload, query = "") {
       return;
     }
     if (value !== null && typeof value === "object") {
-      const text = value.phrase ?? value.suggestion ?? value.query ?? value.value;
+      const text =
+        value.phrase ?? value.suggestion ?? value.query ?? value.value;
       if (typeof text === "string") values.push(text);
     }
   };
@@ -316,7 +340,9 @@ export function parseSuggestions(payload, query = "") {
     }
   }
   const seen = new Set();
-  const typed = String(query ?? "").trim().toLowerCase();
+  const typed = String(query ?? "")
+    .trim()
+    .toLowerCase();
   const out = [];
   for (const raw of values) {
     const text = raw.trim();
@@ -336,9 +362,10 @@ function sleep(ms) {
 function fetchFunction() {
   const scope = chromeGlobal();
   if (typeof scope.fetch === "function") return scope.fetch.bind(scope);
-  if (typeof globalThis.fetch === "function") return globalThis.fetch.bind(globalThis);
+  if (typeof globalThis.fetch === "function")
+    return globalThis.fetch.bind(globalThis);
   try {
-    const services = (scope.Services ?? globalThis.Services);
+    const services = scope.Services ?? globalThis.Services;
     const win = services?.wm?.getMostRecentWindow?.("navigator:browser");
     if (typeof win?.fetch === "function") return win.fetch.bind(win);
   } catch {
@@ -358,7 +385,8 @@ async function fetchSuggestions(text, current, stillCurrent) {
   if (url === null || doFetch === null) return [];
   await sleep(SUGGEST_DEBOUNCE_MS);
   if (!stillCurrent()) return null;
-  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const controller =
+    typeof AbortController === "function" ? new AbortController() : null;
   const timer = setTimeout(() => controller?.abort(), SUGGEST_TIMEOUT_MS);
   try {
     const response = await doFetch(url, {
@@ -443,7 +471,12 @@ export const Search = {
     const wantsSuggestions =
       text !== "" && bang(text) === null && suggestionsEnabled();
     if (!wantsSuggestions) {
-      emitSearch({ context: echoed, query: text, results: rows, pending: false });
+      emitSearch({
+        context: echoed,
+        query: text,
+        results: rows,
+        pending: false,
+      });
       return true;
     }
 
@@ -457,7 +490,12 @@ export const Search = {
     );
     if (_newtabRequests.get(session) !== token) return true;
     const results = suggestions?.length
-      ? [...suggestions.map((suggestion) => suggestionRow(suggestion, current)), ...rows]
+      ? [
+          ...suggestions.map((suggestion) =>
+            suggestionRow(suggestion, current),
+          ),
+          ...rows,
+        ]
       : rows;
     emitSearch({ context: echoed, query: text, results, pending: false });
     return true;
@@ -466,13 +504,18 @@ export const Search = {
   /** Run the row the person picked. */
   async newtabRun({ action = null, context = null } = {}) {
     const owner = context ?? (await Search.newtabContext({}));
-    if (!action || action.type !== "OpenUrl" || typeof action.url !== "string") {
+    if (
+      !action ||
+      action.type !== "OpenUrl" ||
+      typeof action.url !== "string"
+    ) {
       return { operation_id: null, accepted: false };
     }
     // A row's URL is an address, never words: a javascript:/data: row is
     // refused outright instead of being turned into a search.
     const resolved = resolve(action.url);
-    if (!resolved || resolved.kind !== "url") return { operation_id: null, accepted: false };
+    if (!resolved || resolved.kind !== "url")
+      return { operation_id: null, accepted: false };
     const tab = __tabsState().selectedId;
     if (tab) {
       await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });
@@ -497,7 +540,10 @@ export const Search = {
     if (!resolved) return { operation_id: null, accepted: false };
     const tab = new_tab ? "" : __tabsState().selectedId;
     if (tab) {
-      const result = await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });
+      const result = await Navigation.loadURL({
+        astra_tab_id: tab,
+        url: resolved.url,
+      });
       return { operation_id: null, accepted: !result.error };
     }
     await Tabs.create({ url: resolved.url, background: false });
@@ -530,7 +576,12 @@ export const Search = {
     );
     if (_launcherRequest !== token) return true;
     const results = suggestions?.length
-      ? [...suggestions.map((suggestion) => suggestionRow(suggestion, current)), ...rows]
+      ? [
+          ...suggestions.map((suggestion) =>
+            suggestionRow(suggestion, current),
+          ),
+          ...rows,
+        ]
       : rows;
     emitSearch({ context: null, query: text, results, pending: false });
     return true;
@@ -538,13 +589,18 @@ export const Search = {
 
   /** Run a launcher row (the launcher's own results are native's). */
   async launcherRun({ action = null } = {}) {
-    if (!action || action.type !== "OpenUrl" || typeof action.url !== "string") {
+    if (
+      !action ||
+      action.type !== "OpenUrl" ||
+      typeof action.url !== "string"
+    ) {
       return { operation_id: null, accepted: false };
     }
     // A row's URL is an address, never words: a javascript:/data: row is
     // refused outright instead of being turned into a search.
     const resolved = resolve(action.url);
-    if (!resolved || resolved.kind !== "url") return { operation_id: null, accepted: false };
+    if (!resolved || resolved.kind !== "url")
+      return { operation_id: null, accepted: false };
     const tab = __tabsState().selectedId;
     if (tab) {
       await Navigation.loadURL({ astra_tab_id: tab, url: resolved.url });
