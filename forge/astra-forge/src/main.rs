@@ -1855,35 +1855,74 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
             );
         }
         let nasm_dir = std::env::var("ASTRA_NASM_DIR").unwrap_or_else(|_| "C:\\tools\\nasm".into());
-        let mut script = format!(
-            "export PATH=\"/c/Program Files/LLVM/bin:{}:$PATH\" && ",
+        let mut script = String::from("set -e\n");
+        script.push_str(&format!(
+            "export PATH=\"/c/Program Files/LLVM/bin:{}:$PATH\"\n",
             to_msys_path(Path::new(&nasm_dir))
-        );
+        ));
         let _ = fs::create_dir_all(&sccache);
         script.push_str(&format!(
-            "export MOZCONFIG={} && export SCCACHE_DIR={} && \
-             export SCCACHE_LOG=warn && export SCCACHE_ERROR_LOG={} && \
-             export SCCACHE_IDLE_TIMEOUT=0; \
-             sccache --show-stats >/dev/null 2>&1 || sccache --start-server >/dev/null 2>&1 || true; ",
-            to_msys_path(&mozconfig),
+            "export SCCACHE_DIR={} SCCACHE_LOG=warn SCCACHE_ERROR_LOG={} \
+             SCCACHE_IDLE_TIMEOUT=0\n\
+             sccache --show-stats >/dev/null 2>&1 || sccache --start-server >/dev/null 2>&1 || true\n",
             to_msys_path(&sccache),
             to_msys_path(&sccache.join("error.log"))
         ));
-        for key in ["MOZ_WINDOWS_APP_SDK_DIR", "MOZ_WINDOWS_RS_DIR"] {
-            if let Ok(value) = std::env::var(key) {
-                if !value.is_empty() {
-                    script.push_str(&format!(
-                        "export {key}={} && ",
-                        to_msys_path(Path::new(&value))
-                    ));
-                }
+        // The Windows configure recipe (docs/astra/WINDOWS_PORT.md) also needs
+        // the two staged toolchain sources. Honour an explicit environment
+        // value first, then the documented staging paths, and only when they
+        // exist, so another machine is not pointed at a missing directory.
+        for (key, fallback) in [
+            (
+                "MOZ_WINDOWS_APP_SDK_DIR",
+                "D:\\astra-build\\windowsappsdk\\winappsdk-x86_64-pc-windows-msvc",
+            ),
+            (
+                "MOZ_WINDOWS_RS_DIR",
+                "D:\\astra-build\\windows-rs\\windows-0.62.2",
+            ),
+        ] {
+            let value = std::env::var(key)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| fallback.to_string());
+            let path = Path::new(&value);
+            if path.is_dir() {
+                script.push_str(&format!(
+                    "export {key}={}\n",
+                    to_msys_path(path)
+                ));
             }
         }
+        // The objdir remembers the mozconfig it was configured with. Reusing
+        // it avoids a reconfigure against a different file (which is what made
+        // `forge build --os windows` die on a missing WASI sysroot here).
+        let configured = engine.join(format!("obj-astra-{os}")).join(".mozconfig");
+        let config = if std::env::var("MOZCONFIG").is_ok() {
+            mozconfig.clone()
+        } else if os == "windows" && configured.is_file() {
+            configured
+        } else {
+            mozconfig.clone()
+        };
+        script.push_str(&format!("export MOZCONFIG={}\n", to_msys_path(&config)));
         script.push_str(&format!(
-            "cd {} && ./mach {}",
+            "cd {} && exec ./mach {}\n",
             to_msys_path(&engine),
             mach_args.join(" ")
         ));
+        // Write the script to a file and hand only its path to `-c`. Passing
+        // the script itself as one cmd.exe argument used to fail with
+        // "The syntax of the command is incorrect.": cmd.exe mangles the
+        // embedded double quotes Rust adds for `export PATH="/c/Program
+        // Files/LLVM/bin:..."`. A path plus one word contains no quotes and
+        // survives every layer.
+        let script_path = root.join("out").join(format!(".forge-build-{os}.sh"));
+        if let Some(parent) = script_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&script_path, script)
+            .map_err(|e| format!("build: write {}: {e}", script_path.display()))?;
         Command::new("cmd")
             .args([
                 "/C",
@@ -1892,7 +1931,7 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
                 "-defterm",
                 "-c",
             ])
-            .arg(script)
+            .arg(format!("bash {}", to_msys_path(&script_path)))
             .status()
             .map_err(|e| format!("spawn MozillaBuild: {e}"))?
     } else {
@@ -1945,13 +1984,55 @@ fn install_core_binary(root: &Path, os: &str) -> Result<(), String> {
         return Ok(());
     }
     let dest = dist.join(format!("astra-core{suffix}"));
-    std::fs::copy(&src, &dest).map_err(|e| format!("copy core: {e}"))?;
+    // A running dev browser keeps `astra-core.exe` mapped, and Windows refuses
+    // to overwrite a mapped image (os error 32) — which used to leave the
+    // dist sidecar stale and only print a warning. Copy beside it, then try a
+    // swap; when the file is opened without delete-sharing the rename fails
+    // too, so the staged `.new` stays for `Boot.launchCore` to swap at the
+    // next launch.
+    let staged = dist.join(format!("astra-core{suffix}.new"));
+    std::fs::copy(&src, &staged).map_err(|e| format!("copy core: {e}"))?;
+    #[cfg(windows)]
+    {
+        let retired = dist.join(format!("astra-core{suffix}.old"));
+        let _ = std::fs::remove_file(&retired);
+        if dest.exists() {
+            match std::fs::rename(&dest, &retired) {
+                Ok(()) => {}
+                Err(_) => {
+                    // Not running and not replaceable: fall through to the
+                    // direct copy, which will report the real error.
+                }
+            }
+        }
+        match std::fs::rename(&staged, &dest)
+            .or_else(|_| std::fs::copy(&staged, &dest).map(|_| ()))
+        {
+            Ok(()) => {
+                let _ = std::fs::remove_file(&staged);
+                println!("core: installed {}", dest.display());
+            }
+            Err(_) => {
+                // A running browser holds the old image. Keep the new file
+                // beside it; `Boot.launchCore` swaps it in before the next
+                // launch, when nothing has the file open.
+                println!(
+                    "core: staged {} (a running browser holds the old binary; it is swapped at the next launch)",
+                    staged.display()
+                );
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::rename(&staged, &dest).map_err(|e| format!("install core: {e}"))?;
+        println!("core: installed {}", dest.display());
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755));
     }
-    println!("core: installed {}", dest.display());
     Ok(())
 }
 

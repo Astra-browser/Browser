@@ -106,6 +106,16 @@ Section "Astra" SEC_MAIN
     "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
     "DisplayIcon" "$INSTDIR\astra.exe,0"
+  ; Apps & Features shows "Location" from InstallLocation; without it the
+  ; entry has no path and tools that read the uninstall key cannot find the
+  ; install. This build has no modify/repair flow, so say so instead of
+  ; offering buttons that do nothing.
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
+    "InstallLocation" "$INSTDIR"
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
+    "NoModify" 1
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
+    "NoRepair" 1
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \
     "Publisher" "Astra"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Astra" \

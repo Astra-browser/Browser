@@ -34,6 +34,41 @@ function err(request_id, code, message) {
   return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
 
+/**
+ * A build stages `astra-core.exe.new` beside a running binary, because Windows
+ * cannot replace a mapped image. At launch nothing has that file open yet, so
+ * this is the moment to swap it in. Node contracts have no ChromeUtils and no
+ * staged file, so this is a no-op there.
+ */
+function applyStagedCore(command) {
+  if (typeof command !== "string" || !command.toLowerCase().endsWith(".exe")) {
+    return command;
+  }
+  try {
+    if (typeof ChromeUtils === "undefined") return command;
+    const { FileUtils } = ChromeUtils.importESModule(
+      "resource://gre/modules/FileUtils.sys.mjs",
+    );
+    const staged = new FileUtils.File(`${command}.new`);
+    if (!staged.exists()) return command;
+    const live = new FileUtils.File(command);
+    try {
+      if (live.exists()) live.remove(false);
+    } catch {
+      // Still held by something: the next launch tries again.
+      return command;
+    }
+    try {
+      staged.moveTo(live.parent, live.leafName);
+    } catch {
+      // The next launch tries again.
+    }
+  } catch {
+    // No chrome or no staged file.
+  }
+  return command;
+}
+
 /** One Appendix C frame: 4-byte BE length + UTF-8 JSON body. */
 export class SidecarFrame {
   static encode(obj) {
@@ -278,6 +313,7 @@ export const Boot = {
         reason: "no core command configured",
       });
     }
+    command = applyStagedCore(command.trim());
     if (!currentLaunch()) {
       setLaunch(
         launchCoreHandle(command.trim(), Array.isArray(args) ? args : [])
