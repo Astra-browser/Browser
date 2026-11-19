@@ -76,3 +76,8 @@ ui_inspiration/
 # Only the build notes stay tracked.
 /release/*
 !/release/README-alpha.md
+/.opencode
+/site/*
+# A tool run from the repo root (vite/vitest) drops its cache here; the real
+# dependency trees live under ui/.
+/node_modules
