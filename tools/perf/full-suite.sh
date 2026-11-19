@@ -39,7 +39,7 @@ CONTRACTS=(
   privacy_host spaces_model profiles_model bookmarks_model spaces_profiles_model
   protected_content native_surfaces chrome_extensions native_file_picker
   menu_layer telemetry_blocklist migration_model search_model commands_model
-  blocker_coverage passkeys_model
+  launcher_edit blocker_coverage passkeys_model
 )
 for t in "${CONTRACTS[@]}"; do
   if [ -f "tests/contract/$t.mjs" ]; then

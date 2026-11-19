@@ -271,7 +271,8 @@ check("shell frame layout mounts", shell.includes("data-astra-frame")
 check("shell extends __astraHost with Windows",
   shell.includes("Windows: host.Windows"));
 check("shell seam carries Frame dispatch",
-  shell.includes("Frame:") && shell.includes("dispatchWindowControl"));
+  (shell.includes("get Frame()") || shell.includes("Frame:"))
+    && shell.includes("dispatchWindowControl"));
 check("shell seam keeps Tabs/Navigation/Panes/addEventListener",
   shell.includes("Tabs: host.Tabs") && shell.includes("Navigation: host.Navigation")
   && shell.includes("Panes: host.Panes") && shell.includes("addEventListener"));

@@ -381,6 +381,16 @@ const MALFORMED_WRITES = [
   ["add_link with a blank url", { kind: "add_link", parent: null, title: "Docs", url: "   " }],
   ["add_link with an unparseable url",
     { kind: "add_link", parent: null, title: "Docs", url: "not a url" }],
+  // A row in the list must be an address the product can open. There is no
+  // bookmarklet runner, so a javascript: bookmark could only ever be inert
+  // (and is a script payload); data: is the same. A local file is allowed —
+  // that is a real address.
+  ["add_link with a javascript: url",
+    { kind: "add_link", parent: null, title: "Run", url: "javascript:alert(1)" }],
+  ["add_link with a data: url",
+    { kind: "add_link", parent: null, title: "Doc", url: "data:text/html,<h1>x</h1>" }],
+  ["add_link with an about: url",
+    { kind: "add_link", parent: null, title: "Config", url: "about:config" }],
   ["add_link with a numeric title", { kind: "add_link", parent: null, title: 7, url: URL }],
   ["rename without an id", { kind: "rename", title: "Docs" }],
   ["rename with an empty id", { kind: "rename", id: "", title: "Docs" }],

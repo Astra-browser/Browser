@@ -16,7 +16,7 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows } = await import(pathToFileURL(path.join(HOST, "Metadata.sys.mjs")).href);
+const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows, organisationDiffers } = await import(pathToFileURL(path.join(HOST, "Metadata.sys.mjs")).href);
 const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 
 let passed = 0;
@@ -303,6 +303,45 @@ function tab(overrides) {
   check("Metadata exposes the plan function", Metadata.plan === planRestore);
   check("a fresh module has not restored anything", Metadata.status().restored === false);
   Metadata.__resetForTests();
+}
+
+// --- Organisation changes persist with no page open (2026-11-20) -------------
+// A space deleted while it held the only page left a capture with zero tabs.
+// `save()` refused it and the quit flush rewrote the older snapshot, so the
+// space came back. Only a space change may persist an empty capture; a tab or
+// selection change may not, or a restore that has not finished would erase the
+// organisation it is about to restore.
+{
+  const withPage = buildSnapshot({
+    spaces: [{ id: "space-1", name: "Space" }, { id: "space-2", name: "Doomed" }],
+    active_space_id: "space-1",
+    tabs: [{ astra_tab_id: "tab-1", url: "https://example.com/", title: "x", window_id: "win-1", private: false }],
+    windows: [{ window_id: "win-1", private: false }],
+    selected_tab_id: "tab-1",
+  });
+  const afterDelete = buildSnapshot({
+    spaces: [{ id: "space-1", name: "Space" }],
+    active_space_id: "space-1",
+    tabs: [],
+    windows: [{ window_id: "win-1", private: false }],
+  });
+  const renamedOnly = buildSnapshot({
+    spaces: [{ id: "space-1", name: "Renamed" }, { id: "space-2", name: "Doomed" }],
+    active_space_id: "space-1",
+    tabs: [],
+    windows: [{ window_id: "win-1", private: false }],
+  });
+  check("deleting a space differs from the saved organisation",
+    organisationDiffers(afterDelete, withPage) === true);
+  check("renaming a space differs from the saved organisation",
+    organisationDiffers(renamedOnly, withPage) === true);
+  check("an unchanged organisation does not differ",
+    organisationDiffers(afterDelete, afterDelete) === false);
+  check("a tab-only change is not an organisation change",
+    organisationDiffers(
+      { spaces: afterDelete.spaces, tabs: [{ astra_tab_id: "tab-2" }] },
+      afterDelete,
+    ) === false);
 }
 
 console.log(

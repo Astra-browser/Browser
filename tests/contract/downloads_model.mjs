@@ -444,6 +444,45 @@ for (const kind of ["entries", "teleport", ""]) {
   reset();
 }
 
+// --- Pause -> resume keeps a monotonic revision (2026-11-20) ----------------
+// A resume used to return to the "receiving" rank, which sorted *below* the
+// "paused" revision it replaced; the app drops a frame whose revision is not
+// higher, so the row stayed paused and its progress froze.
+{
+  const { __revisionOf, __idOf } = await import(
+    pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href
+  );
+  const transfer = { currentBytes: 1000, startTime: 1, stopped: false, succeeded: false };
+  const receiving = __revisionOf(transfer, "d1");
+  transfer.canceled = true;
+  transfer.stopped = true;
+  const paused = __revisionOf(transfer, "d1");
+  check("the paused revision is higher than the receiving one", paused > receiving);
+  transfer.canceled = false;
+  transfer.stopped = false;
+  transfer.currentBytes = 1000;
+  const resumed = __revisionOf(transfer, "d1");
+  check("a resume with no new bytes is still a higher revision", resumed > paused);
+  transfer.currentBytes = 2000;
+  const progress = __revisionOf(transfer, "d1");
+  check("progress after a resume is higher again", progress > resumed);
+  const stable = __revisionOf(transfer, "d1");
+  check("an unchanged frame keeps its revision", stable === progress);
+
+  // A resume rewrites `startTime`; the wire id must stay with the transfer or
+  // the panel shows a second 0 B row whose Cancel cannot reach anything.
+  const native = {
+    startTime: new Date(1000),
+    source: { url: "https://example.test/a.zip" },
+    target: { path: "C:/Downloads/a.zip" },
+  };
+  const first = __idOf(native);
+  native.startTime = new Date(9999);
+  check("a resumed transfer keeps its wire id", __idOf(native) === first);
+  const other = { ...native, target: { path: "C:/Downloads/b.zip" } };
+  check("a different transfer gets a different id", __idOf(other) !== first);
+}
+
 console.log(`\ndownloads_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
 
