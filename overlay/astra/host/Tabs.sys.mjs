@@ -135,6 +135,9 @@ function insertionIndexFor({ index, window_id, space_id }) {
 // into the model and the projection.
 const TAB_SCHEMES = new Set(["http:", "https:"]);
 
+/** Past any real address: the engine cannot load it, so it is refused. */
+const MAX_URL_LENGTH = 32 * 1024;
+
 /** The address a tab stores: a loadable web address, or a New Tab. */
 export function safeTabUrl(url) {
   if (typeof url !== "string" || url === "") {
@@ -278,6 +281,18 @@ export function __setFailure(astra_tab_id, failure = null) {
   const tab = _tabs.get(astra_tab_id);
   if (!tab) return false;
   tab.failure = failure;
+  // A covering failure replaces the page, so the row must stop naming the
+  // engine's error document ("Problem loading page" — an English engine string
+  // that does not belong to this product). The host is the honest, neutral
+  // label; the pane below it carries the sentence.
+  if (failure && failure.covers_page === true) {
+    try {
+      const host = new URL(failure.url).host;
+      if (host) tab.title = host;
+    } catch {
+      // A malformed failure URL keeps the title it had.
+    }
+  }
   emit("tab.updated", { astra_tab_id, failure });
   emitItemsChanged();
   return true;
@@ -929,6 +944,12 @@ export const Tabs = {
   async create({ request_id = "", url = "about:blank", background = false, window_id = DEFAULT_WINDOW_ID, index = -1, dedupe = true } = {}) {
     if (typeof url !== "string" || url === "") {
       return err(request_id, "invalid_url", "url must be a non-empty string");
+    }
+    // An address the engine can never load (well past any real URL) used to be
+    // coerced to a blank tab and reported as admitted. Refuse it here instead
+    // of leaving a tab that silently ignores what was typed.
+    if (url.length > MAX_URL_LENGTH) {
+      return err(request_id, "invalid_url", "the address is too long");
     }
     url = safeTabUrl(url);
     const space_id = _activeSpaceId;

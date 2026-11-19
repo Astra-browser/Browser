@@ -281,6 +281,7 @@ export function makeProgressListener({
   onErrorPage,
   onCommit,
   onStop,
+  titleBlocked,
 } = {}) {
   const resolveTitle = setTitle ?? ((id, title) => Tabs.setTitle({ astra_tab_id: id, title }));
   return {
@@ -315,9 +316,13 @@ export function makeProgressListener({
     onTitleChange(browser, title) {
       try {
         const id = tabIdOf ? tabIdOf(browser) : null;
-        if (id && typeof title === "string" && title !== "") {
-          resolveTitle(id, title);
-        }
+        if (!id || typeof title !== "string" || title === "") return;
+        // After a failed load the engine documents the failure with its own
+        // English title ("Problem loading page"). The row already carries the
+        // host label; letting the engine overwrite it leaks Firefox's string
+        // into a localized product.
+        if (typeof titleBlocked === "function" && titleBlocked(id)) return;
+        resolveTitle(id, title);
       } catch {
         // Ignore listener failures, as above.
       }
@@ -1224,7 +1229,18 @@ export const Content = {
         } catch {
           title = "";
         }
-        if (typeof title === "string" && title !== "") {
+        const failure = __tabsState()?.tabs?.get(id)?.failure;
+        if (failure?.covers_page === true) {
+          // The engine labels a failed load "Problem loading page". That is
+          // Firefox's string, not this product's; the model already carries
+          // the host, so put it back instead of projecting the engine title.
+          try {
+            const host = failure.url ? new URL(failure.url).host : "";
+            if (host && tab.label !== host) tab.label = host;
+          } catch {
+            // A malformed failure URL keeps the label it had.
+          }
+        } else if (typeof title === "string" && title !== "") {
           void Tabs.setTitle({ astra_tab_id: id, title });
         }
       }
@@ -1337,6 +1353,9 @@ export const Content = {
 
     const progress = makeProgressListener({
       tabIdOf: (browser) => idOfTab(gb.getTabForBrowser(browser)),
+      // A covering failure owns the row's title until a real page commits.
+      titleBlocked: (id) =>
+        __tabsState()?.tabs?.get(id)?.failure?.covers_page === true,
       // A Back/Forward move traverses the engine's own session history. Keep
       // that direction on the commits the traversal produces so the model
       // rewrites the entry it is on instead of pushing a new one and
@@ -1375,15 +1394,45 @@ export const Content = {
         }
       },
       onErrorPage: ({ astra_tab_id, url, browser }) => {
+        // `url` here is the address that failed, not the document the engine
+        // put in its place. `about:neterror` carries the `e=` reason
+        // `netErrorFor` maps, so read the committed document — it lands in the
+        // same turn, hence the bounded retry rather than one read. Without
+        // this the app never learned why the page failed and Firefox's own
+        // "Server Not Found" page stayed on screen.
+        const showFailure = (attempt = 0) => {
+          let spec = "";
+          try {
+            spec = browser?.documentURI?.spec ?? "";
+          } catch {
+            // A browser torn down before its error document committed.
+            spec = "";
+          }
+          if (spec.startsWith("about:neterror") || spec.startsWith("about:blocked")) {
+            DialogPrompts.netErrorFor({ failedURI: spec, tabId: astra_tab_id });
+            // The window title follows the native tab's label. Left alone it
+            // reads "Problem loading page" — Firefox's own English string —
+            // even though the row and the pane say the host.
+            try {
+              const host = new URL(url).host;
+              const nativeTab = browser && gb.getTabForBrowser(browser);
+              if (host && nativeTab) nativeTab.label = host;
+            } catch {
+              // A malformed address keeps the engine's label.
+            }
+            return;
+          }
+          if (attempt < 4) {
+            setTimeout(() => showFailure(attempt + 1), 50);
+          }
+        };
         void DialogPrompts.certErrorFor({ browser, failedURI: url, tabId: astra_tab_id }).then(
           (handled) => {
             if (handled) return;
             // The error document is committed in this same turn; set the
             // app's failed page after that commit so Navigation does not
             // clear it again.
-            setTimeout(() => {
-              DialogPrompts.netErrorFor({ failedURI: url, tabId: astra_tab_id });
-            }, 0);
+            setTimeout(() => showFailure(), 0);
           },
         );
       },

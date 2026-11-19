@@ -326,6 +326,56 @@ async function windowState() {
   };
 }
 
+/**
+ * The snapshot the current model would write. `null` when the window list is
+ * unavailable (the caller reports `windows_unavailable`).
+ */
+async function captureCurrent() {
+  const windows = await windowState();
+  if (windows === null) return null;
+  const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
+  const { spaces, active_space_id } = __spacesState();
+  return buildSnapshot({
+    spaces,
+    active_space_id,
+    tabs: Array.isArray(listed?.tabs) ? listed.tabs : [],
+    windows: windows.windows,
+    selected_tab_id: listed?.selected_tab_id ?? "",
+  });
+}
+
+/**
+ * Spaces, their order and their names are organisation even when no page is
+ * open; only those changes are allowed to persist an empty-tab capture.
+ * Exported for the metadata contract.
+ */
+export function organisationDiffers(next, previous) {
+  return (
+    JSON.stringify(next?.spaces ?? []) !== JSON.stringify(previous?.spaces ?? [])
+  );
+}
+
+/** Send one snapshot to the core and remember it when it lands. */
+async function writeSnapshot(snapshot, request_id) {
+  const reply = await Boot.coreCall({
+    request_id,
+    name: "session.save",
+    payload: { name: NAME, snapshot: JSON.stringify(snapshot) },
+  });
+  if (reply?.error) {
+    _lastError = reply.error.code ?? "core_failed";
+    return { saved: false, reason: _lastError };
+  }
+  _lastSnapshot = snapshot;
+  _lastSavedAt = Number(reply.payload?.updated_at) || _lastSavedAt;
+  _lastError = null;
+  return {
+    saved: true,
+    tabs: snapshot.tabs.length,
+    spaces: snapshot.spaces.length,
+  };
+}
+
 export const Metadata = {
   /**
    * Load the organisation snapshot and install the spaces before the model
@@ -457,8 +507,8 @@ export const Metadata = {
     if (!_available) {
       return { saved: false, reason: "unavailable" };
     }
-    const windows = await windowState();
-    if (windows === null) {
+    const snapshot = await captureCurrent();
+    if (snapshot === null) {
       _lastError = "windows_unavailable";
       return { saved: false, reason: "windows_unavailable" };
     }
@@ -467,39 +517,24 @@ export const Metadata = {
     ) {
       return { saved: false, reason: "not_owner" };
     }
-    const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
-    const { spaces, active_space_id } = __spacesState();
-    const snapshot = buildSnapshot({
-      spaces,
-      active_space_id,
-      tabs: Array.isArray(listed?.tabs) ? listed.tabs : [],
-      windows: windows.windows,
-      selected_tab_id: listed?.selected_tab_id ?? "",
-    });
     // Nothing persistable yet: SessionStore may not have restored or loaded a
     // real page, and a window of New Tabs carries no organisation. Never
     // replace a saved organisation with an empty capture; the next real
     // navigation or space/pin change writes again.
-    if (snapshot.tabs.length === 0) {
+    //
+    // The exception is an organisation change made while no page is open —
+    // deleting the space that held the only page, renaming a space from a New
+    // Tab. Refusing that write kept the pre-change snapshot and the quit flush
+    // then wrote it again, so the deleted space came back. A change is only
+    // honoured against a baseline we already saved, never on a profile whose
+    // restore has not completed.
+    if (
+      snapshot.tabs.length === 0 &&
+      (_lastSnapshot === null || !organisationDiffers(snapshot, _lastSnapshot))
+    ) {
       return { saved: false, reason: "empty_capture" };
     }
-    const reply = await Boot.coreCall({
-      request_id: "metadata-save",
-      name: "session.save",
-      payload: { name: NAME, snapshot: JSON.stringify(snapshot) },
-    });
-    if (reply?.error) {
-      _lastError = reply.error.code ?? "core_failed";
-      return { saved: false, reason: _lastError };
-    }
-    _lastSnapshot = snapshot;
-    _lastSavedAt = Number(reply.payload?.updated_at) || null;
-    _lastError = null;
-    return {
-      saved: true,
-      tabs: snapshot.tabs.length,
-      spaces: snapshot.spaces.length,
-    };
+    return writeSnapshot(snapshot, "metadata-save");
   },
 
   /**
@@ -525,22 +560,17 @@ export const Metadata = {
     if (_lastSnapshot === null) {
       return current;
     }
-    const reply = await Boot.coreCall({
-      request_id: "metadata-flush",
-      name: "session.save",
-      payload: { name: NAME, snapshot: JSON.stringify(_lastSnapshot) },
-    });
-    if (reply?.error) {
-      _lastError = reply.error.code ?? "core_failed";
-      return { saved: false, reason: _lastError };
+    // The write was refused because no page is open, yet the space list moved
+    // away from the last saved one. Writing the stale snapshot here is what
+    // resurrected a deleted space, so persist the current organisation (which
+    // carries no tabs) instead.
+    if (current.reason === "empty_capture") {
+      const snapshot = await captureCurrent();
+      if (snapshot !== null && organisationDiffers(snapshot, _lastSnapshot)) {
+        return writeSnapshot(snapshot, "metadata-flush");
+      }
     }
-    _lastSavedAt = Number(reply.payload?.updated_at) || _lastSavedAt;
-    _lastError = null;
-    return {
-      saved: true,
-      tabs: _lastSnapshot.tabs.length,
-      spaces: _lastSnapshot.spaces.length,
-    };
+    return writeSnapshot(_lastSnapshot, "metadata-flush");
   },
 
   /** Subscribe once and keep the store current after every organisation change. */

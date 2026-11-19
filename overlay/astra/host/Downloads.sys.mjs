@@ -138,6 +138,7 @@ export function __resetDownloadsForTests() {
   nativeViewAttached = false;
   knownProfiles.clear();
   pausedIds.clear();
+  _downloadIds = new WeakMap();
   lastIds = null;
   if (changeTimer !== null && typeof globalThis.clearTimeout === "function") {
     globalThis.clearTimeout(changeTimer);
@@ -209,14 +210,28 @@ function hash(text) {
 }
 
 /** Newest first: the UI sorts `entry.id` descending, so the id starts with a
- *  zero-padded start time. */
-function idOf(download) {
+ *  zero-padded start time. The native transfer keeps one object across a
+ *  pause/resume, but `startTime` is rewritten by the resume — so the first id
+ *  a transfer is given sticks to it. Without this a resume looked like a new
+ *  download and left a ghost 0 B row whose Cancel could not reach anything. */
+let _downloadIds = new WeakMap();
+
+export function __idOf(download) {
+  if (!download) return "";
+  const known = _downloadIds.get(download);
+  if (known) return known;
   const started = download?.startTime?.getTime?.() ?? 0;
   const source = download?.source?.url ?? "";
   const target = download?.target?.path ?? "";
-  return `${String(started).padStart(16, "0")}-${hash(
+  const id = `${String(started).padStart(16, "0")}-${hash(
     `${source}\n${target}\n${started}`,
   )}`;
+  try {
+    _downloadIds.set(download, id);
+  } catch {
+    // A proxy that cannot be a WeakMap key keeps the value it just computed.
+  }
+  return id;
 }
 
 /** Wire state for one native Download. */
@@ -232,8 +247,16 @@ function stateOf(download, id = null) {
   return "receiving";
 }
 
+/**
+ * State generation per native transfer. A pause is a higher revision than the
+ * receiving frame before it, and a resume is higher again: ranking states by
+ * name (receiving 1 < paused 2) made every frame after a resume look older
+ * than the paused one, so the app dropped them and the row froze on "paused".
+ */
+const _stateGen = new WeakMap();
+
 /** A revision that only grows while the wire state does. */
-function revisionOf(download, id = null) {
+export function __revisionOf(download, id = null) {
   const state = stateOf(download, id);
   const rank = {
     pending: 0,
@@ -247,10 +270,24 @@ function revisionOf(download, id = null) {
     cancelled: 8,
     completed: 9,
   }[state];
+  let gen = 1;
+  try {
+    const previous = download ? _stateGen.get(download) : null;
+    if (previous && previous.state === state) {
+      gen = previous.gen;
+    } else if (download) {
+      gen = (previous?.gen ?? 0) + 1;
+      _stateGen.set(download, { state, gen });
+    }
+  } catch {
+    gen = rank;
+  }
   const received = Number.isSafeInteger(download?.currentBytes)
     ? download.currentBytes
     : 0;
-  return `${rank}${String(Math.max(0, received)).padStart(16, "0")}`;
+  return `${String(gen).padStart(8, "0")}${String(rank).padStart(2, "0")}${String(
+    Math.max(0, received),
+  ).padStart(16, "0")}`;
 }
 
 /** Wire error for one native Download. */
@@ -279,10 +316,10 @@ function filenameOf(download) {
 
 /** One `DownloadView`; no invented fields. */
 function viewOf(download) {
-  const id = idOf(download);
+  const id = __idOf(download);
   return {
     id,
-    revision: revisionOf(download, id),
+    revision: __revisionOf(download, id),
     created_at: (download?.startTime ?? new Date()).toISOString(),
     filename: filenameOf(download),
     source: download?.source?.url ?? "",
@@ -325,7 +362,7 @@ function makeNative(scope) {
 
   async function find(id) {
     const all = await (await list()).getAll();
-    return all.find((download) => idOf(download) === id) ?? null;
+    return all.find((download) => __idOf(download) === id) ?? null;
   }
 
   async function preferences() {

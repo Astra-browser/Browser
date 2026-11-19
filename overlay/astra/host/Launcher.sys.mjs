@@ -20,6 +20,7 @@
 
 import { Keymap } from "./Keymap.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
+import { emit } from "./Events.sys.mjs";
 
 const SHORTCUT_KEY = "launcher.shortcut";
 const DOUBLE_TAP_KEY = "launcher.double-tap";
@@ -170,6 +171,36 @@ export const Launcher = {
     const shortcut = await storedShortcut();
     await applyShortcut(shortcut);
     return currentState();
+  },
+
+  /**
+   * Hand a page's address to the launcher for editing. The sidebar field is
+   * one line wide; the launcher can show the whole URL and its suggestions.
+   * The app owns the overlay, so this only announces the edit — the address
+   * is untouched until the person submits something.
+   *
+   * Returns whether the address was handed over. A tab id alone is not
+   * enough: the URL is what the field must show, so a missing or non-web
+   * address is refused instead of opening an empty launcher.
+   */
+  async edit({ tab_id = "", tabId = "", url = "" } = {}) {
+    // The relay carries wire names (`tab_id`); the binding's camelCase name is
+    // accepted too so a direct caller cannot silently be refused.
+    const id = typeof tab_id === "string" && tab_id !== "" ? tab_id : tabId;
+    if (typeof id !== "string" || id === "") return false;
+    let parsed = null;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return false;
+    }
+    if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
+      return false;
+    }
+    // The command channel carries the address verbatim, encoded so the `=`
+    // inside a query string cannot be mistaken for the separator.
+    emit("ui-command", `launcher.edit=${encodeURIComponent(parsed.href)}`);
+    return true;
   },
 
   /**

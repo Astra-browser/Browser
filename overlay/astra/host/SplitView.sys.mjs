@@ -974,24 +974,37 @@ function splitViewsIn(binding) {
 }
 
 /** A background tab can still be about:blank; a split must show its page. */
-function ensurePaneLoaded(binding, tab) {
+function ensurePaneLoaded(binding, tab, attempt = 0) {
   const id = idOf(binding, tab);
   const url = id ? __tabsState()?.tabs?.get(id)?.url : "";
   if (!tab || !/^https?:/u.test(url ?? "")) return;
-  try {
+  const blank = () => {
     const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
-    if (
-      spec &&
-      spec !== "about:blank" &&
-      !spec.startsWith("chrome://browser/content/blanktab")
-    ) {
-      return;
-    }
+    return !spec || spec === "about:blank" || spec.startsWith("chrome://browser/content/blanktab");
+  };
+  try {
+    if (!blank()) return;
     tab.linkedBrowser?.fixupAndLoadURIString(url, {
       triggeringPrincipal: systemPrincipal(),
     });
   } catch {
     // A tab that is still being created loads on its own activation.
+  }
+  // The first load can land while the background browser is still being
+  // created and be dropped, leaving the pane blank. Retry a few times, but
+  // only while the document is still blank: a page the person stopped or the
+  // engine replaced is not ours to reload.
+  if (attempt >= 4) return;
+  try {
+    setTimeout(() => {
+      try {
+        if (tab.linkedBrowser && blank()) ensurePaneLoaded(binding, tab, attempt + 1);
+      } catch {
+        // The tab closed while waiting.
+      }
+    }, 120 * (attempt + 1));
+  } catch {
+    // No timer available in this environment.
   }
 }
 

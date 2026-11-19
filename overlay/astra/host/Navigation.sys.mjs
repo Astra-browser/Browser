@@ -87,6 +87,8 @@ function commit(id, url, extra = {}) {
   emitItemsChanged();
 }
 
+const MAX_URL_LENGTH = 32 * 1024;
+
 export const Navigation = {
   async loadURL({ request_id = "", astra_tab_id = "", url = "" } = {}) {
     const { id, tab } = tabOf(astra_tab_id);
@@ -98,6 +100,11 @@ export const Navigation = {
     }
     if (!url) {
       return err(request_id, "invalid_url", "url must be a non-empty string");
+    }
+    // An address past any real length used to be accepted and then silently
+    // left the tab blank. Refuse it while the caller can still report why.
+    if (url.length > MAX_URL_LENGTH) {
+      return { ...err(request_id, "invalid_url", "the address is too long"), accepted: false };
     }
     // Words typed into an address field are a search, not a broken address;
     // Search owns that decision, so every box agrees.

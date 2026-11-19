@@ -801,7 +801,13 @@ async function addLink(profile, call) {
   } catch {
     return error(profile, "invalid");
   }
-  if (!parsed.protocol || parsed.protocol === ":") {
+  // A bookmark is an address the person expects to open. This build has no
+  // bookmarklet runner and opens an unknown scheme as a search, so storing
+  // `javascript:`/`data:` would put a row in the list that cannot do what it
+  // says (and a javascript: URL is a script payload, not a page). A local file
+  // is a real address and stays allowed.
+  const allowed = new Set(["http:", "https:", "file:"]);
+  if (!allowed.has(parsed.protocol)) {
     return error(profile, "invalid");
   }
   const store = await panelStore();
