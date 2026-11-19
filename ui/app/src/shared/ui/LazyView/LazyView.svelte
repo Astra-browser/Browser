@@ -1,5 +1,20 @@
+<script module lang="ts">
+  import type { Component as SvelteComponent } from "svelte";
+  // A loader names a view this window has already fetched, so its module is
+  // still in memory. Remembering the resolved component lets a surface that is
+  // unmounted by a tab switch (New Tab, its search field) mount straight from
+  // the cache: without this every switch back painted the load state — a black
+  // stage with "Loading" in its top-left corner — for a frame. Feature entries
+  // export loaders as stable functions, so the loader is the cache key.
+  // Module scope, not the instance: every LazyView in the window shares it.
+  // It is a cache, never drawn from, so a SvelteMap would only add tracking.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain module cache
+  const loadedViews = new Map<unknown, SvelteComponent<Record<string, unknown>>>();
+</script>
+
 <script lang="ts" generics="P extends Record<string, unknown>">
   import type { Component, Snippet } from "svelte";
+  import { untrack } from "svelte";
   import RenderBoundary from "../RenderBoundary";
   let {
     loader,
@@ -14,20 +29,29 @@
     failureLabel: string;
     retryLabel: string;
   } = $props();
-  let component = $state.raw<Component<P> | null>(null);
+  let component = $state.raw<Component<P> | null>(
+    untrack(() => (loadedViews.get(loader) as Component<P> | undefined) ?? null),
+  );
   let failed = $state(false);
   let attempt = $state(0);
   $effect(() => {
     const load = loader;
     void attempt;
+    failed = false;
+    const known = (loadedViews.get(load) ?? null) as Component<P> | null;
+    if (known) {
+      component = known;
+      return;
+    }
     let current = true;
     component = null;
-    failed = false;
     void Promise.resolve()
       .then(() => (current ? load() : null))
       .then(
         (module) => {
-          if (current && module) component = module.default;
+          if (!current || !module) return;
+          loadedViews.set(load, module.default as SvelteComponent<Record<string, unknown>>);
+          component = module.default;
         },
         () => {
           if (current) failed = true;

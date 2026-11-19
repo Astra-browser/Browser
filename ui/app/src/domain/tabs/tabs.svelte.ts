@@ -155,7 +155,12 @@ export const forwardActive = onActive((id) => fire(commands.tabsForward(id)));
 export const split = (other: string) => fire(commands.tabsSplit(other));
 export const unsplit = () => fire(commands.tabsUnsplit());
 export const leaveSplit = (id: string) => fire(commands.tabsLeaveSplit(id));
-export const inSplit = (id: string) => state.split_group?.members.includes(id) ?? false;
+// A tab can belong to a split that is not the one in front: the menu must
+// still offer Remove/End for it. Reading only the active `split_group` made
+// the split rows vanish as soon as another tab was selected.
+export const inSplit = (id: string) =>
+  (state.split_group?.members.includes(id) ?? false) ||
+  (state.split_groups ?? []).some((group) => group.members.includes(id));
 /** Pane order for the native split, or null when there is no split. */
 export const splitMembers = () => state.split_group?.members ?? [];
 

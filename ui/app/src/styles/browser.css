@@ -64,6 +64,10 @@
   gap: 8px;
   height: 44px;
   padding-inline: 10px;
+  /* The window controls float over the frame's top-right corner (~132px).
+     Without this an internal page's last action sits under them: Page Source's
+     "Copy source" was half covered by the minimize/maximize/close pill. */
+  padding-inline-end: 150px;
   font-size: 12px;
   color: var(--color-muted);
 }

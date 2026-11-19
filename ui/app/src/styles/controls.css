@@ -43,6 +43,16 @@
   height: 28px;
 }
 
+/* The global focus ring lives in `:where()` (zero specificity), so the
+   `outline: none` above won every comparison and every icon control was
+   invisible to keyboard focus. Restate the ring at component specificity. */
+.chrome-button:focus-visible,
+.window-button:focus-visible,
+.icon-button:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
 .window-button {
   width: 28px;
   height: 22px;

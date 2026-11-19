@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import * as m from "$shared/i18n/messages";
   import { commands, type SearchContext, type SearchResult } from "$shared/ipc/bindings";
   import { events } from "$shared/ipc/native-events";
@@ -14,7 +14,7 @@
    * same host calls (`launcher_search` / `launcher_run`) the window used, with
    * the field, the list and Return doing what they do there.
    */
-  let { onclose }: { onclose: () => void } = $props();
+  let { onclose, initial = "" }: { onclose: () => void; initial?: string } = $props();
 
   const EMPTY_CONTEXT: SearchContext = {
     window_id: "",
@@ -25,9 +25,17 @@
   };
 
   let input = $state<HTMLInputElement>();
-  let query = $state("");
+  // A hand-off from Ctrl+L starts on the page's own address, selected, so the
+  // next keystroke replaces it — the same contract as every other browser.
+  // Read once: the seed belongs to this opening, not to later prop changes.
+  let query = $state(untrack(() => initial));
   let rows = $state.raw<SearchResult[]>([]);
   let selected = $state(0);
+  // Whether the person moved the cursor themselves. Until they do, Return
+  // means "the words I typed" — the host decides address vs search, exactly as
+  // the address field does. Without this, a typed address ran the first
+  // suggestion row (always a web search) and could never navigate.
+  let touched = $state(false);
   let pending = $state(false);
   let failed = $state(false);
   let sequence = 0;
@@ -36,6 +44,7 @@
     const text = query;
     const request = `overlay-${++sequence}`;
     selected = 0;
+    touched = false;
     if (text.trim() === "") {
       rows = [];
       pending = false;
@@ -69,6 +78,7 @@
         else stop = unlisten;
       });
     input?.focus();
+    if (initial !== "") input?.select();
     return () => {
       disposed = true;
       stop?.();
@@ -76,7 +86,7 @@
   });
 
   async function run(): Promise<void> {
-    const row = rows[selected];
+    const row = touched ? rows[selected] : undefined;
     try {
       if (row) {
         const result = await commands.launcherRun(row.action, EMPTY_CONTEXT, false);
@@ -111,11 +121,13 @@
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
+      touched = true;
       selected = Math.min(rows.length - 1, selected + 1);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
+      touched = true;
       selected = Math.max(0, selected - 1);
       return;
     }
@@ -151,7 +163,10 @@
       <ul class="rows" role="listbox" aria-label={m.panel_search_mode()}>
         {#each rows as row, index (row.title + row.detail + index)}
           <li role="option" aria-selected={index === selected} class:selected={index === selected}>
-            <button type="button" onclick={() => ((selected = index), void run())}>
+            <button
+              type="button"
+              onclick={() => ((touched = true), (selected = index), void run())}
+            >
               <span class="title">{row.title}</span>
               {#if row.detail}<span class="detail">{row.detail}</span>{/if}
             </button>
@@ -225,7 +240,9 @@
   }
 
   .rows li.selected {
-    background: var(--color-hover);
+    /* `--color-hover` never existed, so the whole declaration was invalid and
+       the arrow-key cursor was invisible. */
+    background: var(--color-fill-active);
   }
 
   .rows button {

@@ -2,6 +2,7 @@
   import {
     ArrowLeft02Icon,
     ArrowRight02Icon,
+    Cancel01Icon,
     Home01Icon,
     Refresh01Icon,
   } from "@hugeicons/core-free-icons";
@@ -91,15 +92,28 @@
     onclick={tabs.forwardActive}
     onmenu={(anchor) => void openHistoryMenu(true, anchor)}
   />
-  <IconButton
-    icon={Refresh01Icon}
-    label={m.ui_reload()}
-    shape="rounded"
-    {buttonSize}
-    size={iconSize}
-    disabled={active === undefined}
-    onclick={tabs.reloadActive}
-  />
+  {#if active?.loading === true}
+    <!-- Reload becomes Stop while a page is arriving. Before this the control
+         kept saying Reload and only Ctrl+. could cancel a slow load. -->
+    <IconButton
+      icon={Cancel01Icon}
+      label={m.command_nav_stop()}
+      shape="rounded"
+      {buttonSize}
+      size={iconSize}
+      onclick={() => void commands.runCommand("nav.stop").catch(() => {})}
+    />
+  {:else}
+    <IconButton
+      icon={Refresh01Icon}
+      label={m.ui_reload()}
+      shape="rounded"
+      {buttonSize}
+      size={iconSize}
+      disabled={active === undefined}
+      onclick={tabs.reloadActive}
+    />
+  {/if}
   <IconButton
     icon={Home01Icon}
     label={m.command_nav_home()}

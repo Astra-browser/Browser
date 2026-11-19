@@ -208,13 +208,16 @@
     <Select
       label={m.settings_sidebar()}
       labelHidden
-      value={preferences.value("sidebar.mode")}
+      value={preferences.value("sidebar.mode") === "compact"
+        ? "hidden"
+        : preferences.value("sidebar.mode")}
       disabled={preferences.saving()}
       options={[
         { value: "default", label: m.settings_expanded() },
-        IS_WINDOWS
-          ? { value: "compact", label: m.settings_compact() }
-          : { value: "hidden", label: m.settings_hidden() },
+        /* The rail is not a shape anymore: a stored "compact" is adopted as
+           hidden (sidebar-mode.svelte.ts `chosen`). Offering "Compact" hid the
+           column with no rail at all, so the row now names what it does. */
+        { value: "hidden", label: m.settings_hidden() },
       ]}
       onchange={(v) => void preferences.set("sidebar.mode", v)}
     />

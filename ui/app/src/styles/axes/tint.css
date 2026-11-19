@@ -91,9 +91,11 @@
 }
 
 /* The light ladder's soft/on accents were written for the default blue; every
-   tint must carry its own switch track, soft fill and focus ring too. */
+   tint must carry its own switch track, soft fill and focus ring too. The ring
+   is the solid accent, not a 50% wash: a wash measured 2.0:1 on the light
+   ground, below the 3:1 SC 1.4.11 needs for a focus indicator. */
 :root[data-theme="light"][data-tint] {
   --color-track-on: var(--color-accent);
   --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  --color-ring: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --color-ring: var(--color-accent);
 }

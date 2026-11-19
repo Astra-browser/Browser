@@ -150,10 +150,18 @@
     const tab = tabs.activeTab();
     if (!tab?.url || (tab.content ?? "web") !== "web") return false;
     // Work has no page in front, so there the launcher opens empty. A hand-off
-    // the host refuses is not the field's to report: it stays where it is.
+    // the host refuses is not the field's to report, but it must not swallow
+    // the keystroke: the field takes the typing instead of doing nothing.
+    const takeField = () => {
+      input?.focus();
+      input?.select();
+    };
     if (surface.currentPage() === "work")
-      void commands.runCommand("launcher.toggle").catch(() => {});
-    else void commands.launcherEdit(tab.id, tab.url).catch(() => {});
+      void commands.runCommand("launcher.toggle").catch(takeField);
+    else
+      void commands.launcherEdit(tab.id, tab.url).then((taken) => {
+        if (!taken) takeField();
+      }, takeField);
     return true;
   }
 

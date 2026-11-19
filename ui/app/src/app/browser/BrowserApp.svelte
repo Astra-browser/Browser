@@ -114,12 +114,26 @@
   // an address" and the sidebar's search button all ask for it through the one
   // command, so there is one surface and one key path.
   let launcherOpen = $state(false);
+  // An address handed over by Ctrl+L (or the field's own edit-in-launcher
+  // hand-off). The overlay takes it as its first query; empty opens blank.
+  let launcherSeed = $state("");
   let handledLauncher = 0;
   $effect(() => {
     const command = ui.uiCommand();
     if (command.seq === 0 || command.seq === handledLauncher) return;
     handledLauncher = command.seq;
+    if (command.id.startsWith("launcher.edit=")) {
+      try {
+        launcherSeed = decodeURIComponent(command.id.slice("launcher.edit=".length));
+      } catch {
+        launcherSeed = "";
+      }
+      launcherOpen = true;
+      window.focus();
+      return;
+    }
     if (command.id !== "launcher.toggle") return;
+    launcherSeed = "";
     launcherOpen = !launcherOpen;
     // A shortcut pressed while another app was in front has to bring this one
     // forward: the overlay is drawn here, not in a window of its own.
@@ -303,7 +317,7 @@
   {/if}
 </div>
 {#if launcherOpen}
-  <LauncherOverlay onclose={() => (launcherOpen = false)} />
+  <LauncherOverlay initial={launcherSeed} onclose={() => (launcherOpen = false)} />
 {/if}
 {#if webext.review() !== null}
   <WebExtensionReview review={webext.review()!} />

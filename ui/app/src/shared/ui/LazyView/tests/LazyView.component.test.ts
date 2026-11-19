@@ -34,3 +34,19 @@ test("a stale loader result cannot replace the newer view", async () => {
   await Promise.resolve();
   await expect.element(screen.getByText("Ready", { exact: true })).toBeVisible();
 });
+
+test("a fetched view mounts again without replaying the load state", async () => {
+  // A tab switch unmounts and remounts the New Tab (and its search field).
+  // The second mount must come from the module already in memory, because the
+  // load state is the black stage with "Loading" in the corner the person saw
+  // for a frame on every switch.
+  const loader = vi.fn().mockResolvedValue({ default: Loaded });
+  const first = await render(Harness, { loader });
+  await expect.element(first.getByText("Ready", { exact: true })).toBeVisible();
+  expect(loader).toHaveBeenCalledTimes(1);
+  await first.unmount();
+  const second = await render(Harness, { loader });
+  await expect.element(second.getByText("Ready", { exact: true })).toBeVisible();
+  expect(second.getByRole("status").query()).toBeNull();
+  expect(loader).toHaveBeenCalledTimes(1);
+});

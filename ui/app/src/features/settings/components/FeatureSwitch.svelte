@@ -102,6 +102,11 @@
   <div class="copy">
     <h3>{item.title()}</h3>
     <p>{on ? item.on() : item.off()}</p>
+    {#if preferences.saveFailed()}
+      <!-- A switch that did not take must say so: the knob stays where the
+           store is, and the row explains why nothing changed. -->
+      <p class="failed" role="alert">{m.settings_save_error()}</p>
+    {/if}
   </div>
   <Switch
     label={item.title()}
@@ -213,6 +218,11 @@
     color: var(--color-muted);
     font-size: var(--text-label);
     line-height: 1.5;
+  }
+
+  .copy > p.failed {
+    margin-block-start: 4px;
+    color: var(--color-danger);
   }
 
   .confirm {

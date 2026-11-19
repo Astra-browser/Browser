@@ -98,9 +98,10 @@
   --color-label-secondary: #d8d8db;
   --color-muted: rgb(244 244 246 / 0.68);
 
-  /* 5.1:1 on the dark ground; 0.44 composited to 4.0:1 (below AA). */
+  /* 5.9:1 on the dark ground (0.52 measured 3.95:1 on a raised float, below
+     AA for the 11 px captions that use it). */
 
-  --color-faint: rgb(244 244 246 / 0.52);
+  --color-faint: rgb(244 244 246 / 0.6);
 
   /* Controls are fill and nothing else, on the same ladder as a field, so a
      button, a chip, a checkbox and an input in one row are the same material
@@ -713,9 +714,10 @@
   --color-label-secondary: #55555c;
   --color-muted: rgb(28 28 31 / 0.62);
 
-  /* 4.7:1 on the light ground; 0.42 composited to 2.6:1 (below AA). */
+  /* 4.9:1 on the light ground; 0.63 measured 4.46:1 on the menu wash, just
+     below AA for the 11 px captions that use it. */
 
-  --color-faint: rgb(28 28 31 / 0.63);
+  --color-faint: rgb(28 28 31 / 0.68);
 
   --color-control: #ffffff;
   --color-control-hover: #f9f9f9;
@@ -883,7 +885,10 @@
   --color-accent-hover: #4050e6;
   --color-on-accent: #fff;
   --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  --color-ring: rgb(79 93 240 / 0.5);
+
+  /* 50% ink measured 2.02:1 on the light ground — below the 3:1 a focus
+     indicator needs (SC 1.4.11). The solid accent is 5.06:1. */
+  --color-ring: var(--color-accent);
 
   --shadow-raised: 0 1px 2px rgb(29 28 26 / 0.08), 0 0 0 0.5px rgb(29 28 26 / 0.05);
   --shadow-float: 0 8px 26px rgb(29 28 26 / 0.14), 0 0 0 0.5px rgb(29 28 26 / 0.08);

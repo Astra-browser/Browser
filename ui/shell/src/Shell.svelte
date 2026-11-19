@@ -255,10 +255,13 @@
     const win = doc.defaultView ?? null;
     // A native drag region has to be a XUL box in this chrome document; an
     // HTML element with the same CSS is ignored by the Windows widget.
+    // No left edge box: the hidden sidebar's own reveal strip lives in the
+    // outermost 16 px, and a z-200 drag box over its first 8 px made the
+    // reveal work only from x 8–16. The top bar is the drag surface on that
+    // side (the sidebar is a `drag-region="deep"` aside when it is shown).
     const dragGeometry = {
       top: "inset:0 0 auto 0;height:16px",
       bottom: "inset:auto 0 0 0;height:8px",
-      left: "inset:16px auto 8px 0;width:8px",
       right: "inset:16px 0 8px auto;width:8px",
     };
     for (const [edge, geometry] of Object.entries(dragGeometry)) {
@@ -1432,21 +1435,22 @@
             <span class="loading-spinner" aria-hidden="true"></span>
             <span>{loadingHost}</span>
           </div>
+          <!-- The skeleton is the content card's own surface: it fills the
+               card (the rounded rect the native page occupies) and never the
+               window. As a sibling of this card it resolved against the main
+               column, which is the whole window once the app frame draws the
+               sidebar itself — so a slow load hid the entire chrome behind a
+               skeleton. -->
+          <div class="load-skeleton" aria-hidden="true">
+            <div class="sk sk-bar"></div>
+            <div class="sk sk-hero"></div>
+            <div class="sk sk-line" style:inline-size="62%"></div>
+            <div class="sk sk-line" style:inline-size="86%"></div>
+            <div class="sk sk-line" style:inline-size="74%"></div>
+            <div class="sk sk-line" style:inline-size="40%"></div>
+          </div>
         {/if}
       </div>
-      {#if loadingHost}
-        <!-- The skeleton is a stage surface, not a page card: it covers the
-             whole content column while a page arrives, so the rounded card
-             inset and its empty frame never show during a load. -->
-        <div class="load-skeleton" aria-hidden="true">
-          <div class="sk sk-bar"></div>
-          <div class="sk sk-hero"></div>
-          <div class="sk sk-line" style:inline-size="62%"></div>
-          <div class="sk sk-line" style:inline-size="86%"></div>
-          <div class="sk sk-line" style:inline-size="74%"></div>
-          <div class="sk sk-line" style:inline-size="40%"></div>
-        </div>
-      {/if}
     </div>
   </div>
   <details class="astra-about">
@@ -1637,10 +1641,12 @@
     border-radius: 12px;
     overflow: hidden;
     background: transparent;
-    /* A pinned bar keeps its row. A floating bar is an overlay: the page
-       keeps the card's full rectangle and the bar slides over the top of it,
-       so revealing the bar never moves the page. */
-    transition: inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    /* A pinned bar keeps its row; a floating bar is an overlay and the page
+       keeps the card's full rectangle. The card's top edge changes with that
+       mode, and that change is a layout fact, not a movement: a New Tab shows
+       the bar in its row (48px) and the page it opens floats it (8px), so a
+       transition here made the page slide up on the very first frame after
+       every switch back from a New Tab. It must land in place instead. */
   }
   @media (-moz-platform: windows) {
     .astra-frame[data-app-booted="true"] .astra-content,
@@ -1652,14 +1658,14 @@
   :global(.astra-frame[data-app-booted="pending"][data-astra-bar="overlay"] .astra-content) {
     inset-block-start: 8px;
   }
-  /* A deliberate change of shape travels on the app's own curve
-     (`--motion-page` 400ms, `--ease-emphasized`); those tokens live in the
-     app document, not this one, so the values are mirrored here. A drag
-     reports animate=false: the page must track the pointer, not chase it. */
+  /* A deliberate change of shape travels horizontally on the app's own curve
+     (`--motion-page` 400ms, `--ease-emphasized`); those tokens live in the app
+     document, not this one, so the values are mirrored here. The top edge is
+     never animated: it belongs to the bar's mode, which flips as part of a tab
+     switch, and a travelling card read as the page sliding into place.
+     A drag reports animate=false: the page must track the pointer, not chase it. */
   :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {
-    transition:
-      inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1),
-      inset-block-start 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   @media (prefers-reduced-motion: reduce) {
     :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {

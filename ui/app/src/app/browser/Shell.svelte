@@ -122,6 +122,22 @@
       stopShellMenu();
     };
   });
+  // A restored session can open on a page, so the New Tab pair may not have
+  // been fetched yet. Warm both chunks once the window is idle: the first
+  // switch to a New Tab then mounts from the LazyView cache like every later
+  // one, instead of painting its load state over the stage.
+  onMount(() => {
+    const warm = () => {
+      void loadNewTab();
+      void loadNewTabSearch();
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(warm, 1500);
+    return () => window.clearTimeout(timer);
+  });
 
   /** The browser's own menu: no page to act on, only the window and the app. */
   function openChromeContextMenu(event: MouseEvent) {

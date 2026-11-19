@@ -229,6 +229,7 @@ const ROUTES: Record<string, Route> = {
   newtab_cancel: ["Search", "newtabCancel"],
   launcher_search: ["Search", "launcherSearch"],
   launcher_run: ["Search", "launcherRun"],
+  launcher_edit: ["Launcher", "edit"],
   launcher_trigger: ["Launcher", "trigger"],
   launcher_set_shortcut: ["Launcher", "setShortcut"],
   launcher_record_shortcut: ["Launcher", "recordShortcut"],

@@ -72,8 +72,14 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
       ? [
           { kind: "item" as const, id: "tab.replacePane", label: "Replace This Pane…" },
           { kind: "item" as const, id: "tab.leaveSplit", label: "Remove from Split View" },
-          { kind: "item" as const, id: "tab.unsplit", label: "End Split View" },
-          { kind: "item" as const, id: "tab.saveSplit", label: "Save Split Arrangement…" },
+          // End/Save act on the split in front; on a tab whose split is parked
+          // behind another tab they would end the wrong view.
+          ...(tabs.splitMembers().includes(id)
+            ? [
+                { kind: "item" as const, id: "tab.unsplit", label: "End Split View" },
+                { kind: "item" as const, id: "tab.saveSplit", label: "Save Split Arrangement…" },
+              ]
+            : []),
         ]
       : []),
     ...(tab.group

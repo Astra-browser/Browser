@@ -10,8 +10,12 @@
 
   function editAddress() {
     const tab = surface.currentPage() === "work" ? null : tabs.activeTab();
-    if (tab?.url && (tab.content ?? "web") === "web") void commands.launcherEdit(tab.id, tab.url);
-    else void commands.runCommand("launcher.toggle");
+    // A refused hand-off is not the button's to report: the launcher simply
+    // does not open. Fire-and-forget still needs a handler or a transport
+    // failure becomes an unhandled rejection.
+    if (tab?.url && (tab.content ?? "web") === "web")
+      void commands.launcherEdit(tab.id, tab.url).catch(() => {});
+    else void commands.runCommand("launcher.toggle").catch(() => {});
   }
 </script>
 
