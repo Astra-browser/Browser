@@ -656,6 +656,13 @@
     // exists yet and the app can wait forever on the splash. Seed the model
     // first; the later bootstrap is idempotent.
     void host.Tabs.bootstrap({ request_id: newRequestId() }).catch(() => {});
+    // The app needs one relay round trip for its first projection. Resolve
+    // this as soon as it paints (or fails), so the native deck mount below can
+    // wait for it instead of starving the relay with adoption work.
+    let resolveFirstPaint = () => {};
+    const firstPaint = new Promise((resolve) => {
+      resolveFirstPaint = resolve;
+    });
     appApi = mountAppFrame(appMount, host, {
       window_id: ownWindowId,
       // Records the mode the app actually booted in (P3-T15 contract seam:
@@ -665,6 +672,7 @@
         if (frameRoot) frameRoot.dataset.bootReady = String(Math.round(performance.now()));
         appMount.dataset.appReady = mode;
         appBooted = mode === "host";
+        resolveFirstPaint();
         if (!appBooted) {
           appError = `app booted in ${mode} mode, expected host`;
         } else {
@@ -679,6 +687,7 @@
       onFailure: (message) => {
         appBooted = false;
         appError = message;
+        resolveFirstPaint();
       },
       // The app chooses light or dark; web pages follow the same choice, and
       // the shell's own loading ground (which paints before/behind a page)
@@ -743,14 +752,10 @@
     // Frame.sys.mjs rides the same resource:// mapping as the Host API
     // (jar.mn: content/astra/res/frame/Frame.sys.mjs). Degrades to null
     // outside the browser; window controls then report unsupported_chrome_op.
+    // Imported after the app's first paint: this is a synchronous module
+    // evaluation that blocks message delivery, and the app's first projection
+    // must be answered before it runs.
     let Frame = null;
-    try {
-      Frame = await import(
-        /* @vite-ignore */ "resource://astra/frame/Frame.sys.mjs"
-      );
-    } catch {
-      Frame = null;
-    }
 
     // Chrome adapter for dispatchWindowControl: the DOM window owns
     // minimize/maximize/restore (no Host API equivalent). Only methods the
@@ -894,21 +899,25 @@
         Windows: host.Windows,
         Metadata: host.Metadata,
         __spacesState: host.__spacesState,
-        Frame: Frame
-          ? {
-              version: Frame.FRAME_VERSION,
-              actions: Frame.WINDOW_ACTIONS,
-              dispatchWindowControl: (opts = {}) =>
-                (async () => {
-                  const window_id = opts.window_id ?? ownWindowId;
-                  return Frame.dispatchWindowControl(host, chromeAdapter, {
-                    request_id: newRequestId(),
-                    ...opts,
-                    window_id,
-                  });
-                })(),
-            }
-          : null,
+        // Loaded after the app's first paint (the import spins the event loop
+        // and would otherwise delay the app's first projection). Probes and
+        // the window controls read it lazily.
+        get Frame() {
+          if (!Frame) return null;
+          return {
+            version: Frame.FRAME_VERSION,
+            actions: Frame.WINDOW_ACTIONS,
+            dispatchWindowControl: (opts = {}) =>
+              (async () => {
+                const window_id = opts.window_id ?? ownWindowId;
+                return Frame.dispatchWindowControl(host, chromeAdapter, {
+                  request_id: newRequestId(),
+                  ...opts,
+                  window_id,
+                });
+              })(),
+          };
+        },
         addEventListener: host.addEventListener,
       };
     }
@@ -1052,6 +1061,21 @@
     if (!host.Content) {
       slotError = "content binding unavailable";
     } else {
+      // The app's first paint needs one relay round trip for the tab
+      // projection. The deck mount below adopts the restored session and can
+      // hold the main thread long enough to delay that response by ~0.7 s, so
+      // let the first paint land first (bounded; a failure still proceeds).
+      await Promise.race([
+        firstPaint,
+        new Promise((resolve) => setTimeout(resolve, 400)),
+      ]);
+      try {
+        Frame = await import(
+          /* @vite-ignore */ "resource://astra/frame/Frame.sys.mjs"
+        );
+      } catch {
+        Frame = null;
+      }
       try {
         try {
           // P5b: install the saved spaces before any tab exists, so a tab

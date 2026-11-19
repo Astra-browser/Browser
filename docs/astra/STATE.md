@@ -11,6 +11,48 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: splash / startup speed (2026-11-19)
+
+Startup was measured from the real window (Win32 `PrintWindow` frames every
+~200 ms, independent of Marionette) and with the shell/app boot marks. On the
+installed 0.1.753 build the splash was still up at 3.7 s and the first usable
+chrome appeared between 3.7 s and 4.7 s.
+
+| Finding | Evidence |
+|---|---|
+| The app document itself is fast | navigation 157 ms, DOMContentLoaded 157 ms |
+| The shell mounts at ~0.65–0.9 s and starts the app frame ~90 ms later | `data-boot-start` / `data-boot-frame` |
+| The app mounts at ~0.14 s of its own timeline, then its first section paint waited 0.6–0.9 s | new marks `astraEntry` / `astraMounted` / `astraItems` / `astraSections` |
+| The shell answered the app's first `Tabs.bootstrap` in <1 ms — when it got to the message | relay marks `astraRelayReq` / `astraRelayRes` |
+| A chrome-process profile showed 0.26 s bursts in engine `utilityOverlay.js` and a 0.46 s first layout (`getBoundingClientRect` → `PresShell::DoFlushPendingNotifications`) on the main thread | Gecko profiler + local PDB |
+
+**Changes landed (0.1.754):**
+
+- The app entry now stamps `astraEntry`, `astraBridge`, `astraMounted`,
+  `astraItems`, `astraBar`, `astraRow`, `astraEssentials`, `astraShelf`,
+  `astraSections` and `astraBootstrap`, and the shell stamps
+  `astraRelayReq`/`astraRelayRes`. These are cheap dataset writes and make the
+  next startup regression measurable.
+- The first projection is asked for again (60/150 ms retries) instead of
+  waiting for an unrelated host event; the reveal ceiling is 600 ms, so a lost
+  first event can no longer hold the splash for 1.2 s.
+- The shell waits (bounded 400 ms) for the app's first paint before it starts
+  the native deck mount, so adoption work cannot starve the relay that answers
+  the app's first projection.
+- `Frame.sys.mjs` is imported after that first paint. Its synchronous module
+  evaluation was on the path between the app mount and the first projection;
+  `__astraHost.Frame` is now a lazy getter and the window controls no-op only
+  for the brief moment before the import completes.
+
+**Result:** first usable chrome at **3.4–3.8 s** instead of 3.7–4.7 s; full UI
+with page content ~4.9 s in the same conditions; the 0.1.753 first-search
+freeze fix still holds (max 197 ms round trip across three cold cycles). The
+remaining cost is not the app relay: it is Gecko's native chrome initialisation
+and the app's first full layout. Getting below ~2 s needs engine-side chrome
+startup work (skip native toolbar/utility init that Astra never shows) plus a
+lighter first layout, which is tracked as the next startup task rather than
+faked here.
+
 ## Owner report: first-navigation "Not Responding" — root cause and fix (2026-11-19)
 
 The 10–11 s whole-window freeze after launching and loading the first real page

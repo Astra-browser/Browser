@@ -184,6 +184,18 @@ export function mountAppFrame(container, host, { window_id = "", onReady, onFail
       } catch {
         // Diagnostics only.
       }
+      try {
+        const ds = win.document.documentElement.dataset;
+        if (
+          data.module === "Tabs" &&
+          data.method === "bootstrap" &&
+          !ds.astraRelayReq
+        ) {
+          ds.astraRelayReq = String(Math.round(performance.now()));
+        }
+      } catch {
+        // Diagnostics only.
+      }
       const id = data.id;
       let payload = null;
       let error = null;
@@ -243,6 +255,18 @@ export function mountAppFrame(container, host, { window_id = "", onReady, onFail
         // Diagnostics only.
       }
       post({ kind: "res", id, payload, error });
+      try {
+        const ds = win.document.documentElement.dataset;
+        if (
+          data.module === "Tabs" &&
+          data.method === "bootstrap" &&
+          !ds.astraRelayRes
+        ) {
+          ds.astraRelayRes = String(Math.round(performance.now()));
+        }
+      } catch {
+        // Diagnostics only.
+      }
     } else if (data.kind === "window") {
       // The window's own controls: Frame owns minimize/maximize/restore/close.
       post({ kind: "window-res", id: data.id, action: data.action });

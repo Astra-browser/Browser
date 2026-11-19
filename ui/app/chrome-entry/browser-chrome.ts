@@ -94,8 +94,18 @@ function fail(message: string, error: unknown): void {
 try {
   document.title = "Astra [entry]";
   setWindowLabel(SURFACE);
+  // Boot diagnostics (cheap dataset stamps; read by the startup probes).
+  const bootMark = (name: string) => {
+    try {
+      document.documentElement.dataset[name] = String(Math.round(performance.now()));
+    } catch {
+      // Diagnostics only.
+    }
+  };
+  bootMark("astraEntry");
 
   const bridge = await ensureBridge(SURFACE, window.location.search);
+  bootMark("astraBridge");
   // Probe seam: the live route table, not a direct Host module call. Chrome
   // code already has this capability; it adds no new privilege.
   try {
@@ -145,17 +155,21 @@ try {
   const sectionsReady = () => {
     const bar = target.querySelector(".space-bar");
     const row = target.querySelector("[data-astra-tab-id]");
-    return (
-      !!bar &&
-      (bar.textContent ?? "").includes("Space") &&
-      !!row &&
-      (row.textContent ?? "").trim().length > 0 &&
-      !!target.querySelector("[data-essentials-drop]") &&
-      !!target.querySelector(".shelf .case")
-    );
+    const hasBar = !!bar && (bar.textContent ?? "").includes("Space");
+    const hasRow = !!row && (row.textContent ?? "").trim().length > 0;
+    const hasEssentials = !!target.querySelector("[data-essentials-drop]");
+    const hasShelf = !!target.querySelector(".shelf .case");
+    if (hasBar) bootMark("astraBar");
+    if (hasRow) bootMark("astraRow");
+    if (hasEssentials) bootMark("astraEssentials");
+    if (hasShelf) bootMark("astraShelf");
+    const ready = hasBar && hasRow && hasEssentials && hasShelf;
+    if (ready) bootMark("astraSections");
+    return ready;
   };
   let gateTimer = 0;
   let stable = 0;
+  let itemsSeen = false;
   const waitForStablePaint = () => {
     if (revealed) return;
     requestAnimationFrame(() => {
@@ -225,6 +239,8 @@ try {
           : event.payload;
       window.dispatchEvent(new CustomEvent(dom, { detail }));
       if (wire === "items-changed" && !revealed) {
+        itemsSeen = true;
+        bootMark("astraItems");
         waitForStablePaint();
       }
     });
@@ -233,6 +249,7 @@ try {
   mount(App, { target });
   // The presentation barrier observes this DOM synchronously.
   flushSync();
+  bootMark("astraMounted");
   // The theme is written by the app's own appearance init, a pass after the
   // mount; watch the one attribute and tell the shell each time it changes.
   try {
@@ -248,20 +265,37 @@ try {
   // `announce` is called from `reveal()`: the shell only shows this frame once
   // the first paint is complete, so a half-built chrome is never displayed.
   // Guarantee the first projection: the app asks for its own snapshot during
-  // onMount, but if that request raced the listener wiring the sidebar would
-  // paint an empty Space section for a frame. `bootstrap` is idempotent and
-  // re-emits `items-changed`, so this costs one in-process call and makes the
-  // first paint complete.
-  void bridge.invoke("tabs_bootstrap").catch(() => {
-    // The app's own bootstrap still runs; this is only a safety net.
-  });
+  // onMount, but the very first request can race the shell's relay wiring, and
+  // a lost response leaves the sidebar empty until a later host event (~0.9 s
+  // on a cold launch). `bootstrap` is idempotent and re-emits `items-changed`,
+  // so retry briefly until the projection is seen instead of waiting for an
+  // unrelated event.
+  const askForItems = (attempt: number) => {
+    if (itemsSeen || revealed || attempt > 3) return;
+    window.setTimeout(
+      () => {
+        if (itemsSeen || revealed) return;
+        bootMark("astraAsk");
+        void bridge
+          .invoke("tabs_bootstrap")
+          .then(() => bootMark("astraBootstrap"))
+          .catch(() => {
+            // The app's own bootstrap still runs; this is only a safety net.
+          });
+        askForItems(attempt + 1);
+      },
+      attempt === 1 ? 60 : 150,
+    );
+  };
+  askForItems(1);
   // Start the gate as soon as the app is mounted, and never leave the window
-  // blank if a section never arrives.
+  // blank if a section never arrives. The 600 ms ceiling only applies when the
+  // projection never lands; each retry above normally resolves it in <250 ms.
   waitForStablePaint();
   setTimeout(() => {
     window.clearTimeout(gateTimer);
     reveal();
-  }, 1200);
+  }, 600);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error), error);
 }

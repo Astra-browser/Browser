@@ -96,6 +96,15 @@ function relayHost(): HostModules {
     new Promise<unknown>((resolve, reject) => {
       const id = `relay-${++next}`;
       pending.set(id, { resolve, reject });
+      try {
+        const ds = document.documentElement.dataset;
+        if (!ds.astraPost) {
+          ds.astraPost = String(Math.round(performance.now()));
+          ds.astraPostName = `${moduleName}.${method}`;
+        }
+      } catch {
+        // Diagnostics only.
+      }
       window.parent.postMessage(
         { ns: SHELL_NS, kind: "req", id, module: moduleName, method, args },
         "*",
