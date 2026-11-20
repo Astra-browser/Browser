@@ -6,6 +6,7 @@ import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { surface } from "$domain/surface";
+import { IS_WINDOWS } from "$shared/platform";
 import * as notices from "$session/notice.svelte";
 import * as sidebarMode from "$session/sidebar-mode.svelte";
 import { theme } from "$domain/appearance";
@@ -79,10 +80,19 @@ test("the address field stands in the column's head, and the bar keeps it when t
 
   const field = screen.container.querySelector("[data-astra-address]")!;
   const sidebar = screen.container.querySelector("aside")!;
-  expect(sidebar.contains(field)).toBe(true);
-  // The bar above the page has nothing of its own to carry while the column
-  // is in its full shape.
-  expect(screen.container.querySelector(".stage-column [data-content-bar]")).toBeNull();
+  if (IS_WINDOWS) {
+    // The page bar is the top panel on Windows (it carries the window's own
+    // controls), so the one field lives there and the column keeps none.
+    expect(sidebar.contains(field)).toBe(false);
+    expect(
+      screen.container.querySelector(".stage-column [data-content-bar]")?.contains(field),
+    ).toBe(true);
+  } else {
+    expect(sidebar.contains(field)).toBe(true);
+    // The bar above the page has nothing of its own to carry while the column
+    // is in its full shape.
+    expect(screen.container.querySelector(".stage-column [data-content-bar]")).toBeNull();
+  }
   // One field, the product's own, not a second bar for the new tab.
   expect(screen.container.querySelectorAll("[data-astra-address]")).toHaveLength(1);
 
@@ -102,7 +112,7 @@ test("the address field stands in the column's head, and the bar keeps it when t
   sidebarMode.setMode("default");
 });
 
-test("keyboard order runs skip link, the address field, the column's list, then content", async () => {
+test("keyboard order runs skip link, then the column's list and the page bar", async () => {
   await surface.init();
   await tabs.init();
   emitNativeEvent("itemsChanged", boot());
@@ -113,10 +123,16 @@ test("keyboard order runs skip link, the address field, the column's list, then 
   const address = screen.container.querySelector<HTMLInputElement>("[data-astra-address]")!;
   const firstTab = screen.container.querySelector<HTMLElement>("[data-astra-tab-id] button")!;
   expect(order[0]).toBe(skip);
-  // The column's head carries the controls and the field, so the address is
-  // reached before the list it stands above.
   expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(skip));
-  expect(order.indexOf(address)).toBeLessThan(order.indexOf(firstTab));
+  if (IS_WINDOWS) {
+    // The bar stands after the column in the chrome, so the list is reached
+    // first and the address follows it.
+    expect(order.indexOf(address)).toBeGreaterThan(order.indexOf(firstTab));
+  } else {
+    // The column's head carries the controls and the field, so the address is
+    // reached before the list it stands above.
+    expect(order.indexOf(address)).toBeLessThan(order.indexOf(firstTab));
+  }
 
   // The skip link moves focus to the stage the app draws. A native page owns
   // the content surface itself, so the link is present and named, and the

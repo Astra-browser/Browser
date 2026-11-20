@@ -5,10 +5,17 @@ import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision, spaceFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { surface } from "$domain/surface";
+import { preferences } from "$domain/preferences";
 import * as sidebar from "$session/sidebar-mode.svelte";
 import Shell from "../Shell.svelte";
 
 vi.mock("../WorkWorkspace.svelte", async () => await import("./StageStub.svelte"));
+
+// This file is about the bar's hover reveal, which is the `auto` arrangement;
+// the Windows default is the pinned top panel, so pin the preference here.
+const native = vi.hoisted(() => ({
+  settings: { "ui.main-bar": "auto" } as Record<string, string>,
+}));
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
@@ -18,6 +25,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     tabsActivate: async () => ({ accepted: true, operation_id: null }),
     sidebarSetHidden: async () => {},
     sidebarSetWidth: async () => {},
+    settingGet: async (key: string) => native.settings[key] ?? null,
   });
 });
 
@@ -25,6 +33,7 @@ afterEach(() => {
   sidebar.adoptMode("default");
   surface.dispose();
   tabs.dispose();
+  preferences.dispose();
 });
 
 function hover(hover: boolean) {
@@ -34,6 +43,7 @@ function hover(hover: boolean) {
 }
 
 async function floatingBar() {
+  await preferences.init();
   await surface.init();
   await tabs.init();
   // The column in its full shape draws the address itself; the floating bar

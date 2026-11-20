@@ -67,8 +67,11 @@ for (const [material, glass] of Object.entries(BACKDROPS))
       });
       await settle();
       await shot(material === "acrylic" ? `windows-${theme}` : `windows-${material}-${theme}`);
-      // Windows draws its own caption buttons over the window's corner; the
-      // chrome draws none of its own there.
-      expect(screen.container.querySelector('[aria-label="Close"]')).toBeNull();
+      // The window's own caption controls are ours, in the page bar's trailing
+      // end: one trio, part of the horizontal top panel, not a capsule floating
+      // over the page.
+      const closes = screen.container.querySelectorAll('[aria-label="Close"]');
+      expect(closes).toHaveLength(1);
+      expect(closes[0]!.closest("[data-content-bar]")).not.toBeNull();
     });
   }

@@ -222,16 +222,26 @@ test("the panel is as wide as the field, with two groups divided and every row o
   await expect.element(panel.getByRole("switch", { name: "Block on this site" })).toBeVisible();
   await expect.element(panel.getByRole("group", { name: "Page zoom" })).toBeVisible();
 
-  const field = screen.container
-    .querySelector<HTMLElement>(".address-field")!
-    .getBoundingClientRect();
+  const fieldElement = screen.container.querySelector<HTMLElement>(".address-field")!;
+  const field = fieldElement.getBoundingClientRect();
   // Opening scales the panel up from a hair under, so wait for it to settle.
-  await expect
-    .poll(() => Math.abs(panel.element().getBoundingClientRect().left - field.left))
-    .toBeLessThanOrEqual(1);
-  expect(Math.abs(panel.element().getBoundingClientRect().right - field.right)).toBeLessThanOrEqual(
-    1,
-  );
+  // In the column the tray is a sheet as wide as the field; in the page bar it
+  // is a floating panel anchored to the field's end and capped to a readable
+  // width, because a 700px-wide tray is not a menu.
+  const inColumn = !!fieldElement.closest(".browser-sidebar");
+  if (inColumn) {
+    await expect
+      .poll(() => Math.abs(panel.element().getBoundingClientRect().left - field.left))
+      .toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(panel.element().getBoundingClientRect().right - field.right),
+    ).toBeLessThanOrEqual(1);
+  } else {
+    await expect
+      .poll(() => Math.abs(panel.element().getBoundingClientRect().right - field.right))
+      .toBeLessThanOrEqual(8);
+    expect(panel.element().getBoundingClientRect().width).toBeLessThanOrEqual(320);
+  }
 
   const body = panel.element().querySelector<HTMLElement>("[data-tray-body]")!;
   const line = (row: Element) => (row as HTMLElement).offsetHeight;
@@ -313,10 +323,12 @@ test("a certificate the person continued past is not secure either", async () =>
 test("a new tab keeps its own search field and shows the page bar", async () => {
   native.extensions = true;
   const screen = await shell({ url: null });
-  // In the expanded column the head owns the one field and the page bar; the
-  // floating `[data-content-bar]` belongs to the rails and the hidden shape.
+  // The one address field stands in the page bar; on Windows the bar is the
+  // top panel (it carries the window's controls), so the column keeps only its
+  // own controls. On the other platforms the full column still owns the field.
   expect(screen.container.querySelector("[data-astra-address]")).not.toBeNull();
-  expect(screen.container.querySelector(".browser-sidebar [data-astra-address]")).not.toBeNull();
+  expect(screen.container.querySelector("[data-content-bar] [data-astra-address]")).not.toBeNull();
+  expect(screen.container.querySelector(".browser-sidebar [data-astra-address]")).toBeNull();
   expect(screen.container.querySelector("main#astra-stage")).not.toBeNull();
 });
 
