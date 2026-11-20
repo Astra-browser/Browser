@@ -177,6 +177,7 @@ else
     "webext_ui:tools/perf/stress/webext_ui_probe.py"
     "passkeys:tools/marionette-probe/passkeys-probe.py"
     "devtools:tools/perf/stress/devtools_probe.py"
+    "devtools_window:tools/marionette-probe/devtools-window-probe.py"
     "first_load:tools/perf/stress/first_load_probe.py"
     "settings_native:tools/marionette-probe/settings-native-probe.py"
     "settings_restart:tools/marionette-probe/settings-restart-probe.py"
