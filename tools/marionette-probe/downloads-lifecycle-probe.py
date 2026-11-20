@@ -200,14 +200,16 @@ def trigger(session, name):
 
 
 def main():
-    profile = tempfile.mkdtemp(prefix="astra-downloads-", dir=os.environ.get("TMPDIR", "/tmp/opencode"))
+    base = os.environ.get("TMPDIR") or tempfile.gettempdir()
+    os.makedirs(base, exist_ok=True)
+    profile = tempfile.mkdtemp(prefix="astra-downloads-", dir=base)
     downloads = os.path.join(profile, "downloads")
     os.makedirs(downloads, exist_ok=True)
-    with open(os.path.join(profile, "user.js"), "w") as prefs:
+    with open(os.path.join(profile, "user.js"), "w", encoding="utf-8") as prefs:
         prefs.write(
             f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n'
             f'user_pref("browser.download.folderList", 2);\n'
-            f'user_pref("browser.download.dir", "{downloads}");\n'
+            f'user_pref("browser.download.dir", {json.dumps(downloads)});\n'
             'user_pref("browser.download.useDownloadDir", true);\n'
             'user_pref("browser.download.always_ask_before_handling_new_types", false);\n'
             'user_pref("browser.download.manager.showWhenStarting", false);\n'
@@ -279,6 +281,32 @@ def main():
             os.path.exists(path) and os.path.getsize(path) == SIZE,
             f"{path} exists={os.path.exists(path)}",
         )
+        check(
+            "the completed view names the file's target",
+            finished
+            and os.path.normcase(finished.get("target") or "") == os.path.normcase(path),
+            json.dumps(finished),
+        )
+        check(
+            "the completed view says the file exists",
+            finished and finished.get("exists") is True and finished.get("deleted") is False,
+            json.dumps(finished),
+        )
+
+        # The file is removed outside the browser. The next list must say so
+        # instead of offering an Open that cannot work.
+        os.remove(path)
+        host_call(session, {"kind": "list", "before": None, "limit": 50})
+        missing = wait(
+            lambda: (
+                (lambda e: e and e.get("deleted") is True and e.get("exists") is False)(
+                    find(session, "slow.bin")
+                )
+            ),
+            15,
+            step=0.4,
+        )
+        check("a deleted file is marked deleted in the viewer list", bool(missing), json.dumps(find(session, "slow.bin")))
 
         kept = host_call(session, {"kind": "keep", "id": first["id"]})
         check(

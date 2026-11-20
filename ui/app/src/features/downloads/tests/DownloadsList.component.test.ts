@@ -132,6 +132,53 @@ test("native completion replaces cancellation with ID-scoped open and reveal act
   expect(native.listener).toBeNull();
 });
 
+test("a completed file that is no longer at its target is marked deleted", async () => {
+  const profile = "00000000000000000000000001";
+  const entry: DownloadView = {
+    id: "0000000000000000000000000d",
+    revision: "00000005",
+    created_at: "1",
+    filename: "gone.zip",
+    source: "https://example.com",
+    source_is_context: false,
+    state: "completed",
+    received: "2048",
+    total: "2048",
+    error: null,
+    target: "C:\\Users\\me\\Downloads\\gone.zip",
+    exists: false,
+    deleted: true,
+  };
+  native.call.mockImplementation(async (_profile: string, call: DownloadCall) => {
+    if (call.kind === "list")
+      return {
+        kind: "page",
+        cleanup: { running: false, error: null },
+        entries: [entry],
+        next: null,
+        supported: true,
+      };
+    if (call.kind === "updates")
+      return {
+        kind: "updates",
+        cleanup: { running: false, error: null },
+        entries: [entry],
+        removed: [],
+      };
+    return { kind: "applied" };
+  });
+  const screen = await render(DownloadsList, { profile });
+  await expect.element(page.getByText("Deleted from Downloads", { exact: true })).toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: "Open gone.zip", exact: true }))
+    .not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("button", { name: "Show in folder", exact: true }))
+    .toBeInTheDocument();
+  expect(screen.container.querySelectorAll("[data-deleted]")).toHaveLength(1);
+  await screen.unmount();
+});
+
 test("a folder the system refused says so once and offers another folder", async () => {
   const profile = "00000000000000000000000001";
   const entry: DownloadView = {

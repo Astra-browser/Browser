@@ -25,7 +25,10 @@ const ROOT = path.dirname(
 );
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
-const { Downloads } = await import(pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href);
+const { Downloads, __downloadsInternals } = await import(
+  pathToFileURL(path.join(HOST, "Downloads.sys.mjs")).href
+);
+const { viewOf, timeMs } = __downloadsInternals;
 
 let passed = 0;
 let failed = 0;
@@ -113,6 +116,39 @@ const call = (profile, call_) => Downloads.call({ profile, call: call_ });
   const retried = await call(P, { kind: "retry_cleanup" });
   check("retry_cleanup answers applied", retried.kind === "applied");
   check("retry_cleanup echoes the profile", retried.profile === P);
+}
+
+// === Completed and history views carry the target and its presence ==========
+{
+  const completed = {
+    startTime: new Date("2026-11-20T10:00:00.000Z"),
+    stopped: true,
+    succeeded: true,
+    source: { url: "https://example.test/file.zip" },
+    target: { path: "C:\\Users\\me\\Downloads\\file.zip", exists: true, size: 4096 },
+    currentBytes: 4096,
+    totalBytes: 4096,
+  };
+  const present = viewOf(completed, true);
+  check("a completed view names its target", present.target === completed.target.path);
+  check("a present file is not deleted", present.exists === true && present.deleted === false);
+  check("a completed view keeps its byte total", present.total === "4096" && present.received === "4096");
+  const missing = viewOf(completed, false);
+  check("a missing target is marked deleted", missing.exists === false && missing.deleted === true);
+  const explicit = viewOf({ ...completed, deleted: true }, true);
+  check("a browser-deleted file stays deleted", explicit.exists === false && explicit.deleted === true);
+
+  const history = {
+    stopped: true,
+    succeeded: true,
+    source: { url: "https://example.test/old.zip" },
+    target: { path: "C:\\Users\\me\\Downloads\\old.zip", exists: true, size: 2048 },
+    endTime: 1_700_000_000,
+  };
+  const old = viewOf(history, true);
+  check("history end time becomes a created_at", old.created_at === new Date(1_700_000_000_000).toISOString());
+  check("history size fills total and received", old.total === "2048" && old.received === "2048");
+  check("seconds and milliseconds are both accepted", timeMs(1_700_000_000) === timeMs(1_700_000_000_000));
 }
 
 // === Calls that need the real manager: error, never a fake success ==========

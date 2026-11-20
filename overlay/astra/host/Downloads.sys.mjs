@@ -49,6 +49,15 @@ const MAX_PAGE_LIMIT = 2000;
 /** How often one native burst becomes one `downloads-changed`. */
 const CHANGE_COALESCE_MS = 250;
 
+/** Newest completed downloads read from Places history. The engine keeps the
+ *  session list in memory only for stopped downloads, so the finished ones
+ *  that survive a restart live in history. */
+const HISTORY_LIMIT = 300;
+
+/** A file's presence is cached briefly so a progress burst does not stat the
+ *  whole history on every change. A page open forces a fresh check. */
+const EXISTS_TTL_MS = 2500;
+
 /** The idle cleanup state: no pass is running and none failed. */
 function idleCleanup() {
   return { running: false, error: null };
@@ -199,6 +208,17 @@ function prefsOf(scope) {
   }
 }
 
+/** Seconds, milliseconds, or a Date to milliseconds since epoch. */
+function timeMs(value) {
+  if (value instanceof Date) {
+    const stamp = value.getTime();
+    return Number.isFinite(stamp) ? stamp : 0;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return 0;
+  return number > 1_000_000_000_000 ? number : number * 1000;
+}
+
 /** A small stable hash so a Download object keeps one wire id across calls. */
 function hash(text) {
   let value = 2166136261;
@@ -220,7 +240,9 @@ export function __idOf(download) {
   if (!download) return "";
   const known = _downloadIds.get(download);
   if (known) return known;
-  const started = download?.startTime?.getTime?.() ?? 0;
+  // A history download has no startTime; its endTime is what orders it.
+  const started =
+    download?.startTime?.getTime?.() ?? timeMs(download?.endTime);
   const source = download?.source?.url ?? "";
   const target = download?.target?.path ?? "";
   const id = `${String(started).padStart(16, "0")}-${hash(
@@ -314,22 +336,62 @@ function filenameOf(download) {
   return at >= 0 ? path.slice(at + 1) : path;
 }
 
-/** One `DownloadView`; no invented fields. */
-function viewOf(download) {
+/**
+ * One `DownloadView`; no invented fields. `exists` is passed by the native
+ * adapter after it has checked the target path. A completed download whose
+ * file is gone is marked `deleted` so the viewer can say so instead of
+ * offering an Open that cannot work.
+ */
+function viewOf(download, exists = undefined) {
   const id = __idOf(download);
+  const completed = download?.stopped === true && download?.succeeded === true;
+  const target =
+    typeof download?.target?.path === "string" && download.target.path !== ""
+      ? download.target.path
+      : null;
+  const available =
+    completed && target !== null && download?.deleted !== true
+      ? exists !== undefined
+        ? exists === true
+        : download?.target?.exists !== false
+      : false;
+  const deleted =
+    completed &&
+    (download?.deleted === true || target === null || available === false);
+  const at =
+    download?.startTime?.getTime?.() ??
+    timeMs(download?.endTime) ??
+    0;
+  const size =
+    Number.isSafeInteger(download?.totalBytes) && download.totalBytes > 0
+      ? download.totalBytes
+      : Number.isSafeInteger(download?.target?.size)
+        ? download.target.size
+        : 0;
+  const received =
+    Number.isSafeInteger(download?.currentBytes) && download.currentBytes > 0
+      ? download.currentBytes
+      : completed
+        ? size
+        : 0;
   return {
     id,
     revision: __revisionOf(download, id),
-    created_at: (download?.startTime ?? new Date()).toISOString(),
+    created_at: new Date(at || Date.now()).toISOString(),
     filename: filenameOf(download),
     source: download?.source?.url ?? "",
     state: stateOf(download, id),
-    received: String(Math.max(0, download?.currentBytes ?? 0)),
+    received: String(Math.max(0, received)),
     total:
       Number.isSafeInteger(download?.totalBytes) && download.totalBytes > 0
         ? String(download.totalBytes)
-        : null,
+        : completed && size > 0
+          ? String(size)
+          : null,
     error: errorOf(download),
+    target,
+    exists: available,
+    deleted,
   };
 }
 
@@ -337,11 +399,30 @@ function makeNative(scope) {
   const { Downloads } = scope.ChromeUtils.importESModule(
     "resource://gre/modules/Downloads.sys.mjs",
   );
+  let DownloadHistory = null;
+  try {
+    ({ DownloadHistory } = scope.ChromeUtils.importESModule(
+      "resource://gre/modules/DownloadHistory.sys.mjs",
+    ));
+  } catch {
+    // A build without the history module still shows the live session list.
+  }
+  let PlacesUtils = null;
+  try {
+    ({ PlacesUtils } = scope.ChromeUtils.importESModule(
+      "resource://gre/modules/PlacesUtils.sys.mjs",
+    ));
+  } catch {
+    // Removing a history row is best effort when Places is unavailable.
+  }
   const prefs = prefsOf(scope);
   const services = scope.Services;
   if (!prefs || !services) {
     throw new Error("no chrome preferences");
   }
+  const Cc = scope.Cc ?? globalThis.Cc;
+  const Ci = scope.Ci ?? globalThis.Ci;
+  const io = scope.IOUtils ?? globalThis.IOUtils;
 
   let listPromise = null;
   async function list() {
@@ -360,9 +441,114 @@ function makeNative(scope) {
     return listPromise;
   }
 
+  // The engine keeps only in-progress/partial downloads in `downloads.json`.
+  // Finished downloads live in Places history, so the viewer reads the merged
+  // list: current transfers plus everything from previous sessions.
+  let historyPromise = null;
+  async function merged() {
+    historyPromise ??= (async () => {
+      try {
+        if (!DownloadHistory) return await list();
+        return await DownloadHistory.getList({
+          type: Downloads.PUBLIC,
+          maxHistoryResults: HISTORY_LIMIT,
+        });
+      } catch {
+        // A profile whose Places database is not ready still gets the live
+        // session list rather than an empty view.
+        return await list();
+      }
+    })();
+    return historyPromise;
+  }
+
+  const existsCache = new Map();
+  async function existsFor(download, { fresh = false, check = true } = {}) {
+    if (!download || download.stopped !== true || download.succeeded !== true) {
+      return false;
+    }
+    if (download.deleted === true) return false;
+    const path = download.target?.path;
+    if (typeof path !== "string" || path === "") return false;
+    if (!check) return download.target?.exists !== false;
+    const cached = existsCache.get(path);
+    if (!fresh && cached && Date.now() - cached.at < EXISTS_TTL_MS) {
+      return cached.exists;
+    }
+    let exists = false;
+    try {
+      exists = io && typeof io.exists === "function"
+        ? await io.exists(path)
+        : download.target?.exists !== false;
+    } catch {
+      exists = download.target?.exists !== false;
+    }
+    existsCache.set(path, { exists, at: Date.now() });
+    return exists;
+  }
+
+  async function allDownloads() {
+    return (await merged()).getAll();
+  }
+
   async function find(id) {
-    const all = await (await list()).getAll();
+    const all = await allDownloads();
     return all.find((download) => __idOf(download) === id) ?? null;
+  }
+
+  function localFile(path) {
+    if (!Cc || !Ci || typeof path !== "string" || path === "") return null;
+    const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+    file.initWithPath(path);
+    return file;
+  }
+
+  async function launch(download) {
+    const path = download?.target?.path;
+    const file = localFile(path);
+    if (!file || !file.exists() || !file.isFile()) return false;
+    file.launch();
+    return true;
+  }
+
+  async function reveal(download) {
+    const path = download?.target?.path;
+    const file = localFile(path);
+    if (!file) return false;
+    if (file.exists()) {
+      file.reveal();
+      return true;
+    }
+    // A file that moved or was deleted has no row to reveal; its folder is
+    // still useful, so open that and let the person look.
+    const parent = file.parent;
+    if (!parent || !parent.exists()) return false;
+    parent.reveal();
+    return true;
+  }
+
+  async function removeEntry(download) {
+    const path = download?.target?.path;
+    if (path) existsCache.delete(path);
+    try {
+      await (await list()).remove(download);
+    } catch {
+      // A history-only object is not in the session list.
+    }
+    const url = download?.source?.url;
+    if (PlacesUtils && typeof url === "string" && url !== "") {
+      try {
+        await PlacesUtils.history.remove(url);
+      } catch {
+        // A download whose history row is already gone is still removed from
+        // the session list above.
+      }
+    }
+    try {
+      if (typeof download?.finalize === "function") await download.finalize(true);
+    } catch {
+      // Best effort.
+    }
   }
 
   async function preferences() {
@@ -379,9 +565,21 @@ function makeNative(scope) {
   }
 
   return {
-    async list() {
-      const all = await (await list()).getAll();
-      return all.map(viewOf);
+    /**
+     * The merged session and history list. `refresh` checks each completed
+     * target path; the live `updates` call uses the short cache so a progress
+     * burst does not stat the whole history on every change.
+     */
+    async list({ refresh = true } = {}) {
+      const all = await allDownloads();
+      return Promise.all(
+        all.map(async (download) =>
+          viewOf(
+            download,
+            await existsFor(download, { fresh: refresh, check: refresh }),
+          ),
+        ),
+      );
     },
 
     preferences,
@@ -423,7 +621,7 @@ function makeNative(scope) {
 
     async cancel(id) {
       const download = await find(id);
-      if (!download) return false;
+      if (!download || typeof download.cancel !== "function") return false;
       pausedIds.delete(id);
       await download.cancel();
       return true;
@@ -432,30 +630,27 @@ function makeNative(scope) {
     async open(id) {
       const download = await find(id);
       if (!download || !download.succeeded) return false;
-      await download.launch();
-      return true;
+      return await launch(download);
     },
 
     async reveal(id) {
       const download = await find(id);
       if (!download) return false;
-      await download.showContainingDirectory();
-      return true;
+      return await reveal(download);
     },
 
     async forget(id) {
       const download = await find(id);
       if (!download) return false;
       pausedIds.delete(id);
-      await (await list()).remove(download);
+      await removeEntry(download);
       return true;
     },
 
     async clear() {
-      const target = await list();
-      const all = await target.getAll();
+      const all = await allDownloads();
       for (const download of all) {
-        if (download.stopped) await target.remove(download);
+        if (download.stopped) await removeEntry(download);
       }
       pausedIds.clear();
       return true;
@@ -467,7 +662,9 @@ function makeNative(scope) {
     // wire state honest between the two calls.
     async pause(id) {
       const download = await find(id);
-      if (!download || download.stopped) return false;
+      if (!download || download.stopped || typeof download.cancel !== "function") {
+        return false;
+      }
       pausedIds.add(id);
       try {
         await download.cancel();
@@ -479,7 +676,14 @@ function makeNative(scope) {
     },
     async resume(id) {
       const download = await find(id);
-      if (!download || !download.stopped || download.succeeded) return false;
+      if (
+        !download ||
+        !download.stopped ||
+        download.succeeded ||
+        typeof download.start !== "function"
+      ) {
+        return false;
+      }
       pausedIds.delete(id);
       try {
         // Firefox's own pause/resume starts the Download without waiting for
@@ -506,7 +710,9 @@ function makeNative(scope) {
     },
     async keep(id) {
       const download = await find(id);
-      if (!download?.hasBlockedData) return false;
+      if (!download?.hasBlockedData || typeof download.unblock !== "function") {
+        return false;
+      }
       try {
         await download.unblock();
       } catch {
@@ -519,12 +725,15 @@ function makeNative(scope) {
       if (!download) return false;
       pausedIds.delete(id);
       try {
-        if (download.hasBlockedData) {
+        if (
+          download.hasBlockedData &&
+          typeof download.confirmBlock === "function"
+        ) {
           await download.confirmBlock();
           return true;
         }
         if (download.stopped) {
-          await (await list()).remove(download);
+          await removeEntry(download);
           return true;
         }
       } catch {
@@ -597,7 +806,7 @@ async function answer(profile, call) {
         };
       }
       try {
-        const entries = await native.list();
+        const entries = await native.list({ refresh: false });
         const current = new Set(entries.map((entry) => entry.id));
         const removed =
           lastIds === null
@@ -759,3 +968,6 @@ export const Downloads = {
     return false;
   },
 };
+
+/** Pure mapping helpers for the contract suite (no chrome state). */
+export const __downloadsInternals = { viewOf, timeMs };

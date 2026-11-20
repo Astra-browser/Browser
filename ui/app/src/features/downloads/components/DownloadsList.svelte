@@ -98,6 +98,13 @@
     }
   }
 
+  /** The folder the engine saved into, for a file that is no longer there. */
+  function folderOf(path: string | null | undefined) {
+    if (!path) return "";
+    const parts = path.split(/[\\/]/u);
+    return parts.length > 1 ? parts[parts.length - 2] : "";
+  }
+
   function line(entry: DownloadView) {
     if (entry.state === "receiving") {
       const rate = rates.observe(entry.id, Number(entry.received));
@@ -112,6 +119,10 @@
     const where = entry.source_is_context
       ? m.download_source_context({ origin: entry.source })
       : hostOf(entry.source);
+    if (entry.state === "completed" && entry.deleted) {
+      const folder = folderOf(entry.target);
+      return folder ? m.download_deleted_from({ folder }) : m.download_deleted();
+    }
     if (entry.state === "completed")
       return `${formatDownloadBytes(entry.total ?? entry.received)} · ${where}`;
     return `${labels[entry.state]()} · ${where}`;
@@ -175,12 +186,13 @@
       {#each group.entries as entry (entry.id)}
         {@const progress = downloadProgress(entry)}
         {@const problem =
+          entry.deleted ||
           entry.state === "failed" ||
           entry.state === "interrupted" ||
           entry.state === "held" ||
           (entry.state === "paused" && entry.error !== null)}
-        <li data-state={entry.state}>
-          {#if entry.state === "completed"}<button
+        <li data-state={entry.state} data-deleted={entry.deleted || undefined}>
+          {#if entry.state === "completed" && !entry.deleted}<button
               type="button"
               class="body"
               aria-label={m.download_open_named({ name: entry.filename })}
@@ -194,9 +206,11 @@
               <span class="copy"
                 >{@render name(entry)}<span
                   class="line"
-                  title={entry.error
-                    ? downloadDetail(entry.error, entry.state === "paused")
-                    : undefined}>{line(entry)}</span
+                  title={entry.deleted
+                    ? m.download_deleted_help()
+                    : entry.error
+                      ? downloadDetail(entry.error, entry.state === "paused")
+                      : undefined}>{line(entry)}</span
                 >
                 {#if entry.state === "receiving" || entry.state === "pending"}<span
                     class="track"

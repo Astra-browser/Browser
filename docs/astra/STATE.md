@@ -2155,3 +2155,27 @@ Spaces page.
   cache or on Refresh. The probe used a scratch folder with the default folders
   excluded so its result is stable; the default rows were verified separately
   in the contract test.
+
+## Downloads: completed history and deleted files (2026-11-20)
+
+The owner reported that downloads were not stored or visible in the viewer,
+and asked for a file that no longer exists to be marked deleted. The engine
+keeps only in-progress/partial downloads in its session list; on Desktop the
+completed ones are written to Places history. The host was reading only
+`Downloads.PUBLIC`, so a finished download disappeared on restart.
+
+| Fix | What changed | Verification |
+|---|---|---|
+| Durable list | `Downloads.sys.mjs` reads `DownloadHistory.getList({ type: Downloads.PUBLIC, maxHistoryResults: 300 })`, merging current transfers with completed history. `updates` returns the same merged set. | `downloads_model` 140/140; live `downloads-history-probe.py` 10/10 across a real quit/relaunch |
+| Target and deletion | `DownloadView` gains optional `target`, `exists` and `deleted`. `list` checks each completed target with `IOUtils.exists` (forced fresh on a page load); a missing or browser-deleted file is `exists:false, deleted:true`. `updates` uses a 2.5 s cache so a progress burst does not stat the history. | `downloads-lifecycle-probe.py` 18/18 (completion, target, file on disk, delete -> marked); component test `DownloadsList` 16/16 |
+| Viewer | A completed deleted row is not an Open button. It says `Deleted from <folder>` with the deleted-help tooltip, keeps Show in folder (the folder, not the missing file), and is marked `data-deleted`. The status card also shows Deleted. | live viewer check in `downloads-history-probe.py`; `DownloadsList.component.test.ts` deleted-row test |
+| Forget / clear | `forget` and `clear` remove the session entry and its Places history row (never the file). History downloads are no longer invisible to those verbs. | `downloads_model` command checks; live discard path unchanged |
+| Open / reveal | Both resolve the target path. Open refuses a missing file; reveal opens the containing folder when the file is gone. Pause/resume/keep are restricted to session transfers. | `downloads-lifecycle-probe.py`; contract checks |
+
+**Wire note (SCOPE rule 5):** the three `DownloadView` fields are an optional
+extension in `ui/app/src/shared/ipc/bindings.ts` (there is no Specta generator
+in this checkout); responses include them, older fixtures may omit them.
+
+**Deferred:** the list keeps the newest 300 history entries. `clear` removes the
+download's Places URL visit, matching Firefox's own download deletion. The
+private-window public-list policy is unchanged.

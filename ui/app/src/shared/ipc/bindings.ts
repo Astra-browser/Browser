@@ -1527,6 +1527,12 @@ export type DownloadView = {
 	received: string,
 	total: string | null,
 	error: DownloadError | null,
+	/**  Absolute path the engine saved to, or null for a record without one. */
+	target?: string | null,
+	/**  Completed and still present at `target`. */
+	exists?: boolean,
+	/**  Completed but no longer at `target`; the viewer says so and disables Open. */
+	deleted?: boolean,
 };
 
 export type DownloadsChanged = {

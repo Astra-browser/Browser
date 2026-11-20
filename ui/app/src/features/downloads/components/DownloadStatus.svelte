@@ -57,7 +57,8 @@
     if (active.some((entry) => entry.state === "held")) return attention.hold();
   });
   let problem = $derived(
-    current?.state === "failed" ||
+    current?.deleted ||
+      current?.state === "failed" ||
       current?.state === "interrupted" ||
       current?.state === "held" ||
       (current?.state === "paused" && current.error !== null),
@@ -80,7 +81,9 @@
       case "finalizing":
         return m.download_finalizing();
       case "completed":
-        return formatDownloadBytes(current.total ?? current.received);
+        return current.deleted
+          ? m.download_deleted()
+          : formatDownloadBytes(current.total ?? current.received);
       case "cancelled":
         return m.download_cancelled();
       case "held":

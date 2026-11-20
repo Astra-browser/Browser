@@ -150,6 +150,7 @@ else
     "multiwindow:tools/perf/stress/gbrowser_multiwindow_probe.py"
     "multi_window_isolation:tools/marionette-probe/multi-window-isolation-probe.py"
     "downloads_lifecycle:tools/marionette-probe/downloads-lifecycle-probe.py"
+    "downloads_history:tools/marionette-probe/downloads-history-probe.py"
     "gallery:tools/marionette-probe/gallery-probe.py"
     "tab_order:tools/marionette-probe/tab-order-probe.py"
     "tabs_churn:tools/marionette-probe/tabs-churn-probe.py"
