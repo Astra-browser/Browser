@@ -233,7 +233,18 @@ def main():
         if not finished:
             return 1
 
-        os.remove(path)
+        # The engine may still hold the completed file for a moment after the
+        # state flips; wait for the handle to close instead of failing the
+        # probe on a Windows sharing violation.
+        deadline = time.time() + 15
+        while True:
+            try:
+                os.remove(path)
+                break
+            except PermissionError:
+                if time.time() >= deadline:
+                    raise
+                time.sleep(0.25)
         host_call(session, {"kind": "list", "before": None, "limit": 50})
         gone = wait(
             lambda: (

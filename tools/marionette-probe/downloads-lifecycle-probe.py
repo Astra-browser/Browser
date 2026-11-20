@@ -295,7 +295,15 @@ def main():
 
         # The file is removed outside the browser. The next list must say so
         # instead of offering an Open that cannot work.
-        os.remove(path)
+        deadline = time.time() + 15
+        while True:
+            try:
+                os.remove(path)
+                break
+            except PermissionError:
+                if time.time() >= deadline:
+                    raise
+                time.sleep(0.25)
         host_call(session, {"kind": "list", "before": None, "limit": 50})
         missing = wait(
             lambda: (
