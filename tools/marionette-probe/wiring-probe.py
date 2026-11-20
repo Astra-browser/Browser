@@ -119,23 +119,20 @@ SIDEBAR_STATE = "return (() => {" + APP_DOC + """
   return JSON.stringify({
     hidden: !!(a && a.hasAttribute('data-hidden')),
     peek: !!(a && a.hasAttribute('data-peek')),
-    edge: !!d.querySelector('.sidebar-edge'),
   });
 })()"""
 
 EDGE_ENTER = "return (() => {" + APP_DOC + """
   if (!d) return 'no app document';
-  const e = d.querySelector('.sidebar-edge');
-  if (!e) return 'no edge strip';
-  e.dispatchEvent(new PointerEvent('pointerenter', { bubbles: false }));
+  // Native watches the window's edge because the page's view takes the
+  // pointer there; the app answers its own event.
+  d.defaultView.dispatchEvent(new d.defaultView.CustomEvent('astra:sidebar-edge', { detail: { near: true } }));
   return 'ok';
 })()"""
 
 EDGE_LEAVE = "return (() => {" + APP_DOC + """
   if (!d) return 'no app document';
-  const e = d.querySelector('.sidebar-edge');
-  if (!e) return 'no edge strip';
-  e.dispatchEvent(new PointerEvent('pointerleave', { bubbles: false }));
+  d.defaultView.dispatchEvent(new d.defaultView.CustomEvent('astra:sidebar-edge', { detail: { near: false } }));
   return 'ok';
 })()"""
 
@@ -332,13 +329,19 @@ def main():
     print("sidebar.show: " + str(m.js(HIDE_SIDEBAR)), flush=True)
     time.sleep(2)
 
-    # 1. Work is a browser surface, opened by a command.
-    print("work.click: " + str(m.js(CLICK_WORK)), flush=True)
-    time.sleep(2)
-    state = json.loads(m.js(SURFACE))
-    print("work.state: " + json.dumps(state), flush=True)
-    if state.get("surface") != "work" or state.get("banner"):
-        failures.append("work surface did not open cleanly")
+    # 1. Work is a browser surface, opened by a command. The Work surface is
+    # compiled in only when VITE_ASTRA_WORK is on; the off build is covered by
+    # work-off-probe, so its absence here is a SKIP, not a wiring failure.
+    clicked = m.js(CLICK_WORK)
+    print("work.click: " + str(clicked), flush=True)
+    if clicked == "no Work radio":
+        print("SKIP work surface (this build has VITE_ASTRA_WORK off)", flush=True)
+    else:
+        time.sleep(2)
+        state = json.loads(m.js(SURFACE))
+        print("work.state: " + json.dumps(state), flush=True)
+        if state.get("surface") != "work" or state.get("banner"):
+            failures.append("work surface did not open cleanly")
 
     # Reload the chrome document so the next scenario starts on Browse.
     print("reload: " + str(m.js(RELOAD)), flush=True)

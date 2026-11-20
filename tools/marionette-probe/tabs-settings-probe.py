@@ -7,6 +7,7 @@ import base64
 import http.server
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -252,16 +253,37 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     clip = os.path.join(OUT, "clip.webm")
     if not os.path.exists(clip):
-        subprocess.run(
-            [
-                "ffmpeg", "-y", "-loglevel", "error",
-                "-f", "lavfi", "-i", "testsrc=size=320x240:rate=15",
-                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
-                "-t", "8", "-c:v", "libvpx-vp9", "-b:v", "300k",
-                "-c:a", "libopus", "-b:a", "64k", clip,
-            ],
-            check=True,
-        )
+        built = False
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "testsrc=size=320x240:rate=15",
+                    "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+                    "-t", "8", "-c:v", "libvpx-vp9", "-b:v", "300k",
+                    "-c:a", "libopus", "-b:a", "64k", clip,
+                ],
+                check=True,
+            )
+            built = True
+        except (OSError, subprocess.CalledProcessError):
+            # ffmpeg is not installed on this machine. The engine tree ships
+            # real clips for its own media tests; use one so the PiP half runs
+            # against an actual video instead of being skipped.
+            for candidate in (
+                "testing/talos/talos/tests/video/clips/testsrc.480p.60fps.webm",
+                "testing/web-platform/tests/media/movie_300.webm",
+                "dom/media/test/sync.webm",
+            ):
+                source = os.path.join(astra_env.ROOT, "engine", *candidate.split("/"))
+                if os.path.exists(source):
+                    shutil.copyfile(source, clip)
+                    print("clip: copied " + source, flush=True)
+                    built = True
+                    break
+        if not built:
+            print("SKIP no clip: install ffmpeg or an engine test tree", flush=True)
+            return 2
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_address[1]}"

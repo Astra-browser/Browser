@@ -4,14 +4,14 @@ old rail's width back.
 Usage: python3 tools/marionette-probe/utility-bar-probe.py <profile-dir> <out-dir>
 
 Checks, against a fresh packaged dev build:
-  * no 44px rail; the sidebar is the column alone (240px at rest),
-  * the media/downloads/notes/spaces/sleeping marks and the shape toggle are
-    an even four-column grid inside the column at 240px, with one extension
-    door rather than two,
+  * no 44px rail; the sidebar is the column alone (260px at rest),
+  * the media/downloads/notes/spaces/sleeping marks and the one extension
+    door sit on one row inside the column at 260px, headed by the header's
+    shape toggle (the four-column grid is for a column at or under 220px),
   * the extension hub opens opaque over the tab list,
   * the media popover opens under the bar and inside the column,
-  * opening a tool keeps a 56px column with the same marks in a two-column
-    grid and the panel at the window's top edge,
+  * opening a tool keeps a 56px column with the same marks, and the panel head
+    (a narrow container) reflows them into the four-column grid,
   * the compact media popover stays inside those 56px,
   * the toggle hides the column and the edge brings it back as the card.
 
@@ -105,6 +105,11 @@ STATE = js("""
   const items = bar ? [...bar.querySelectorAll('button')].map((b) => ({
     name: b.getAttribute('aria-label'), ...box(b),
   })) : [];
+  // The plates on the bar's own row: direct buttons plus each disclosure's
+  // trigger, not the rows inside a tray that is always rendered.
+  const plates = bar ? [...bar.querySelectorAll(
+    ':scope > button, :scope > .ui-disclosure > button, :scope > .rail-spaces > button',
+  )].map((b) => ({ name: b.getAttribute('aria-label'), ...box(b) })) : [];
   return JSON.stringify({
     hidden: !!(aside && aside.hasAttribute('data-hidden')),
     peek: !!(aside && aside.hasAttribute('data-peek')),
@@ -116,12 +121,14 @@ STATE = js("""
     bar: box(bar),
     display: bar ? getComputedStyle(bar).display : null,
     gridColumns: bar ? getComputedStyle(bar).gridTemplateColumns : null,
+    gridAutoFlow: bar ? getComputedStyle(bar).gridAutoFlow : null,
     compact: bar ? bar.hasAttribute('data-compact') : null,
     extensions: bar
       ? [...bar.querySelectorAll('button')].filter(
           (b) => b.getAttribute('aria-label') === 'Extensions').length
       : 0,
     items,
+    plates,
     panel: panel ? { ...box(panel), open: panel.getAttribute('data-open') } : null,
     extensionPanel: extensionPanel
       ? {
@@ -132,6 +139,9 @@ STATE = js("""
         }
       : null,
     columnBar: !!d.querySelector('.sidebar-browser-column .utility-bar'),
+    headerToggle: !!d.querySelector('.sidebar-top button[aria-label="Toggle sidebar"]'),
+    barParentWidth: bar && bar.parentElement
+      ? Math.round(bar.parentElement.getBoundingClientRect().width) : null,
     toolClose: !!d.querySelector('.sidebar-tool-host .shared-tool-header button[aria-label="Close tool"]'),
     railSearch: !!d.querySelector('.sidebar-browser-column .rail-search button'),
     modeSwitch: !!d.querySelector('.mode-switch'),
@@ -188,12 +198,13 @@ def main():
         names = {item["name"] for item in expanded["items"]}
         aside = expanded["sidebar"] or {}
         check("no route beside the column", expanded["oldRail"] is False)
-        check("the page inset is the column alone", aside.get("w") == 240, aside)
+        check("the page inset is the column alone", aside.get("w") == 260, aside)
+        plates = expanded["plates"]
         check(
-            "the bar is an even four-column grid at the default width",
-            expanded["display"] == "grid"
-            and len((expanded["gridColumns"] or "").split()) == 4,
-            {"display": expanded["display"], "columns": expanded["gridColumns"]},
+            "the bar keeps every mark in one row at the default width",
+            expanded["display"] == "flex"
+            and len({item["y"] for item in plates}) == 1,
+            {"display": expanded["display"], "plates": plates},
         )
         check(
             "every utility is in the bar",
@@ -201,7 +212,7 @@ def main():
             <= names,
             names,
         )
-        check("the shape toggle heads it", "Toggle sidebar" in names, names)
+        check("the shape toggle heads the column", expanded["headerToggle"] is True, expanded)
         check("one extension door", expanded["extensions"] == 1, expanded["extensions"])
         check(
             "no mark leaves the column",
@@ -252,7 +263,12 @@ def main():
         bar = tool["bar"] or {}
         check("a tool keeps the 56px tab column", column.get("w") == 56, column)
         check("the utilities leave the tab column", tool["columnBar"] is False)
-        check("the utilities head the panel", tool["display"] == "flex", tool["display"])
+        check(
+            "the utilities head the panel",
+            tool["display"] == "grid" and tool["gridAutoFlow"] == "column",
+            {"display": tool["display"], "flow": tool["gridAutoFlow"],
+             "columns": tool["gridColumns"]},
+        )
         check(
             "the utilities span the panel's head",
             bar.get("x", 0) >= host.get("x", 0)
@@ -292,8 +308,8 @@ def main():
         check(
             "the panel closes back to the expanded head",
             closed["host"] is None
-            and (closed["sidebar"] or {}).get("w") == 240
-            and closed["display"] == "grid",
+            and (closed["sidebar"] or {}).get("w") == 260
+            and closed["headerToggle"] is True,
             closed,
         )
         m.shot(os.path.join(outdir, "utility-bar-expanded-again.png"))
