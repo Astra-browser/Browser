@@ -18,7 +18,7 @@
 //
 // Pure logic: no chrome at import time, so Node contract tests can load it.
 
-import { Keymap } from "./Keymap.sys.mjs";
+import { Keymap, setLauncherAccelerator } from "./Keymap.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
 import { emit } from "./Events.sys.mjs";
 
@@ -33,6 +33,13 @@ const DOUBLE_TAP_MODES = new Set(["off", "command", "option"]);
  * rather than guessing.
  */
 let _registered = false;
+
+/** The accelerator the core was last handed ("" is "stand down"). A read of
+ *  an unchanged, live shortcut must not tear the registration down again. */
+let _applied = "";
+
+/** The registration currently in flight: `{ text, promise }`. */
+let _pending = null;
 
 /**
  * Keys the desktop or an application already answers to. Recording one would
@@ -141,20 +148,66 @@ async function currentState() {
 }
 
 /**
- * Hands the shortcut to the core, which registers it with the desktop. The
- * answer is the system's: another application may already hold the key.
+ * Hands `text` to the core. Never called directly: `applyShortcut` owns the
+ * cache and the in-flight guard.
  */
-async function applyShortcut(accelerator) {
+async function registerShortcut(text) {
+  _applied = text;
   try {
     const { Boot } = await import("./Boot.sys.mjs");
-    const reply = await Boot.launcherShortcut({ accelerator });
+    const reply = await Boot.launcherShortcut({ accelerator: text });
     // "cleared" is the recorder standing the hotkey down, not a failure.
-    if (reply?.reason === "cleared") return reply;
+    if (reply?.reason === "cleared") {
+      _registered = false;
+      return reply;
+    }
     _registered = reply?.registered === true;
     return reply ?? { registered: false, reason: "unavailable" };
   } catch {
     _registered = false;
     return { registered: false, reason: "unavailable" };
+  }
+}
+
+/**
+ * Hands the shortcut to the core, which registers it with the desktop. The
+ * answer is the system's: another application may already hold the key.
+ *
+ * Reading the state is how registration happens, so a read must not redo a
+ * registration that already stands: clearing and re-registering on every
+ * Settings render left a gap where a press was lost, and a second app that
+ * grabbed the key in that gap silently turned the shortcut off while Settings
+ * still reported the last answer. A failed registration is retried, because
+ * the key may since have been released.
+ *
+ * The boot path forces one registration (a fresh core has none) while the app
+ * reads its state at the same moment; the in-flight guard keeps those two from
+ * clearing each other's registration.
+ */
+async function applyShortcut(accelerator, { force = false } = {}) {
+  const text = typeof accelerator === "string" ? accelerator : "";
+  // The window's own key handler reads the keymap, and a rebind has to reach
+  // it now — and the recorder must be able to hear the chord it is replacing.
+  const canonical =
+    text === ""
+      ? null
+      : await Keymap.canonical(
+          text,
+          currentPlatform() === "mac" ? "mac" : "other",
+        );
+  setLauncherAccelerator(canonical);
+  if (!force && text !== "" && text === _applied && _registered) {
+    return { registered: true };
+  }
+  if (!force && _pending !== null && _pending.text === text) {
+    return _pending.promise;
+  }
+  const tracked = registerShortcut(text);
+  _pending = { text, promise: tracked };
+  try {
+    return await tracked;
+  } finally {
+    if (_pending?.promise === tracked) _pending = null;
   }
 }
 
@@ -264,9 +317,11 @@ export const Launcher = {
   /**
    * Hands the stored shortcut to the core again. The core starts after the
    * app, so the first read can arrive before there is anything to register.
+   * Force: a fresh core has no registration even though the key did not
+   * change, and the cache above must not hide that.
    */
   async reapply() {
-    return applyShortcut(await storedShortcut());
+    return applyShortcut(await storedShortcut(), { force: true });
   },
 
   async setDoubleTap({ mode = "off" } = {}) {    if (!DOUBLE_TAP_MODES.has(mode)) return currentState();
@@ -283,5 +338,8 @@ export const Launcher = {
 
 /** Test-only: forget what a previous test wrote. */
 export function __resetLauncherForTests() {
+  _registered = false;
+  _applied = "";
+  _pending = null;
   return undefined;
 }

@@ -33,6 +33,10 @@ import {
 import { Navigation } from "./Navigation.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
 import { Zoom } from "./Zoom.sys.mjs";
+// The closed-tab stack belongs to the engine, and the engine keys it by
+// window: the command has to name the window that pressed the key, not "the
+// last window this process focused".
+import { __windowIdFor } from "./Windows.sys.mjs";
 
 /** Browser surfaces a command can stand over the active tab. */
 const PAGES = new Set([
@@ -96,7 +100,6 @@ const SHELL_ACTIONS = new Set([
   "page.paste",
   "page.devtools",
   "page.devtools.alt",
-  "page.print",
   "page.save",
   "page.selectAll",
   "page.viewSource",
@@ -116,6 +119,7 @@ const APP_ACTIONS = new Set([
   "find.previous",
   "find.show",
   "launcher.toggle",
+  "sidebar.toggleCompact",
   "split.choose",
   "theme.dark",
   "theme.light",
@@ -125,9 +129,34 @@ const APP_ACTIONS = new Set([
   "work.pane.close",
 ]);
 
+/**
+ * Commands the keymap advertises that no surface answers yet. They are refused
+ * by name rather than by falling off the end of the switch, so a dead shortcut
+ * is visible in `supported()`/diagnostics and in the contract test instead of
+ * looking like an id nobody registered. Each needs the app route named here
+ * before it can move out of this map.
+ */
+const UNAVAILABLE = new Map([
+  // No password picker: passkeys owns sign-in, there is no saved-login sheet.
+  ["page.autofillPassword", "no password picker"],
+  // Clear Browsing Data has no sheet of its own (site data has one).
+  ["settings.clearData", "no clear-data sheet"],
+  // Work panes have no "open this pane in Browse" hand-off yet.
+  ["work.pane.openInBrowse", "no work pane hand-off"],
+]);
+
 /** The chrome's `runCommand` answer: an admission, as `settle()` expects. */
 function admission(accepted) {
   return { operation_id: null, accepted };
+}
+
+/**
+ * An honest refusal. `reason` is diagnostics, not wire: the UI reads
+ * `accepted` (through `settle()`), and a surface that wants to explain a
+ * refusal hears it on `ui-command` instead.
+ */
+function refusal(reason) {
+  return { operation_id: null, accepted: false, reason };
 }
 
 function selectedId(window_id = "") {
@@ -243,6 +272,154 @@ async function goHome(window_id = "") {
   return admission(!result?.error);
 }
 
+// --- Reopening a closed tab ------------------------------------------------
+//
+// The engine owns the closed-tab stack, per window: it is the same store
+// Firefox's own "Reopen Closed Tab" reads, and the only place a closed page
+// (URL, history, container) still exists. `HistoryCall` answers
+// `closed_tabs: []` and `reopen_closed: unavailable` because it holds no copy
+// of that stack, so the command reads the engine's own answer instead of
+// presenting a History row that could not reopen anything.
+
+/** Test seam: `{ window, store }` replaces the chrome window and engine store. */
+let _reopenForTests = null;
+
+export function __setReopenForTests(engine) {
+  _reopenForTests = engine ?? null;
+}
+
+let _sessionStore = null;
+let _sessionStoreRead = false;
+
+/** Commands state the contract test has to be able to put back. */
+export function __resetCommandsForTests() {
+  _reopenForTests = null;
+  _sessionStore = null;
+  _sessionStoreRead = false;
+  _launcherToggleAt = 0;
+}
+
+/** The engine's SessionStore, or null outside chrome. Read once, lazily. */
+function sessionStore() {
+  if (_reopenForTests) return _reopenForTests.store ?? null;
+  if (_sessionStoreRead) return _sessionStore;
+  _sessionStoreRead = true;
+  try {
+    const CU = globalThis.ChromeUtils;
+    _sessionStore =
+      CU?.importESModule?.(
+        "resource:///modules/sessionstore/SessionStore.sys.mjs",
+      )?.SessionStore ?? null;
+  } catch {
+    _sessionStore = null;
+  }
+  return _sessionStore;
+}
+
+/**
+ * The chrome window `window_id` names, or null. A command runs in the window
+ * that sent it, so the id is the authority; "the focused window" is only the
+ * fallback for a caller that has no id (a direct diagnostic call).
+ */
+function chromeWindow(window_id = "") {
+  if (_reopenForTests) return _reopenForTests.window ?? null;
+  let services = null;
+  try {
+    services = globalThis.Services ?? null;
+  } catch {
+    services = null;
+  }
+  if (!services?.wm?.getEnumerator) return null;
+  let windows = null;
+  try {
+    windows = services.wm.getEnumerator("navigator:browser");
+  } catch {
+    return null;
+  }
+  let first = null;
+  while (windows.hasMoreElements()) {
+    let win = null;
+    try {
+      win = windows.getNext();
+    } catch {
+      break;
+    }
+    if (!win || win.closed === true) continue;
+    if (!first) first = win;
+    if (window_id !== "" && __windowIdFor(win) === window_id) return win;
+  }
+  // An id nobody bound is not an invitation to guess another window.
+  if (window_id !== "") return null;
+  try {
+    return services.wm.getMostRecentWindow("navigator:browser") ?? first;
+  } catch {
+    return first;
+  }
+}
+
+/** How many tabs the engine would let this window bring back. */
+function closedTabCount(store, win) {
+  if (!store) return 0;
+  try {
+    const count =
+      typeof store.getClosedTabCountForWindow === "function"
+        ? store.getClosedTabCountForWindow(win)
+        : typeof store.getClosedTabCount === "function"
+          ? store.getClosedTabCount(win)
+          : 0;
+    return Number.isSafeInteger(count) && count > 0 ? count : 0;
+  } catch {
+    // An untracked window has no stack; the engine throws for it.
+    return 0;
+  }
+}
+
+/**
+ * Reopen the most recently closed tab in the calling window. Nothing to
+ * reopen is a refusal, never a pretend success: the sidebar only moves when
+ * the engine really restored a tab.
+ */
+async function reopenClosedTab(window_id = "") {
+  const win = chromeWindow(window_id);
+  if (!win) return refusal("unavailable");
+  const store = sessionStore();
+  if (closedTabCount(store, win) <= 0) return refusal("empty");
+  try {
+    // Source and target are the same window: a reopen belongs where the key
+    // was pressed, never in whichever window the engine calls topmost.
+    const tab = store.undoCloseTab(win, 0, win);
+    if (!tab) return refusal("refused");
+  } catch {
+    // SessionStore throws for an index it no longer has (another window took
+    // the last closed tab first); that is not a reopen.
+    return refusal("refused");
+  }
+  // The engine announces the restored tab through `TabOpen`, which the content
+  // stage adopts into the model, so the projection follows without a second
+  // write here.
+  return admission(true);
+}
+
+// --- The launcher ----------------------------------------------------------
+//
+// One press can arrive twice: the core registers the launcher as an OS hotkey
+// and the chrome's own key handler also matches it while this window is in
+// front. Toggling twice closes what the first press just opened, so a second
+// delivery within one press is coalesced.
+const LAUNCHER_TOGGLE_MS = 120;
+let _launcherToggleAt = 0;
+
+function launcherToggle() {
+  const now = Date.now();
+  if (now - _launcherToggleAt < LAUNCHER_TOGGLE_MS) {
+    // The press was handled by the first delivery.
+    return admission(true);
+  }
+  _launcherToggleAt = now;
+  emit("ui-command", "launcher.toggle");
+  return admission(true);
+}
+
 export const Commands = {
   /**
    * Run one command by id. Page commands are synchronous state changes: the
@@ -302,6 +479,13 @@ export const Commands = {
     }
 
     // --- The keyboard's own commands -------------------------------------
+    // An advertised command with no surface behind it is refused by name, so
+    // a dead shortcut never looks like a command that simply did nothing.
+    if (UNAVAILABLE.has(id)) return refusal("unavailable");
+    // The launcher's key is a real toggle, not a one-way announce: a press
+    // that arrives from both the OS hotkey and this window must not cancel
+    // itself out.
+    if (id === "launcher.toggle") return launcherToggle();
     if (SHELL_ACTIONS.has(id) || APP_ACTIONS.has(id)) {
       emit("ui-command", id);
       return admission(true);
@@ -316,6 +500,24 @@ export const Commands = {
         const out = await Tabs.close({ astra_tab_id: current });
         return admission(out.closed !== false);
       }
+      // The engine's own closed-tab stack, for the window that asked.
+      case "tab.reopen":
+        return reopenClosedTab(window_id);
+      // The menu's Duplicate: the same host route the sidebar already had,
+      // reached through the command id so no new binding is needed.
+      case "tab.duplicate": {
+        const current = selectedId(window_id);
+        if (!current) return refusal("no_tab");
+        const out = await Tabs.duplicate({ astra_tab_id: current });
+        return out?.error ? refusal("refused") : admission(true);
+      }
+      case "page.print":
+        // Firefox's print preview is native UI (D-38), and the product has no
+        // print sheet yet. The press is refused, and the reason is announced
+        // for the app to show as a notice (`notice.print-unavailable`); the
+        // shortcut is never answered by silently opening the engine's window.
+        emit("ui-command", "notice.print-unavailable");
+        return refusal("unavailable");
       case "tab.next":
         return stepTab(1, window_id);
       case "tab.previous":
@@ -360,7 +562,9 @@ export const Commands = {
       const out = await Tabs.switchSpace({ space: space.id });
       return admission(out.accepted === true);
     }
-    return admission(false);
+    // Nothing matched: say so with a reason. A keymap id that reaches this
+    // line is a wiring gap, which the contract test keeps visible.
+    return refusal("unknown");
   },
 
   /** Every id this module currently executes (tests and diagnostics). */
@@ -375,11 +579,16 @@ export const Commands = {
       "note.new",
       "tab.new",
       "tab.close",
+      "tab.reopen",
+      "tab.duplicate",
       "tab.next",
       "tab.previous",
       "tab.above",
       "tab.below",
       "tab.select.last",
+      ...Array.from({ length: 9 }, (_unused, index) => `tab.select.${index + 1}`),
+      ...Array.from({ length: 9 }, (_unused, index) => `space.select.${index + 1}`),
+      "page.print",
       "nav.back",
       "nav.forward",
       "nav.reload",
@@ -392,5 +601,10 @@ export const Commands = {
       "space.next",
       "space.previous",
     ];
+  },
+
+  /** Advertised commands this module answers with an explicit refusal. */
+  async unavailable() {
+    return [...UNAVAILABLE.keys()];
   },
 };

@@ -1,5 +1,6 @@
 import { openAt } from "$features/menus";
 import { tabs } from "$domain/tabs";
+import { commands } from "$shared/ipc/bindings";
 import {
   cloneTabToSpace,
   collapseTabGroup,
@@ -59,6 +60,10 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
           { kind: "item" as const, id: "tab.copyLink", label: m.native_copy_link() },
         ]
       : []),
+    // The host has had `Tabs.duplicate` all along; without a row the only
+    // caller was a probe. A split pane's own row is fine: the copy is a new
+    // tab beside the view, not a third pane.
+    { kind: "item", id: "tab.duplicate", label: m.native_duplicate_tab() },
     { kind: "separator" },
     {
       kind: "item",
@@ -145,7 +150,18 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
         if (copied) notices.show(m.notice_link_copied());
       });
     else if (choice === "tab.keep") void tabs.setKept(id, !kept);
-    else if (choice === "tab.split") tabs.split(id);
+    else if (choice === "tab.duplicate") {
+      // The command duplicates the tab in front of this window, so put this
+      // row's tab in front first: the two relay calls reach the host in that
+      // order, and a refusal must not look like a copy that was never made.
+      tabs.activate(id);
+      void commands.runCommand("tab.duplicate").then(
+        (admission) => {
+          if (!admission?.accepted) notices.show("This tab could not be duplicated");
+        },
+        () => notices.show("This tab could not be duplicated"),
+      );
+    } else if (choice === "tab.split") tabs.split(id);
     else if (choice === "tab.replacePane") tabs.beginReplace(id);
     else if (choice === "tab.group")
       void createTabGroup(id).catch(() => notices.show("The tabs could not be grouped"));

@@ -577,6 +577,30 @@ const OVERRIDES_PREF = "astra.keymap.overrides";
 let _loaded = false;
 let _recording = false;
 
+/**
+ * The launcher's own accelerator, canonical for this platform: a string, or
+ * null when the key is not currently ours (the recorder is listening).
+ * `undefined` is "the launcher has not reported yet" and falls back to the
+ * registry default, so a build that never reads the launcher still shows the
+ * default key in Keyboard settings.
+ *
+ * `launcher.toggle` is not customizable here — the launcher owns its recorder
+ * and stores its value in Settings — but the key the window should match is
+ * still the person's, not the registry default. Without this the window key
+ * handler kept running the default after a rebind, and kept eating the chord
+ * while the recorder was trying to record it.
+ */
+let _launcherAccelerator;
+
+/** Called by `Launcher` with what it registered (`null` while recording). */
+export function setLauncherAccelerator(accelerator) {
+  const next =
+    typeof accelerator === "string" && accelerator !== "" ? accelerator : null;
+  if (next === _launcherAccelerator) return;
+  _launcherAccelerator = next;
+  emit("keymap-changed", { version: 1 });
+}
+
 function loadOverrides() {
   if (_loaded) return;
   _loaded = true;
@@ -617,6 +641,9 @@ function saveOverrides() {
 
 function binding(spec, platform) {
   loadOverrides();
+  if (spec.id === "launcher.toggle" && _launcherAccelerator !== undefined) {
+    return _launcherAccelerator;
+  }
   if (_overrides.has(spec.id)) {
     return _overrides.get(spec.id);
   }
@@ -642,8 +669,10 @@ export const Keymap = {
 
   /**
    * Every registry command with its current keys and defaults, sorted by id.
-   * `accelerator` is the person's binding or the platform default;
-   * `default_accelerator` is the registry default for that platform.
+   * `accelerator` is the person's binding or the platform default; for the
+   * launcher it is the shortcut the launcher registered (it owns that row's
+   * recorder), and `default_accelerator` is the registry default for that
+   * platform.
    */
   async entries({ platform = null } = {}) {
     const at = platformOf(platform ?? currentPlatform());
@@ -778,4 +807,5 @@ export function __resetKeymapForTests() {
   _overrides.clear();
   _loaded = false;
   _recording = false;
+  _launcherAccelerator = undefined;
 }

@@ -176,5 +176,80 @@ check(
   thirdId,
 );
 
+// === Process-wide binding across module instances (P2-1) ==================
+// Every chrome window loads its own copy of this module, so a per-module map
+// made the second window call itself `win-1` too. The record lives on
+// `Services` (one object per process); two imports under one Services stand
+// in for two chrome windows.
+{
+  const shared = {};
+  globalThis.Services = shared;
+  const url = pathToFileURL(path.join(HOST, "Windows.sys.mjs")).href;
+  const windowsA = await import(`${url}?scope=window-a`);
+  const windowsB = await import(`${url}?scope=window-b`);
+  const nativeA = fakeWindow();
+  const nativeB = fakeWindow();
+  const idA = windowsA.__bindCurrentWindow(nativeA);
+  const idB = windowsB.__bindCurrentWindow(nativeB);
+  check(
+    "two module instances share one window id space",
+    idA === "win-1" && idB === "win-2",
+    `${idA},${idB}`,
+  );
+  const listA = await windowsA.Windows.list({ request_id: "shared-a" });
+  const listB = await windowsB.Windows.list({ request_id: "shared-b" });
+  check(
+    "each window lists both windows",
+    listA.windows.map((w) => w.window_id).join() === "win-1,win-2" &&
+      listB.windows.map((w) => w.window_id).join() === "win-1,win-2",
+    JSON.stringify({
+      a: listA.windows.map((w) => w.window_id),
+      b: listB.windows.map((w) => w.window_id),
+    }),
+  );
+  check(
+    "the focus projection agrees between windows",
+    listA.focused_window_id === listB.focused_window_id,
+    `${listA.focused_window_id} vs ${listB.focused_window_id}`,
+  );
+  await windowsB.Windows.focus({ request_id: "shared-focus", window_id: idA });
+  check(
+    "focus from the second window moves the first window's projection",
+    (await windowsA.Windows.list({ request_id: "shared-a2" })).focused_window_id === idA,
+  );
+  await windowsB.Windows.setFullscreen({
+    request_id: "shared-fs",
+    window_id: idA,
+    fullscreen: true,
+  });
+  check(
+    "fullscreen from the second window lands on the first window's record",
+    (await windowsA.Windows.get({ request_id: "shared-get", window_id: idA })).window
+      .fullscreen === true,
+  );
+  const closedFirst = await windowsB.Windows.close({
+    request_id: "shared-close-a",
+    window_id: idA,
+  });
+  check(
+    "a window can close an id its own module never allocated",
+    closedFirst.closed === true && closedFirst.window_id === idA,
+    JSON.stringify(closedFirst),
+  );
+  const afterFirst = await windowsB.Windows.list({ request_id: "shared-after-a" });
+  check(
+    "the default window is not resurrected for the survivor",
+    afterFirst.windows.map((w) => w.window_id).join() === idB &&
+      afterFirst.focused_window_id === idB,
+    JSON.stringify({
+      ids: afterFirst.windows.map((w) => w.window_id),
+      focused: afterFirst.focused_window_id,
+    }),
+  );
+  windowsA.__resetWindowsForTests();
+  windowsB.__resetWindowsForTests();
+  delete globalThis.Services;
+}
+
 console.log(`\nwindow_scope: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

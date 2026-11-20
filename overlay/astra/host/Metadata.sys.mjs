@@ -22,7 +22,7 @@
 import { addEventListener } from "./Events.sys.mjs";
 import { Boot } from "./Boot.sys.mjs";
 import { Tabs, __applySpaces, __spacesState } from "./Tabs.sys.mjs";
-import { Windows } from "./Windows.sys.mjs";
+import { Windows, __nativeWindows, __windowIdFor } from "./Windows.sys.mjs";
 
 const NAME = "organisation";
 const SNAPSHOT_VERSION = 1;
@@ -101,29 +101,51 @@ export function buildSnapshot({
   const privateWindows = new Set(
     windows.filter((win) => win?.private === true).map((win) => win.window_id),
   );
-  const kept = tabs.filter(
-    (tab) =>
-      tab &&
-      tab.private === false &&
-      !privateWindows.has(tab.window_id) &&
-      isPersistableUrl(tab.url),
-  );
-  const positions = new Map(
-    kept.map((tab, index) => [tab.astra_tab_id, index]),
-  );
+  // A capture may be assembled from every window's host model, and each model
+  // numbers its own tabs (`tab-1` exists in all of them). Identity is the
+  // window plus the id; the URL joins the key so a stale cross-window id
+  // collision can never cost a real page.
+  const seenTabs = new Set();
+  const kept = [];
+  for (const tab of tabs) {
+    if (
+      !tab ||
+      tab.private !== false ||
+      privateWindows.has(tab.window_id) ||
+      !isPersistableUrl(tab.url)
+    ) {
+      continue;
+    }
+    const identity = `${tab.window_id ?? ""}\u0000${tab.astra_tab_id ?? ""}\u0000${tab.url}`;
+    if (seenTabs.has(identity)) continue;
+    seenTabs.add(identity);
+    kept.push(tab);
+  }
+  // Spaces are process-wide: every window's model carries a copy of the same
+  // space ids, so a merged capture writes each space once.
+  const seenSpaces = new Set();
+  const uniqueSpaces = [];
+  for (const space of spaces) {
+    if (!space || typeof space !== "object") continue;
+    if (typeof space.id === "string" && space.id !== "") {
+      if (seenSpaces.has(space.id)) continue;
+      seenSpaces.add(space.id);
+    }
+    uniqueSpaces.push(space);
+  }
   const windowIds = new Set(
     windows.filter((win) => win?.private !== true).map((win) => win.window_id),
   );
   for (const tab of kept) {
     if (!windowIds.has(tab.window_id)) windowIds.add(tab.window_id);
   }
-  const spaceIds = new Set(spaces.map((space) => space.id));
+  const spaceIds = new Set(uniqueSpaces.map((space) => space.id));
   const activeKept = kept.some((tab) => tab.astra_tab_id === selected_tab_id);
   return {
     version: SNAPSHOT_VERSION,
     name: NAME,
     created_at: Math.floor(now / 1000),
-    spaces: spaces.map((space, index) => ({
+    spaces: uniqueSpaces.map((space, index) => ({
       uuid: space.id,
       name: space.name,
       position: index,
@@ -141,13 +163,15 @@ export function buildSnapshot({
         windows.find((win) => win.window_id === window_id)?.focused === true,
       title: windows.find((win) => win.window_id === window_id)?.title ?? "",
     })),
-    tabs: kept.map((tab) => ({
+    tabs: kept.map((tab, index) => ({
       astra_tab_id: tab.astra_tab_id,
       space_uuid: spaceIds.has(tab.space_id) ? tab.space_id : null,
       url: tab.url,
       title: typeof tab.title === "string" ? tab.title : "",
       pinned: tab.pinned === true,
-      position: positions.get(tab.astra_tab_id) ?? 0,
+      // The merged order is the capture order: a per-id map would collapse
+      // two windows' `tab-1` onto one position.
+      position: index,
       window_id: tab.window_id ?? "",
       history: [tab.url],
       history_index: 0,
@@ -275,8 +299,35 @@ function scheduleSave() {
   resetTimer();
   _timer = setTimeout(() => {
     _timer = null;
-    void Metadata.save();
+    void requestSave();
   }, SAVE_DELAY_MS);
+}
+
+/**
+ * Write through the process's one writer. A window that does not own the
+ * store still knows its own change has to land, so it calls the owner's
+ * published writer rather than writing itself. The slot is free (or ours)
+ * after the owner closed: this module takes it and writes directly.
+ */
+async function requestSave() {
+  const shared = sharedServices();
+  if (shared) {
+    const owner = "astraOrgOwner" in shared ? shared.astraOrgOwner : null;
+    if (owner !== null && owner !== _token) {
+      const hook = shared.astraOrgSave;
+      if (typeof hook === "function" && hook !== _saveHook) {
+        try {
+          return await hook(_windowId);
+        } catch {
+          // The owner is tearing down; this window writes for itself below.
+        }
+      }
+    } else {
+      // Claim an idle slot so two windows do not both start merging.
+      claimOwner();
+    }
+  }
+  return Metadata.save({ prefer_window_id: _windowId });
 }
 
 function parseSnapshot(raw) {
@@ -306,12 +357,124 @@ function claimOwner() {
   if (!("astraOrgOwner" in shared) || shared.astraOrgOwner === null) {
     shared.astraOrgOwner = _token;
   }
-  return shared.astraOrgOwner === _token;
+  const mine = shared.astraOrgOwner === _token;
+  if (mine) publishSaveHook(shared);
+  return mine;
 }
 
 function ownerToken() {
   const shared = sharedServices();
   return shared && "astraOrgOwner" in shared ? shared.astraOrgOwner : null;
+}
+
+/**
+ * The owner's writer, published for the other windows. Their own module
+ * instance may not write (`not_owner`), yet a space or tab they change is
+ * exactly what has to reach disk. Calling the owner's writer keeps one writer
+ * per process while merging every window's model (P1-2). The argument is the
+ * window whose change triggered the capture, so its copy of a shared space
+ * wins the merge.
+ */
+const _saveHook = (origin_window_id = "") =>
+  Metadata.save({ prefer_window_id: origin_window_id });
+
+function publishSaveHook(shared) {
+  try {
+    if (shared && typeof shared === "object") shared.astraOrgSave = _saveHook;
+  } catch {
+    // A frozen Services object leaves the owner writing for itself only.
+  }
+}
+
+function unpublishSaveHook() {
+  const shared = sharedServices();
+  try {
+    if (shared && shared.astraOrgSave === _saveHook) delete shared.astraOrgSave;
+  } catch {
+    // Nothing left to release.
+  }
+}
+
+/**
+ * Every window's Host API instance in this process, or `null` when there is
+ * none to merge with (Node tests, a preview DOM). `Services.astraHosts` is the
+ * registry the shell fills per chrome window; it is a `WeakMap`, so it is read
+ * through the bound native windows (a WeakMap cannot be enumerated on every
+ * runtime) and each entry's window resolves the id the merge needs.
+ */
+function windowHosts() {
+  const shared = sharedServices();
+  const hosts = shared?.astraHosts;
+  if (!hosts || typeof hosts.get !== "function") {
+    return null;
+  }
+  const found = [];
+  try {
+    for (const win of __nativeWindows()) {
+      const host = hosts.get(win);
+      if (!host || typeof host !== "object") continue;
+      found.push({ host, window_id: __windowIdFor(win) });
+    }
+  } catch {
+    return null;
+  }
+  return found.length > 0 ? found : null;
+}
+
+/**
+ * The tabs, spaces and selection of every live window. `prefer_window_id` is
+ * the window whose change triggered the capture; it is merged first so its
+ * copy of a shared space (a rename) wins the de-duplication by space id.
+ */
+async function collectModel(preferWindowId = "", privateWindowIds = null) {
+  const prefer = typeof preferWindowId === "string" ? preferWindowId : "";
+  const hosts = windowHosts();
+  const tabs = [];
+  const spaces = [];
+  const selections = [];
+  if (hosts !== null) {
+    hosts.sort((a, b) => {
+      const rank = (entry) =>
+        prefer !== "" && entry.window_id === prefer ? 0 : 1;
+      return rank(a) - rank(b);
+    });
+    for (const { host, window_id } of hosts) {
+      // A window that is private — or that cannot be proven public, because
+      // its id is unknown — contributes nothing. `buildSnapshot` filters too,
+      // but a private window's model must not even be read into the capture.
+      if (window_id === "" || privateWindowIds?.has(window_id)) continue;
+      try {
+        const listed = await host.Tabs?.list?.({ request_id: "metadata-save-tabs" });
+        if (Array.isArray(listed?.tabs)) tabs.push(...listed.tabs);
+        if (typeof listed?.selected_tab_id === "string") {
+          selections.push({ window_id, selected_tab_id: listed.selected_tab_id });
+        }
+      } catch {
+        // A window that is tearing down contributes nothing.
+      }
+      try {
+        const state =
+          typeof host.__spacesState === "function" ? host.__spacesState() : null;
+        if (Array.isArray(state?.spaces)) spaces.push(...state.spaces);
+      } catch {
+        // Same: a closing window has no model left to read.
+      }
+    }
+    // Nothing usable from the registry: never turn a miss into an empty
+    // capture that would erase the store. Fall through to this window's own
+    // model, the single-window behaviour.
+    if (tabs.length > 0 || spaces.length > 0) {
+      return { tabs, spaces, selections };
+    }
+  }
+  const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
+  if (Array.isArray(listed?.tabs)) tabs.push(...listed.tabs);
+  spaces.push(...__spacesState().spaces);
+  return {
+    tabs,
+    spaces,
+    selections: [{ window_id: _windowId, selected_tab_id: listed?.selected_tab_id ?? "" }],
+  };
 }
 
 async function windowState() {
@@ -329,18 +492,33 @@ async function windowState() {
 /**
  * The snapshot the current model would write. `null` when the window list is
  * unavailable (the caller reports `windows_unavailable`).
+ *
+ * In chrome this merges every window's host: one Host API instance (and one
+ * tab/space model) exists per chrome window, so a capture from the owner's
+ * model alone never contained the second window's rows.
  */
-async function captureCurrent() {
+async function captureCurrent(preferWindowId = "") {
   const windows = await windowState();
   if (windows === null) return null;
-  const listed = await Tabs.list({ request_id: "metadata-save-tabs" });
-  const { spaces, active_space_id } = __spacesState();
+  const privateWindowIds = new Set(
+    windows.windows
+      .filter((win) => win?.private === true)
+      .map((win) => win.window_id),
+  );
+  const model = await collectModel(preferWindowId, privateWindowIds);
+  const focused = windows.focused_window_id;
+  const focusedSelection = model.selections.find(
+    (entry) => entry.window_id !== "" && entry.window_id === focused,
+  );
+  const selectedTabId =
+    focusedSelection?.selected_tab_id ||
+    model.selections.find((entry) => entry.selected_tab_id !== "")?.selected_tab_id ||
+    "";
   return buildSnapshot({
-    spaces,
-    active_space_id,
-    tabs: Array.isArray(listed?.tabs) ? listed.tabs : [],
+    spaces: model.spaces,
+    tabs: model.tabs,
     windows: windows.windows,
-    selected_tab_id: listed?.selected_tab_id ?? "",
+    selected_tab_id: selectedTabId,
   });
 }
 
@@ -388,9 +566,11 @@ export const Metadata = {
     _private = false;
     const requested = typeof windowId === "string" ? windowId : "";
     _owner = claimOwner();
-    // A second window shares this process-wide store. It must not reload the
-    // snapshot over the owner's copy or take the writer slot; the owner's
-    // snapshot already includes both windows' tabs.
+    // A second window has its own Metadata instance, so `_owner` alone does
+    // not stop it loading the saved organisation: it needs the snapshot to
+    // restore its own tabs. What it must not do is write — the writer slot
+    // stays with the first window, whose capture merges every window's model
+    // (`requestSave` calls the owner's published writer).
     if (!_owner && (_off !== null || _available || _snapshot !== null)) {
       return { state: "secondary" };
     }
@@ -495,7 +675,7 @@ export const Metadata = {
   },
 
   /** Write the current organisation. Never called before `prepare`. */
-  async save({ private: isPrivate = false } = {}) {
+  async save({ private: isPrivate = false, prefer_window_id = "" } = {}) {
     resetTimer();
     if (isPrivate === true || _private)
       return { saved: false, reason: "private" };
@@ -507,7 +687,7 @@ export const Metadata = {
     if (!_available) {
       return { saved: false, reason: "unavailable" };
     }
-    const snapshot = await captureCurrent();
+    const snapshot = await captureCurrent(prefer_window_id);
     if (snapshot === null) {
       _lastError = "windows_unavailable";
       return { saved: false, reason: "windows_unavailable" };
@@ -555,7 +735,7 @@ export const Metadata = {
     // Capture the current organisation, not the snapshot from before the
     // last debounce: a pin or space changed just before quitting is exactly
     // what the person expects to find next launch.
-    const current = await this.save();
+    const current = await this.save({ prefer_window_id: _windowId });
     if (current.saved) return current;
     if (_lastSnapshot === null) {
       return current;
@@ -565,7 +745,7 @@ export const Metadata = {
     // resurrected a deleted space, so persist the current organisation (which
     // carries no tabs) instead.
     if (current.reason === "empty_capture") {
-      const snapshot = await captureCurrent();
+      const snapshot = await captureCurrent(_windowId);
       if (snapshot !== null && organisationDiffers(snapshot, _lastSnapshot)) {
         return writeSnapshot(snapshot, "metadata-flush");
       }
@@ -590,7 +770,6 @@ export const Metadata = {
       if (typeof event?.type !== "string") return;
       if (SAVE_EVENTS.has(event.type)) scheduleSave();
       if (event.type === "nav.committed") Metadata.retryRestore();
-      // A newly focused window takes over writing.
     });
     scheduleSave();
   },
@@ -599,6 +778,7 @@ export const Metadata = {
    *  that prepared the store may release it. */
   releaseOwner({ window_id = "" } = {}) {
     if (window_id && _windowId && window_id !== _windowId) return false;
+    unpublishSaveHook();
     const shared = sharedServices();
     try {
       if (shared && shared.astraOrgOwner === _token)
@@ -650,6 +830,11 @@ export const Metadata = {
   // Test seam: exact-input capture/plan without the chrome stores.
   capture: buildSnapshot,
   plan: planRestore,
+
+  /** Test seam: the merged capture `save()` would write, without a sidecar. */
+  async __captureForTests({ prefer_window_id = "" } = {}) {
+    return captureCurrent(prefer_window_id);
+  },
 
   /** Test seam: install a snapshot without a running sidecar. */
   __setSnapshotForTests(snapshot) {

@@ -21,6 +21,11 @@ const HOST = path.join(ROOT, "overlay", "astra", "host");
 
 const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Commands, addEventListener, __resetForTests } = HostAPI;
+// The same module instance HostAPI re-exports (one URL, one cache entry), so
+// the reopen seam drives the Commands the product calls.
+const { __setReopenForTests, __resetCommandsForTests } = await import(
+  pathToFileURL(path.join(HOST, "Commands.sys.mjs")).href
+);
 
 let passed = 0;
 let failed = 0;
@@ -181,6 +186,182 @@ for (const id of [
     inB.selected_tab_id === b1,
     JSON.stringify({ selected: inB.selected_tab_id, b1 }),
   );
+}
+
+// === Reopen a closed tab ==================================================
+// The engine owns the closed-tab stack (SessionStore), per window. The command
+// must reopen in the window that pressed the key and must never claim a reopen
+// the engine did not perform.
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "tab.reopen" }));
+  check("tab.reopen without the engine is refused", result.accepted === false);
+  check("tab.reopen names the missing engine", result.reason === "unavailable");
+  check("tab.reopen announces nothing", seen.length === 0);
+
+  const win = { closed: false };
+  const calls = [];
+  const store = (count, undo = () => ({ id: "native" })) => ({
+    getClosedTabCountForWindow(target) {
+      calls.push(["count", target]);
+      return count;
+    },
+    undoCloseTab(...args) {
+      calls.push(["undo", ...args]);
+      return undo();
+    },
+  });
+
+  __setReopenForTests({ window: win, store: store(0) });
+  const empty = await capture(() => Commands.run({ id: "tab.reopen" }));
+  check("an empty closed-tab stack is refused", empty.result.accepted === false);
+  check("an empty stack is not asked to undo", empty.result.reason === "empty");
+  check(
+    "an empty stack calls no undo",
+    !calls.some(([kind]) => kind === "undo"),
+  );
+
+  calls.length = 0;
+  __setReopenForTests({ window: win, store: store(1) });
+  const opened = await Commands.run({ id: "tab.reopen", window_id: "win-a" });
+  check("tab.reopen is admitted when the engine has one", opened.accepted === true);
+  check("tab.reopen has no operation to observe", opened.operation_id === null);
+  const undo = calls.find(([kind]) => kind === "undo");
+  check(
+    "tab.reopen undoes in the calling window",
+    undo?.[1] === win && undo?.[2] === 0 && undo?.[3] === win,
+    JSON.stringify(calls),
+  );
+
+  __setReopenForTests({
+    window: win,
+    store: store(2, () => {
+      throw new Error("gone");
+    }),
+  });
+  const thrown = await Commands.run({ id: "tab.reopen" });
+  check("a refused undo is not a reopened tab", thrown.accepted === false);
+  check("a refused undo names the refusal", thrown.reason === "refused");
+
+  __setReopenForTests(null);
+}
+
+// === Duplicate the tab in front ===========================================
+{
+  const { Tabs } = HostAPI;
+  const src = await Tabs.create({ request_id: "dup-src", url: "https://dup.test/page" });
+  await Tabs.select({ request_id: "dup-sel", astra_tab_id: src.astra_tab_id });
+  const before = (await Tabs.list({ request_id: "dup-0" })).tabs;
+  const { result } = await capture(() => Commands.run({ id: "tab.duplicate" }));
+  const after = (await Tabs.list({ request_id: "dup-1" })).tabs;
+  check("tab.duplicate is admitted", result.accepted === true);
+  check(
+    "tab.duplicate adds one tab with the same URL",
+    after.length === before.length + 1 &&
+      after.some(
+        (tab) => tab.astra_tab_id !== src.astra_tab_id && tab.url === "https://dup.test/page",
+      ),
+    String(after.length),
+  );
+}
+
+// === Print has no Astra surface yet =======================================
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "page.print" }));
+  check("page.print is refused", result.accepted === false);
+  check("page.print names the refusal", result.reason === "unavailable");
+  check(
+    "page.print asks the app for a notice",
+    seen.length === 1 && seen[0] === "notice.print-unavailable",
+  );
+  check("page.print never reaches the native print path", !seen.includes("page.print"));
+}
+
+// === The launcher's key toggles once per press ============================
+{
+  __resetCommandsForTests();
+  const first = await capture(() => Commands.run({ id: "launcher.toggle" }));
+  const second = await capture(() => Commands.run({ id: "launcher.toggle" }));
+  check(
+    "launcher.toggle asks the app to open the launcher",
+    first.seen.length === 1 && first.seen[0] === "launcher.toggle",
+  );
+  check("the first delivery is admitted", first.result.accepted === true);
+  check(
+    "a second delivery of one press does not toggle back",
+    second.seen.length === 0,
+  );
+  check("the coalesced press still reports handled", second.result.accepted === true);
+  __resetCommandsForTests();
+  const later = await capture(() => Commands.run({ id: "launcher.toggle" }));
+  check("a press after the coalescing window toggles again", later.seen.length === 1);
+}
+
+// === The launcher's key reaches the window's keymap ======================
+// The chrome key handler builds its map from `Keymap.entries()`. The launcher
+// stores its key elsewhere, so without this the window kept matching the
+// registry default after a rebind and ate the chord while recording.
+{
+  const { Keymap, Launcher } = HostAPI;
+  const row = async () =>
+    (await Keymap.entries({ platform: "other" })).find((entry) => entry.id === "launcher.toggle");
+  await Launcher.trigger();
+  check(
+    "the launcher publishes its shortcut to the keymap",
+    (await row()).accelerator === "Ctrl+Shift+Space",
+    JSON.stringify(await row()),
+  );
+  await Launcher.recordShortcut({ active: true });
+  check(
+    "the recorder silences the launcher key in the window",
+    (await row()).accelerator === null,
+  );
+  await Launcher.recordShortcut({ active: false });
+  check(
+    "stopping the recorder restores the launcher key",
+    (await row()).accelerator === "Ctrl+Shift+Space",
+  );
+}
+
+// === The sidebar's compact toggle was advertised and unrouted ============
+{
+  const { seen, result } = await capture(() => Commands.run({ id: "sidebar.toggleCompact" }));
+  check("sidebar.toggleCompact is admitted", result.accepted === true);
+  check(
+    "sidebar.toggleCompact reaches the app",
+    seen.length === 1 && seen[0] === "sidebar.toggleCompact",
+  );
+}
+
+// === Advertised commands without a surface are refused by name ===========
+{
+  const unavailable = await Commands.unavailable();
+  check("some advertised commands are explicitly unavailable", unavailable.length > 0);
+  for (const id of unavailable) {
+    const { seen, result } = await capture(() => Commands.run({ id }));
+    check(`${id} is refused by name`, result.accepted === false && result.reason === "unavailable");
+    check(`${id} announces nothing`, seen.length === 0);
+  }
+}
+
+// === Every keymap id is handled or refused ===============================
+{
+  const supported = new Set(await Commands.supported());
+  const refused = new Set(await Commands.unavailable());
+  const entries = await HostAPI.Keymap.entries();
+  const base = (id) => id.replace(/\.alt\d*$/u, "");
+  const missing = entries
+    .map((entry) => base(entry.id))
+    .filter((id) => !supported.has(id) && !refused.has(id));
+  check(
+    "every keymap id is executed or refused by name",
+    missing.length === 0,
+    missing.join(", "),
+  );
+  const both = [...supported].filter((id) => refused.has(id));
+  check("no id is both executed and refused", both.length === 0, both.join(", "));
+  check("supported() lists tab.reopen", supported.has("tab.reopen"));
+  check("supported() lists tab.duplicate", supported.has("tab.duplicate"));
+  check("supported() lists page.print", supported.has("page.print"));
 }
 
 console.log(`\ncommands_model: ${passed} passed, ${failed} failed`);
