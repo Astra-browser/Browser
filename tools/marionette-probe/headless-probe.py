@@ -11,8 +11,12 @@ import sys
 import time
 import os
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2829
-FIREFOX = "engine/obj-astra-linux/dist/bin/firefox"
+FIREFOX = astra_env.BINARY
 
 SNAP_JS = """return JSON.stringify((() => {
   const q = (s) => document.querySelector(s);
@@ -84,7 +88,7 @@ def main():
     proc = subprocess.Popen(
         [os.path.abspath(FIREFOX), "-headless", "-profile", os.path.abspath(profile),
          "-no-remote", "--marionette", "-marionette-port", str(PORT), "about:blank"],
-        cwd=os.path.join(os.getcwd(), "engine/obj-astra-linux/dist/bin"),
+        cwd=astra_env.BIN_DIR,
         stdout=errlog, stderr=subprocess.STDOUT)
     print(f"launched pid={proc.pid}", flush=True)
     m = None

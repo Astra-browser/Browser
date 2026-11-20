@@ -209,7 +209,7 @@ def main():
 
     profile = tempfile.mkdtemp(prefix="astra-settings-")
     with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(profile, "log"), "wb")
     proc = subprocess.Popen(
         [FIREFOX, "-profile", profile, "-no-remote", "-headless",

@@ -62,11 +62,12 @@ import tempfile
 import threading
 import time
 
+import astra_env  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 IS_WIN = os.name == "nt"
-OBJ = "obj-astra-windows" if IS_WIN else "obj-astra-linux"
-EXE = "firefox.exe" if IS_WIN else "firefox"
+OBJ = astra_env.OBJDIR
 FIXTURES = os.path.join(HERE, "fixtures")
 
 # One URL per site so a cold profile really stays cold. News, video, apps.
@@ -864,7 +865,7 @@ def resolve_binary():
     env = os.environ.get("ASTRA_BINARY")
     if env:
         return env if os.path.exists(env) else None
-    cand = os.path.join(ROOT, "engine", OBJ, "dist", "bin", EXE)
+    cand = astra_env.BINARY
     if os.path.exists(cand):
         return cand
     return shutil.which("firefox")

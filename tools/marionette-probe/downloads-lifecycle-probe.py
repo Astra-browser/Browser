@@ -23,11 +23,12 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.environ.get(
-    "ASTRA_BINARY",
-    os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox"),
-)
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_MARIONETTE_PORT", "2844"))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/astra-downloads"
 os.makedirs(OUT, exist_ok=True)
@@ -204,7 +205,7 @@ def main():
     os.makedirs(downloads, exist_ok=True)
     with open(os.path.join(profile, "user.js"), "w") as prefs:
         prefs.write(
-            f'user_pref("marionette.port", {PORT});\n'
+            f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n'
             f'user_pref("browser.download.folderList", 2);\n'
             f'user_pref("browser.download.dir", "{downloads}");\n'
             'user_pref("browser.download.useDownloadDir", true);\n'

@@ -19,8 +19,10 @@ import sys
 import tempfile
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-FIREFOX = os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox")
+FIREFOX = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_FIRST_LOAD_PORT", "2841"))
 
 
@@ -139,7 +141,7 @@ def main():
         return 2
     profile = tempfile.mkdtemp(prefix="astra-first-load-")
     with open(os.path.join(profile, "user.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         f.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         f.write('user_pref("browser.aboutwelcome.enabled", false);\n')
         f.write('user_pref("media.autoplay.default", 0);\n')

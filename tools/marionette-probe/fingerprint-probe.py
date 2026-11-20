@@ -25,9 +25,14 @@ import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import sys
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 
 
 class H(BaseHTTPRequestHandler):
@@ -124,7 +129,7 @@ def hash_canvas(value):
 
 def run(name, port, extra_prefs):
     profile = tempfile.mkdtemp(prefix=f"astra-fp-{name}-")
-    lines = [f'user_pref("marionette.port", {port});']
+    lines = [f'user_pref("marionette.port", {port});\nuser_pref("astra.onboarding.force", "skip");']
     for key, value in extra_prefs.items():
         lines.append(f'user_pref("{key}", {json.dumps(value)});')
     with open(os.path.join(profile, "prefs.js"), "w") as handle:

@@ -14,8 +14,12 @@ Exit 0 PASS, 2 SKIP when the clip never reaches an active media controller.
 """
 import http.server, io, json, os, shutil, signal, socketserver, subprocess, sys, tempfile, threading, time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BIN = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+BIN = astra_env.BINARY
 CLIP = os.path.join(ROOT, "engine/layout/reftests/webm-video/frames.webm")
 PORT = 2968
 MPORT = 2969
@@ -75,7 +79,7 @@ class S(socketserver.TCPServer):
 httpd = S(("127.0.0.1", PORT), H)
 threading.Thread(target=httpd.serve_forever, daemon=True).start()
 open(os.path.join(profile, "user.js"), "w").write(
-    f'user_pref("marionette.port", {MPORT});\n'
+    f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n'
     'user_pref("browser.shell.checkDefaultBrowser", false);\n'
     'user_pref("media.autoplay.default", 0);\n'
     'user_pref("media.autoplay.blocking_policy", 0);\n'

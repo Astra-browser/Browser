@@ -28,10 +28,13 @@ P5="$ROOT/patches/ASTRA-0005-astra-blocker-hook.patch"
 SRC="$ROOT/blocker/engine"
 STAGED="$ENGINE_DIR/toolkit/components/astra_blocker_engine"
 HOST="$ROOT/overlay/astra/host/Blocker.sys.mjs"
-PASS=0; FAIL=0
+PASS=0; FAIL=0; SKIP=0
 
 ok()   { PASS=$((PASS+1)); echo "PASS: $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "FAIL: $1"; }
+# A prerequisite this checkout does not carry (gitignored reference clones) is
+# not a regression: say so and keep going. Never used for a real assertion.
+skip() { SKIP=$((SKIP+1)); echo "SKIP: $1"; }
 
 [ -d "$ENGINE_DIR" ] || { echo "FAIL: ENGINE_DIR missing: $ENGINE_DIR"; exit 2; }
 
@@ -40,6 +43,10 @@ echo "engine : $ENGINE_DIR"
 echo "source : $SRC"
 
 # 1. headers / order --------------------------------------------------------
+# Git-Bash gives every text file CRLF endings, so a `sed` capture keeps a
+# trailing \r, `sort` sorts on it and the series comparison can never match.
+# Strip \r where a value is captured or compared, not on the whole input: the
+# patch bodies must stay byte-identical for the diff checks below.
 IDS=""
 for p in "$P3" "$P4" "$P5"; do
   [ -f "$p" ] || { bad "missing patch $p"; continue; }
@@ -47,11 +54,16 @@ for p in "$P3" "$P4" "$P5"; do
   for f in Patch-Id Title Tier Upstream-Files Intent Risk Test Verified-On Removal-Plan; do
     echo "$hdr" | grep -qE "^$f: *[^ ]" || bad "$(basename "$p"): header '$f' missing/empty"
   done
-  id="$(echo "$hdr" | sed -nE 's/^Patch-Id: *//p')"
+  id="$(echo "$hdr" | sed -nE 's/^Patch-Id: *//p' | tr -d '\r')"
   case "$(basename "$p")" in "$id"-*|"$id".patch) ok "$(basename "$p"): filename matches $id";; *) bad "$(basename "$p"): filename/Patch-Id mismatch";; esac
   IDS="$IDS $id"
 done
-[ "$(echo "$IDS" | tr ' ' '\n' | grep . | tr '\n' ' ')" = "$(echo "$IDS" | tr ' ' '\n' | grep . | sort | tr '\n' ' ')" ] \
+# Git-Bash resolves `sort` to C:\WINDOWS\system32\sort.exe, which terminates
+# every line with CRLF, so the sorted side must be stripped *after* the sort as
+# well as before it. The IDs are also captured without their own \r above.
+ids_ordered="$(printf '%s\n' $IDS | tr -d '\r' | tr '\n' ' ')"
+ids_sorted="$(printf '%s\n' $IDS | tr -d '\r' | sort | tr -d '\r' | tr '\n' ' ')"
+[ "$ids_ordered" = "$ids_sorted" ] \
   && ok "patch series in Patch-Id order" || bad "patch series out of order:$IDS"
 
 # 2. ASTRA-0004 covers the component ---------------------------------------
@@ -102,8 +114,9 @@ print("PASS: ASTRA-0004 new-file bodies match blocker/engine")
 EOF
 
 # 4. dependency pin ---------------------------------------------------------
-PIN="$(grep -E '^adblock *= ' "$SRC/Cargo.toml" | sed -nE 's/.*= *"=([^"]+)".*/\1/p')"
-VENDORED="$(grep -E '^version *=' "$ENGINE_DIR/third_party/rust/adblock/Cargo.toml" 2>/dev/null | head -1 | sed -nE 's/.*"([^"]+)".*/\1/p')"
+# Both files can be checked out with CRLF on Windows; compare the value only.
+PIN="$(grep -E '^adblock *= ' "$SRC/Cargo.toml" | sed -nE 's/.*= *"=([^"]+)".*/\1/p' | tr -d '\r')"
+VENDORED="$(grep -E '^version *=' "$ENGINE_DIR/third_party/rust/adblock/Cargo.toml" 2>/dev/null | head -1 | sed -nE 's/.*"([^"]+)".*/\1/p' | tr -d '\r')"
 [ -n "$PIN" ] && [ "$PIN" = "$VENDORED" ] \
   && ok "adblock pin == vendored ($PIN)" || bad "adblock pin '$PIN' != vendored '$VENDORED'"
 
@@ -163,7 +176,12 @@ print(f"PASS: shipped catalog ({len(catalog['lists'])} lists) and resources ({le
 EOF
 
 # 7. data + parity ---------------------------------------------------------
-if "$PYTHON" "$ROOT/blocker/tools/sync.py" --check >/dev/null 2>&1; then
+# The reference clones (`folder_context/` in .gitignore) are what sync.py
+# compares against. A clean checkout does not carry them, so an absent clone
+# directory is a SKIP with its reason; a present one that disagrees is a FAIL.
+if [ ! -d "$ROOT/folder_context" ]; then
+  skip "sync.py --check (folder_context/ reference clones are not checked out)"
+elif "$PYTHON" "$ROOT/blocker/tools/sync.py" --check >/dev/null 2>&1; then
   ok "sync.py --check (catalog/resources match the reference clones)"
 else
   bad "sync.py --check failed (run $PYTHON blocker/tools/sync.py)"
@@ -177,5 +195,7 @@ fi
 rm -f /tmp/astra-blocker-test.$$
 
 echo
-echo "blocker-wiring-check: $([ "$FAIL" -eq 0 ] && echo PASS || echo FAIL) ($PASS passed, $FAIL failed)"
+summary="blocker-wiring-check: $([ "$FAIL" -eq 0 ] && echo PASS || echo FAIL) ($PASS passed, $FAIL failed"
+[ "$SKIP" -gt 0 ] && summary="$summary, $SKIP skipped by environment"
+echo "$summary)"
 exit $([ "$FAIL" -eq 0 ] && echo 0 || echo 1)

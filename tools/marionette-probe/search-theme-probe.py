@@ -13,8 +13,12 @@ Usage: python3 tools/marionette-probe/search-theme-probe.py [out-dir]
 import json, os, socket, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2872
-FIREFOX = os.path.abspath("engine/obj-astra-linux/dist/bin/firefox")
+FIREFOX = astra_env.BINARY
 OUT = sys.argv[1] if len(sys.argv) > 1 else "out/search-theme"
 
 
@@ -83,7 +87,7 @@ class M:
 
 def launch(profile, port):
     with open(os.path.join(profile, "prefs.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {port});\n')
+        f.write(f'user_pref("marionette.port", {port});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(profile, "log"), "wb")
     return subprocess.Popen(
         [FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access", "--marionette", "about:blank"],

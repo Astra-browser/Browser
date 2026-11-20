@@ -21,11 +21,12 @@ Exit: 0 PASS, 1 FAIL.
 import json, os, socket, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
-BINARY = "firefox.exe" if os.name == "nt" else "firefox"
-FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
-    ROOT, "engine", OBJDIR, "dist", "bin", BINARY)
+FIREFOX = astra_env.BINARY
 PORT = 2891
 HITS = {"ad": 0, "page": 0}
 
@@ -118,7 +119,7 @@ port = server.server_address[1]
 url = f"http://127.0.0.1:{port}/"
 profile = tempfile.mkdtemp(prefix="astra-blocker-live-")
 with open(os.path.join(profile, "prefs.js"), "w") as f:
-    f.write(f'user_pref("marionette.port", {PORT});\n')
+    f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
 log = open(os.path.join(profile, "log"), "wb")
 proc = subprocess.Popen(
     [FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access",

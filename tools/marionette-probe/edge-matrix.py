@@ -43,11 +43,13 @@ import threading
 import time
 import urllib.request
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine"))
-FIREFOX = os.environ.get(
-    "ASTRA_BINARY", os.path.join(ENGINE, "obj-astra-linux", "dist", "bin", "firefox")
-)
+ENGINE = astra_env.ENGINE
+FIREFOX = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_MARIONETTE_PORT", "2828"))
 HOST = "127.0.0.1"
 

@@ -81,12 +81,30 @@ the single-writer rule: the second window reports `owner: false` and refuses to
 save (`not_owner`), while the first keeps writing and survives the other
 window closing.
 
+**Open (2026-11-20):** the Windows run of `metadata_restore_probe.py` is red in
+phase B. `Metadata.restore` answers `{restored: true, moved: 0, pinned: 0}`, and
+the re-created tab stays in `space-1` and unpinned, although the SQLite row
+names `Work` and `pinned: true`. The durable side is correct, so the
+URL-to-tab re-homing window (a lazily restored tab may commit after
+`RESTORE_RETRY_MS`) is the suspect. Tracked as an open P2 in
+`docs/astra/E2E_AUDIT_2026-11-20.md`; the Linux run reported 74/74, so this is
+also a Windows difference.
+
 ## Known limits
 
+Current as of the 2026-11-20 full-product E2E audit
+(`docs/astra/E2E_AUDIT_2026-11-20.md`). The store and its probes are live; the
+limits below are the parts of the organisation that are not captured yet.
+
 - **Multi-window:** one window is the writer (see above). A second window's
-  spaces are not persisted yet; merging per-window organisation is P5b-3.
-- **Folders:** the UI's tab folders still live in `localStorage`; the store
-  schema and `SessionSnapshot.folders` are ready, but the host has no folder
-  model to capture yet.
+  spaces are not persisted yet, every window currently believes it is `win-1`,
+  and merging per-window organisation is still P5b-3 (E2E audit: open P1).
+- **Folders:** nothing creates a folder. The host has no folder model (no
+  `folder` in `overlay/astra/host/Tabs.sys.mjs`), no route or command produces
+  one, and the app no longer keeps tab folders in `localStorage` — the
+  `{ type: "folder" }` binding, `sidebar-model`'s folder branch and
+  `FolderRow.svelte` are render-only. `SessionSnapshot.folders` is ready and
+  validated; the capture side is what is missing. Open decision: build the host
+  folder model, or delete the binding and the row (E2E audit F7).
 - **Scroll/zoom/history:** `SessionStore` owns those; the snapshot carries only
   organisation.

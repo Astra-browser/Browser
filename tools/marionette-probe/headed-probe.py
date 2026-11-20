@@ -4,11 +4,12 @@ app frame really painted, dump UI state and capture the window.
 Usage:
   python3 tools/marionette-probe/headed-probe.py [profile-dir] [out-dir]
 
-Windows uses the packaged build at
-`engine/obj-astra-windows/dist/bin/firefox.exe` by default and captures the
-real top-level window through Win32 GDI (the compositor target, not the page
-bitmap). Linux keeps the existing Hyprland `grim` capture and the
-`obj-astra-linux` default. Pass `--binary` to point at another build.
+The default binary is the platform's dev build (`astra_env.BINARY`:
+`engine/obj-astra-windows` on Windows, `engine/obj-astra-linux` elsewhere);
+`ASTRA_BINARY` overrides it. Windows captures the real top-level window
+through Win32 GDI (the compositor target, not the page bitmap); Linux keeps
+the existing Hyprland `grim` capture. Pass `--binary` to point at another
+build.
 
 The probe fails when the app frame is missing, not booted, has no relay, logs
 Astra/Bridge/NS_ERROR console errors, or when the desktop capture is blank.
@@ -27,18 +28,15 @@ import tempfile
 import time
 import zlib
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST = "127.0.0.1"
 PORT = 2828
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 IS_WINDOWS = os.name == "nt"
-DEFAULT_BINARY = os.path.join(
-    ROOT,
-    "engine",
-    "obj-astra-windows" if IS_WINDOWS else "obj-astra-linux",
-    "dist",
-    "bin",
-    "firefox.exe" if IS_WINDOWS else "firefox",
-)
+DEFAULT_BINARY = astra_env.BINARY
 
 SNAP_JS = """return JSON.stringify((() => {
   const q = (s) => document.querySelector(s);
@@ -446,7 +444,7 @@ def main():
         return 2
 
     with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-        f.write(f'user_pref("marionette.port", {args.port});\n')
+        f.write(f'user_pref("marionette.port", {args.port});\nuser_pref("astra.onboarding.force", "skip");\n')
         f.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
 
     errlog_path = os.path.join(outdir, "stderr.log")

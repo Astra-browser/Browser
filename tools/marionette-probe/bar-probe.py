@@ -1,9 +1,13 @@
 import json, os, socket, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2871
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 
 
 class H(BaseHTTPRequestHandler):
@@ -67,7 +71,7 @@ def main():
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     profile = tempfile.mkdtemp(prefix="astra-bar-")
     with open(os.path.join(profile, "prefs.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(profile, "log"), "wb")
     proc = subprocess.Popen([FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access", "--marionette", "about:blank"],
                             cwd=os.path.dirname(FIREFOX), stdout=log, stderr=subprocess.STDOUT)

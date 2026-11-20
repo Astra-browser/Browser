@@ -16,8 +16,12 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2831
-FIREFOX = os.path.abspath("engine/obj-astra-linux/dist/bin/firefox")
+FIREFOX = astra_env.BINARY
 OUT = sys.argv[1] if len(sys.argv) > 1 else "out/ui-consistency"
 
 APP = "const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;"
@@ -129,7 +133,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     profile = tempfile.mkdtemp(prefix="astra-ui-")
     with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(profile, "log"), "wb")
     proc = subprocess.Popen(
         [

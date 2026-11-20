@@ -2001,3 +2001,50 @@ engine-side visit annotation. The packaged dev build was not rebuilt or
 restarted for this batch because a live instance was already running; run
 `tools/marionette-probe` after the next build to capture live evidence for the
 Spaces page.
+
+## Audit note: verification gates and stale counts (2026-11-20)
+
+> Added by the gate-repair lane of the full-product E2E audit. This is the only
+> edit to STATE.md in that lane; the rows above are untouched.
+
+- **Unrouted commands (corrects "200 of the 270" above):** the registry held
+  **278** command names with **141** unrouted when the audit was stamped, not
+  200 of 270 (279/140 a little later, as routes kept landing). The baseline is
+  now derived (`node tests/contract/wire_coverage.mjs --write-baseline`), and
+  the guard fails if a baseline entry is routed or is not a command, so the
+  number can be trusted even while it moves.
+- **Split / drag-drop / menus / downloads / media import** in that same bullet
+  are routed and shipped; the remaining unrouted names are account, Work,
+  page assist, voice, page styles, profiles-menu leftovers, updates and
+  onboarding, plus the dead `divider_*`/`*_menu_popup` sends.
+- **Sidebar width:** this file and `UI_REFRESH.md` still cite a 240 px expanded
+  column; the code floors it at 252 px (`MIN_EXPANDED_WIDTH`) and the legacy
+  probe measured 260 px. `utility-bar-probe.py` is unregistered until its
+  geometry assertions are rewritten.
+- **The gate:** `tools/perf/full-suite.sh` registers every `tests/contract/*.mjs`
+  (an unregistered suite fails), and `tools/perf/full-suite.ps1` runs the same
+  gates on Windows. Registered is not everything: stale probes are listed in
+  `out/audit/findings/probes.md`. `docs/astra/TESTING.md` states what a PASS
+  covers.
+- Details, before/after counts and changed files:
+  `out/audit/fixes/gates.md`.
+  Audit: `docs/astra/E2E_AUDIT_2026-11-20.md`.
+
+## Page dialogs — ASTRA-0020 (2026-11-20, audit fix lane)
+
+- A page's `alert`/`confirm`/`prompt`/`beforeunload` are drawn by the app, not
+  by `chrome://global/content/commonDialog.xhtml` (fuzz F1/F3, P1).
+  `patches/ASTRA-0020-astra-page-dialogs.patch` (engine actor),
+  `overlay/astra/host/PageDialogs.sys.mjs` (controller), the window hook in
+  `Boot.sys.mjs`, `PageDialogPrompt.svelte`, and the host route
+  `page_dialog_answer` + event `page-dialog-prompt-changed`.
+- **Generated-binding gap:** `bindings.ts`/`proto.ts` have no generator in this
+  checkout, so the one command and one event were added by hand, mirroring the
+  surrounding entries: `pageDialogAnswer(...)` in `commands`,
+  `pageDialogPromptChanged` in `events`, `PageDialogKind` /
+  `PageDialogPromptChanged` types, and `page_dialog_answer` /
+  `page-dialog-prompt-changed` in `proto.ts` (counts updated). Replace them
+  with `astra-proto` output when the generator lands.
+- Verification: `page_dialogs` 54, `dialogs_events` 104, `wire_coverage` 69
+  (baseline regenerated), `boot_model` 31; patch applies with
+  `git -C engine apply --check`. Live: `out/audit/fixes/page-dialogs.md`.

@@ -33,12 +33,12 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
-BINARY = "firefox.exe" if os.name == "nt" else "firefox"
-FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
-    ROOT, "engine", OBJDIR, "dist", "bin", BINARY
-)
+FIREFOX = astra_env.BINARY
 PORT = 2896
 OUT = os.path.join(ROOT, "out", "superadblock")
 SITE = "https://superadblocktest.com/?run=1"
@@ -165,7 +165,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     profile = tempfile.mkdtemp(prefix="astra-superadblock-")
     with open(os.path.join(profile, "prefs.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         f.write('user_pref("media.volume_scale", "0.0");\n')
     log = open(os.path.join(profile, "log"), "wb")
     proc = subprocess.Popen(

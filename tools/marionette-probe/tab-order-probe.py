@@ -16,11 +16,12 @@ import sys
 import tempfile
 import time
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.environ.get(
-    "ASTRA_BINARY",
-    os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox"),
-)
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_TAB_ORDER_PORT", "2848"))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/astra-tab-order"
 os.makedirs(OUT, exist_ok=True)
@@ -108,7 +109,7 @@ def check(name, cond, detail=""):
 def main():
     profile = tempfile.mkdtemp(prefix="astra-tab-order-", dir=os.environ.get("TMPDIR", "/tmp/opencode"))
     with open(os.path.join(profile, "user.js"), "w") as prefs:
-        prefs.write(f'user_pref("marionette.port", {PORT});\n')
+        prefs.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(OUT, "browser.log"), "wb")
     process = subprocess.Popen(
         [FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access",

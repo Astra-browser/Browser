@@ -30,7 +30,7 @@ def one(prealloc, port, outroot):
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(profile)
     with open(os.path.join(profile, "user.js"), "w", encoding="utf-8") as fh:
-        fh.write(f'user_pref("marionette.port", {port});\n')
+        fh.write(f'user_pref("marionette.port", {port});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("browser.aboutwelcome.enabled", false);\n')
         fh.write('user_pref("datareporting.policy.dataSubmissionEnabled", false);\n')

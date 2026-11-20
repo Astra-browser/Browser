@@ -24,9 +24,13 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2837
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_BINARY = os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox")
+DEFAULT_BINARY = astra_env.BINARY
 FIREFOX = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_BINARY
 
 with open(os.path.join(ROOT, "branding", "astra.toml"), encoding="utf-8") as f:
@@ -90,7 +94,7 @@ def main():
 
     profile = tempfile.mkdtemp(prefix="astra-version-")
     with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log = open(os.path.join(profile, "log"), "wb")
     proc = subprocess.Popen(
         [

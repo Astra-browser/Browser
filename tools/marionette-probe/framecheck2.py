@@ -11,14 +11,19 @@ import socket
 import subprocess
 import tempfile
 import time
+import sys
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
 
 PORT = 2839
-FIREFOX = os.path.abspath("engine/obj-astra-linux/dist/bin/firefox")
+FIREFOX = astra_env.BINARY
 OUT = "out/headed-frames2"
 
 profile = tempfile.mkdtemp(prefix="astra-fc2-")
 with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-    f.write(f'user_pref("marionette.port", {PORT});\n')
+    f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
 log = open(os.path.join(profile, "log"), "wb")
 shutil.rmtree(OUT, ignore_errors=True)
 os.makedirs(OUT, exist_ok=True)

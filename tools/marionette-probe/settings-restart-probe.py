@@ -23,8 +23,12 @@ import tempfile
 import threading
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2838
-FIREFOX = os.path.abspath("engine/obj-astra-linux/dist/bin/firefox")
+FIREFOX = astra_env.BINARY
 OUT = sys.argv[1] if len(sys.argv) > 1 else "out/settings-restart"
 
 APP = "const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;"
@@ -194,7 +198,7 @@ def main():
     start_url = f"http://127.0.0.1:{server.server_address[1]}/start.html"
     profile = tempfile.mkdtemp(prefix="astra-restart-")
     with open(os.path.join(profile, "prefs.js"), "w", encoding="utf-8") as f:
-        f.write(f'user_pref("marionette.port", {PORT});\n')
+        f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
 
     results = {"checks": [], "pass": False}
 

@@ -29,9 +29,11 @@ import sys
 import tempfile
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 MPORT = int(os.environ.get("ASTRA_CORPUS_MARIONETTE", "2923"))
 OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, "out", "extension-corpus")
 CORPUS = os.path.join(OUT, "corpus.json")
@@ -214,7 +216,7 @@ def launch(profile):
 def run_batch(batch):
     profile = tempfile.mkdtemp(prefix="astra-corpus-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("browser.startup.page", 0);\n')
         fh.write('user_pref("browser.startup.homepage", "about:blank");\n')

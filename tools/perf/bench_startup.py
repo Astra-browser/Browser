@@ -41,7 +41,7 @@ def one_startup(binary, profile, port, fresh):
     # profile (same mechanism geckodriver uses). Rewrite it per run so
     # parallel/sequential runs never collide on the default 2828.
     with open(os.path.join(profile, "user.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {port});\n')
+        f.write(f'user_pref("marionette.port", {port});\nuser_pref("astra.onboarding.force", "skip");\n')
         f.write('user_pref("marionette.enabled", true);\n')
     env = dict(os.environ)
     env.update(ENV)

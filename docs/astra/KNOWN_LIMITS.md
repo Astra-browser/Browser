@@ -3,25 +3,46 @@
 Recorded so the next phase does not rediscover them as regressions. Each item
 has an owner phase; none is a silent fallback.
 
+> **Status 2026-11-20.** This file is kept as the 2026-11-04 record; the rows
+> marked **resolved** below were re-checked against the code and the running
+> build in the full-product E2E audit, and the file's original wording is left
+> in place so the history stays readable. Open items are marked **open**. Read
+> `docs/astra/E2E_AUDIT_2026-11-20.md` for the current defect list (it, not this
+> file, is the "do not re-report" list for anything after 2026-11-04). The
+> probe-level drift behind the old rows is in `out/audit/findings/probes.md`.
+
 ## Native surfaces still using Firefox UI
 
 | Surface | Today | Next |
 |---|---|---|
-| Save-password doorhanger after HTTP auth | `LoginManagerAuthPrompter` still shows Firefox's save prompt | decide with `PASSWORD_DECISION.md` (Option B: signon off) |
-| Print | `PrintUtils.startPrintWindow` (Firefox print window) | Astra print UI |
-| Tab context menu, split, drag/drop, menu popups | the app calls `tab_menu_popup`, `chrome_menu_popup`, `tabs_split`, `tab_drop`, ... which are unrouted | P10: implement the Astra menu/split or remove the controls |
-| Extension toolbar action buttons | `extension_action_*` unrouted; actions list is empty | P9b |
-| Certificate error page | detected from the error-page flag; the engine page can flash before the app pane replaces it | optional `LoadURIDelegate` actor |
+| Save-password doorhanger after HTTP auth | **open** — `LoginManagerAuthPrompter` still shows Firefox's save prompt | decide with `PASSWORD_DECISION.md` (Option B: signon off) |
+| Print | **open** — `PrintUtils.startPrintWindow` (Firefox print window); no Astra print surface exists | Astra print UI (E2E audit, open P2) |
+| Tab context menu, split, drag/drop, menu popups | **resolved 2026-11-20** — the app draws its own menus (`tab-menu.ts`, `.shell-menu`, 0 native XUL popups), split is native `addTabSplitView` panes with a host resizer, and `tabs_split`/`tab_drop` are routed. The old sentence ("the app calls ... which are unrouted") describes the 2026-11-04 build | keep dead leftovers out: `tab_menu_popup`, `chrome_menu_popup`, `divider_*` are in the wire baseline as known-unrouted |
+| Extension toolbar action buttons | **resolved 2026-11-20** — `extension_action_invoke` is routed, the action list is populated, and `webext_action_probe.py` is registered in the suite | — |
+| Certificate error page | **open** — detected from the error-page flag; the engine page can flash before the app pane replaces it | optional `LoadURIDelegate` actor |
 
 ## Features with no backend yet
 
-Popup blocking and external-protocol cards have no producer yet, so the
-PageRequestCard only appears for HTTP auth; `Tabs.answerPageRequest` is wired
-and refuses an answer for a card that is not on screen. `Work` author/query/execute, human takeover, model providers, accounts, voice,
-page assist, browser import/export, updates, profiles, downloads
-manager, resource media, notes `reveal`, and the tasks/notes Rust store. The
-wiring inventory is in the audit report; the next phase (P8/P10) owns them.
-`unknown_command` for any of these is a product gap, not a deferral to ship.
+The 2026-11-04 list here is out of date in both directions. Re-checked
+2026-11-20:
+
+- **Shipped since:** browser import/export (`Migration`), downloads manager
+  (`Downloads`), profiles (`Profiles`), notes (`Notes`, live probe PASS),
+  resource media and media import (`Resources`, `media_player`/`media_import`),
+  time/focus (`Time`), tasks (`Resources`). Updates has a host module too
+  (`System.updateStatus`), but it answers `unavailable` because the build ships
+  `--disable-updater`; `update_relaunch`/`update_highlights` are still unrouted,
+  so "restart to update" will be a silent no-op the day an updater lands.
+- **Still behind an off build flag, by decision (D-48):** Work, the AI/assist
+  and voice surfaces, page styles, and the account/plan pages. Their commands
+  are in the wire baseline as known-unrouted, not unknown.
+- **Still genuinely missing:** popup-blocking and external-protocol cards (the
+  card component exists, no producer raises it), the first-run onboarding page
+  (built but neither staged nor opened), the window-close handshake
+  (`astra:resource-close` has no producer), and print.
+
+`unknown_command` for a flag-off surface is expected; for a shipped surface it
+is a product gap. The rule did not change — the list of shipped surfaces did.
 
 ## Protected content (DRM / Widevine)
 
@@ -56,8 +77,13 @@ wiring inventory is in the audit report; the next phase (P8/P10) owns them.
 - **Multi-window organisation:** one window is the writer (`Metadata` owner);
   a second window's spaces/pins are not merged into the store yet (P5b-3). The
   owner is released on close and the next window takes over.
-- **Folders/sync:** the UI's tab folders are `localStorage`; the Rust
-  `SessionSnapshot.folders` is ready but the host has no folder model.
+- **Folders (corrected 2026-11-20):** there is no folder store anywhere. The
+  app no longer keeps tab folders in `localStorage`, the host emits only
+  `{type: "tab"}` sidebar nodes and has no folder method, and no route or
+  command creates one — `FolderRow.svelte` and the `{type: "folder"}` binding
+  are render-only. The Rust `SessionSnapshot.folders` is ready and validated;
+  the capture side is missing. Open decision: implement the host folder model
+  or remove the binding and the row (E2E audit F7).
 - **Page source:** `PageSource` is real but the shell driver is still the
   privileged `fetch` (fresh GET, not the tab's cached document). Private
   windows are refused. Native view-source is P8-1b.

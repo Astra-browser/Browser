@@ -46,9 +46,9 @@ from profiler import (  # noqa: E402
     Sampler, system_cpu, system_mem, loadavg, find_intel_card, _read, _int, pct,
 )
 
-ASTRA_BIN = os.environ.get(
-    "ASTRA_BINARY", os.path.join(ROOT, "engine", "obj-astra-linux", "dist", "bin", "firefox")
-)
+import astra_env  # noqa: E402
+
+ASTRA_BIN = astra_env.BINARY
 STOCK_BIN = os.environ.get("STOCK_FIREFOX", "/usr/bin/firefox")
 FIXTURES = os.path.join(HERE, "fixtures")
 OBSERVATIONS = os.path.join(ROOT, "docs", "performance", "OBSERVATIONS.md")

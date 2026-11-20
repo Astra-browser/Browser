@@ -20,9 +20,11 @@ import tempfile
 import threading
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_SOURCE_PORT", "2897"))
 MPORT = int(os.environ.get("ASTRA_SOURCE_MARIONETTE", "2898"))
 MARKER = "ASTRA-SOURCE-MARKER-7f3c"
@@ -87,7 +89,7 @@ def main():
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     profile = tempfile.mkdtemp(prefix="astra-src-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
     log = open(os.path.join(profile, "browser.log"), "wb")
     proc = subprocess.Popen(

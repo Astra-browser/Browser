@@ -16,8 +16,12 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = 2828
 PIN = "123456"
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/passkeys"

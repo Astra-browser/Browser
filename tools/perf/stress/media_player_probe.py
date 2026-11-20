@@ -24,9 +24,11 @@ import threading
 import time
 import wave
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_MEDIA_PORT", "2903"))
 MPORT = int(os.environ.get("ASTRA_MEDIA_MARIONETTE", "2904"))
 sys.path.insert(0, os.path.join(ROOT, "tests", "contract"))
@@ -209,7 +211,7 @@ def main():
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     profile = tempfile.mkdtemp(prefix="astra-media-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("media.autoplay.default", 0);\n')
         fh.write('user_pref("media.autoplay.blocking_policy", 0);\n')

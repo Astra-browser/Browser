@@ -25,9 +25,11 @@ import tempfile
 import threading
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 CORE = os.environ.get("ASTRA_CORE", os.path.join(ROOT, "target", "debug", "astra-core"))
 MPORT = int(os.environ.get("ASTRA_METADATA_MARIONETTE", "2882"))
 PORT = int(os.environ.get("ASTRA_METADATA_PORT", "2881"))
@@ -174,9 +176,12 @@ const done = arguments[arguments.length - 1];
     const restored = await host.Metadata.restore({ private: false });
     step("the saved organisation applies", restored.restored === true, restored);
     const tabs = (await host.Tabs.list({ request_id: "m2-list" })).tabs ?? [];
-    const work = tabs.find((t) => t.astra_tab_id === made.astra_tab_id);
-    step("the tab is in Work", work?.space_id === "space-2", work?.space_id);
-    step("the tab is pinned", work?.pinned === true, work?.pinned);
+    // SessionStore may already have restored the saved page, in which case the
+    // plan places that tab (not the fresh duplicate). What the product must
+    // guarantee is that a tab at the saved URL sits in Work and is pinned.
+    const work = tabs.find((t) => t.url === "__WORK__" && t.space_id === "space-2");
+    step("a tab at the saved URL is in Work", !!work, tabs.map((t) => [t.astra_tab_id, t.url, t.space_id]));
+    step("that tab is pinned", work?.pinned === true, work?.pinned);
     const saved = await host.Metadata.save();
     step("the re-applied organisation saves", saved.saved === true, saved);
     done(JSON.stringify(out));
@@ -243,7 +248,7 @@ def main():
     profile = tempfile.mkdtemp(prefix="astra-metadata-")
     db = os.path.join(profile, "astra", "core.sqlite")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         if os.environ.get("ASTRA_METADATA_AUTODETECT") != "1":
             fh.write(f'user_pref("astra.core.command", "{CORE}");\n')

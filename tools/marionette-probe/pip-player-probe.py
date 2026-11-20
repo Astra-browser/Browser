@@ -13,15 +13,19 @@ Exit 0 PASS, 1 FAIL, 2 SKIP when the window cannot be opened.
 """
 import json, os, shutil, signal, subprocess, sys, tempfile, time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BIN = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+BIN = astra_env.BINARY
 MPORT = 2954
 sys.path.insert(0, os.path.join(ROOT, "tests/contract"))
 import load_state as L
 
 profile = tempfile.mkdtemp(prefix='astra-pip-live-')
 open(os.path.join(profile,'user.js'),'w').write(
-    f'user_pref("marionette.port", {MPORT});\n'
+    f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n'
     'user_pref("browser.shell.checkDefaultBrowser", false);\n'
     'user_pref("media.videocontrols.picture-in-picture.enabled", true);\n'
 )

@@ -22,8 +22,12 @@ Exit: 0 when every page loaded and YouTube played; 1 otherwise.
 """
 import json, os, socket, subprocess, tempfile, time, sys
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = 2911
 
 SITES = [
@@ -153,7 +157,7 @@ return JSON.stringify({
 def main():
     profile = tempfile.mkdtemp(prefix="astra-real-sites-")
     prefs = [
-        f'user_pref("marionette.port", {PORT});',
+        f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");',
         'user_pref("media.volume_scale", "0.0");',
         'user_pref("media.autoplay.default", 5);',
         'user_pref("media.autoplay.blocking_policy", 2);',

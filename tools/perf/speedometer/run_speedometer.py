@@ -233,7 +233,7 @@ def main():
 
     profile = tempfile.mkdtemp(prefix="astra-speedometer-")
     with open(os.path.join(profile, "prefs.js"), "w") as f:
-        f.write(f'user_pref("marionette.port", {args.port});\n')
+        f.write(f'user_pref("marionette.port", {args.port});\nuser_pref("astra.onboarding.force", "skip");\n')
         f.write('user_pref("media.volume_scale", "0.0");\n')
         # Keep the benchmark page in front and prevent tab unloading.
         f.write('user_pref("browser.tabs.unloadOnLowMemory", false);\n')

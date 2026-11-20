@@ -21,8 +21,12 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = 2828
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/astra-fix-probe"
 os.makedirs(OUT, exist_ok=True)
@@ -115,7 +119,7 @@ log = open(os.path.join(OUT, "stderr.log"), "wb")
 proc = subprocess.Popen(
     [FIREFOX, "-profile", profile, "-no-remote", "-remote-allow-system-access",
      "--marionette", "about:blank"],
-    cwd=os.path.join(ROOT, "engine/obj-astra-linux/dist/bin"),
+    cwd=astra_env.BIN_DIR,
     stdout=log, stderr=subprocess.STDOUT)
 
 m = None
@@ -282,7 +286,7 @@ check("the sleeping-tabs driver is running", perf.get("status", {}).get("running
 
 # --- externally handed link ----------------------------------------------
 subprocess.run([FIREFOX, "-profile", profile, "-url", site + "/external-link"],
-               cwd=os.path.join(ROOT, "engine/obj-astra-linux/dist/bin"),
+               cwd=astra_env.BIN_DIR,
                capture_output=True, timeout=30)
 time.sleep(4)
 handoff = m.script("""

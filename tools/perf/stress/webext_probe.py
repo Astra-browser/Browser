@@ -18,9 +18,11 @@ import tempfile
 import time
 import zipfile
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 MPORT = int(os.environ.get("ASTRA_WEBEXT_MARIONETTE", "2909"))
 ADDON_ID = "probe@astra.test"
 sys.path.insert(0, os.path.join(ROOT, "tests", "contract"))
@@ -57,6 +59,21 @@ const done = arguments[arguments.length - 1];
     const { AddonManager } = ChromeUtils.importESModule("resource://gre/modules/AddonManager.sys.mjs");
     const { FileUtils } = ChromeUtils.importESModule("resource://gre/modules/FileUtils.sys.mjs");
     await AddonManager.readyPromise;
+
+    // A release-mode build (`--enable-release`) ignores
+    // `xpinstall.signatures.required` and refuses an unsigned XPI with
+    // ERROR_SIGNEDSTATE_REQUIRED. That is the build's posture, not a defect in
+    // the install flow; say SKIP instead of reporting a product failure.
+    try {
+      const probeFile = new FileUtils.File("__XPI__");
+      const probeInstall = await AddonManager.getInstallForFile(probeFile, null);
+      if (probeInstall && probeInstall.error === AddonManager.ERROR_SIGNEDSTATE_REQUIRED) {
+        done(JSON.stringify({ skip: "unsigned XPI refused by a release-mode build (signatures required)" }));
+        return;
+      }
+    } catch (e) {
+      // Fall through: a file that cannot be read at all is a real failure.
+    }
 
     let review = null;
     try {
@@ -154,7 +171,7 @@ def main():
     profile = tempfile.mkdtemp(prefix="astra-webext-")
     xpi = build_xpi(profile)
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("xpinstall.signatures.required", false);\n')
         fh.write('user_pref("extensions.autoDisableScopes", 0);\n')
@@ -174,7 +191,10 @@ def main():
         m.cmd("WebDriver:SetTimeouts", {"script": 240000, "implicit": 0, "pageLoad": 120000})
         m.cmd("Marionette:SetContext", {"value": "chrome"})
         time.sleep(4)
-        script = RUN.replace("__XPI__", xpi).replace("__ID__", ADDON_ID)
+        # The path goes into a JS string literal: on Windows a raw backslash
+        # path is an escape sequence (`\U` → `U`), so the probe used to open a
+        # path that does not exist and then blame the install flow.
+        script = RUN.replace('"__XPI__"', json.dumps(xpi)).replace("__ID__", ADDON_ID)
         out = json.loads(m.execute_async(script))
     finally:
         try:
@@ -191,6 +211,9 @@ def main():
         else:
             print(f"profile kept: {profile}", file=sys.stderr)
     print(json.dumps(out, indent=2))
+    if out.get("skip"):
+        print(f"SKIP {out['skip']}", file=sys.stderr)
+        return 2
     return 0 if out.get("steps") and all(s["ok"] for s in out["steps"]) else 1
 
 

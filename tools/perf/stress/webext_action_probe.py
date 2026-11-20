@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import json, os, shutil, signal, subprocess, sys, tempfile, time, zipfile
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.path.join(ROOT, "engine", "obj-astra-linux")
+ENGINE = astra_env.ENGINE
 BIN = os.path.join(ENGINE, "dist", "bin", "firefox")
 MPORT = 2911
 ADDON_ID = "action-probe@astra.test"
@@ -127,7 +129,7 @@ def main():
     profile = tempfile.mkdtemp(prefix="astra-action-")
     xpi = build_xpi(profile)
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("xpinstall.signatures.required", false);\n')
         fh.write('user_pref("extensions.autoDisableScopes", 0);\n')

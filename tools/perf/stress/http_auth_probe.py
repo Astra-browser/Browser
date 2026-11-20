@@ -22,9 +22,11 @@ import tempfile
 import threading
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_AUTH_PORT", "2899"))
 MPORT = int(os.environ.get("ASTRA_AUTH_MARIONETTE", "2900"))
 USER, PASSWORD = "astra", "s3cret"
@@ -194,7 +196,7 @@ def main():
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     profile = tempfile.mkdtemp(prefix="astra-auth-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("signon.rememberSignons", false);\n')
     log = open(os.path.join(profile, "browser.log"), "wb")

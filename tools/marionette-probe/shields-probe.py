@@ -23,8 +23,12 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = 2897
 STATE = {"hits": {}, "paths": [], "lang": []}
 
@@ -157,7 +161,7 @@ base = f"http://127.0.0.1.nip.io:{port}"
 
 profile = tempfile.mkdtemp(prefix="astra-shields-")
 with open(os.path.join(profile, "prefs.js"), "w") as f:
-    f.write(f'user_pref("marionette.port", {PORT});\n')
+    f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     f.write('user_pref("browser.cache.disk.enable", false);\n')
     f.write('user_pref("browser.cache.memory.enable", false);\n')
     f.write('user_pref("browser.cache.offline.enable", false);\n')

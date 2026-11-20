@@ -24,8 +24,12 @@ import sys
 import tempfile
 import time
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox")
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = 2893
 OUT = os.path.join(ROOT, "out", "adblock-benchmark")
 TURTLECUTE = "https://adblock.turtlecute.org/"
@@ -106,7 +110,7 @@ def wait(fn, timeout=90, step=0.5):
 os.makedirs(OUT, exist_ok=True)
 profile = tempfile.mkdtemp(prefix="astra-adbench-")
 with open(os.path.join(profile, "prefs.js"), "w") as f:
-    f.write(f'user_pref("marionette.port", {PORT});\n')
+    f.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     # Keep the benchmark deterministic and silent.
     f.write('user_pref("media.volume_scale", "0.0");\n')
     f.write('user_pref("media.autoplay.default", 0);\n')

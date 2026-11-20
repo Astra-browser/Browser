@@ -18,12 +18,13 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2828
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OBJDIR = "obj-astra-windows" if os.name == "nt" else "obj-astra-linux"
-BINARY = "firefox.exe" if os.name == "nt" else "firefox"
-FIREFOX = os.environ.get("ASTRA_BINARY") or os.path.join(
-    ROOT, "engine", OBJDIR, "dist", "bin", BINARY)
+FIREFOX = astra_env.BINARY
 APP = "const f=document.querySelector('iframe[data-astra-app-frame]');const d=f&&f.contentDocument;"
 
 

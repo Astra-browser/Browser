@@ -23,9 +23,11 @@ import tempfile
 import threading
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 MPORT = int(os.environ.get("ASTRA_OWNER_MARIONETTE", "2892"))
 PORT = int(os.environ.get("ASTRA_OWNER_PORT", "2893"))
 WORK = f"http://127.0.0.1:{PORT}/work.html"
@@ -124,7 +126,7 @@ def main():
     profile = tempfile.mkdtemp(prefix="astra-owner-")
     db = os.path.join(profile, "astra", "core.sqlite")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
     log = open(os.path.join(profile, "browser.log"), "wb")
     proc = subprocess.Popen(

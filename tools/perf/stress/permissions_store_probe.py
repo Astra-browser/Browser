@@ -12,9 +12,11 @@ import sys
 import tempfile
 import time
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.environ.get("ASTRA_ENGINE", os.path.join(ROOT, "engine", "obj-astra-linux"))
-BIN = os.environ.get("ASTRA_BINARY", os.path.join(ENGINE, "dist", "bin", "firefox"))
+ENGINE = astra_env.ENGINE
+BIN = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_PERM_PORT", "2860"))
 sys.path.insert(0, os.path.join(ROOT, "tests", "contract"))
 import load_state as L  # noqa: E402
@@ -62,7 +64,7 @@ RUN = """const done = arguments[arguments.length - 1];
 def main():
     profile = tempfile.mkdtemp(prefix="astra-perm-")
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {PORT});\n')
+        fh.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
     log = open(os.path.join(profile, "browser.log"), "wb")
     proc = subprocess.Popen(

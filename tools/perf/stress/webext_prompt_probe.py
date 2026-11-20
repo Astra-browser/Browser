@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import functools, http.server, json, os, shutil, signal, subprocess, sys, tempfile, threading, time, zipfile
 
+import astra_env  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-ENGINE = os.path.join(ROOT, "engine", "obj-astra-linux")
+ENGINE = astra_env.ENGINE
 BIN = os.path.join(ENGINE, "dist", "bin", "firefox")
 MPORT = 2912
 ADDON_ID = "prompt-probe@astra.test"
@@ -99,7 +101,7 @@ def main():
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     with open(os.path.join(profile, "user.js"), "w") as fh:
-        fh.write(f'user_pref("marionette.port", {MPORT});\n')
+        fh.write(f'user_pref("marionette.port", {MPORT});\nuser_pref("astra.onboarding.force", "skip");\n')
         fh.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
         fh.write('user_pref("xpinstall.signatures.required", false);\n')
         fh.write('user_pref("extensions.autoDisableScopes", 0);\n')

@@ -16,11 +16,12 @@ import sys
 import tempfile
 import time
 
-ROOT = "/home/rem/Projects/Astra"
-FIREFOX = os.environ.get(
-    "ASTRA_BINARY",
-    os.path.join(ROOT, "engine/obj-astra-linux/dist/bin/firefox"),
-)
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
+ROOT = astra_env.ROOT
+FIREFOX = astra_env.BINARY
 PORT = int(os.environ.get("ASTRA_CHURN_PORT", "2850"))
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/astra-tabs-churn"
 os.makedirs(OUT, exist_ok=True)
@@ -126,7 +127,7 @@ def snapshot(session, window_id):
 def main():
     profile = tempfile.mkdtemp(prefix="astra-churn-", dir=os.environ.get("TMPDIR", "/tmp/opencode"))
     with open(os.path.join(profile, "user.js"), "w") as prefs:
-        prefs.write(f'user_pref("marionette.port", {PORT});\n')
+        prefs.write(f'user_pref("marionette.port", {PORT});\nuser_pref("astra.onboarding.force", "skip");\n')
     log_path = os.path.join(OUT, "browser.log")
     log = open(log_path, "wb")
     process = subprocess.Popen(

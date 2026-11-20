@@ -14,8 +14,12 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
+import astra_env  # noqa: E402
+
 HOST, PORT = "127.0.0.1", 2828
-FIREFOX = "engine/obj-astra-linux/dist/bin/firefox"
+FIREFOX = astra_env.BINARY
 
 CLICK_WORK = """return JSON.stringify((() => {
   const frame = document.querySelector('iframe[data-astra-app-frame]');
@@ -88,7 +92,7 @@ def main():
     proc = subprocess.Popen(
         [os.path.abspath(FIREFOX), "-profile", os.path.abspath(profile),
          "-no-remote", "-remote-allow-system-access", "--marionette", "about:blank"],
-        cwd=os.path.join(os.getcwd(), "engine/obj-astra-linux/dist/bin"),
+        cwd=astra_env.BIN_DIR,
         stdout=errlog, stderr=subprocess.STDOUT)
 
     m = None
