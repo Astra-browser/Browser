@@ -975,13 +975,38 @@ function splitViewsIn(binding) {
 
 /** A background tab can still be about:blank; a split must show its page. */
 function ensurePaneLoaded(binding, tab, attempt = 0) {
+  if (!tab) return;
   const id = idOf(binding, tab);
   const url = id ? __tabsState()?.tabs?.get(id)?.url : "";
-  if (!tab || !/^https?:/u.test(url ?? "")) return;
   const blank = () => {
-    const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
-    return !spec || spec === "about:blank" || spec.startsWith("chrome://browser/content/blanktab");
+    try {
+      const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
+      return !spec || spec === "about:blank" || spec.startsWith("chrome://browser/content/blanktab");
+    } catch {
+      return false;
+    }
   };
+  const retry = (limit) => {
+    if (attempt >= limit) return;
+    try {
+      setTimeout(() => {
+        try {
+          if (tab.linkedBrowser) ensurePaneLoaded(binding, tab, attempt + 1);
+        } catch {
+          // The tab closed while waiting.
+        }
+      }, 120 * (attempt + 1));
+    } catch {
+      // No timer available in this environment.
+    }
+  };
+  // A tab created for the split is adopted a turn or two later; until then it
+  // has no Astra id and no URL to load, and giving up here is what left a pane
+  // showing about:blank.
+  if (!/^https?:/u.test(url ?? "")) {
+    retry(10);
+    return;
+  }
   try {
     if (!blank()) return;
     tab.linkedBrowser?.fixupAndLoadURIString(url, {
@@ -994,18 +1019,7 @@ function ensurePaneLoaded(binding, tab, attempt = 0) {
   // created and be dropped, leaving the pane blank. Retry a few times, but
   // only while the document is still blank: a page the person stopped or the
   // engine replaced is not ours to reload.
-  if (attempt >= 4) return;
-  try {
-    setTimeout(() => {
-      try {
-        if (tab.linkedBrowser && blank()) ensurePaneLoaded(binding, tab, attempt + 1);
-      } catch {
-        // The tab closed while waiting.
-      }
-    }, 120 * (attempt + 1));
-  } catch {
-    // No timer available in this environment.
-  }
+  if (blank()) retry(6);
 }
 
 function addToSplit(binding, tabs) {
