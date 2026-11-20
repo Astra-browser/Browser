@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.parse
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
@@ -69,8 +70,9 @@ NEWTAB_SEARCH = js("""
 NEWTAB_ROW = js("""
   if (!d) return null;
   const list = d.querySelector('#newtab-search-results');
-  const text = list ? (list.textContent || '').replace(/\s+/g, ' ').trim() : '';
-  return JSON.stringify({ row: /Search DuckDuckGo/.test(text), text: text.slice(0, 120) });
+  const text = list ? (list.textContent || '').replace(/\\s+/g, ' ').trim() : '';
+  const label = window.__probeLabel || 'Search';
+  return JSON.stringify({ row: text.includes(label), text: text.slice(0, 120), label });
 """)
 
 NEWTAB_RUN = js("""
@@ -152,6 +154,39 @@ def main():
     time.sleep(20)
 
     failures = []
+    # The probe must test the engine the product is configured with, not the
+    # one it shipped with when the probe was written.
+    engine = (
+        m.js(
+            'try { return Services.prefs.getStringPref("astra.settings.search.engine", "google"); }'
+            ' catch (e) { return "google"; }'
+        )
+        or "google"
+    ).strip().lower()
+    ENGINE_HOSTS = {
+        "google": "google.com",
+        "duckduckgo": "duckduckgo.com",
+        "bing": "bing.com",
+        "brave": "search.brave.com",
+        "startpage": "startpage.com",
+        "ecosia": "ecosia.org",
+    }
+    ENGINE_LABELS = {
+        "google": "Search Google",
+        "duckduckgo": "Search DuckDuckGo",
+        "bing": "Search Bing",
+        "brave": "Search Brave",
+        "startpage": "Search Startpage",
+        "ecosia": "Search Ecosia",
+    }
+    host = ENGINE_HOSTS.get(engine, engine)
+    label = ENGINE_LABELS.get(engine, "Search " + engine)
+    print("engine:", engine, host)
+    m.js(
+        "window.__probeLabel = %s; window.__probeHost = %s; return true;"
+        % (json.dumps(label), json.dumps(host))
+    )
+
     print("field before:", m.js(FIELD))
     print("submit:", m.js(TYPE_AND_SUBMIT))
     time.sleep(3)
@@ -165,14 +200,25 @@ def main():
     row = m.js(TAB_URL)
     print("field after:", field)
     print("tab row:", row)
-    if not field or "duckduckgo.com" not in field:
+    if not field or host not in field:
         failures.append("the address field did not resolve to a search URL")
-    if "q=hello%20world" not in (field or ""):
+    shown = urllib.parse.unquote_plus(field or "")
+    if "hello" not in shown or "world" not in shown:
         failures.append("the query was not encoded into the URL")
 
-    # New Tab: the same words must offer a web search and run it.
-    print("newtab.reload:", m.js("return (() => {" + "const f=document.querySelector('iframe[data-astra-app-frame]');f.contentWindow.location.reload();return 'ok';" + "})()"))
-    time.sleep(10)
+    # New Tab: the same words must offer a web search and run it. A reload of
+    # the app frame shows the selected page, so open a real new tab first.
+    print(
+        "newtab.open:",
+        m.js(
+            js(
+                "const b = d.querySelector('[data-astra-new-tab-action], "
+                "[data-action=new-tab], button[aria-label*=\"New tab\" i]');"
+                "if (!b) return 'no-button'; b.click(); return 'ok';"
+            )
+        ),
+    )
+    time.sleep(2.5)
     print("newtab.type:", m.js(NEWTAB_SEARCH))
     time.sleep(2)
     row = json.loads(m.js(NEWTAB_ROW))
@@ -185,7 +231,7 @@ def main():
     time.sleep(0.5)
     field = m.js(FIELD)
     print("newtab.field:", field)
-    if not field or "duckduckgo.com" not in field:
+    if not field or host not in field:
         failures.append("the New Tab search did not run")
 
     print("VERDICT:", "PASS" if not failures else "FAIL " + "; ".join(failures))
