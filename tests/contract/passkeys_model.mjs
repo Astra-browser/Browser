@@ -224,5 +224,88 @@ check("a normal prompt is forwarded", host.currentPrompt()?.tid === 100);
 
 host.deactivate();
 
+// --- A build that does not carry the vault class ---------------------------
+// `@astra/passkeys;1` is missing (Windows today: passkeys are Windows Hello's),
+// so `Cc[...]` throws. The module must resolve that once, answer every verb
+// with one structured "not on this build", and never throw a dead sheet at the
+// person or hide the browser's own prompt.
+let vaultLookups = 0;
+globalThis.Cc = new Proxy(
+  {},
+  {
+    get(_target, key) {
+      if (key === "@astra/passkeys;1") {
+        vaultLookups += 1;
+        const error = new Error("NS_ERROR_FACTORY_NOT_REGISTERED");
+        error.result = 0x80040111;
+        throw error;
+      }
+      if (key === "@mozilla.org/webauthn/service;1") {
+        return {
+          getService: () => ({
+            cancel: (tid) => calls.push(["cancel", tid]),
+            pinCallback: (tid, pin) => calls.push(["pin", tid, pin]),
+            selectionCallback: (tid, selection) => calls.push(["select", tid, selection]),
+          }),
+        };
+      }
+      return undefined;
+    },
+  },
+);
+prefValues.delete("astra.passkeys.ui");
+const absent = await import(
+  new URL("../../overlay/astra/host/Passkeys.sys.mjs?without-vault", import.meta.url)
+);
+const callsBeforeAbsent = calls.length;
+
+absent.activate();
+check(
+  "a build without the vault keeps the browser's own prompt",
+  prefValues.get("astra.passkeys.ui") === undefined,
+);
+
+const absentStatus = absent.status();
+check(
+  "status names the platform, not a generic failure",
+  absentStatus.available === false && absentStatus.reason === "platform_unsupported",
+);
+check(
+  "status keeps the full shape",
+  absentStatus.exists === false &&
+    absentStatus.has_pin === false &&
+    absentStatus.unlocked === false &&
+    absentStatus.system_auth_available === false &&
+    absentStatus.error === "platform_unsupported",
+);
+let threw = false;
+try {
+  absent.call({ call: { kind: "status" } });
+} catch {
+  threw = true;
+}
+check("status does not throw without a vault", !threw);
+
+const absentCreate = absent.call({ call: { kind: "enable", pin: "123456", system_unlock: false } });
+check(
+  "creating a vault is refused with the platform code",
+  absentCreate.ok === false && absentCreate.error === "platform_unsupported",
+);
+check("the refusal carries the unavailable status", absentCreate.status.available === false);
+check(
+  "listing is empty instead of throwing",
+  absent.call({ call: { kind: "list" } }).credentials.length === 0,
+);
+check("the switch is refused too", absent.call({ call: { kind: "set_enabled", enabled: false } }).ok === false);
+check("the class is resolved once, not per call", vaultLookups === 1);
+check(
+  "no vault verb was attempted",
+  !calls
+    .slice(callsBeforeAbsent)
+    .some(([name]) => name === "create" || name === "unlock" || name === "lock"),
+);
+
+absent.deactivate();
+
 console.log(`\npasskey host contract: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

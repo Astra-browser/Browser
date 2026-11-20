@@ -8,10 +8,21 @@
 //! owning the policy layer is `fprintd`. It is used when the user enables
 //! system authentication and a fingerprint device is present; every failure
 //! path falls back to the PIN, which is always available.
+//!
+//! Everywhere else there is no verifier this crate can call: Windows passkeys
+//! belong to Windows Hello and the browser's own platform service, and the
+//! vault's system-unlock path is simply not offered. Both entry points report
+//! "no system auth" instead of running a Linux command, so `system.rs` builds
+//! and behaves on a non-Linux host.
 
+use std::time::Duration;
+
+#[cfg(target_os = "linux")]
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 
+#[cfg(target_os = "linux")]
 fn current_user() -> String {
     std::env::var("USER")
         .or_else(|_| std::env::var("LOGNAME"))
@@ -27,6 +38,7 @@ fn current_user() -> String {
 }
 
 /// True when `fprintd` reports at least one device for this user.
+#[cfg(target_os = "linux")]
 pub fn system_auth_available() -> bool {
     let user = current_user();
     if user.is_empty() {
@@ -44,8 +56,16 @@ pub fn system_auth_available() -> bool {
     output.status.success() && !text.contains("no devices available") && !text.trim().is_empty()
 }
 
+/// No OS verifier exists outside Linux, so system authentication is never
+/// offered and the PIN stays the only unlock.
+#[cfg(not(target_os = "linux"))]
+pub fn system_auth_available() -> bool {
+    false
+}
+
 /// Run `fprintd-verify` and report whether the user passed. Never blocks the
 /// caller longer than `timeout`.
+#[cfg(target_os = "linux")]
 pub fn verify_system_auth(timeout: Duration) -> bool {
     let user = current_user();
     if user.is_empty() {
@@ -54,6 +74,14 @@ pub fn verify_system_auth(timeout: Duration) -> bool {
     run_for("fprintd-verify", &[user.as_str()], timeout)
 }
 
+/// No OS verifier exists outside Linux: verification never succeeds, and it
+/// returns at once instead of waiting out the timeout.
+#[cfg(not(target_os = "linux"))]
+pub fn verify_system_auth(_timeout: Duration) -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
 fn run_for(program: &str, args: &[&str], timeout: Duration) -> bool {
     let Ok(mut child) = Command::new(program)
         .args(args)
@@ -84,7 +112,7 @@ fn run_for(program: &str, args: &[&str], timeout: Duration) -> bool {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::run_for;
     use std::time::Duration;
@@ -102,5 +130,23 @@ mod tests {
     #[test]
     fn a_missing_program_does_not_verify() {
         assert!(!run_for("astra-no-such-verifier", &[], Duration::from_secs(1)));
+    }
+}
+
+#[cfg(all(test, not(target_os = "linux")))]
+mod tests {
+    use super::{system_auth_available, verify_system_auth};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn no_system_auth_is_reported() {
+        assert!(!system_auth_available());
+    }
+
+    #[test]
+    fn verification_fails_without_waiting_out_the_timeout() {
+        let started = Instant::now();
+        assert!(!verify_system_auth(Duration::from_secs(20)));
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 }

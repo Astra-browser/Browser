@@ -779,7 +779,16 @@ fn cmd_overlay(root: &Path, os: &str) -> Result<(), String> {
     if os == "linux" {
         stage_passkeys(root, &engine)?;
     } else {
-        println!("overlay: passkeys/engine skipped on {os} (Windows uses Windows Hello)");
+        // ASTRA-0014 is OS: linux on purpose. Applying it here would register
+        // `@astra/passkeys;1` over a vault crate that does not build with this
+        // toolchain (passkeys/engine/src/vault.rs still calls
+        // `std::os::unix::fs` and `OpenOptions::mode`), and Windows passkey
+        // create/sign is already served by `WinWebAuthnService` (Windows
+        // Hello). See patches/ASTRA-0014-astra-passkeys.patch header.
+        println!(
+            "overlay: passkeys/engine skipped on {os} (ASTRA-0014 is Linux-only; \
+             Windows passkeys go through Windows Hello)"
+        );
     }
     // Sanity: the wiring targets must exist after overlay.
     for f in [

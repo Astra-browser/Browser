@@ -43,6 +43,57 @@ let promptObserver = null;
 let activePrompt = null;
 let lockTimer = null;
 
+// `@astra/passkeys;1` ships with the engine (ASTRA-0014). A build that does
+// not carry it has no contract ID at all, so the lookup throws. Probe that
+// once, memoised, and answer every verb with one structured "not on this
+// build" instead of throwing on each call.
+const PLATFORM_UNSUPPORTED = "platform_unsupported";
+let availability = null;
+
+function vaultContract() {
+  try {
+    return classes()?.["@astra/passkeys;1"] ?? null;
+  } catch {
+    // Not registered on this build, or no chrome environment at all.
+    return null;
+  }
+}
+
+function available() {
+  if (availability === null) {
+    const contract = vaultContract();
+    availability = typeof contract?.getService === "function";
+  }
+  return availability;
+}
+
+function unsupportedStatus() {
+  let enabled = false;
+  try {
+    enabled = Services.prefs.getBoolPref(ENABLED_PREF, true);
+  } catch {
+    // A build without the preference is a build without the vault.
+  }
+  return {
+    enabled,
+    exists: false,
+    has_pin: false,
+    unlocked: false,
+    system_unlock: false,
+    system_auth_available: false,
+    credential_count: 0,
+    pin_retries_left: 0,
+    locked_for_secs: 0,
+    available: false,
+    reason: PLATFORM_UNSUPPORTED,
+    error: PLATFORM_UNSUPPORTED,
+  };
+}
+
+function unsupported() {
+  return { ok: false, error: PLATFORM_UNSUPPORTED, status: unsupportedStatus() };
+}
+
 function vaultService() {
   return classes()["@astra/passkeys;1"].getService(interfaces().nsIAstraPasskeys);
 }
@@ -104,6 +155,9 @@ function readStatus() {
       error: "unavailable",
     };
   }
+  if (!available()) {
+    return unsupportedStatus();
+  }
   const enabled = Services.prefs.getBoolPref(ENABLED_PREF, true);
   let raw = null;
   let error = null;
@@ -127,6 +181,9 @@ function readStatus() {
 }
 
 function statusResult(run) {
+  if (!available()) {
+    return unsupported();
+  }
   try {
     run();
     return { ok: true, error: null, status: readStatus() };
@@ -180,6 +237,12 @@ function onPrompt(subject, topic, data) {
 export function activate() {
   if (activated || !Services) return;
   activated = true;
+  if (!available()) {
+    // No vault class on this build: leave `astra.passkeys.ui` alone so the
+    // browser's own prompt stays in charge, and observe nothing Astra cannot
+    // answer.
+    return;
+  }
   try {
     Services.prefs.setStringPref(VAULT_PREF, vaultPath());
   } catch {
@@ -214,6 +277,9 @@ export function status() {
 }
 
 export function setEnabled({ enabled }) {
+  if (!available()) {
+    return unsupported();
+  }
   try {
     Services.prefs.setBoolPref(ENABLED_PREF, enabled === true);
     if (!enabled) {
@@ -258,6 +324,9 @@ export function setSystemUnlock({ enabled }) {
 }
 
 export function list() {
+  if (!available()) {
+    return { ok: false, error: PLATFORM_UNSUPPORTED, credentials: [], status: unsupportedStatus() };
+  }
   try {
     return { ok: true, error: null, credentials: JSON.parse(vaultService().listJson()) };
   } catch (e) {
