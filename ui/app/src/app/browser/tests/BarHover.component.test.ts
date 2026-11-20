@@ -105,3 +105,19 @@ test("the floating bar stays down when the pointer moves back to the strip", asy
   hover(false);
   await expect.poll(() => bar.getAttribute("data-hidden")).toBe("true");
 });
+
+// A pointer that leaves through the window edge, a native page taking the
+// press, another app coming forward: no `pointerleave` and no `focusout`
+// arrives inside this document for any of them, so the hold has to be dropped
+// on the window's own blur. Left latched, the bar stayed down and the shell
+// kept the whole app frame raised and clipped over the page for it.
+test("the floating bar lets go when this window loses the pointer and the focus", async () => {
+  const { bar } = await floatingBar();
+
+  hover(true);
+  await expect.poll(() => bar.getAttribute("data-hidden")).toBe("false");
+  bar.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false }));
+
+  window.dispatchEvent(new Event("blur"));
+  await expect.poll(() => bar.getAttribute("data-hidden")).toBe("true");
+});

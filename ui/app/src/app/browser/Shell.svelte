@@ -468,9 +468,19 @@
       }
     };
     window.addEventListener("message", onShellMessage);
+    // A window that lost the pointer and the focus cannot be hovering or
+    // focusing the bar; see `dropBarHold`.
+    const onWindowBlur = () => dropBarHold();
+    window.addEventListener("blur", onWindowBlur);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") dropBarHold();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       observer.disconnect();
       window.removeEventListener("message", onShellMessage);
+      window.removeEventListener("blur", onWindowBlur);
+      document.removeEventListener("visibilitychange", onVisibility);
       if (popupSync !== 0) clearTimeout(popupSync);
       popupSync = 0;
       try {
@@ -588,6 +598,20 @@
   function barLeave() {
     barPointerInside = false;
     releaseBar();
+  }
+  // Nothing inside this document can hold the bar once the document itself
+  // has lost the pointer and the focus: a pointer that left through the window
+  // edge, a native page taking the press, another app coming forward. Without
+  // this the latches stayed set (a lost `pointerleave` never fires), the bar
+  // stayed down, and the shell kept the whole app frame raised and clipped over
+  // the page for a bar nobody could see — a sliver of chrome at the window's
+  // edge and a live frame composited over the page for nothing.
+  function dropBarHold() {
+    barRevealHover = false;
+    barPointerInside = false;
+    barFocused = false;
+    clearBarHide();
+    barHover = false;
   }
   $effect(() => () => clearBarHide());
   // A pinned bar never hides, so its hover/focus latches never get the

@@ -53,6 +53,9 @@
   let appBooted = $state(null);
   let appApi = null;
   let dragEdges = [];
+  /** The XUL caption box across the window's top gutter. While the page bar
+   *  floats hidden, that gutter belongs to the bar's reveal instead. */
+  let topDragBox = null;
   // The page covers the app frame, so the top-edge strip belongs to the shell
   // while the bar is away. It forwards hover to the app, which owns the bar's
   // own reveal delay.
@@ -270,9 +273,14 @@
     // reveal work only from x 8–16. The top bar is the drag surface on that
     // side (the sidebar is a `drag-region="deep"` aside when it is shown).
     const dragGeometry = {
-      top: "inset:0 0 auto 0;height:16px",
+      // The window's 8px gutter, no more: this box is a caption the OS owns,
+      // so anything under it never sees a pointer. At 16px it covered the
+      // page bar's top 8px and the whole top-edge reveal strip, which is why
+      // the floating bar could not be brought down with the mouse on
+      // Windows. It now matches the gutter exactly.
+      top: "inset:0 0 auto 0;height:8px",
       bottom: "inset:auto 0 0 0;height:8px",
-      right: "inset:16px 0 8px auto;width:8px",
+      right: "inset:8px 0 8px auto;width:8px",
     };
     for (const [edge, geometry] of Object.entries(dragGeometry)) {
       const box = doc.createElementNS(
@@ -287,6 +295,7 @@
       box.setAttribute("aria-hidden", "true");
       frameRoot.append(box);
       dragEdges.push(box);
+      if (edge === "top") topDragBox = box;
     }
     // Bind this exact chrome window to win-1 before any Host API call. A
     // lazy Services/getMostRecentWindow can otherwise bind win-1 to a newly
@@ -1342,6 +1351,17 @@
         // the shell's own top-edge strip, so the frame (and its themed ground)
         // stays under the page.
         frameRoot.dataset.astraBarOpen = overlay && shown ? "true" : "false";
+        // A hovering pointer has to reach the reveal strip, and a caption box
+        // is an OS hit-test on Windows: no move, no enter, nothing. So while
+        // the bar floats, the top gutter belongs to the reveal and never to
+        // the caption — otherwise the bar closed under a pointer still parked
+        // at the edge and re-opened as the caption went away, blinking. The
+        // caption keeps the gutter while the bar is a row (it is the title
+        // surface there); with the bar floating, it is dragged from its own
+        // top edge once it is down.
+        if (topDragBox) {
+          topDragBox.style.display = overlay ? "none" : "";
+        }
         if (Number.isFinite(data.height) && data.height > 0) {
           frameRoot.style.setProperty("--astra-bar-height", `${Math.round(data.height)}px`);
         }
@@ -1604,6 +1624,16 @@
      loading ground would hide it. The app paints its wash over the material. */
   :global(.astra-frame[data-astra-material]:not([data-astra-material="none"])[data-app-booted="true"]) {
     background: transparent !important;
+  }
+  /* Windows' tiers (mica, acrylic) are the window's own backdrop, sampled
+     from the desktop. The app paints its ground opaquely there, so leaving
+     the shell clear only exposed the desktop in the gutter and around a
+     peeking card — the colour changed as the window took focus. The other
+     platforms keep their native effect behind the shell. */
+  @media (-moz-platform: windows) {
+    :global(.astra-frame[data-astra-material]:not([data-astra-material="none"])[data-app-booted="true"]) {
+      background: var(--shell-loading-ground) !important;
+    }
   }
   :global(.astra-frame[data-astra-theme="light"][data-app-booted="true"]) {
     --shell-loading-ground: #f1f1f3;
@@ -1954,8 +1984,13 @@
     inset-inline-start: calc(var(--astra-sidebar-width, 0px) + 8px);
     inset-inline-end: 0;
     block-size: 8px;
-    /* stylelint-disable-next-line property-no-unknown -- Gecko chrome property. */
-    -moz-window-dragging: drag;
+    /* Deliberately NOT a window-drag region. `-moz-window-dragging: drag` is
+       a caption hit-test on Windows: the OS takes the pointer there for the
+       drag and then never sends a move or an enter to the document, so this
+       strip could not report hover and the bar it reveals never came down —
+       the top bar was unreachable with the mouse. The bar itself stays a
+       drag region, so the window can still be moved from the top edge once
+       it is down. */
   }
   /* `data-astra-bar` is set imperatively on the frame, so the ancestor is
      global; a scoped selector here is pruned as unreachable. */
@@ -2040,6 +2075,14 @@
     :global(.astra-frame[data-astra-bar-open="true"] .astra-app-frame) {
       transition: none;
     }
+  }
+  /* With the column put away there is no column to keep, so the kept-left
+     region collapses to nothing: the raised frame is only the bar's strip.
+     The 16px of gutter the shown column carries used to stay as a live sliver
+     of the app frame down the window's left edge, painting chrome over the
+     page under a bar that was the only part of it meant to be there. */
+  :global(.astra-frame[data-astra-bar-open="true"][data-astra-sidebar-hidden="true"] .astra-app-frame) {
+    --astra-bar-keep-left: 0px;
   }
   :global(.astra-frame[data-astra-bar-open="true"][data-astra-sidebar-peek="true"] .astra-app-frame) {
     --astra-bar-keep-left: calc(var(--astra-sidebar-card-width, 240px) + 24px);
