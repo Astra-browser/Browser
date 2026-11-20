@@ -251,11 +251,15 @@ function rail(active = "read") {
   spaced(active);
   sidebar.setMode("compact");
 }
+/** The compact rail switches spaces through its one switcher, not a chip. */
+async function openRailSpaces(screen: Stage) {
+  await settle();
+  await screen.getByRole("button", { name: "All Spaces" }).first().click();
+}
 async function railEditor(screen: Stage) {
   rail();
-  await settle();
-  await screen.getByRole("button", { name: "Spaces — Reading" }).click();
-  await screen.getByRole("menuitem", { name: "Edit Reading" }).click();
+  await openRailSpaces(screen);
+  await screen.getByRole("menuitem", { name: "Edit Reading" }).first().click();
 }
 const columnLooks: readonly ColumnLook[] = [
   { name: "expanded", capture: shot },
@@ -295,7 +299,7 @@ const columnLooks: readonly ColumnLook[] = [
     name: "rail-stack",
     prepare: async (screen) => {
       rail();
-      await screen.getByRole("button", { name: "Spaces — Reading" }).click();
+      await openRailSpaces(screen);
     },
   },
   { name: "rail-editor", capture: wide, prepare: railEditor },

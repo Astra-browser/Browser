@@ -20,7 +20,24 @@ async function both(name: string, wait = 900) {
   for (const theme of ["dark", "light"]) {
     document.documentElement.dataset.theme = theme;
     await new Promise((done) => setTimeout(done, wait));
-    await page.screenshot({ path: `${shots}/${name}-${theme}.png` });
+    // The card counts down while it is open, so the page keeps changing for
+    // the camera. Freeze every animation and transition for the frame; a look
+    // shot is about the composition, not the motion, and a live clock must not
+    // make the capture wait for a stability it will never reach.
+    const freeze = document.createElement("style");
+    freeze.textContent =
+      "*, *::before, *::after { animation: none !important; transition: none !important; }";
+    document.head.append(freeze);
+    try {
+      // Give the frozen frame two turns to settle: disabling a running
+      // transition snaps it, and the capture must not race that snap.
+      await new Promise<void>((done) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      await page.screenshot({ path: `${shots}/${name}-${theme}.png` });
+    } finally {
+      freeze.remove();
+    }
   }
   document.documentElement.dataset.theme = "dark";
 }
@@ -33,7 +50,9 @@ function sessionOf(scene: ReturnType<typeof checkScene>) {
 }
 
 test("a bot check the run waits on: the page, the island, the card holds the actions", async () => {
-  await page.viewport(1440, 820);
+  // The stage is captured by the page screenshot, which cannot scroll a stage
+  // wider than the test window: 1440 never stabilises, 1280 does.
+  await page.viewport(1280, 800);
   const scene = checkScene("waiting");
   const session = sessionOf(scene);
   const onaction = vi.fn();
@@ -54,8 +73,8 @@ test("a bot check the run waits on: the page, the island, the card holds the act
     onaction,
     onwaitingpage,
   });
-  screen.container.style.width = "1440px";
-  screen.container.style.height = "820px";
+  screen.container.style.width = "1280px";
+  screen.container.style.height = "800px";
   const band = screen.getByRole("group", { name: "allegro.pl wants to confirm you’re a person" });
   await expect.element(band).toBeVisible();
   await expect.element(band.getByText("1:12 left")).toBeVisible();
@@ -127,7 +146,7 @@ test("a check nobody solved in time: the part offers to try the site again", asy
 });
 
 test("the takeover on a check says Work will remember it", async () => {
-  await page.viewport(1200, 800);
+  await page.viewport(1440, 820);
   const screen = await render(TakeoverPane, {
     host: "allegro.pl",
     url: CHECK_URL,
