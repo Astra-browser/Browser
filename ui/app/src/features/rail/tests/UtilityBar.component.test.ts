@@ -178,17 +178,17 @@ test("the bar is one row when the column has room", async () => {
   expect(element.getBoundingClientRect().height).toBeLessThanOrEqual(30);
 });
 
-test("the bar reflows as an even four-column grid when the column is dragged narrow", async () => {
+test("the bar reflows as an even four-column grid below 220px", async () => {
   await tabs.init();
   project();
   const screen = await render(UtilityBar, { ontoggle: () => {} });
   const host = screen.container;
-  host.style.inlineSize = "240px";
+  host.style.inlineSize = "216px";
   host.style.containerType = "inline-size";
   const element = host.querySelector<HTMLElement>(".utility-bar")!;
   await expect.poll(() => getComputedStyle(element).display).toBe("grid");
   // Four plates per row, not a ragged wrap: eight entries make exactly two
-  // even rows at the default 240px column.
+  // even rows in the narrow column.
   expect(getComputedStyle(element).gridTemplateColumns.split(" ")).toHaveLength(4);
   expect(getComputedStyle(host.querySelector<HTMLElement>(".bar-rule")!).display).toBe("none");
   const hostBox = host.getBoundingClientRect();
@@ -197,6 +197,19 @@ test("the bar reflows as an even four-column grid when the column is dragged nar
     expect(box.left).toBeGreaterThanOrEqual(hostBox.left - 0.5);
     expect(box.right).toBeLessThanOrEqual(hostBox.right + 0.5);
   }
+});
+
+test("the settled column keeps one row above the grid threshold", async () => {
+  await tabs.init();
+  project();
+  const screen = await render(UtilityBar, { ontoggle: () => {} });
+  const host = screen.container;
+  // The expanded column never goes below its one-row minimum: the grid is for
+  // the narrow rail and a compact header, not a settled 260px column.
+  host.style.inlineSize = "240px";
+  host.style.containerType = "inline-size";
+  const element = host.querySelector<HTMLElement>(".utility-bar")!;
+  await expect.poll(() => getComputedStyle(element).display).toBe("flex");
 });
 
 test("the narrow grid still fits the column at its 180px minimum", async () => {
