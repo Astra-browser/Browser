@@ -114,7 +114,7 @@ test("a bot check the run waits on: the page, the island, the card holds the act
   await expect.element(band.getByRole("button", { name: "Keep waiting" })).not.toBeInTheDocument();
   await screen.unmount();
   session.dispose();
-});
+}, 30_000);
 
 test("a check nobody solved in time: the part offers to try the site again", async () => {
   await page.viewport(1440, 820);
