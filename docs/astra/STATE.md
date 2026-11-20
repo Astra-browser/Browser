@@ -11,6 +11,43 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: window ground colour on click + the unreachable page bar (2026-11-20)
+
+Two owner reports from the Windows dev build, both traced to chrome layers
+rather than to the app's own surfaces.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Clicking anything turned the whole window's ground (the 8px gutter and every translucent edge) into the desktop's colour, and it only happened once the window was in use | The material tiers painted the window ground as a translucent wash (`color-mix(chrome 20–28%, transparent)`), so the OS backdrop showed through it. Windows only wakes the Mica backdrop for the focused window, so the shift tracked focus. | `material.css`: mica and acrylic paint the window ground in the theme's own `--color-chrome`. The wash still tints menus, the launcher and raised floats; the desktop hue no longer belongs to the window. |
+| The top bar never appeared, hover or not; the address field had no home on a web page | The window's top gutter was a 16px XUL caption box (`-moz-window-dragging: drag`). On Windows that box is a `HTCAPTION` hit-test: the OS owns the pointer there and no `pointermove`/`pointerenter` ever reaches a document, so the reveal strip underneath could not fire. | The caption box is now the gutter's own 8px, and the shell hands that gutter to the reveal strip whenever the bar floats (the caption stays while the bar is a row). The reveal strip itself is no longer a drag region. |
+
+**Verified:** `WindowGround` (new, 4/4: opaque ground for mica/acrylic in both
+themes), `BarHover` (2/2), `ShellLook`, `NewTabMaterial` component suites; the
+chrome bundle and the shell rebuilt into `overlay/astra/chrome/`
+(`stage-chrome`: 802 files, CSP audit clean); stylelint and prettier clean on
+the touched sources.
+
+**Follow-up, same day — a sliver of chrome over the page.** The bar's hold
+could latch: a `pointerleave`/`focusout` that never fires (pointer out through
+the window edge, a native page taking the press, another app forward) left the
+bar "hovered" for good. The shell then kept the whole app frame raised and
+clipped over the page, so a strip of chrome at the window's edge was live
+compositing for a bar nobody had asked for. Two changes:
+
+- `Shell.svelte` (app): the hold is dropped on the document's own `blur` and on
+  `visibilitychange → hidden`. Nothing inside a document that lost the pointer
+  and the focus can still be holding its bar (`BarHover` 3/3, new test).
+- `Shell.svelte` (shell): with the column put away the raised frame's kept-left
+  region collapses to zero. It used to leave 16px of the app frame down the
+  left edge, painting chrome over the page under the bar's strip.
+  Live: column hidden + a page + the bar revealed now clips to
+  `polygon(0 0, 100% 0, 100% 49px, 0 49px, 0 100%, 0 100%)` (`keep-left: 0px`);
+  before it kept a full-height sliver.
+
+**Deferred:** a live Windows probe of the reveal at the window edge and of the
+pinned bar's paint over a native page; the bar is not a drag surface while it
+floats (drag it once it is down, or from the window's other edges).
+
 ## Owner report: splash / startup speed (2026-11-19)
 
 Startup was measured from the real window (Win32 `PrintWindow` frames every
