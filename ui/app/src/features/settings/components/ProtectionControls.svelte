@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import * as m from "$shared/i18n/messages";
   import { blocker } from "$domain/blocker";
   import type { BlockerListEntry, BlockerListsView } from "$shared/ipc/bindings";
   import SettingsGroup from "$shared/ui/SettingsGroup";
@@ -23,14 +24,14 @@
   const unavailable = $derived(view !== null && view.available !== true);
   const standing = $derived(
     status.protection === "pending"
-      ? "Preparing protection… You can keep browsing."
+      ? m.protection_status_pending()
       : status.protection === "active"
-        ? "Protection is active."
+        ? m.protection_status_active()
         : status.protection === "disabled"
-          ? "Protection is off for this profile."
+          ? m.protection_status_off()
           : status.protection === "degraded"
-            ? "Protection needs attention. The last working rules stay installed."
-            : "Protection is unavailable in this build.",
+            ? m.protection_status_degraded()
+            : m.protection_status_unavailable(),
   );
 
   const groups = $derived.by(() => {
@@ -69,12 +70,12 @@
     try {
       const result = await action();
       if (result.state === "pending") {
-        message = "The change is still being applied.";
+        message = m.protection_change_pending();
       } else if (
         result.state !== "processed" ||
         !["applied", "no_op"].includes(result.disposition.outcome)
       ) {
-        message = "Could not confirm this change. Check the status or retry.";
+        message = m.protection_change_unconfirmed();
       }
       await refresh();
     } finally {
@@ -85,15 +86,15 @@
   function groupLabel(group: string): string {
     switch (group) {
       case "ads":
-        return "Ads and annoyances";
+        return m.protection_group_ads();
       case "privacy":
-        return "Trackers and privacy";
+        return m.protection_group_privacy();
       case "malware":
-        return "Malware and scams";
+        return m.protection_group_malware();
       case "regional":
-        return "Regional lists";
+        return m.protection_group_regional();
       default:
-        return "Optional lists";
+        return m.protection_group_optional();
     }
   }
 
@@ -106,7 +107,7 @@
       if (index !== -1) next.splice(index, 1);
     }
     if (next.length === 0) {
-      message = "Keep at least one filter list enabled.";
+      message = m.protection_keep_one();
       return;
     }
     void run(() =>
@@ -200,11 +201,11 @@
   function addCustomList() {
     const url = customUrl.trim();
     if (!/^https:\/\/\S+$/iu.test(url)) {
-      message = "Custom lists must use an https:// URL.";
+      message = m.protection_custom_https();
       return;
     }
     if (customDraft.includes(url)) {
-      message = "That list is already added.";
+      message = m.protection_custom_duplicate();
       return;
     }
     const next = [...customDraft, url];
@@ -249,14 +250,15 @@
   }
 
   function formatDate(value: number | null | undefined): string {
-    if (!value || !Number.isFinite(value)) return "Never";
+    if (!value || !Number.isFinite(value)) return m.protection_never();
     try {
       return new Date(value * 1000).toLocaleString();
     } catch {
-      return "Unknown";
+      return m.protection_unknown();
     }
   }
 
+  // Units stay symbols: "MB" and "KB" are not words in any shipped locale.
   function formatBytes(value: number | null | undefined): string {
     if (!value) return "—";
     if (value > 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -265,17 +267,10 @@
   }
 </script>
 
-<SettingsGroup
-  title="Ad, tracker and malware protection"
-  description="Astra blocks network requests with the engine's own channel hook and hides the elements its filter lists match. Filter lists update on the schedule you choose; an update never removes the last working rules."
->
-  <SettingsRow
-    title="Block ads, trackers and malware"
-    description={standing}
-    settingId="privacy.blocking"
-  >
+<SettingsGroup title={m.protection_title()} description={m.protection_description()}>
+  <SettingsRow title={m.protection_blocking()} description={standing} settingId="privacy.blocking">
     <Switch
-      label="Block ads, trackers and malware"
+      label={m.protection_blocking()}
       labelHidden
       checked={status.desired_enabled === true}
       disabled={busy ||
@@ -287,33 +282,30 @@
   </SettingsRow>
 
   <SettingsRow
-    title="Protection mode"
+    title={m.protection_mode()}
     description={view?.mode === "aggressive"
-      ? "Aggressive adds the annoyance, cookie-banner and social-embed lists on top of ads, trackers and malware."
-      : "Standard blocks ads, trackers and malware with the low-breakage default lists. Aggressive adds annoyances, cookie banners and social embeds."}
+      ? m.protection_mode_aggressive_help()
+      : m.protection_mode_standard_help()}
   >
-    <div class="segmented" role="group" aria-label="Protection mode">
+    <div class="segmented" role="group" aria-label={m.protection_mode()}>
       <button
         type="button"
         class:active={view?.mode !== "aggressive"}
         disabled={busy || view === null}
-        onclick={() => setMode("standard")}>Standard</button
+        onclick={() => setMode("standard")}>{m.protection_mode_standard()}</button
       >
       <button
         type="button"
         class:active={view?.mode === "aggressive"}
         disabled={busy || view === null}
-        onclick={() => setMode("aggressive")}>Aggressive</button
+        onclick={() => setMode("aggressive")}>{m.protection_mode_aggressive()}</button
       >
     </div>
   </SettingsRow>
 
-  <SettingsRow
-    title="Strip tracking parameters"
-    description="Remove utm_*, fbclid, gclid, msclkid and the other campaign parameters from requests before they are sent."
-  >
+  <SettingsRow title={m.protection_removeparam()} description={m.protection_removeparam_help()}>
     <Switch
-      label="Strip tracking parameters"
+      label={m.protection_removeparam()}
       labelHidden
       checked={view?.removeparam !== false}
       disabled={busy || view === null}
@@ -321,12 +313,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Unwrap tracking links"
-    description="Known bounce and redirector links (search engines, social redirectors, shorteners) open their destination directly instead of passing through the tracker."
-  >
+  <SettingsRow title={m.protection_bounce()} description={m.protection_bounce_help()}>
     <Switch
-      label="Unwrap tracking links"
+      label={m.protection_bounce()}
       labelHidden
       checked={view?.bounce !== false}
       disabled={busy || view === null}
@@ -334,12 +323,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="CNAME uncloaking"
-    description="Resolve first-party hostnames and block the ones whose DNS canonical name is a known tracker."
-  >
+  <SettingsRow title={m.protection_cname()} description={m.protection_cname_help()}>
     <Switch
-      label="CNAME uncloaking"
+      label={m.protection_cname()}
       labelHidden
       checked={view?.cname !== false}
       disabled={busy || view === null}
@@ -347,12 +333,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Redirect placeholders"
-    description="When a list blocks an ad with a redirect resource, load the neutral placeholder instead of cancelling it. Turning this off cancels the request."
-  >
+  <SettingsRow title={m.protection_redirects()} description={m.protection_redirects_help()}>
     <Switch
-      label="Use redirect placeholders"
+      label={m.protection_redirects_label()}
       labelHidden
       checked={view?.redirects !== false}
       disabled={busy || view === null}
@@ -360,12 +343,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Block scripts"
-    description="Cancel every script request. This is a strict, site-breaking mode; prefer the per-site shield for a single site."
-  >
+  <SettingsRow title={m.protection_scripts()} description={m.protection_scripts_help()}>
     <Switch
-      label="Block scripts"
+      label={m.protection_scripts()}
       labelHidden
       checked={view?.block_scripts === true}
       disabled={busy || view === null}
@@ -374,30 +354,41 @@
   </SettingsRow>
 
   <SettingsRow
-    title="Filter lists"
+    title={m.protection_lists()}
     description={unavailable
-      ? "The list catalog could not be read in this build."
-      : `${defaultCount} of ${view?.lists.length ?? 0} lists enabled · ${view?.installed_rules ?? 0} compiled rules · ${formatBytes(
-          view?.lists.reduce((sum, entry) => sum + (entry.enabled ? (entry.bytes ?? 0) : 0), 0),
-        )}`}
+      ? m.protection_lists_unavailable()
+      : m.protection_lists_summary({
+          enabled: defaultCount,
+          total: view?.lists.length ?? 0,
+          rules: view?.installed_rules ?? 0,
+          bytes: formatBytes(
+            view?.lists.reduce((sum, entry) => sum + (entry.enabled ? (entry.bytes ?? 0) : 0), 0),
+          ),
+        })}
   >
     <Button
       disabled={busy || status.can_refresh_sources !== true}
       onclick={() => void run(blocker.refreshSources)}
-      >{busy ? "Updating…" : "Update lists now"}</Button
+      >{busy ? m.protection_update_busy() : m.protection_update_now()}</Button
     >
   </SettingsRow>
 
   <SettingsRow
-    title="Automatic updates"
+    title={m.protection_updates()}
     description={view === null
-      ? "Reading the schedule…"
+      ? m.protection_updates_reading()
       : view.auto_update
-        ? `Checks the enabled sources ${view.update_hours === 0 ? "on demand only" : `every ${view.update_hours} hours`}. Last check: ${formatDate(view.last_update_unix)}.`
-        : "Automatic checks are off. Use “Update lists now” whenever you want a refresh."}
+        ? m.protection_updates_auto({
+            schedule:
+              view.update_hours === 0
+                ? m.protection_updates_on_demand()
+                : m.protection_updates_every_hours({ hours: view.update_hours }),
+            date: formatDate(view.last_update_unix),
+          })
+        : m.protection_updates_off()}
   >
     <Switch
-      label="Check for list updates"
+      label={m.protection_updates_label()}
       labelHidden
       checked={view?.auto_update === true}
       disabled={busy || view === null}
@@ -405,33 +396,27 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Check interval"
-    description="A cron-like schedule: the browser checks while it is running and catches up on the next start when a check was missed."
-  >
+  <SettingsRow title={m.protection_interval()} description={m.protection_interval_help()}>
     <select
       class="select"
-      aria-label="Check interval"
+      aria-label={m.protection_interval()}
       value={String(view?.update_hours ?? 24)}
       disabled={busy || view === null}
       onchange={(event) => setSchedule(Number(event.currentTarget.value))}
     >
-      <option value="6">Every 6 hours</option>
-      <option value="12">Every 12 hours</option>
-      <option value="24">Every 24 hours</option>
-      <option value="48">Every 2 days</option>
-      <option value="72">Every 3 days</option>
-      <option value="168">Every week</option>
-      <option value="0">Never (manual only)</option>
+      <option value="6">{m.protection_interval_6()}</option>
+      <option value="12">{m.protection_interval_12()}</option>
+      <option value="24">{m.protection_interval_24()}</option>
+      <option value="48">{m.protection_interval_48()}</option>
+      <option value="72">{m.protection_interval_72()}</option>
+      <option value="168">{m.protection_interval_week()}</option>
+      <option value="0">{m.protection_interval_never()}</option>
     </select>
   </SettingsRow>
 
-  <SettingsRow
-    title="Element hiding"
-    description="Inject the cosmetic rules the lists carry. This is what removes the empty boxes ads leave behind."
-  >
+  <SettingsRow title={m.protection_cosmetic()} description={m.protection_cosmetic_help()}>
     <Switch
-      label="Hide matching page elements"
+      label={m.protection_cosmetic_label()}
       labelHidden
       checked={view?.cosmetic === true}
       disabled={busy || view === null}
@@ -439,12 +424,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Scriptlet rules"
-    description="Run the small page-side helpers that filter lists use for cookie banners and anti-adblock scripts. Off means only network and CSS rules apply."
-  >
+  <SettingsRow title={m.protection_scriptlets()} description={m.protection_scriptlets_help()}>
     <Switch
-      label="Run scriptlet rules"
+      label={m.protection_scriptlets_label()}
       labelHidden
       checked={view?.scriptlets === true}
       disabled={busy || view === null}
@@ -453,19 +435,22 @@
   </SettingsRow>
 
   {#if (view?.cloaked?.length ?? 0) > 0}
-    <SettingsRow title="CNAME-uncloaked hosts" description={view?.cloaked?.join(", ")}>
+    <SettingsRow title={m.protection_cloaked()} description={view?.cloaked?.join(", ")}>
       <span></span>
     </SettingsRow>
   {/if}
 
   <SettingsRow
-    title="Blocked in this profile"
+    title={m.protection_stats()}
     description={view?.stats?.today == null
-      ? "Counts are unavailable in this build. Private windows are blocked but never counted."
-      : `${view.stats.today} today · ${view.stats.last7Days ?? 0} in the last 7 days. Private windows are blocked but never counted.`}
+      ? m.protection_stats_unavailable()
+      : m.protection_stats_summary({
+          today: view.stats.today,
+          week: view.stats.last7Days ?? 0,
+        })}
   >
     <Button disabled={busy || view === null} onclick={() => void run(blocker.resetStats)}
-      >Reset counts</Button
+      >{m.protection_stats_reset()}</Button
     >
   </SettingsRow>
 
@@ -497,8 +482,8 @@
                   <span class="title">{entry.title}</span>
                 </label>
                 <span class="meta">
-                  {#if entry.bundled}<span class="badge">bundled</span>{/if}
-                  <span>{entry.license || "upstream list"}</span>
+                  {#if entry.bundled}<span class="badge">{m.protection_badge_bundled()}</span>{/if}
+                  <span>{entry.license || m.protection_license_fallback()}</span>
                   {#if entry.bytes}<span>{formatBytes(entry.bytes)}</span>{/if}
                 </span>
               </li>
@@ -508,25 +493,24 @@
       </section>
     {/each}
     {#if view === null}
-      <p class="empty">Reading the filter catalog…</p>
+      <p class="empty">{m.protection_catalog_reading()}</p>
     {:else if view.lists.length === 0}
-      <p class="empty">No filter lists are available in this build.</p>
+      <p class="empty">{m.protection_catalog_empty()}</p>
     {/if}
   </div>
-  <SettingsRow
-    title="Custom filter lists"
-    description="Add any HTTPS adblock list. It is fetched, cached and compiled with the catalog; a failed download keeps the previous rules."
-  >
+  <SettingsRow title={m.protection_custom()} description={m.protection_custom_help()}>
     <div class="custom-add">
       <input
         type="url"
         class="input"
         placeholder="https://example.com/list.txt"
-        aria-label="Custom filter list URL"
+        aria-label={m.protection_custom_url_label()}
         bind:value={customUrl}
         disabled={busy}
       />
-      <Button disabled={busy || view === null} onclick={addCustomList}>Add list</Button>
+      <Button disabled={busy || view === null} onclick={addCustomList}
+        >{m.protection_custom_add()}</Button
+      >
     </div>
   </SettingsRow>
 
@@ -536,26 +520,25 @@
         <li class="row">
           <span class="title">{url}</span>
           <button type="button" class="remove" disabled={busy} onclick={() => removeCustomList(url)}
-            >Remove</button
+            >{m.action_remove()}</button
           >
         </li>
       {/each}
     </ul>
   {/if}
 
-  <SettingsRow
-    title="Your filter rules"
-    description="One adblock rule per line, applied after every subscribed list. Use it for a site-specific fix or a rule that is not in any list."
-  >
+  <SettingsRow title={m.protection_rules()} description={m.protection_rules_help()}>
     <div class="rules">
       <textarea
         class="textarea"
         rows="4"
         spellcheck="false"
-        aria-label="Custom filter rules"
+        aria-label={m.protection_rules_label()}
         bind:value={rulesDraft}
         disabled={busy}></textarea>
-      <Button disabled={busy || view === null} onclick={saveRules}>Save rules</Button>
+      <Button disabled={busy || view === null} onclick={saveRules}
+        >{m.protection_rules_save()}</Button
+      >
     </div>
   </SettingsRow>
   {#if message}<p class="feedback" role="status">{message}</p>{/if}
@@ -593,7 +576,7 @@
     min-height: 36px;
     padding: 0 12px;
     border: 0;
-    background: var(--color-surface-raised);
+    background: var(--color-fill);
     color: var(--color-text);
     font: inherit;
     font-weight: 600;
@@ -643,13 +626,13 @@
     gap: 8px;
     flex: 0 0 auto;
     color: var(--color-muted);
-    font-size: var(--text-small);
+    font-size: var(--text-caption);
   }
 
   .badge {
     padding: 1px 6px;
     border-radius: 999px;
-    background: var(--color-surface-raised);
+    background: var(--color-fill);
     color: var(--color-muted);
     font-size: 10px;
     text-transform: uppercase;
@@ -716,7 +699,7 @@
     width: min(360px, 46vw);
     resize: vertical;
     font-family: var(--font-mono);
-    font-size: var(--text-small);
+    font-size: var(--text-label);
   }
 
   .custom-list {
@@ -732,7 +715,7 @@
     background: none;
     color: var(--color-muted);
     font: inherit;
-    font-size: var(--text-small);
+    font-size: var(--text-label);
     cursor: default;
   }
 </style>

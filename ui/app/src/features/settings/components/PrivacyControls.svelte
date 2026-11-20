@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import * as m from "$shared/i18n/messages";
   import { commands, type PrivacyStateView } from "$shared/ipc/bindings";
   import SettingsGroup from "$shared/ui/SettingsGroup";
   import SettingsRow from "$shared/ui/SettingsRow";
@@ -8,6 +9,8 @@
   let view = $state<PrivacyStateView | null>(null);
   let busy = $state(false);
   let message = $state("");
+
+  const engineValue = $derived(view?.cookie_behavior ?? "—");
 
   onMount(() => {
     void refresh();
@@ -44,50 +47,42 @@
         (patch.bounce_protection as boolean | null | undefined) ?? null,
       );
       if (!result?.accepted) {
-        message = "Could not apply this privacy change.";
+        message = m.privacy_change_failed();
       }
       await refresh();
     } catch {
-      message = "The privacy service did not answer.";
+      message = m.privacy_service_silent();
     } finally {
       busy = false;
     }
   }
 </script>
 
-<SettingsGroup
-  title="Cookies and site data"
-  description="Cookies, site storage and per-site permissions are enforced by the engine. Partitioned third-party storage keeps sign-ins working without letting a tracker read another site's state."
->
+<SettingsGroup title={m.privacy_cookies_group()} description={m.privacy_cookies_group_help()}>
   <SettingsRow
-    title="Third-party cookies"
-    description={`${
-      view?.cookies === "allow"
-        ? "All cookies are accepted, including third-party cookies."
-        : view?.cookies === "block-third-party"
-          ? "Third-party cookies are blocked. Some embedded sign-ins stop working."
-          : "Third-party cookies are partitioned per top-level site (Total Cookie Protection)."
-    } Engine value: ${view?.cookie_behavior ?? "—"}.`}
+    title={m.privacy_cookies()}
+    description={view?.cookies === "allow"
+      ? m.privacy_cookies_allow_help({ value: engineValue })
+      : view?.cookies === "block-third-party"
+        ? m.privacy_cookies_block_help({ value: engineValue })
+        : m.privacy_cookies_partition_help({ value: engineValue })}
   >
     <select
       class="select"
-      aria-label="Third-party cookies"
+      aria-label={m.privacy_cookies()}
       value={view?.cookies ?? "partition"}
       disabled={busy || view === null}
       onchange={(event) => void configure({ cookies: event.currentTarget.value })}
     >
-      <option value="allow">Allow all cookies</option>
-      <option value="block-third-party">Block third-party</option>
-      <option value="partition">Partition (recommended)</option>
+      <option value="allow">{m.privacy_cookies_allow()}</option>
+      <option value="block-third-party">{m.privacy_cookies_block()}</option>
+      <option value="partition">{m.privacy_cookies_partition()}</option>
     </select>
   </SettingsRow>
 
-  <SettingsRow
-    title="Forget me when I close this site"
-    description="Clear cookies, storage, cache, permissions and history for a site when its last tab closes. Turn this on globally, or choose sites from the shield menu."
-  >
+  <SettingsRow title={m.privacy_forget()} description={m.privacy_forget_help()}>
     <Switch
-      label="Forget sites when closed"
+      label={m.privacy_forget_label()}
       labelHidden
       checked={view?.forget_on_close === true}
       disabled={busy || view === null}
@@ -95,12 +90,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Ephemeral third-party storage"
-    description="Partition third-party storage and purge the site's data when the last tab closes, so an embedded tracker cannot persist between visits."
-  >
+  <SettingsRow title={m.privacy_ephemeral()} description={m.privacy_ephemeral_help()}>
     <Switch
-      label="Ephemeral third-party storage"
+      label={m.privacy_ephemeral()}
       labelHidden
       checked={view?.ephemeral === true}
       disabled={busy || view === null}
@@ -109,11 +101,11 @@
   </SettingsRow>
 
   <SettingsRow
-    title="Bounce tracking protection"
-    description={`The engine classifies navigations that bounce through a tracker and purges the state they set (mode ${view?.bounce_mode ?? "—"}). Astra also unwraps known redirector links before the request.`}
+    title={m.privacy_bounce()}
+    description={m.privacy_bounce_help({ mode: view?.bounce_mode ?? "—" })}
   >
     <Switch
-      label="Bounce tracking protection"
+      label={m.privacy_bounce()}
       labelHidden
       checked={view?.bounce_protection !== false}
       disabled={busy || view === null}
@@ -123,50 +115,51 @@
 
   {#if (view?.forget_sites?.length ?? 0) > 0 || Object.keys(view?.site_cookies ?? {}).length > 0 || Object.keys(view?.site_fingerprints ?? {}).length > 0}
     <SettingsRow
-      title="Per-site overrides"
-      description={`${view?.forget_sites?.length ?? 0} forgotten on close · ${Object.keys(view?.site_cookies ?? {}).length} cookie rules · ${Object.keys(view?.site_fingerprints ?? {}).length} fingerprint rules`}
+      title={m.privacy_overrides()}
+      description={m.privacy_overrides_summary({
+        forgotten: view?.forget_sites?.length ?? 0,
+        cookies: Object.keys(view?.site_cookies ?? {}).length,
+        fingerprints: Object.keys(view?.site_fingerprints ?? {}).length,
+      })}
     >
       <span></span>
     </SettingsRow>
   {/if}
   {#if (view?.forget_sites?.length ?? 0) > 0}
-    <SettingsRow title="Sites forgotten on close" description={view?.forget_sites?.join(", ")}>
+    <SettingsRow title={m.privacy_forget_sites()} description={view?.forget_sites?.join(", ")}>
       <span></span>
     </SettingsRow>
   {/if}
 </SettingsGroup>
 
 <SettingsGroup
-  title="Fingerprinting protection"
-  description="Astra uses Firefox's native fingerprinting protection with a stronger target set than the low-breakage default. Standard randomizes canvas and audio, hides the GPU model, tiers hardware concurrency and limits font and display metrics without breaking the user agent or timezone."
+  title={m.privacy_fingerprint_group()}
+  description={m.privacy_fingerprint_group_help()}
 >
   <SettingsRow
-    title="Protection level"
+    title={m.privacy_fingerprint_level()}
     description={view?.fingerprinting === "off"
-      ? "Fingerprinting protection is off."
+      ? m.privacy_fingerprint_off_help()
       : view?.fingerprinting === "aggressive"
-        ? "Aggressive adds screen, window and locale targets to standard protection."
-        : "Standard protects canvas, audio, WebGL, fonts, display metrics and timer precision."}
+        ? m.privacy_fingerprint_aggressive_help()
+        : m.privacy_fingerprint_standard_help()}
   >
     <select
       class="select"
-      aria-label="Fingerprinting protection level"
+      aria-label={m.privacy_fingerprint_level_label()}
       value={view?.fingerprinting ?? "standard"}
       disabled={busy || view === null}
       onchange={(event) => void configure({ fingerprinting: event.currentTarget.value })}
     >
-      <option value="off">Off</option>
-      <option value="standard">Standard</option>
-      <option value="aggressive">Aggressive</option>
+      <option value="off">{m.privacy_fingerprint_off()}</option>
+      <option value="standard">{m.privacy_fingerprint_standard()}</option>
+      <option value="aggressive">{m.privacy_fingerprint_aggressive()}</option>
     </select>
   </SettingsRow>
 
-  <SettingsRow
-    title="Language fingerprinting"
-    description="Report en-US in navigator.language, navigator.languages and the Accept-Language header."
-  >
+  <SettingsRow title={m.privacy_language()} description={m.privacy_language_help()}>
     <Switch
-      label="Spoof language"
+      label={m.privacy_language_label()}
       labelHidden
       checked={view?.language === true}
       disabled={busy || view === null}
@@ -174,12 +167,9 @@
     />
   </SettingsRow>
 
-  <SettingsRow
-    title="Screen fingerprinting"
-    description="Report a rounded screen rectangle and pixel depth instead of the exact display metrics."
-  >
+  <SettingsRow title={m.privacy_screen()} description={m.privacy_screen_help()}>
     <Switch
-      label="Spoof screen metrics"
+      label={m.privacy_screen_label()}
       labelHidden
       checked={view?.screen === true}
       disabled={busy || view === null}
@@ -188,7 +178,7 @@
   </SettingsRow>
 
   {#if view?.targets && view.targets.length > 0}
-    <SettingsRow title="Active fingerprint targets" description={view.targets.join(" · ")}>
+    <SettingsRow title={m.privacy_targets()} description={view.targets.join(" · ")}>
       <span></span>
     </SettingsRow>
   {/if}
