@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   COMPLETED_KEY,
+  LEGACY_THEME_KEY,
   THEMES,
   THEME_KEY,
   isFirstRun,
   isThemeChoice,
   persistWelcome,
   readTheme,
+  shouldOpenOnboarding,
   type ThemeChoice,
 } from "../index";
 
@@ -41,6 +43,20 @@ describe("first-run flag", () => {
     await expect(isFirstRun()).resolves.toBe(false);
   });
 
+  test("the rule: fresh shows, completed skips, private never shows", () => {
+    expect(shouldOpenOnboarding(null)).toBe(true);
+    expect(shouldOpenOnboarding("false")).toBe(true);
+    expect(shouldOpenOnboarding("true")).toBe(false);
+    expect(shouldOpenOnboarding(null, true)).toBe(false);
+    expect(shouldOpenOnboarding("false", true)).toBe(false);
+  });
+
+  test("the appearance key is the one the core validates", () => {
+    expect(THEME_KEY).toBe("appearance.theme");
+    expect(LEGACY_THEME_KEY).toBe("appearance");
+    expect(COMPLETED_KEY).toBe("onboarding.completed");
+  });
+
   test("persisting the run records the theme and the flag", async () => {
     const choice: ThemeChoice = "dark";
     expect(THEMES).toContain(choice);
@@ -72,5 +88,17 @@ describe("theme choice", () => {
   test("a bogus stored theme falls back to system", async () => {
     native.settings[THEME_KEY] = "neon";
     await expect(readTheme()).resolves.toBe("system");
+  });
+
+  test("the old spelling is adopted into the canonical key", async () => {
+    native.settings[LEGACY_THEME_KEY] = "dark";
+    await expect(readTheme()).resolves.toBe("dark");
+    expect(native.settings[THEME_KEY]).toBe("dark");
+  });
+
+  test("the canonical key wins over a stale old spelling", async () => {
+    native.settings[THEME_KEY] = "light";
+    native.settings[LEGACY_THEME_KEY] = "dark";
+    await expect(readTheme()).resolves.toBe("light");
   });
 });

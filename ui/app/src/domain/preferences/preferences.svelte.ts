@@ -5,7 +5,7 @@ import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
 
 const defaults = {
-  appearance: "light",
+  "appearance.theme": "light",
   "search.engine": "google",
   "search.custom-url": "",
   "search.suggestions": "true",
@@ -165,8 +165,8 @@ async function initialize(generation: number, signal: AbortSignal) {
   const unsubscribe = await events.uiCommand.listen(({ payload }) => {
     if (generation !== epoch) return;
     if (payload.startsWith("theme.")) {
-      updated.appearance = true;
-      apply("appearance", payload.slice(6));
+      updated["appearance.theme"] = true;
+      apply("appearance.theme", payload.slice(6));
     }
     if (!payload.startsWith("preference.")) return;
     const body = payload.slice(11);

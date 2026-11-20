@@ -15,6 +15,12 @@ import {
 
 export type Appearance = "system" | "light" | "dark";
 
+/** The appearance choice. One spelling, the one `astra_core::settings`
+ *  validates; the onboarding flow writes the same key. */
+const APPEARANCE_KEY = "appearance.theme";
+/** The pre-0.1.755 spelling. Read once to migrate, never written. */
+const LEGACY_APPEARANCE_KEY = "appearance";
+
 /** The stored customization, as preference values. */
 export type Customization = {
   theme: string;
@@ -197,11 +203,14 @@ async function initialize(generation: number) {
         .catch(() => {});
       return;
     }
-    // Settings writes the stored `appearance` preference; every other surface
-    // hears that push, so the window must apply it too.
-    const preference = id.startsWith("preference.appearance=")
-      ? id.slice("preference.appearance=".length)
-      : null;
+    // Settings writes the stored `appearance.theme` preference; every other
+    // surface hears that push, so the window must apply it too. The old
+    // `appearance` spelling is still accepted while profiles migrate.
+    const preference = id.startsWith("preference.appearance.theme=")
+      ? id.slice("preference.appearance.theme=".length)
+      : id.startsWith("preference.appearance=")
+        ? id.slice("preference.appearance=".length)
+        : null;
     const next = preference ?? id.slice("theme.".length);
     if (
       (preference === null && !id.startsWith("theme.")) ||
@@ -214,7 +223,7 @@ async function initialize(generation: number) {
     apply();
     // A keyboard or menu theme command is also a choice: store it so the next
     // launch starts in the same mode. Settings' own write arrives as a push.
-    if (preference === null) void commands.settingSet("appearance", next).catch(() => {});
+    if (preference === null) void commands.settingSet(APPEARANCE_KEY, next).catch(() => {});
   });
 
   try {
@@ -225,10 +234,23 @@ async function initialize(generation: number) {
     }
     applyMaterial(commandMaterial ?? info.material, info.materials);
 
-    const stored = await commands.settingGet("appearance");
+    let stored = await commands.settingGet(APPEARANCE_KEY);
     if (generation !== lifecycle) {
       (await listener)();
       return;
+    }
+    if (stored === null) {
+      // A profile from before the split kept the choice under `appearance`.
+      // Adopt it into the key the core validates.
+      const legacy = await commands.settingGet(LEGACY_APPEARANCE_KEY);
+      if (generation !== lifecycle) {
+        (await listener)();
+        return;
+      }
+      if (legacy === "light" || legacy === "dark" || legacy === "system") {
+        void commands.settingSet(APPEARANCE_KEY, legacy).catch(() => {});
+        stored = legacy;
+      }
     }
     if (
       commandAppearance === null &&

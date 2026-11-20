@@ -4,8 +4,10 @@
 
 // P3-T15: stage the chrome app build into the overlay + audit it.
 //
-// `vite build --config vite.chrome.ts` already emits directly into
-// `overlay/astra/chrome/app/` (outDir, wiped first). This script then:
+// `vite build --config vite.chrome.ts` already emits the browser document
+// directly into `overlay/astra/chrome/app/` (outDir, wiped first), and
+// `vite build --config vite.onboarding.config.ts --mode chrome` adds the
+// first-run document to the same tree without emptying it. This script then:
 //   1. restores static (non-bundled) chrome/app files that live in the ui
 //      tree (none today: P3-T21 removed the relay framescript when the app
 //      became a first-party chrome document),
@@ -43,10 +45,10 @@ async function listFiles(dir, base = "") {
 }
 
 const files = await listFiles(appDir);
-if (!files.includes("browser-chrome.html")) {
-  throw new Error(
-    `stage-chrome: ${appDir} has no browser-chrome.html (run the chrome build first)`,
-  );
+for (const document of ["browser-chrome.html", "onboarding.html"]) {
+  if (!files.includes(document)) {
+    throw new Error(`stage-chrome: ${appDir} has no ${document} (run the chrome build first)`);
+  }
 }
 
 // --- static files (not bundled; restored after emptyOutDir wipes them) ---

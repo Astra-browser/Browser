@@ -104,7 +104,8 @@
     return untrack(() => {
       if (phase !== "waiting" || !air) return;
       phase = "forming";
-      void commands.onboardingPlayIntro().catch(() => {});
+      // The intro is drawn here, by the page itself; the old native
+      // `onboarding_play_intro` cue has no host route and no effect here.
       if (reducedMotion()) {
         phase = "still";
         return;

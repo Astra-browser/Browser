@@ -270,6 +270,8 @@ export const commands = {
 	 *  the new tab the closing scene ends on, whatever was chosen there.
 	 */
 	onboardingFinish: () => __TAURI_INVOKE<boolean>("onboarding_finish"),
+	/** Whether this window must show the first-run page (the host's rule). */
+	onboardingPending: () => __TAURI_INVOKE<{ open: boolean, reason: string }>("onboarding_pending"),
 	tabsNavigate: (id: string, input: string) => __TAURI_INVOKE<OperationAdmission>("tabs_navigate", { id, input }),
 	tabsReload: (id: string) => __TAURI_INVOKE<OperationAdmission>("tabs_reload", { id }),
 	tabsAnswerPageRequest: (id: string, answer: PageRequestAnswer) => __TAURI_INVOKE<OperationAdmission>("tabs_answer_page_request", { id, answer }),
@@ -392,6 +394,12 @@ export const commands = {
 	 *  sheet and the page leaves the screen.
 	 */
 	pagePermissionCardHost: (available: boolean) => __TAURI_INVOKE<void>("page_permission_card_host", { available }),
+	/**
+	 *  Answers the page dialog Astra is showing in place of the engine's
+	 *  commonDialog. The request token is the capability; a token that is not
+	 *  pending in this window is refused.
+	 */
+	pageDialogAnswer: (request: string, confirmed: boolean, value: string, checked: boolean) => __TAURI_INVOKE<OperationAdmission>("page_dialog_answer", { request, confirmed, value, checked }),
 	tabSetMuted: (id: string, muted: boolean) => __TAURI_INVOKE<OperationAdmission>("tab_set_muted", { id, muted }),
 	mediaPlayer: (id: string, action: MediaPlayerAction) => __TAURI_INVOKE<OperationAdmission>("media_player", { id, action }),
 	/**
@@ -726,6 +734,7 @@ export const events = {
 	notesChanged: makeEvent<NotesChanged>("notes-changed"),
 	operationProcessed: makeEvent<OperationProcessed>("operation-processed"),
 	pagePermissionPromptChanged: makeEvent<PagePermissionPromptChanged>("page-permission-prompt-changed"),
+	pageDialogPromptChanged: makeEvent<PageDialogPromptChanged>("page-dialog-prompt-changed"),
 	passkeyPromptChanged: makeEvent<PasskeyPromptChanged>("passkey-prompt-changed"),
 	resourceChanged: makeEvent<ResourceChanged>("resource-changed"),
 	runtimeStatusChanged: makeEvent<RuntimeStatusChanged>("runtime-status-changed"),
@@ -2534,6 +2543,25 @@ export type PageAssistSuggestionV1 = "summarize" | "key_points" | "key_numbers" 
 export type PagePermissionKindView = "camera" | "microphone" | "geolocation" | "notifications" | "persistent-storage" | "xr" | "loopback-network" | "local-network";
 
 export type PagePermissionPromptChanged = PagePermissionPromptView;
+
+/** The page dialog the engine asked Astra to draw (ASTRA-0020). */
+export type PageDialogKind = "alert" | "confirm" | "prompt" | "beforeunload";
+
+export type PageDialogPromptChanged = {
+	kind: PageDialogKind,
+	/** The page's host, never a path, query or credential. */
+	host: string,
+	title: string,
+	text: string,
+	/** `prompt` only: the page's initial text. */
+	defaultValue: string,
+	/** Empty unless the page supplied a checkbox label. */
+	checkboxLabel: string,
+	/** The exact request token an answer must echo back. */
+	request: string,
+	/** True when the request timed out, was answered elsewhere or went away. */
+	closed?: boolean,
+};
 
 export type PagePermissionPromptDecisionInput = "allow_once" | "always_allow" | "deny_once" | "always_deny" | "dismiss";
 

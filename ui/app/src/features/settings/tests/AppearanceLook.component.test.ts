@@ -52,7 +52,7 @@ const cases: [string, "light" | "dark", string][] = [
 for (const [id, mode, material] of cases) {
   test(`Appearance in ${id}, ${mode}, ${material}`, async () => {
     await page.viewport(1100, 1200);
-    native.settings = { appearance: mode, "ui.theme": id, "ui.material": material };
+    native.settings = { "appearance.theme": mode, "ui.theme": id, "ui.material": material };
     document.documentElement.dataset.theme = mode;
     document.documentElement.dataset.material = material;
     await preferences.init();
@@ -64,7 +64,7 @@ for (const [id, mode, material] of cases) {
 
 test("editing a preset forks it into Custom and writes once it rests", async () => {
   await page.viewport(1100, 1200);
-  native.settings = { appearance: "dark", "ui.theme": "nord" };
+  native.settings = { "appearance.theme": "dark", "ui.theme": "nord" };
   document.documentElement.dataset.theme = "dark";
   await preferences.init();
   const screen = await render(AppearanceStage);
@@ -94,7 +94,7 @@ test("editing a preset forks it into Custom and writes once it rests", async () 
 
 test("a copied theme imports back, and a broken one says so", async () => {
   await page.viewport(1100, 1200);
-  native.settings = { appearance: "light", "ui.theme": "dracula" };
+  native.settings = { "appearance.theme": "light", "ui.theme": "dracula" };
   document.documentElement.dataset.theme = "light";
   await preferences.init();
   const screen = await render(AppearanceStage);
@@ -125,7 +125,11 @@ test("a copied theme imports back, and a broken one says so", async () => {
 
 test("contrast works on top of a preset and never forks it", async () => {
   await page.viewport(1100, 1200);
-  native.settings = { appearance: "dark", "ui.theme": "nord", "ui.material": "liquid_glass" };
+  native.settings = {
+    "appearance.theme": "dark",
+    "ui.theme": "nord",
+    "ui.material": "liquid_glass",
+  };
   document.documentElement.dataset.theme = "dark";
   document.documentElement.dataset.material = "liquid_glass";
   await preferences.init();
@@ -149,7 +153,11 @@ test("contrast works on top of a preset and never forks it", async () => {
 
 test("the mode pictures choose the mode by click and by arrow keys", async () => {
   await page.viewport(1100, 1200);
-  native.settings = { appearance: "light", "ui.theme": "nord", "ui.material": "liquid_glass" };
+  native.settings = {
+    "appearance.theme": "light",
+    "ui.theme": "nord",
+    "ui.material": "liquid_glass",
+  };
   document.documentElement.dataset.theme = "light";
   document.documentElement.dataset.material = "liquid_glass";
   await preferences.init();
@@ -157,24 +165,24 @@ test("the mode pictures choose the mode by click and by arrow keys", async () =>
   const modes = screen.getByRole("radiogroup", { name: "Appearance" });
   const dark = modes.getByRole("radio", { name: "Dark" });
   await dark.click();
-  await expect.poll(() => native.settings.appearance).toBe("dark");
+  await expect.poll(() => native.settings["appearance.theme"]).toBe("dark");
   await expect.element(dark).toBeChecked();
   const press = (key: string) =>
     (dark.element() as HTMLElement).dispatchEvent(
       new KeyboardEvent("keydown", { key, bubbles: true }),
     );
   press("ArrowRight");
-  await expect.poll(() => native.settings.appearance).toBe("system");
+  await expect.poll(() => native.settings["appearance.theme"]).toBe("system");
   await expect.element(modes.getByRole("radio", { name: "System" })).toBeChecked();
   press("ArrowRight");
-  await expect.poll(() => native.settings.appearance).toBe("light");
+  await expect.poll(() => native.settings["appearance.theme"]).toBe("light");
   await settle();
   await page.screenshot({ path: `${shots}/mode-nord-light-glass.png` });
 });
 
 test("the mode pictures fit a narrow window", async () => {
   await page.viewport(520, 900);
-  native.settings = { appearance: "system", "ui.theme": "gruvbox", "ui.material": "none" };
+  native.settings = { "appearance.theme": "system", "ui.theme": "gruvbox", "ui.material": "none" };
   document.documentElement.dataset.theme = "dark";
   document.documentElement.dataset.material = "none";
   await preferences.init();

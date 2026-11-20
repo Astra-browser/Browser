@@ -16,7 +16,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 276 command wire names. */
+/** All 277 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -116,6 +116,7 @@ export type CommandName =
   | "newtab_search_context"
   | "note_call"
   | "onboarding_finish"
+  | "onboarding_pending"
   | "onboarding_play_intro"
   | "open_software_update"
   | "operation_acknowledge"
@@ -137,6 +138,7 @@ export type CommandName =
   | "page_assist_resume"
   | "page_assist_status"
   | "page_assist_stop"
+  | "page_dialog_answer"
   | "page_find"
   | "page_permission_card_host"
   | "page_permission_respond"
@@ -397,6 +399,7 @@ export const COMMANDS: readonly CommandName[] = [
   "newtab_search_context",
   "note_call",
   "onboarding_finish",
+  "onboarding_pending",
   "onboarding_play_intro",
   "open_software_update",
   "operation_acknowledge",
@@ -418,6 +421,7 @@ export const COMMANDS: readonly CommandName[] = [
   "page_assist_resume",
   "page_assist_status",
   "page_assist_stop",
+  "page_dialog_answer",
   "page_find",
   "page_permission_card_host",
   "page_permission_respond",
@@ -579,7 +583,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 37 event channel names (post-rename). */
+/** All 38 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -596,6 +600,7 @@ export type EventChannel =
   | "note-open-requested"
   | "notes-changed"
   | "operation-processed"
+  | "page-dialog-prompt-changed"
   | "page-permission-prompt-changed"
   | "passkey-prompt-changed"
   | "resource-changed"
@@ -636,6 +641,7 @@ export const EVENTS: readonly EventChannel[] = [
   "note-open-requested",
   "notes-changed",
   "operation-processed",
+  "page-dialog-prompt-changed",
   "page-permission-prompt-changed",
   "passkey-prompt-changed",
   "resource-changed",

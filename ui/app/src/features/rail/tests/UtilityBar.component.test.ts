@@ -80,7 +80,7 @@ vi.mock("$domain/extensions", () => ({
 
 vi.mock("$domain/preferences", () => ({
   preferences: {
-    value: (key: string) => (key === "appearance" ? native.appearance : ""),
+    value: (key: string) => (key === "appearance.theme" ? native.appearance : ""),
     set: native.setTheme,
   },
 }));
@@ -347,7 +347,7 @@ test("the appearance switch turns the window dark from a light window", async ()
   const dark = screen.getByRole("button", { name: "Use dark appearance", exact: true });
   await expect.element(dark).toBeVisible();
   await dark.click();
-  expect(native.setTheme).toHaveBeenCalledWith("appearance", "dark");
+  expect(native.setTheme).toHaveBeenCalledWith("appearance.theme", "dark");
 });
 
 test("a dark window offers the way back to light", async () => {
@@ -356,7 +356,7 @@ test("a dark window offers the way back to light", async () => {
   const light = screen.getByRole("button", { name: "Use light appearance", exact: true });
   await expect.element(light).toBeVisible();
   await light.click();
-  expect(native.setTheme).toHaveBeenCalledWith("appearance", "light");
+  expect(native.setTheme).toHaveBeenCalledWith("appearance.theme", "light");
 });
 
 test("the keyboard reaches a tool entry", async () => {

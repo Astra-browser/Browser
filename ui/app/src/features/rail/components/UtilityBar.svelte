@@ -55,14 +55,14 @@
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   });
-  const appearance = $derived(preferences.value("appearance"));
+  const appearance = $derived(preferences.value("appearance.theme"));
   const dark = $derived(appearance === "dark" || (appearance === "system" && systemDark));
   // The hub and its menu machinery arrive the first time the door opens, not
   // with the column's own startup.
   let hubOpened = $state(false);
 
   function toggleTheme() {
-    void preferences.set("appearance", dark ? "light" : "dark");
+    void preferences.set("appearance.theme", dark ? "light" : "dark");
   }
 
   function pick(kind: "downloads" | "notes") {

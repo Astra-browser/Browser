@@ -36,9 +36,9 @@
     if (step === undefined) return;
     if (getComputedStyle(group).direction === "rtl" && event.key.endsWith("Arrow")) step = -step;
     event.preventDefault();
-    const index = modes.findIndex((mode) => mode.value === preferences.value("appearance"));
+    const index = modes.findIndex((mode) => mode.value === preferences.value("appearance.theme"));
     const next = modes[(index + step + modes.length) % modes.length] ?? modes[0];
-    void preferences.set("appearance", next.value);
+    void preferences.set("appearance.theme", next.value);
     group.querySelector<HTMLElement>(`[data-mode="${next.value}"]`)?.focus();
   }
 </script>
@@ -53,7 +53,7 @@
   data-setting="appearance.theme"
 >
   {#each modes as mode (mode.value)}
-    {@const chosen = preferences.value("appearance") === mode.value}
+    {@const chosen = preferences.value("appearance.theme") === mode.value}
     <button
       type="button"
       role="radio"
@@ -61,7 +61,7 @@
       aria-checked={chosen}
       tabindex={chosen ? 0 : -1}
       data-mode={mode.value}
-      onclick={() => void preferences.set("appearance", mode.value)}
+      onclick={() => void preferences.set("appearance.theme", mode.value)}
     >
       <span class="picture" aria-hidden="true">
         {#each mode.tones as tone (tone)}

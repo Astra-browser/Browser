@@ -10,6 +10,7 @@
   import { PeekLayer, peek } from "$features/peek";
   import { webext } from "$domain/webext";
   import { PagePermissionPrompt } from "$features/permissions";
+  import { PageDialogPrompt, pageDialogs } from "$features/dialogs";
   import { PasskeyPrompt } from "$features/passkeys";
   import { passkeys } from "$domain/passkeys";
   import { updateNotices } from "$features/updates";
@@ -32,12 +33,13 @@
   import { uiCommands as ui } from "$domain/ui-commands";
   import { surface as browserPage } from "$domain/surface";
   import * as motion from "$session/motion.svelte";
+  import * as notices from "$session/notice.svelte";
   import * as tools from "$session/tools.svelte";
   import { preferences } from "$domain/preferences";
   import { keymap } from "$domain/keymap";
   import { browserImport, nativeImportAdapter } from "$domain/browser-import";
   import { findInPage } from "$features/address";
-  import { acceleratorFrom } from "$shared/lib/accelerator";
+  import { acceleratorFrom, sameAccelerator } from "$shared/lib/accelerator";
   import { applyLanguage } from "$shared/lib/locale.svelte";
   import { applySpaceTheme, spaceThemeValues } from "$features/tabs";
   import * as m from "$shared/i18n/messages";
@@ -117,11 +119,24 @@
   // An address handed over by Ctrl+L (or the field's own edit-in-launcher
   // hand-off). The overlay takes it as its first query; empty opens blank.
   let launcherSeed = $state("");
+  // Whether the core really holds the desktop hotkey. While it does, the
+  // desktop delivers the press (and the host coalesces a second delivery);
+  // when it does not — no core, or another app owns the chord — this window
+  // must still answer its own shortcut.
+  let launcherGlobal = $state(false);
+  const launcherKey = () =>
+    keymap.all().find((entry) => entry.id === "launcher.toggle")?.accelerator ?? null;
   let handledLauncher = 0;
   $effect(() => {
     const command = ui.uiCommand();
     if (command.seq === 0 || command.seq === handledLauncher) return;
     handledLauncher = command.seq;
+    // Commands with no Astra surface still answer: the person pressed a key
+    // and must see why nothing opened, not a dead window.
+    if (command.id === "notice.print-unavailable") {
+      notices.show(m.notice_print_unavailable(), "data");
+      return;
+    }
     if (command.id.startsWith("launcher.edit=")) {
       try {
         launcherSeed = decodeURIComponent(command.id.slice("launcher.edit=".length));
@@ -149,14 +164,16 @@
     if (consentActive || event.defaultPrevented || event.isComposing) return;
     const pressed = acceleratorFrom(event, IS_MAC);
     if (pressed === null) return;
-    // The launcher's shortcut is the core's global hotkey, so it arrives as a
-    // `launcher.toggle` command rather than as a key here. Matching it here
-    // too would toggle twice and cancel itself out.
-    //
-    // The overlay owns the keyboard while it is up, Escape and typing
-    // included; chrome shortcuts must not fire behind it.
+    // The launcher's shortcut reaches this window as a `launcher.toggle`
+    // command while the core holds the desktop hotkey. When it does not (no
+    // core, or the registration was refused), no command will arrive, so the
+    // window matches the bound chord itself — one path at a time, never both.
     if (launcherOpen) return;
-    const command = keymap.commandFor(event, IS_MAC, pressed);
+    const bound = launcherKey();
+    const command =
+      !launcherGlobal && bound !== null && sameAccelerator(bound, pressed, IS_MAC)
+        ? "launcher.toggle"
+        : keymap.commandFor(event, IS_MAC, pressed);
     if (command === null) return;
     event.preventDefault();
     void commands.runCommand(command);
@@ -165,8 +182,16 @@
   onMount(installCloseService);
   // Register the launcher's shortcut with the desktop once per window: the
   // core owns the registration, and this is the first read that hands it over.
+  // The answer says whether the desktop really holds it.
   onMount(() => {
-    void commands.launcherTrigger().catch(() => {});
+    void commands
+      .launcherTrigger()
+      .then((state) => {
+        launcherGlobal = state?.registered === true;
+      })
+      .catch(() => {
+        launcherGlobal = false;
+      });
   });
   onMount(() => void passkeys.start());
   // The startup read can land before the session has a profile, which lists
@@ -222,6 +247,7 @@
     const stopStoreClicks = webext.listenForStoreClicks();
     const stopDrops = webext.listenForDrops(() => browserPage.currentPage() !== "work");
     const pagePermissionsReady = pagePermissions.init();
+    const pageDialogsReady = pageDialogs.init();
 
     // Rasters are emitted immediately before the projection that references
     // them, so this listener must exist before tabs asks native to bootstrap.
@@ -248,6 +274,7 @@
           runtimeReady,
           extensionsReady,
           pagePermissionsReady,
+          pageDialogsReady,
           faviconsReady,
           tabsReady,
           uiEventsReady,
@@ -290,6 +317,7 @@
       extensions.dispose();
       webext.dispose();
       pagePermissions.dispose();
+      pageDialogs.dispose();
       void stopAccess.then((stop) => stop());
       void stopPrompt.then((stop) => stop());
       void stopStoreClicks.then((stop) => stop());
@@ -319,7 +347,11 @@
 {#if launcherOpen}
   <LauncherOverlay initial={launcherSeed} onclose={() => (launcherOpen = false)} />
 {/if}
-{#if webext.review() !== null}
+{#if pageDialogs.prompt() !== null}
+  {#key pageDialogs.prompt()!.request}
+    <PageDialogPrompt />
+  {/key}
+{:else if webext.review() !== null}
   <WebExtensionReview review={webext.review()!} />
 {:else if webext.prompt() !== null}
   <WebExtensionInstallPrompt prompt={webext.prompt()!} />

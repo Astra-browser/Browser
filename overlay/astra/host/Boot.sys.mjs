@@ -19,12 +19,148 @@
 // shell decides the command (packaged binary or dev build) and passes it in.
 
 import { emit, eventSeq } from "./Events.sys.mjs";
+import { Settings } from "./Settings.sys.mjs";
 import { HOST_API_VERSION } from "./Tabs.sys.mjs";
 import { __ensureDefaultWindow } from "./Windows.sys.mjs";
+import { PageDialogs } from "./PageDialogs.sys.mjs";
 
 const FRAME_CAP = 16 * 1024 * 1024;
 const HANDSHAKE_TIMEOUT_MS = 5000;
 const SHUTDOWN_TIMEOUT_MS = 5000;
+
+/** The completion flag, validated by `astra_core::settings` (a bool whose
+ *  default is "false", so a fresh profile is a first run). */
+export const ONBOARDING_KEY = "onboarding.completed";
+
+/** The packaged browser document the frame returns to after onboarding. */
+const BROWSER_DOCUMENT = "chrome://astra/content/app/browser-chrome.html";
+
+/**
+ * The first-run rule, in one place for the host and the page (the page mirrors
+ * it as `shouldOpenOnboarding`, `ui/app/src/features/welcome/lib/first-run.ts`;
+ * `tests/contract/first_run.mjs` holds both to the same cases).
+ *
+ * A private window never opens onboarding and never records it, and only the
+ * stored "true" means the flow is done. A missing or unreadable value is
+ * `null`, which fails open to the flow: a fresh profile has no entry at all.
+ */
+export function onboardingDecision({ completed = null, isPrivate = false } = {}) {
+  if (isPrivate === true) {
+    return { open: false, reason: "private" };
+  }
+  // A test/profile seam: probes and contract runs boot fresh profiles all day
+  // and must reach the browser, not the first-run page. `show` is for the
+  // onboarding probe itself; anything else falls back to the store.
+  let forced = "";
+  try {
+    forced = Services.prefs.getStringPref("astra.onboarding.force", "");
+  } catch {
+    forced = "";
+  }
+  if (forced === "skip") return { open: false, reason: "forced-skip" };
+  if (forced === "show") return { open: true, reason: "forced-show" };
+  // An automation profile is not a person meeting the product for the first
+  // time. `navigator.webdriver` is true in the chrome window while Marionette
+  // drives it; a profile that sets its own Marionette port counts too, because
+  // the probes write that before the session exists.
+  try {
+    const view = globalThis.document?.defaultView ?? null;
+    if (view?.navigator?.webdriver === true) {
+      return { open: false, reason: "automation" };
+    }
+  } catch {
+    // No document in this context.
+  }
+  try {
+    if (Services.prefs.prefHasUserValue("marionette.port")) {
+      return { open: false, reason: "automation" };
+    }
+  } catch {
+    // No prefs service in this context.
+  }
+  if (completed === "true") {
+    return { open: false, reason: "completed" };
+  }
+  return { open: true, reason: "first-run" };
+}
+
+/** Whether this main window must open onboarding now, read from the store. */
+export function onboardingPending({ isPrivate = false } = {}) {
+  return onboardingDecision({ completed: Settings.current(ONBOARDING_KEY), isPrivate }).open;
+}
+
+function chromeDocument() {
+  try {
+    return globalThis.document ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** True in a private chrome window: its document carries the marker, and the
+ *  engine's own answer is used when that module is reachable. */
+export function __chromeWindowIsPrivate() {
+  const doc = chromeDocument();
+  try {
+    if (doc?.documentElement?.getAttribute("privatebrowsingmode") === "temporary") {
+      return true;
+    }
+  } catch {
+    // No marker to read.
+  }
+  try {
+    const win = doc?.defaultView;
+    const { PrivateBrowsingUtils } = globalThis.ChromeUtils?.importESModule?.(
+      "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+    ) ?? {};
+    if (win && PrivateBrowsingUtils?.isWindowPrivate?.(win) === true) {
+      return true;
+    }
+  } catch {
+    // A chrome without the module keeps the marker answer.
+  }
+  return false;
+}
+
+/**
+ * Point this window's app frame back at the browser document. The frame
+ * belongs to the shell, and the onboarding page has no way to reload itself,
+ * so this is how the host closes the page. Only a frame currently on the
+ * onboarding document is moved: a second call (or a browser frame) is a no-op.
+ */
+export function __showBrowserSurface() {
+  const doc = chromeDocument();
+  let frame = null;
+  try {
+    frame = doc?.querySelector?.("[data-astra-app-frame]") ?? null;
+  } catch {
+    return false;
+  }
+  if (!frame) {
+    return false;
+  }
+  try {
+    // The attribute still names the browser page: the hand-off is a
+    // `location.replace` inside the frame, so the live document is the truth.
+    const live = String(frame.contentWindow?.location?.href ?? "");
+    if (!/(^|\/)onboarding\.html(?:[?#]|$)/u.test(live)) {
+      return false;
+    }
+    // The `src` attribute still names the browser page (the hand-off replaced
+    // the live document, not the attribute), so setting it to the same value
+    // is a no-op and the frame stayed on onboarding.html. Navigate the frame
+    // itself; that is the document the person is looking at.
+    try {
+      frame.contentWindow.location.replace(BROWSER_DOCUMENT);
+      return true;
+    } catch {
+      frame.setAttribute("src", BROWSER_DOCUMENT);
+      return true;
+    }
+  } catch {
+    return false;
+  }
+}
 
 function ok(request_id, data = {}) {
   return { request_id, host_api_version: HOST_API_VERSION, ...data };
@@ -265,6 +401,9 @@ export const Boot = {
       );
     }
     const window_id = __ensureDefaultWindow();
+    // The app's boot is the next moment the window is guaranteed to exist;
+    // the import-time attempt can lose a race with the native tab browser.
+    installPageDialogHook();
     const result = ok(request_id, {
       core_version,
       event_seq: eventSeq(),
@@ -383,6 +522,44 @@ export const Boot = {
     });
   },
 
+  /**
+   * Finish onboarding once: persist the completion flag through the settings
+   * store (the key `astra-core` validates), then hand this window's frame back
+   * to the browser. A private window refuses without writing. True only when
+   * the store accepted the write; a refused write keeps the page open so the
+   * person can retry instead of being told a lie.
+   */
+  /**
+   * Whether this window must show the first-run page. The app asks instead of
+   * deciding itself, so the automation/force seams and the private-window rule
+   * live in one place. `null` when the store cannot be read (the caller fails
+   * open, as before).
+   */
+  async onboardingPendingView({ request_id = "onboarding-pending" } = {}) {
+    const decision = onboardingDecision({
+      completed: Settings.current(ONBOARDING_KEY),
+      isPrivate: __chromeWindowIsPrivate(),
+    });
+    return decision;
+  },
+
+  async onboardingFinish({ request_id = "onboarding-finish", isPrivate = null } = {}) {
+    const priv = isPrivate === null ? __chromeWindowIsPrivate() : isPrivate === true;
+    if (priv) {
+      return false;
+    }
+    const written = await Settings.set({
+      request_id,
+      key: ONBOARDING_KEY,
+      value: "true",
+    });
+    if (written?.accepted !== true) {
+      return false;
+    }
+    __showBrowserSurface();
+    return true;
+  },
+
   async shutdown({ request_id = "boot-shutdown", reason = "quit" } = {}) {
     let coreStopped = false;
     _shuttingDown = true;
@@ -432,3 +609,25 @@ export function __resetBootForTests() {
     }
   }
 }
+
+// ASTRA-0020 window hook: the chrome document that loads the Host API is the
+// window whose page dialogs Astra answers. Any other importer (the app frame,
+// a standalone preview, Node) has no gBrowser and gets no controller.
+function installPageDialogHook() {
+  try {
+    const win = globalThis;
+    if (win?.document && win.gBrowser) {
+      PageDialogs.install({ window: win });
+      return true;
+    }
+    // The imported module can run before the native tab browser exists.
+    if (win?.document && typeof win.addEventListener === "function") {
+      win.addEventListener("load", installPageDialogHook, { once: true });
+    }
+  } catch {
+    // Without a chrome window the engine keeps its own dialog.
+  }
+  return false;
+}
+
+installPageDialogHook();

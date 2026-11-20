@@ -81,6 +81,7 @@ import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
 import * as Passkeys from "./Passkeys.sys.mjs";
 import { TabHistory, __resetTabHistoryForTests } from "./TabHistory.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
+import { PageDialogs } from "./PageDialogs.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
 import { __resetEventsForTests } from "./Events.sys.mjs";
 
@@ -143,6 +144,7 @@ export {
   Passkeys,
   TabHistory,
   DialogPrompts,
+  PageDialogs,
   addEventListener,
   emit,
   eventSeq,
@@ -188,6 +190,7 @@ export function __resetForTests() {
   Media.__resetForTests();
   __resetMediaImportForTests();
   DialogPrompts.__resetForTests();
+  PageDialogs.__resetForTests();
   __resetPerformanceForTests();
   __resetTimeForTests();
   __resetEventsForTests();

@@ -23,6 +23,7 @@
 import { getCurrentWindow, setWindowLabel } from "@astra/bridge";
 import type { Bridge } from "@astra/bridge";
 import { ensureBridge, framedInShell } from "$shared/ipc/bridge.js";
+import { shouldOpenOnboarding } from "$features/welcome/lib/first-run";
 import { mount, flushSync } from "svelte";
 import App from "$app/browser/BrowserApp.svelte";
 
@@ -30,6 +31,48 @@ const SURFACE = "browser-chrome";
 const SHELL_NS = "astra-shell";
 /** The shell hands over its ready hook (P3-T23). */
 const READY_HOOK = "__ASTRA_READY__";
+/** The first-run document staged beside this one (vite.onboarding.config.ts). */
+const ONBOARDING_PAGE = "./onboarding.html";
+
+/** The frame is leaving for onboarding; not a failure. */
+class Navigating extends Error {}
+
+/**
+ * True only in a private window. Chrome documents expose
+ * `PrivateBrowsingUtils`; the parent document's marker covers a build without
+ * it. A private window never shows onboarding and never records it.
+ */
+function inPrivateWindow(): boolean {
+  try {
+    if (document.documentElement.getAttribute("privatebrowsingmode") === "temporary") return true;
+  } catch {
+    // No marker to read.
+  }
+  try {
+    const parent = window.parent;
+    if (parent && parent !== window) {
+      if (parent.document?.documentElement?.getAttribute("privatebrowsingmode") === "temporary")
+        return true;
+    }
+  } catch {
+    // A parent that refuses the read keeps the marker check below.
+  }
+  try {
+    const chrome = globalThis as unknown as {
+      ChromeUtils?: {
+        importESModule: (id: string) => {
+          PrivateBrowsingUtils?: { isWindowPrivate: (win: Window) => boolean };
+        };
+      };
+    };
+    const pbu = chrome.ChromeUtils?.importESModule(
+      "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+    )?.PrivateBrowsingUtils;
+    return pbu?.isWindowPrivate((window.parent ?? window) as Window) === true;
+  } catch {
+    return false;
+  }
+}
 
 /** Announce readiness to the embedding shell (no-op standalone). */
 function announce(bridge: Bridge): void {
@@ -124,6 +167,38 @@ try {
   if (!(target instanceof HTMLElement)) {
     throw new Error("trusted UI root is unavailable");
   }
+
+  // First run: the profile has not finished onboarding, so this frame hands
+  // itself to the standalone onboarding document before any browser UI
+  // mounts. The host decides nothing here it cannot undo: completion lives in
+  // the settings store, and `Boot.onboardingFinish` marks it and points the
+  // frame back at this page. A private window never opens the flow. An
+  // unreadable store fails open, as `isFirstRun` does.
+  if (bridge.mode === "host" && framedInShell()) {
+    const completed = await bridge
+      .invoke<string | null>("setting_get", { key: "onboarding.completed" })
+      .catch(() => null);
+    // The host owns the rule (private windows, an automation profile, an
+    // explicit force). Its answer is authoritative; the local rule is only the
+    // fallback for a build with no host route.
+    const decision = await bridge
+      .invoke<{ open: boolean; reason: string } | null>("onboarding_pending")
+      .catch(() => null);
+    const open =
+      decision !== null && typeof decision?.open === "boolean"
+        ? decision.open
+        : shouldOpenOnboarding(completed, inPrivateWindow());
+    if (open) {
+      try {
+        document.documentElement.dataset.astraFirstRun = "1";
+      } catch {
+        // Diagnostics only.
+      }
+      window.location.replace(ONBOARDING_PAGE);
+      throw new Navigating();
+    }
+  }
+
   // Test seam (live suites + SHELL_APP.md): which bridge mode actually booted,
   // and whether it reaches the shell's Host API over the relay or its own.
   target.dataset.bridgeMode = bridge.mode;
@@ -204,6 +279,7 @@ try {
     "ui-command": "astra:ui-command",
     "operation-processed": "astra:operation-processed",
     "page-permission-prompt-changed": "astra:page-permission-prompt",
+    "page-dialog-prompt-changed": "astra:page-dialog-prompt",
     "passkey-prompt-changed": "astra:passkey-prompt",
     "web-extension-prompt-changed": "astra:web-extension-prompt",
     "nav.find-result": "astra:find",
@@ -297,5 +373,8 @@ try {
     reveal();
   }, 600);
 } catch (error) {
-  fail(error instanceof Error ? error.message : String(error), error);
+  // The frame is handing itself to the onboarding document; nothing failed.
+  if (!(error instanceof Navigating)) {
+    fail(error instanceof Error ? error.message : String(error), error);
+  }
 }

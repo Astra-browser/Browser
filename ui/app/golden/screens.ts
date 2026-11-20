@@ -53,7 +53,7 @@ function applyTheme(mode: "light" | "dark"): void {
 async function boot(): Promise<void> {
   // theme.init() adopts the stored appearance; align the bag first so the
   // requested theme survives init.
-  settings.appearance = THEME();
+  settings["appearance.theme"] = THEME();
   await theme.init();
   await preferences.init();
   await surface.init();

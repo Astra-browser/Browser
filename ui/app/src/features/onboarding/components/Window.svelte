@@ -120,7 +120,7 @@
       <span class="lights"><i></i><i></i><i></i></span>
       <div class="rail-modes">
         <span><Icon icon={Globe02Icon} size={12} /></span>
-        <span class="on"><Icon icon={Briefcase02Icon} size={12} /></span>
+        {#if modes}<span class="on"><Icon icon={Briefcase02Icon} size={12} /></span>{/if}
       </div>
       <span class="rail-icon"><Icon icon={Search01Icon} size={15} /></span>
       <hr />

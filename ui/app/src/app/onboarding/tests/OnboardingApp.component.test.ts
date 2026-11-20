@@ -12,7 +12,6 @@ import OnboardingApp from "../OnboardingApp.svelte";
 
 const native = vi.hoisted(() => ({
   settings: {} as Record<string, string>,
-  intro: 0,
   ready: 0,
   finished: 0,
   endpoint: null as string | null,
@@ -50,10 +49,6 @@ vi.mock("$shared/ipc/bindings", async () => {
     workSetModelEndpoint: async (_profile: string, base: string | null) => {
       native.endpoint = base;
       return {} as WorkModelsV1;
-    },
-    onboardingPlayIntro: async () => {
-      native.intro++;
-      return true;
     },
     keymapEntries: async () => [
       {
@@ -123,7 +118,6 @@ const importer: ImportAdapter = {
 
 beforeEach(async () => {
   native.settings = {};
-  native.intro = 0;
   native.ready = 0;
   native.finished = 0;
   native.endpoint = null;
@@ -185,7 +179,8 @@ test("the first run, from the name in the air to the browser", { timeout: 180_00
   await formed();
   await pause(1600);
   await capture("02-welcome", { wait: false });
-  expect(native.intro).toBe(1);
+  // The formation is the page's own drawing now (the old native intro cue has
+  // no host route), so what is left to check is that nothing of it runs on.
   // Nothing of the formation is left running.
   await expect.poll(() => document.querySelector("canvas.air"), { timeout: 4000 }).toBeNull();
 
@@ -197,9 +192,10 @@ test("the first run, from the name in the air to the browser", { timeout: 180_00
   // No greeting is turned on, and the name is left as it was.
   expect(native.settings["ui.newtab-greeting"]).toBeUndefined();
   expect(fakeTabs.profile().name).toBe("Personal");
-  // The engine chosen beside the import is the one search uses.
-  await page.getByRole("radio", { name: "Google" }).click();
-  await expect.poll(() => native.settings["search.engine"]).toBe("google");
+  // The engine chosen beside the import is the one search uses. Google is
+  // already the default, so the write only happens when another is chosen.
+  await page.getByRole("radio", { name: "DuckDuckGo" }).click();
+  await expect.poll(() => native.settings["search.engine"]).toBe("duckduckgo");
   await page.getByRole("radio", { name: "Arc" }).click();
   await capture("04-import");
   await page.getByRole("button", { name: "Import", exact: true }).click();

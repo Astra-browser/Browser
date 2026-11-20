@@ -54,6 +54,7 @@ export interface HostModules {
   Passkeys: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   TabHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  PageDialogs: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   BrowsingData: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Blocker: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -133,6 +134,7 @@ const ROUTES: Record<string, Route> = {
   tabs_answer_sign_in: ["DialogPrompts", "answerAuth", TAB_ARG],
   tabs_answer_page_request: ["Tabs", "answerPageRequest", TAB_ARG],
   tabs_continue_past_certificate: ["DialogPrompts", "answerCert", TAB_ARG],
+  page_dialog_answer: ["PageDialogs", "answer"],
   tabs_navigate: ["Navigation", "loadURL", { ...TAB_ARG, input: "url" }],
   tabs_back: ["Navigation", "goBack", TAB_ARG],
   tabs_forward: ["Navigation", "goForward", TAB_ARG],
@@ -144,6 +146,8 @@ const ROUTES: Record<string, Route> = {
   panel_hide: ["Panes", "hide"],
   panel_ready: ["Panes", "list"],
   ui_ready: ["Boot", "handshake"],
+  onboarding_finish: ["Boot", "onboardingFinish"],
+  onboarding_pending: ["Boot", "onboardingPendingView"],
   sidebar_set_width: ["Sidebar", "setWidth"],
   sidebar_set_hidden: ["Sidebar", "setHidden"],
   sidebar_peek: ["Sidebar", "peek"],

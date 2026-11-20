@@ -211,6 +211,52 @@ const CHROME = { actor: "chrome" };
   check("get unknown rejected", missing.error?.code === "no_such_dialog");
 }
 
+// === Page dialogs (ASTRA-0020): alert/confirm/prompt/beforeunload ===
+{
+  const { PageDialogs, pageDialogKind } = await import(
+    pathToFileURL(path.join(HOST, "PageDialogs.sys.mjs")).href
+  );
+  check(
+    "page dialogs own alert/confirm/prompt/beforeunload",
+    ["alert", "confirm", "prompt"].every(
+      (kind) => pageDialogKind({ promptType: kind }) === kind,
+    ) &&
+      pageDialogKind({ promptType: "confirmEx", inPermitUnload: true }) ===
+        "beforeunload",
+  );
+  check(
+    "page dialogs keep select and auth on the engine path",
+    pageDialogKind({ promptType: "select" }) === null &&
+      pageDialogKind({ promptType: "promptUserAndPass" }) === null,
+  );
+
+  const win = { __astraWindowId: "win-1", addEventListener() {} };
+  check("page dialog controller installs", PageDialogs.install({ window: win }) === true);
+  const pending = win.__astraPageDialogs.present(
+    { promptType: "prompt", text: "name?", value: "draft" },
+    { host: "example.test" },
+  );
+  const emitted = byType("page-dialog-prompt-changed").at(-1);
+  check("page dialog event is emitted", emitted?.data.kind === "prompt");
+  check("page dialog event carries its request", typeof emitted?.data.request === "string");
+  check("page dialog event carries the default", emitted?.data.defaultValue === "draft");
+  check("page dialog event carries a host only", emitted?.data.host === "example.test");
+
+  const admission = await PageDialogs.answer({
+    request: emitted.data.request,
+    confirmed: true,
+    value: "typed",
+    window_id: "win-1",
+  });
+  check("page dialog answer is admitted", admission.accepted === true);
+  check("page dialog resolves with the typed value", (await pending).value === "typed");
+  check(
+    "page dialog closes with a notice",
+    byType("page-dialog-prompt-changed").at(-1)?.data.closed === true,
+  );
+  PageDialogs.uninstall({ window: win });
+}
+
 off();
 
 console.log(`dialogs events contract: ${failed ? "FAIL" : `PASS (${passed} checks)`}`);

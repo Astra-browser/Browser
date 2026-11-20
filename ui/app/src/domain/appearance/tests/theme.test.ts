@@ -154,7 +154,7 @@ describe("theme startup lifecycle", () => {
     await theme.init();
 
     harness.emit("theme.dark");
-    expect(harness.settingSet).toHaveBeenCalledWith("appearance", "dark");
+    expect(harness.settingSet).toHaveBeenCalledWith("appearance.theme", "dark");
     theme.dispose();
   });
 

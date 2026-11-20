@@ -25,7 +25,7 @@ export function unmockedCommands(): string[] {
 
 /** Settings the golden pages read. Theme/appearance is applied per screen. */
 export const settings: Record<string, string> = {
-  appearance: "light",
+  "appearance.theme": "light",
   "ui.theme": "astra",
   "ui.material": "none",
   "ui.newtab-clock-format": "12h",

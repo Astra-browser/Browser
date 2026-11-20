@@ -1,0 +1,84 @@
+Patch-Id: ASTRA-0020
+Title: Hand page alert/confirm/prompt/beforeunload to Astra's own dialog
+Tier: P1
+Upstream-Files: browser/actors/PromptParent.sys.mjs
+Intent: stop the engine's commonDialog.xhtml from answering a page's alert, confirm, prompt and beforeunload in an Astra window; the window's page-dialog controller (published by the shell's Host API as win.__astraPageDialogs) draws the dialog in the app and returns the answer, while select, HTTP auth, certificate and repost prompts keep the engine path
+Risk: medium (only windows whose Host API installed a controller are intercepted; every answer is written onto the engine args exactly as CommonDialog does, a controller failure or a 60 s silence cancels instead of blocking the page, and select/auth/cert/repost keep commonDialog.xhtml; the engine browser-chrome prompt suite still sees the native dialog)
+Test: forge lint; node tests/contract/page_dialogs.mjs (present -> event, answer -> resolution, timeout -> cancelled, wrong request or window ignored, two windows isolated); node tests/contract/dialogs_events.mjs; live: a loopback page firing alert/confirm/prompt and a beforeunload trap, answered in the app with no chrome://global/content/commonDialog.xhtml in the tab dialog stack
+Verified-On: 153.6.0
+Removal-Plan: drop when the engine exposes a first-class page-dialog provider that chrome can register per window, or when Astra no longer draws its own page dialogs
+---
+diff --git a/browser/actors/PromptParent.sys.mjs b/browser/actors/PromptParent.sys.mjs
+index e3694b8418..d386febfc4 100644
+--- a/browser/actors/PromptParent.sys.mjs
++++ b/browser/actors/PromptParent.sys.mjs
+@@ -201,6 +201,27 @@ export class PromptParent extends JSWindowActorParent {
+       throw new Error("Cannot open a prompt in a hidden window");
+     }
+ 
++    // Astra draws the page's own dialogs: alert, confirm, prompt and the
++    // beforeunload confirmation go to the window's app instead of loading
++    // commonDialog.xhtml. A prompt Astra does not own (select, HTTP auth,
++    // certificate, repost) keeps the engine path below.
++    const astraDialogs = win?.__astraPageDialogs;
++    if (astraDialogs?.present) {
++      let answer = null;
++      try {
++        answer = await astraDialogs.present(args, {
++          host: astraPageHost(browsingContext),
++        });
++      } catch {
++        // A broken controller cancels the prompt instead of opening a native
++        // dialog: the page must never be blocked forever.
++        answer = { confirmed: false };
++      }
++      if (answer) {
++        return astraApplyPageDialogAnswer(args, answer);
++      }
++    }
++
+     try {
+       if (browsingContext.embedderElement) {
+         browsingContext.embedderElement.enterModalState();
+@@ -381,3 +402,41 @@ export class PromptParent extends JSWindowActorParent {
+     }
+   }
+ }
++
++// Astra page dialogs (ASTRA-0020). The app owns alert, confirm, prompt and
++// beforeunload; the controller is published on the chrome window by the
++// shell's Host API. A window without one keeps commonDialog.xhtml.
++function astraPageHost(aBrowsingContext) {
++  try {
++    const principal = aBrowsingContext?.currentWindowGlobal?.documentPrincipal;
++    if (principal && !principal.isSystemPrincipal && !principal.isNullPrincipal) {
++      const host = principal.URI.displayHostPort || principal.originNoSuffix || "";
++      // A host only: the prompt must not carry a path, query or credential.
++      if (/^[a-z0-9.-]+(:\d{1,5})?$/iu.test(host)) {
++        return host;
++      }
++    }
++  } catch {
++    // A principal without a URI leaves the host empty.
++  }
++  return "";
++}
++
++// Mirror what CommonDialog writes on the engine's args; the prompt service
++// reads `ok`, `buttonNumClicked`, `value` and `checked`.
++function astraApplyPageDialogAnswer(args, aAnswer) {
++  const confirmed = aAnswer.confirmed === true;
++  args.promptAborted = false;
++  args.promptActive = false;
++  args.ok = confirmed;
++  args.confirmed = confirmed;
++  args.buttonNumClicked =
++    typeof aAnswer.buttonNum === "number" ? aAnswer.buttonNum : confirmed ? 0 : 1;
++  if (args.promptType === "prompt" && typeof aAnswer.value === "string") {
++    args.value = aAnswer.value;
++  }
++  if (typeof args.checkLabel === "string" && args.checkLabel !== "") {
++    args.checked = aAnswer.checked === true;
++  }
++  return args;
++}
