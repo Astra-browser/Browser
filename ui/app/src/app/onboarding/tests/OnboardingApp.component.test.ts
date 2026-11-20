@@ -76,6 +76,10 @@ vi.mock("$domain/tabs", async () => ({
   tabs: (await import("./onboarding-tabs.svelte")).fakeTabs,
 }));
 
+// The first run this suite walks is the full one: Work and its AI step are
+// only in the flow while both build flags are on (`lib/flow.ts:stepsFor`).
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+
 let report: ((job: ImportJob) => void) | null = null;
 const importer: ImportAdapter = {
   sources: async () => [

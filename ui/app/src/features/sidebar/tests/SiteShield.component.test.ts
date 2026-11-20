@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   setEnabled: vi.fn(async () => ({ state: "processed", disposition: { outcome: "applied" } })),
   refresh: vi.fn(async () => {}),
   profile: { kind: "default" },
+  reloadActive: vi.fn(),
 }));
 
 vi.mock("$domain/blocker", () => ({
@@ -35,6 +36,7 @@ vi.mock("$domain/tabs", () => ({
     activeId: () => "a",
     activeTab: () => ({ url: "https://news.example/story", projection_revision: "r1" }),
     profile: () => state.profile,
+    reloadActive: state.reloadActive,
   },
 }));
 
@@ -52,6 +54,7 @@ afterEach(() => {
   state.setProtected.mockClear();
   state.setEnabled.mockClear();
   state.refresh.mockClear();
+  state.reloadActive.mockClear();
   state.profile = { kind: "default" };
 });
 
@@ -88,6 +91,9 @@ test("with blocking off globally the same control turns it on", async () => {
   button.click();
   await vi.waitFor(() => expect(state.setEnabled).toHaveBeenLastCalledWith(true));
   expect(state.setProtected).not.toHaveBeenCalled();
+  // The page was served while protection was off; it is reloaded so what is
+  // on screen is what "on" now means.
+  await vi.waitFor(() => expect(state.reloadActive).toHaveBeenCalled());
 });
 
 test("a private window has no per-site switch (the policy is process-wide)", async () => {
