@@ -196,6 +196,11 @@ test("a narrow pane keeps the field inside the page", async () => {
   const screen = await setup({}, 0);
   screen.container.style.inlineSize = "660px";
   await expect.element(screen.getByRole("combobox")).toBeVisible();
+  // `bind:clientWidth` follows a ResizeObserver: wait for the pane to be the
+  // width the test set rather than measuring the frame before the observer ran.
+  await expect
+    .poll(() => screen.container.querySelector(".newtab")!.getBoundingClientRect().width)
+    .toBeLessThanOrEqual(660);
   const pane = screen.container.querySelector(".newtab")!.getBoundingClientRect();
   const dock = screen.container.querySelector(".field")!.getBoundingClientRect();
   expect(dock.left).toBeGreaterThan(pane.left);

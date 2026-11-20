@@ -9,6 +9,9 @@ import { surface } from "$domain/surface";
 import Shell from "../Shell.svelte";
 
 vi.mock("../WorkWorkspace.svelte", async () => await import("./StageStub.svelte"));
+// The account foot is a build flag; the rail's Account button is only there
+// in the flagged build, which is what this suite describes.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");

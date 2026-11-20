@@ -86,9 +86,12 @@ test("a tab's right-click is Astra's menu, with rows the projection supports", a
     .toEqual([
       "New Tab",
       "Reload Tab",
+      "Preview",
       "Copy Link",
+      "Duplicate Tab",
       "Add to Essentials",
       "Open in Split View",
+      "Group with This Tab",
       "Mute Tab",
       "Clear Data for This Site…",
       "Close Tab",

@@ -16,6 +16,9 @@ import {
 } from "$shared/testing/account";
 import AccountPageStage from "./AccountPageStage.svelte";
 
+// The usage and credits sections are behind the build's AI flag.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+
 const state = vi.hoisted(() => ({
   account: null as AccountV1 | null,
   history: null as AccountHistoryV1 | null,

@@ -60,6 +60,8 @@ test("settings publishes the panel's width, and gives it back on the way out", a
 
   emitNativeEvent("uiCommand", "browser.return");
   await expect.poll(() => surface.currentPage()).toBe(null);
-  await expect.poll(lastWidth).toBe(240);
-  await expect.poll(shownWidth).toBe(240);
+  // Back to the settled expanded column: `expandedWidth` (260), which the
+  // handle may drag down to MIN_EXPANDED_WIDTH (252) but never below.
+  await expect.poll(lastWidth).toBe(260);
+  await expect.poll(shownWidth).toBe(260);
 });

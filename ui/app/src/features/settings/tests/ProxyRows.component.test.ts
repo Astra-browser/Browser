@@ -5,6 +5,10 @@ import ProxyRows from "../components/ProxyRows.svelte";
 
 const state = vi.hoisted(() => ({ values: {} as Record<string, string>, failed: false }));
 
+// The row's help text is platform copy: pin the platform so the assertion is
+// the same on every machine the suite runs on.
+vi.mock("$shared/platform", () => ({ IS_WINDOWS: false, IS_MAC: true }));
+
 vi.mock("$domain/preferences", () => ({
   preferences: {
     value: (key: string) => state.values[key] ?? "",

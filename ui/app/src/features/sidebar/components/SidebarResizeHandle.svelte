@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$shared/i18n/messages";
   import {
     applyDragWidth,
     beginSidebarResize,
@@ -100,11 +101,12 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div
   role="separator"
-  aria-label="Resize sidebar"
+  aria-label={m.ui_resize_sidebar()}
   aria-orientation="vertical"
   aria-valuemin={MIN_EXPANDED_WIDTH}
   aria-valuemax={MAX_EXPANDED_WIDTH}
   aria-valuenow={width}
+  aria-valuetext={m.ui_sidebar_width({ width })}
   aria-disabled={disabled}
   tabindex={disabled ? -1 : 0}
   class="group absolute inset-y-0 -right-1.5 z-20 w-2 cursor-col-resize touch-none outline-none"

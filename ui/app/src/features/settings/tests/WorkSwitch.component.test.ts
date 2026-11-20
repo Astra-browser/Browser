@@ -6,6 +6,9 @@ import { preferences } from "$domain/preferences";
 import * as settings from "../lib/settings-state.svelte";
 import SettingsLookStage from "./SettingsLookStage.svelte";
 
+// The AI switch only exists in a build with the AI flag on.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+
 const native = vi.hoisted(() => ({
   settings: {} as Record<string, string>,
   writes: [] as [string, string][],

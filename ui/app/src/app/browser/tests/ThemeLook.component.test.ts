@@ -75,7 +75,7 @@ for (const id of ["astra", "paper", "nord", "dracula", "catppuccin"])
 
 test("a larger serif interface keeps every row's height", async () => {
   await page.viewport(1100, 720);
-  native.settings = { appearance: "light", "ui.theme": "paper" };
+  native.settings = { "appearance.theme": "light", "ui.theme": "paper" };
   document.documentElement.dataset.theme = "light";
   document.documentElement.dataset.material = "none";
   theme.applyCustomization({

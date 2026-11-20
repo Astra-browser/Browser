@@ -7,6 +7,12 @@ import { accountFixture as account, usageFixture } from "$shared/testing/account
 import { preferences } from "$domain/preferences";
 import AccountPage from "../components/sections/AccountPage.svelte";
 
+// The usage and credits sections are behind the build's AI flag.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+// The vault's own name is platform copy ("Keychain" on macOS, "Windows
+// Credential Manager" on Windows); pin the platform so the copy is stable.
+vi.mock("$shared/platform", () => ({ IS_WINDOWS: false, IS_MAC: true }));
+
 const native = vi.hoisted(() => ({
   get: vi.fn(),
   send: vi.fn(),

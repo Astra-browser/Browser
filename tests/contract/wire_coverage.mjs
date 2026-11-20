@@ -8,7 +8,7 @@
 //
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -153,35 +153,109 @@ for (const name of [
 // No new gap: every command without a route, and every declared channel
 // without a forwarder, must already be in the recorded baseline. Adding a
 // control that calls an unrouted command now fails this guard.
+//
+// The baseline is derived, not curated: `--write-baseline` rewrites it as
+// COMMANDS minus the route table (and declared channels minus forwarders), so
+// an entry that is routed or that is not a command is a real failure below.
+const COMMANDS_HEAD = "export const COMMANDS: readonly CommandName[] = [";
+const commandsSegment = proto.split(COMMANDS_HEAD)[1]?.split("] as const;")[0];
+check("the command registry was parsed", Boolean(commandsSegment));
 const commands = [
-  ...proto
-    .split("export const COMMANDS: readonly CommandName[] = [")[1]
-    .split("];")[0]
-    .matchAll(/"([a-z0-9_]+)"/gu),
-].map((match) => match[1]);
+  ...new Set([...(commandsSegment ?? "").matchAll(/"([a-z0-9_]+)"/gu)].map(
+    (match) => match[1],
+  )),
+];
+check(`the command registry has entries (${commands.length} names)`, commands.length > 200);
 const routed = new Set(routes.map((route) => route.name));
-const knownUnrouted = new Set(baseline.unrouted ?? []);
+const commandSet = new Set(commands);
+const channels = [
+  ...new Set(
+    [...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
+  ),
+];
+const forwardedChannels = new Set(
+  [...chromeEntry.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
+);
+const unroutedCommands = commands.filter((name) => !routed.has(name));
+const unforwardedChannels = channels.filter(
+  (name) => !forwardedChannels.has(name),
+);
+
+if (process.argv.includes("--write-baseline")) {
+  const next = {
+    unrouted: [...unroutedCommands].sort(),
+    unforwarded: [...unforwardedChannels].sort(),
+  };
+  await writeFile(
+    path.join(ROOT, "tests", "contract", "wire_baseline.json"),
+    `${JSON.stringify(next, null, 2)}\n`,
+  );
+  console.log(
+    `wire baseline: wrote ${next.unrouted.length} unrouted commands, ` +
+      `${next.unforwarded.length} unforwarded channels`,
+  );
+  process.exit(0);
+}
+
+// The baseline must stay an inventory of real gaps, or the "known" count lies
+// in both directions and a regression in a pruned name is invisible.
+const baselineUnrouted = baseline.unrouted ?? [];
+const baselineUnforwarded = baseline.unforwarded ?? [];
+check(
+  `the baseline lists no duplicate commands (${baselineUnrouted.length} entries)`,
+  baselineUnrouted.length === new Set(baselineUnrouted).size,
+);
+const nonCommands = baselineUnrouted.filter((name) => !commandSet.has(name));
+check(
+  `every baseline command is a generated command (${nonCommands.length} invalid)`,
+  nonCommands.length === 0,
+);
+for (const name of nonCommands) {
+  console.error(`  ${name} is not in COMMANDS (regenerate with --write-baseline)`);
+}
+const staleRouted = baselineUnrouted.filter((name) => routed.has(name));
+check(
+  `no baseline command is routed (${staleRouted.length} stale)`,
+  staleRouted.length === 0,
+);
+for (const name of staleRouted) {
+  console.error(`  ${name} has a route but is still in the baseline`);
+}
+const unknownChannels = baselineUnforwarded.filter(
+  (name) => !channels.includes(name),
+);
+check(
+  `every baseline channel is declared (${unknownChannels.length} invalid)`,
+  unknownChannels.length === 0,
+);
+for (const name of unknownChannels) console.error(`  ${name} is not declared`);
+const staleForwarded = baselineUnforwarded.filter((name) =>
+  forwardedChannels.has(name),
+);
+check(
+  `no baseline channel is forwarded (${staleForwarded.length} stale)`,
+  staleForwarded.length === 0,
+);
+for (const name of staleForwarded) {
+  console.error(`  ${name} is forwarded but is still in the baseline`);
+}
+
+const knownUnrouted = new Set(baselineUnrouted);
 const newGaps = commands.filter(
   (name) => !routed.has(name) && !knownUnrouted.has(name),
 );
 check(
-  `no new unrouted command (${newGaps.length} new, ${knownUnrouted.size} known)`,
+  `no new unrouted command (${newGaps.length} new, ${knownUnrouted.size} known of ${commands.length})`,
   newGaps.length === 0,
 );
 for (const name of newGaps) console.error(`  ${name} has no route`);
 
-const channels = [
-  ...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu),
-].map((match) => match[1]);
-const forwardedChannels = new Set(
-  [...chromeEntry.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
-);
-const knownUnforwarded = new Set(baseline.unforwarded ?? []);
-const newChannels = [...new Set(channels)].filter(
+const knownUnforwarded = new Set(baselineUnforwarded);
+const newChannels = channels.filter(
   (name) => !forwardedChannels.has(name) && !knownUnforwarded.has(name),
 );
 check(
-  `no new unforwarded channel (${newChannels.length} new, ${knownUnforwarded.size} known)`,
+  `no new unforwarded channel (${newChannels.length} new, ${knownUnforwarded.size} known of ${channels.length})`,
   newChannels.length === 0,
 );
 for (const name of newChannels) console.error(`  ${name} is never forwarded`);

@@ -12,6 +12,11 @@ import { accountFixture, usageFixture } from "$shared/testing/account";
 import AccountPage from "../components/sections/AccountPage.svelte";
 import { ask } from "../lib/settings-state.svelte";
 
+// Credits and usage live behind the build's AI flag; this suite is the
+// flagged build's account page, so pin it on rather than depending on the
+// environment the runner happens to export.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+
 const native = vi.hoisted(() => ({
   get: vi.fn(),
   buy: vi.fn(),

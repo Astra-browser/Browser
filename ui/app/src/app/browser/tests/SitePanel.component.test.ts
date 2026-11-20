@@ -108,10 +108,13 @@ async function shell(over: Parameters<typeof tabFixture>[0] = {}) {
     split_group: null,
   });
   const screen = await render(Shell);
-  // A web page hides the page bar until the pointer reaches the top edge.
-  // The panel lives in that bar, so a real hover is part of these tests.
+  // The tray's glyph is painted only while the column is in use (or its field
+  // has the keyboard); a real pointer rests in the column before reaching it.
   screen.container
     .querySelector(".bar-reveal")
+    ?.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }));
+  screen.container
+    .querySelector(".browser-sidebar")
     ?.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }));
   return screen;
 }
@@ -123,6 +126,8 @@ test("the address field has one control, at its end, and no zoom badge", async (
   const screen = await shell({ zoom: 125 });
   const field = screen.container.querySelector<HTMLElement>(".address-field")!;
   const input = field.querySelector("input")!;
+  // The tray's glyph is revealed with the column; wait for it to be reachable.
+  await expect.element(screen.getByRole("button", { name: "Site information" })).toBeVisible();
   const glyph = screen.getByRole("button", { name: "Site information" }).element();
   expect(field.contains(glyph)).toBe(true);
   expect(before(input, glyph)).toBe(true);
@@ -152,7 +157,11 @@ test("one panel, top to bottom: the shield with blocking, its permissions, zoom,
   for (let at = 1; at < order.length; at++) expect(before(order[at - 1]!, order[at]!)).toBe(true);
 
   const text = panel.element().textContent ?? "";
-  expect(text).not.toContain("meet.example");
+  // The head names the site it is about: a panel that says "Blocking" without
+  // saying blocking where makes a person check the address bar.
+  expect(panel.element().querySelector(".protection .head .site")?.textContent).toBe(
+    "meet.example",
+  );
   expect(text).not.toContain("Site settings");
   expect(text).not.toMatch(/blocked today|Ad blocking|\b42\b/u);
   expect(native.stats).not.toHaveBeenCalled();
@@ -173,12 +182,16 @@ test("the shield and the switch are one row: the shield leads, what the switch d
   expect(
     Math.abs(rect(shield).top + rect(shield).height / 2 - (rect(head).top + rect(head).height / 2)),
   ).toBeLessThan(1);
-  expect(head.offsetHeight).toBe(34);
+  const words = head.querySelector<HTMLElement>(".words")!;
+  // The head is its two lines (the site, then what the switch acts on) and its
+  // own 2px padding: nothing else adds height to the row.
+  expect(head.querySelector(".site")?.textContent).toBe("meet.example");
+  expect(head.offsetHeight).toBe(Math.round(words.getBoundingClientRect().height) + 4);
   expect(head.querySelectorAll("svg")).toHaveLength(1);
   expect(head.querySelector(".status")).toBeNull();
 });
 
-test("a page at its default zoom with no decisions has just the site, blocking and its data", async () => {
+test("a page at its default zoom with no decisions lists the kinds it could ask for at Ask", async () => {
   native.list.mockResolvedValue({
     private: false,
     complete: true,
@@ -190,9 +203,13 @@ test("a page at its default zoom with no decisions has just the site, blocking a
   const panel = screen.getByRole("group", { name: "Site information" });
   await expect.element(panel.getByRole("switch", { name: "Block on this site" })).toBeVisible();
   await expect.poll(() => native.list.mock.calls.length).toBe(1);
-  await expect.element(panel.getByRole("radiogroup")).not.toBeInTheDocument();
+  // No decision is a state of its own: the page may ask, and the row says so
+  // rather than the panel pretending the site has no permissions.
+  const camera = panel.getByRole("radiogroup", { name: "Camera" });
+  await expect.element(camera).toBeVisible();
+  await expect.element(panel.getByText("Ask", { exact: true })).toBeVisible();
+  await expect.element(panel.getByText("Permissions", { exact: true })).toBeVisible();
   await expect.element(panel.getByRole("group", { name: "Page zoom" })).not.toBeInTheDocument();
-  await expect.element(panel.getByText("Permissions")).not.toBeInTheDocument();
   await expect
     .element(panel.getByRole("button", { name: "Clear data for this site…" }))
     .toBeVisible();
@@ -218,9 +235,13 @@ test("the panel is as wide as the field, with two groups divided and every row o
 
   const body = panel.element().querySelector<HTMLElement>("[data-tray-body]")!;
   const line = (row: Element) => (row as HTMLElement).offsetHeight;
-  expect(line(body.querySelector(".protection .head")!)).toBe(34);
+  const head = body.querySelector<HTMLElement>(".protection .head")!;
+  const words = head.querySelector<HTMLElement>(".words")!;
+  // The head is as tall as its words and its own padding; every action row is
+  // the panel's one-line height. (The zoom *group* stacks its label and its
+  // control, so it is a block, not a row.)
+  expect(line(head)).toBe(Math.round(words.getBoundingClientRect().height) + 4);
   expect(line(panel.getByRole("button", { name: "Hide elements…" }).element())).toBe(34);
-  expect(line(panel.getByRole("group", { name: "Page zoom" }).element())).toBe(34);
   expect(line(panel.getByRole("button", { name: "Clear data for this site…" }).element())).toBe(34);
 
   // What acts on the page, and what the site has: one divider between.
@@ -272,7 +293,10 @@ test("an unencrypted page keeps the warning in view, and the panel says why", as
   await expect.element(panel.getByText("Not secure")).toBeVisible();
   await expect.element(panel.getByRole("img", { name: "Not secure" })).toBeVisible();
   expect(panel.element().textContent).not.toContain("Secure");
-  expect(panel.element().textContent).not.toContain("meet.example");
+  // The warning names the site it is about.
+  expect(panel.element().querySelector(".protection .head .site")?.textContent).toBe(
+    "meet.example",
+  );
 });
 
 test("a certificate the person continued past is not secure either", async () => {
@@ -289,10 +313,10 @@ test("a certificate the person continued past is not secure either", async () =>
 test("a new tab keeps its own search field and shows the page bar", async () => {
   native.extensions = true;
   const screen = await shell({ url: null });
-  // The home page always shows the page bar, beside the new tab's own field.
-  // A web page is the only place the bar steps away (until hover or pinning).
+  // In the expanded column the head owns the one field and the page bar; the
+  // floating `[data-content-bar]` belongs to the rails and the hidden shape.
   expect(screen.container.querySelector("[data-astra-address]")).not.toBeNull();
-  expect(screen.container.querySelector("[data-content-bar]")).not.toBeNull();
+  expect(screen.container.querySelector(".browser-sidebar [data-astra-address]")).not.toBeNull();
   expect(screen.container.querySelector("main#astra-stage")).not.toBeNull();
 });
 
@@ -333,10 +357,12 @@ test("Work has no page in front, so the field's tray describes no site", async (
   await expect.element(screen.getByRole("button", { name: "Site information" })).toBeVisible();
   emitNativeEvent("uiCommand", "browser.work");
   await expect.poll(() => screen.container.querySelector("[data-work-stage-stub]")).not.toBeNull();
-  // The bar stays over Work, and its tray stays with the field; with no page
-  // in front there is no site to describe, only the utilities.
+  // With no page in front there is no site to describe, only the utilities.
   await expect
     .element(screen.getByRole("button", { name: "Site information" }))
     .not.toBeInTheDocument();
+  // The tray is painted only while the column is in use or its field has the
+  // keyboard; in Work the field is the one that reveals it.
+  screen.container.querySelector<HTMLInputElement>(".address-field input")?.focus();
   await expect.element(screen.getByRole("button", { name: "Utilities" })).toBeVisible();
 });

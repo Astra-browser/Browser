@@ -12,7 +12,9 @@ import * as sidebar from "$session/sidebar-mode.svelte";
 import Shell from "../Shell.svelte";
 import { paint, settle, shot, wallpaper } from "./look-bench";
 
-const native = vi.hoisted(() => ({ settings: { appearance: "light" } as Record<string, string> }));
+const native = vi.hoisted(() => ({
+  settings: { "appearance.theme": "light" } as Record<string, string>,
+}));
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
@@ -88,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
 
 test("chrome opaque, light", async () => {
   await page.viewport(1100, 760);
-  native.settings = { appearance: "light" };
+  native.settings = { "appearance.theme": "light" };
   document.documentElement.dataset.theme = "light";
   document.documentElement.dataset.material = "none";
   await paint();

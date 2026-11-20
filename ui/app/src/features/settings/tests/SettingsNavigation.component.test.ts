@@ -6,6 +6,9 @@ import * as settings from "../lib/settings-state.svelte";
 import "$styles/global.css";
 import SettingsNavigation from "../components/SettingsNavigation.svelte";
 
+// The identity card exists only in a build with the account flag on.
+vi.mock("$shared/flags", () => ({ flags: { work: true, ai: true, account: true } }));
+
 const native = vi.hoisted(() => ({ available: true }));
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");

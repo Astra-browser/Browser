@@ -12,7 +12,16 @@ vi.mock("../lib/settings-model", async (original) => ({
   ...(await original<typeof import("../lib/settings-model")>()),
   showPreviews: false,
 }));
-vi.mock("$domain/tabs", () => ({ tabs: { profile: () => ({ id: "profile" }) } }));
+// PrivacyPage renders SpaceHistoryClear, which reads the space in front.
+vi.mock("$domain/tabs", () => ({
+  tabs: {
+    profile: () => ({ id: "profile" }),
+    activeSpaceId: () => "space",
+    activeSpace: () => ({ id: "space", name: "Home" }),
+    spaces: () => [],
+    profileSpaces: () => [],
+  },
+}));
 vi.mock("$domain/permissions", () => ({
   sitePermissions: {
     list: async () => null,

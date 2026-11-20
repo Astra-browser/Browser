@@ -432,7 +432,9 @@ test("typing in a task says nothing about saving unless a save is slow", async (
   const screen = await render(TaskHost, { profile });
   await screen.getByText("Call mom").click();
   const title = screen.getByRole("textbox", { name: "Rename", exact: true });
-  const status = screen.container.querySelector(".detail-save")!;
+  // The detail is its own chunk; it is in the document once the import lands.
+  await expect.poll(() => screen.container.querySelector(".detail-save")).not.toBeNull();
+  const status = screen.container.querySelector<HTMLElement>(".detail-save")!;
 
   const seen: string[] = [];
   const watch = new MutationObserver(() => seen.push(status.textContent ?? ""));

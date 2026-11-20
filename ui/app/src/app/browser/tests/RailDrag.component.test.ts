@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-svelte";
 import { flushSync } from "svelte";
@@ -6,6 +6,7 @@ import "$styles/global.css";
 import type { SidebarNodeView } from "$shared/ipc/bindings";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, tabFixture } from "$shared/testing/fixtures";
+import { installPointerCapture } from "$shared/testing/pointer";
 import { surface } from "$domain/surface";
 import { tabs } from "$domain/tabs";
 import * as launch from "$session/motion.svelte";
@@ -45,6 +46,14 @@ afterEach(() => {
   native.setEssential.mockClear();
 });
 
+// A synthetic pointer has no native capture; without this the drag aborts
+// before it sets any state.
+let restorePointerCapture = installPointerCapture();
+beforeEach(() => {
+  restorePointerCapture = installPointerCapture();
+});
+afterEach(() => restorePointerCapture());
+
 async function rail() {
   await page.viewport(900, 700);
   launch.dispose();
@@ -83,16 +92,24 @@ const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve
 function press(handle: HTMLElement, to: { x: number; y: number }) {
   const from = handle.getBoundingClientRect();
   const start = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
-  const init = { bubbles: true, pointerId: 1, button: 0, isPrimary: true };
+  const init = { bubbles: true, pointerId: 1, button: 0, buttons: 1, isPrimary: true };
   handle.dispatchEvent(
     new PointerEvent("pointerdown", { ...init, clientX: start.x, clientY: start.y }),
   );
+  // Below the 9px threshold: a press, not yet a drag.
   handle.dispatchEvent(
     new PointerEvent("pointermove", { ...init, clientX: start.x, clientY: start.y + 8 }),
   );
+  // The drag begins where the pointer crosses the threshold and measures
+  // travel from there, so cross it 10px in before going to the target.
+  handle.dispatchEvent(
+    new PointerEvent("pointermove", { ...init, clientX: start.x, clientY: start.y + 10 }),
+  );
   handle.dispatchEvent(new PointerEvent("pointermove", { ...init, clientX: to.x, clientY: to.y }));
   return () =>
-    handle.dispatchEvent(new PointerEvent("pointerup", { ...init, clientX: to.x, clientY: to.y }));
+    handle.dispatchEvent(
+      new PointerEvent("pointerup", { ...init, buttons: 0, clientX: to.x, clientY: to.y }),
+    );
 }
 
 test("the rail's tabs reorder in place", async () => {

@@ -15,7 +15,7 @@ import Shell from "../Shell.svelte";
 import { paint, settle, themed, wallpaper } from "./look-bench";
 
 const native = vi.hoisted(() => ({
-  settings: { appearance: "light" } as Record<string, string>,
+  settings: { "appearance.theme": "light" } as Record<string, string>,
   profiles: null as ProfilesView | null,
 }));
 vi.mock("$shared/ipc/bindings", async () => {

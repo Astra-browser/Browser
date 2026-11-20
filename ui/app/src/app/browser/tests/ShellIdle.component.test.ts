@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { tabFixture, revision, spaceFixture } from "$shared/testing/fixtures";
+import { blockerStatusFixture } from "$shared/testing/blocker";
 import { wakeupCounter } from "$shared/testing/idle";
 import { tabs } from "$domain/tabs";
 import { surface } from "$domain/surface";
@@ -15,6 +16,9 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     pagePermissionCardHost: async () => {},
     tabsBootstrap: async () => {},
+    // A reconciled blocker: an unmocked read would leave it retrying, and the
+    // test is about a window that has nothing left to poll.
+    blockerStatus: async () => ({ status: "ok" as const, data: blockerStatusFixture() }),
   });
 });
 

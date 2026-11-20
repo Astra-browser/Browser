@@ -49,8 +49,13 @@
   }
 </script>
 
-<SettingsGroup title={m.passkey_title()} description={m.passkey_intro()}>
-  {#if status !== null}
+<SettingsGroup
+  title={m.passkey_title()}
+  description={status?.error === "platform_unsupported" ? undefined : m.passkey_intro()}
+>
+  {#if status !== null && status.error === "platform_unsupported"}
+    <p class="unavailable">{m.passkey_unavailable_build()}</p>
+  {:else if status !== null}
     <SettingsRow
       title={m.passkey_device()}
       description={passkeyStateLabel(status.enabled, status.exists, status.unlocked)}
@@ -242,13 +247,22 @@
       {/if}
     {/if}
 
-    {#if error !== null && error !== ""}
+    {#if error !== null && error !== "" && error !== "platform_unsupported"}
       <p class="error" role="alert">{passkeyErrorMessage(error)}</p>
     {/if}
   {/if}
 </SettingsGroup>
 
 <style>
+  /* No vault class on this build: one honest line instead of a dead form. */
+  .unavailable {
+    margin: 0;
+    padding: 14px 18px;
+    font-size: var(--text-label);
+    line-height: 1.5;
+    color: var(--color-muted);
+  }
+
   .form {
     display: grid;
     gap: 12px;

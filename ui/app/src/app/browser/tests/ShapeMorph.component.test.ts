@@ -59,7 +59,7 @@ async function shell() {
   return render(Shell);
 }
 
-test("collapsing carries every mark into the rail and lets the list go as a ghost", async () => {
+test("collapsing carries every mark into the rail with no ghost column", async () => {
   await shell();
   sidebar.setMode("compact");
   flushSync();
@@ -74,25 +74,21 @@ test("collapsing carries every mark into the rail and lets the list go as a ghos
       .some((animation) => (animation as CSSTransition).transitionProperty === "width"),
   ).toBe(true);
 
-  const ghosts = document.querySelectorAll<HTMLElement>(
-    ".sidebar-columns > .sidebar-browser-column[aria-hidden='true']",
+  // The column is reused between shapes, so there is no ghost to fade: the
+  // same nodes carry the marks from their old rects to their new ones.
+  const columns = document.querySelectorAll<HTMLElement>(
+    ".sidebar-columns > .sidebar-browser-column",
   );
-  expect(ghosts).toHaveLength(1);
-  const ghost = ghosts[0]!;
-  expect(ghost.inert).toBe(true);
-  // Native resolves the address and every tab through these; the ghost must
-  // be invisible to it.
-  expect(ghost.querySelector("[data-astra-address], [data-astra-tab-id]")).toBeNull();
-  expect(document.querySelectorAll("[data-astra-address]")).toHaveLength(1);
-
-  const rail = document.querySelector<HTMLElement>(
-    ".sidebar-columns > .sidebar-browser-column:not([aria-hidden])",
-  )!;
+  expect(columns).toHaveLength(1);
+  const column = columns[0]!;
+  expect(column.getAttribute("aria-hidden")).toBeNull();
+  expect(column.inert).toBe(false);
   for (const id of ["a", "b", "c"]) {
-    const item = rail.querySelector<HTMLElement>(`[data-motion-key="tab:${id}"]`)!;
+    const item = column.querySelector<HTMLElement>(`[data-motion-key="tab:${id}"]`)!;
     expect(item.getAnimations().length).toBeGreaterThan(0);
   }
-  await expect.poll(() => ghost.isConnected, { timeout: 2000 }).toBe(false);
+  // Native resolves the address and every tab through this one column.
+  expect(document.querySelectorAll("[data-astra-address]")).toHaveLength(1);
 });
 
 test("expanding carries the rail back out into the list", async () => {
