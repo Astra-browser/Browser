@@ -198,12 +198,26 @@ def main():
             time.sleep(0.25)
         return state()
 
+    def host_of(uri):
+        """Host of a URI, without a scheme or path."""
+        text = str(uri or "")
+        if "//" not in text:
+            return ""
+        return text.split("//", 1)[1].split("/", 1)[0].lower()
+
+    # The shipped default engine is Google, and this network sometimes answers
+    # an automated query with a consent/CAPTCHA page. Either way the address
+    # was submitted to a real engine; the page's own content is not this
+    # probe's subject.
+    SEARCH_HOSTS = ("google.", "duckduckgo.", "bing.", "brave.", "ecosia.", "startpage.")
+
     print("search address:", m.js(SEARCH_ADDRESS))
     first = wait_for(
-        lambda s: s.get("loading") is None and "duckduckgo" in (s.get("uri") or ""), 30)
+        lambda s: s.get("loading") is None and host_of(s.get("uri")) != "", 30)
+    first_host = host_of(first.get("uri"))
     print("tab1:", json.dumps(first))
-    if "duckduckgo" not in (first.get("uri") or ""):
-        failures.append("the address search did not load")
+    if not any(engine in first_host for engine in SEARCH_HOSTS):
+        failures.append("the address search did not reach a search engine")
     if first.get("loading") is not None:
         failures.append("the search page never finished loading")
 
@@ -227,9 +241,13 @@ def main():
         # The first tab kept its own browser, so its page is already there:
         # switching back must not reload it or show a blank stage.
         back = wait_for(
-            lambda s: "duckduckgo" in (s.get("uri") or ""), 10)
+            lambda s: s.get("hasPage") == "true" and host_of(s.get("uri")) == first_host, 10)
         print("tab1 again:", json.dumps(back))
-        if "duckduckgo" not in (back.get("uri") or ""):
+        # The first tab's page may have redirected on its own in the meantime
+        # (Google turns an automated query into a consent/CAPTCHA page), so the
+        # guarantee is that it still holds its own page on its own host, not a
+        # blank stage and not the second tab's site.
+        if back.get("hasPage") != "true" or host_of(back.get("uri")) != first_host:
             failures.append("switching back did not restore the first tab's page")
 
     print("VERDICT:", "PASS" if not failures else "FAIL " + "; ".join(failures))
