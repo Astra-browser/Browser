@@ -1075,13 +1075,18 @@ async function warmPanes(binding, splitview, sourceId) {
       continue;
     }
     try {
+      // Ask for the load before selecting: a direct load reaches the pane
+      // browser once the split has placed it, while selecting a pane can be
+      // refused while the split is still being registered (which is how the
+      // load was skipped altogether and the pane stayed blank).
+      ensurePaneLoaded(binding, paneTab, 6);
       await Tabs.select({ request_id: `split-warm-${id}`, astra_tab_id: id });
-      // Activation gives the pane its docShell; a browser created for the
-      // split has none, and a load asked for before that is dropped. Ask
-      // again now that the pane is live.
+      // Activation can hand the pane a fresh browser; ask again on the one it
+      // has now.
       ensurePaneLoaded(binding, paneTab, 6);
     } catch {
-      // A pane that cannot be selected still loads on its own first commit.
+      // A refused selection must not also cost the pane its load.
+      ensurePaneLoaded(binding, paneTab, 6);
     }
   }
   if (sourceId) {
