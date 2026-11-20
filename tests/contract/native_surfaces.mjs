@@ -282,6 +282,28 @@ check(
     .includes("split-view-footer"),
 );
 
+// DOM fullscreen (a video player's own fullscreen): the content slot is only
+// the rectangle the native deck is docked over. If the slot is raised above
+// the deck or takes the pointer, an invisible sheet covers the page, the page
+// never sees hover and its own controls never appear (owner report
+// 2026-11-20). The live proof is fullscreen-probe.py; this keeps the rule from
+// being "fixed" back to a transparent wall.
+const chromeCss = fs.readFileSync(
+  path.join(ROOT, "overlay", "astra", "chrome", "shell-chrome.css"),
+  "utf8",
+);
+const fullscreenSlot =
+  chromeCss.match(/:root\[inDOMFullscreen\] #astra-root \.astra-content \{([^}]*)\}/);
+check("the DOM-fullscreen content slot exists", Boolean(fullscreenSlot));
+check(
+  "the DOM-fullscreen content slot stays under the page deck",
+  Boolean(fullscreenSlot) && /z-index:\s*0\s*;/u.test(fullscreenSlot[1]),
+);
+check(
+  "the DOM-fullscreen content slot takes no pointer",
+  Boolean(fullscreenSlot) && /pointer-events:\s*none\s*;/u.test(fullscreenSlot[1]),
+);
+
 console.log(`\nnative surfaces: ${passed}/${passed + failed} checks passed`);
 if (failed > 0) {
   console.error(`${failed} FAILED`);

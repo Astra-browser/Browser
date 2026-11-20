@@ -69,7 +69,14 @@
   inset: 0 !important;
   inset-inline-start: 0 !important;
   border-radius: 0 !important;
-  z-index: 10;
+  /* The native deck is the surface that carries the page: it is positioned
+     over this slot and takes the pointer. Raising the slot above the deck
+     put an empty, transparent box across the whole window, so a fullscreen
+     video never saw a move or a press and its own controls never appeared.
+     The slot is only a rectangle here: keep it under the deck and out of
+     hit testing. */
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* Native split view: the engine owns the panes, but it must not draw its own
