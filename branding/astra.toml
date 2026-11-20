@@ -8,7 +8,7 @@ binary_name = "astra"
 # Astra's own product version. This is NOT the Firefox/Gecko pin — upstream.toml
 # owns that. It is the build handed to dev/alpha testers: bump it on every build
 # that leaves this machine, so About and the package name identify what they ran.
-version = "0.1.757"
+version = "0.1.758"
 app_id = "OWNER_DECISION"            # reverse-DNS, e.g. com.example.astra (dev default: com.astra.dev)
 app_id_dev_suffix = "dev"
 vendor = "OWNER_DECISION"
