@@ -1,17 +1,25 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import PageNav from "./PageNav.svelte";
+  import { WindowControlsInline } from "$shared/ui/WindowControls";
+  import { IS_WINDOWS } from "$shared/platform";
 
   // The bar belongs to the content column, not the sidebar: it stands above
   // the page and carries the page's own controls. The field itself is the
   // product's one address field, composed by the app and placed here; this
   // wrapper never restyles it.
+  //
+  // On Windows the window's own minimise/maximise/close live at this bar's
+  // trailing end: the bar is the horizontal top panel, so they are part of it
+  // rather than a capsule on top of the page. Elsewhere the platform's own
+  // arrangement applies (macOS traffic lights, Linux's overlay cluster).
   let { field }: { field: Snippet } = $props();
 </script>
 
 <div class="content-bar" data-content-bar>
   <PageNav />
   <div class="content-bar-field">{@render field()}</div>
+  {#if IS_WINDOWS}<WindowControlsInline />{/if}
 </div>
 
 <style>
@@ -40,6 +48,40 @@
     max-inline-size: 720px;
     margin-inline: auto;
     margin-block-end: calc(-1 * var(--main-bar-inset));
+  }
+
+  /* Window controls belong to the panel, and come to the hand when it is on
+     the panel: at rest they are only the shapes in the right corner, and a
+     hover (or keyboard focus) brings them out. A touch screen has no hover, so
+     there they are simply present. */
+  .content-bar :global(.window-controls-inline) {
+    opacity: 0;
+    translate: 0 -2px;
+    pointer-events: none;
+    transition:
+      opacity var(--motion-fast) var(--ease-out),
+      translate var(--motion-fast) var(--ease-out);
+  }
+
+  .content-bar:hover :global(.window-controls-inline),
+  .content-bar:focus-within :global(.window-controls-inline) {
+    opacity: 1;
+    translate: 0 0;
+    pointer-events: auto;
+  }
+
+  @media (hover: none) {
+    .content-bar :global(.window-controls-inline) {
+      opacity: 1;
+      translate: 0 0;
+      pointer-events: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .content-bar :global(.window-controls-inline) {
+      transition: none;
+    }
   }
 
   @media (forced-colors: active) {

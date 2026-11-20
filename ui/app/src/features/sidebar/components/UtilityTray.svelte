@@ -38,7 +38,22 @@
   let pointerIn = $state(false);
   let peeked = $state(false);
   let fieldFocused = $state(false);
-  const revealed = $derived(open || warning !== null || pointerIn || peeked || fieldFocused);
+  // The field is not always in the column (the page bar carries it on
+  // Windows), so the pointer over the field itself is its own reveal.
+  let fieldHovered = $state(false);
+  // Outside the column (the page bar carries the field on Windows) there is no
+  // "column in use" to wait for: the field is the page's own chrome, and its
+  // site control belongs beside it the way every browser draws it.
+  let outsideColumn = $state(false);
+  const revealed = $derived(
+    open ||
+      warning !== null ||
+      pointerIn ||
+      peeked ||
+      fieldFocused ||
+      fieldHovered ||
+      outsideColumn,
+  );
 
   $effect(() => {
     const disclosure = body?.closest<HTMLElement>(".ui-disclosure") ?? null;
@@ -52,6 +67,7 @@
   // state, read rather than copied.
   $effect(() => {
     const column = root?.closest<HTMLElement>(".browser-sidebar") ?? null;
+    outsideColumn = column === null;
     if (!column) return;
     const read = () => {
       pointerIn = column.dataset.pointerIn === "true";
@@ -67,11 +83,20 @@
   });
 
   // `.address-field:focus-within` paints it in; the same fact decides whether
-  // it can be reached, so the two never disagree.
+  // it can be reached, so the two never disagree. The pointer over the field
+  // is the pointer-home when the field stands outside the column.
   $effect(() => {
     const field = root?.closest<HTMLElement>(".address-field") ?? null;
     if (!field) return;
     let live = true;
+    const enter = () => {
+      if (live) fieldHovered = true;
+    };
+    const leave = () => {
+      if (live) fieldHovered = false;
+    };
+    field.addEventListener("pointerenter", enter);
+    field.addEventListener("pointerleave", leave);
     const read = () => {
       if (!live) return;
       const active = document.activeElement;
@@ -89,6 +114,8 @@
     document.addEventListener("focusout", read);
     return () => {
       live = false;
+      field.removeEventListener("pointerenter", enter);
+      field.removeEventListener("pointerleave", leave);
       document.removeEventListener("focusin", read);
       document.removeEventListener("focusout", read);
     };
@@ -100,6 +127,8 @@
     if (revealed) {
       button.removeAttribute("aria-hidden");
       button.tabIndex = 0;
+      if (outsideColumn) button.setAttribute("data-outside-column", "");
+      else button.removeAttribute("data-outside-column");
       return;
     }
     // Never take the name off the element the keyboard is standing on.
@@ -168,6 +197,7 @@
   :global(.utilities-trigger[data-state="open"]),
   :global(.browser-sidebar[data-pointer-in="true"] .address-field:hover)
     :global(.utilities-trigger),
+  :global(.address-field:hover) :global(.utilities-trigger),
   :global(.browser-sidebar[data-peek]) :global(.utilities-trigger),
   :global(.address-field:focus-within) :global(.utilities-trigger) {
     opacity: 1;
@@ -190,6 +220,12 @@
       opacity var(--motion-slow) var(--ease-smooth),
       background-color var(--motion-fast) var(--ease-out),
       color var(--motion-fast) var(--ease-out);
+  }
+
+  /* Outside the column there is no pointer to wait for: the field is the page's
+     own chrome, so its site control is simply part of it. */
+  :global(.utilities-trigger[data-outside-column]) {
+    opacity: 1;
   }
 
   :global(.utilities-trigger.utilities-warning) {

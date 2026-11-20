@@ -1,5 +1,6 @@
 import { observe, pause } from "$shared/lib/observe";
 import { flags } from "$shared/flags";
+import { IS_WINDOWS } from "$shared/platform";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
@@ -57,7 +58,10 @@ const defaults = {
   "ui.window-tint": "0",
   "ui.font": "astra",
   "ui.font-size": "13",
-  "ui.main-bar": "auto",
+  // The page bar carries the window's own controls on Windows, so it ships
+  // pinned there: the controls have a panel to belong to, and the address
+  // field sits in the horizontal top bar instead of inside the column.
+  "ui.main-bar": IS_WINDOWS ? "always" : "auto",
   "ui.code-font": "system",
   "ui.theme-contrast": "50",
   "tabs.archive": "never",

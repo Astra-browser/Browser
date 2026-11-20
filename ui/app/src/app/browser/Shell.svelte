@@ -628,7 +628,13 @@
   );
   // A hidden column has no head to carry the field; the floating bar is the
   // only place the address can live while it is away.
-  let sidebarOwnsBar = $derived(!columnCompact && !isHidden() && barMode !== "always");
+  // The page bar owns the address on Windows: the window's own controls live
+  // at its trailing end, so the bar has to exist in the full-column shape too
+  // (it comes down when the pointer reaches the top edge). The column keeps
+  // only its own controls.
+  let sidebarOwnsBar = $derived(
+    !IS_WINDOWS && !columnCompact && !isHidden() && barMode !== "always",
+  );
   let barVisible = $derived(
     !sidebarOwnsBar &&
       (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),

@@ -1,4 +1,5 @@
 import * as m from "$shared/i18n/messages";
+import { IS_WINDOWS } from "$shared/platform";
 export const fields = {
   "privacy.cleanup": {
     preview: true,
@@ -329,7 +330,9 @@ export const fields = {
     section: "appearance",
     label: m.pref_ui_main_bar,
     description: m.pref_ui_main_bar_help,
-    initial: "auto",
+    // The page bar carries the window's own controls on Windows, so it ships
+    // pinned there; the other platforms keep it on hover.
+    initial: IS_WINDOWS ? "always" : "auto",
     options: [
       { value: "auto", label: m.pref_ui_main_bar_option_auto },
       { value: "always", label: m.pref_ui_main_bar_option_always },

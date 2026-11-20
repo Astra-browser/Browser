@@ -340,8 +340,8 @@
   {#if !IS_MAC}
     <Dividers />
   {/if}
-  {#if !IS_MAC}
-    <WindowControlsOverlay always={IS_WINDOWS} />
+  {#if !IS_MAC && !IS_WINDOWS}
+    <WindowControlsOverlay />
   {/if}
 </div>
 {#if launcherOpen}
