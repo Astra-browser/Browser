@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0.
 """astra-proto codegen (P2-T02): single source of truth is
-docs/astra/ipc-surface.md (278 commands + 37 events).
+docs/astra/ipc-surface.md (279 commands + 37 events).
 
 Reads the markdown tables and emits, deterministically:
   schemas/commands.json, schemas/events.json,
@@ -25,7 +25,7 @@ import re
 import sys
 
 PROTOCOL_VERSION = 1
-EXPECTED_COMMANDS = 278
+EXPECTED_COMMANDS = 279
 EXPECTED_EVENTS = 37
 
 # Channel rename rule for the 8 REN events (porting notes, ipc-surface.md):

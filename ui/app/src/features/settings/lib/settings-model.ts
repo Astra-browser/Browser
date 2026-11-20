@@ -7,6 +7,7 @@ import {
   Settings01Icon,
   PaintBoardIcon,
   Add01Icon,
+  Image02Icon,
   Layers01Icon,
   UserCircleIcon,
   Search01Icon,
@@ -54,6 +55,13 @@ const allSections = [
     title: m.section_newtab,
     description: m.section_newtab_description,
     icon: Add01Icon,
+  },
+  {
+    id: "gallery",
+    group: "browser",
+    title: m.section_gallery,
+    description: m.section_gallery_description,
+    icon: Image02Icon,
   },
   {
     id: "search",

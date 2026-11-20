@@ -103,6 +103,7 @@ previous product name. The rebrand maps `prev_*` → `astra_*` (crates, channels
 | `login_item_set` | `loginItemSet` | `d:login_item.rs` | `async caller: WebviewWindow, enabled: bool` | `LoginItemStatus` |
 | `login_item_status` | `loginItemStatus` | `d:login_item.rs` | `async caller: WebviewWindow` | `LoginItemStatus` |
 | `media_admit_remote` | `mediaAdmitRemote` | `d:media.rs` | `async caller: WebviewWindow, app: AppHandle, shell: State<'_, prev_app::Handle>, expected_profile: String, environment: String, element: String, url: String,` | `Result<prev_ipc::MediaAdmitV1, ()>` |
+| `media_gallery` | `mediaGallery` | `d:lib.rs` | `async caller: WebviewWindow, app: tauri::AppHandle, expected_profile: String, call: prev_ipc::GalleryCall,` | `prev_ipc::GalleryResponse` |
 | `media_import` | `mediaImport` | `d:media.rs` | `async caller: WebviewWindow, app: AppHandle, shell: State<'_, prev_app::Handle>, expected_profile: String,` | `Result<MediaImportV1, ()>` |
 | `media_open` | `mediaOpen` | `d:media.rs` | `async caller: WebviewWindow, app: AppHandle, shell: State<'_, prev_app::Handle>, expected_profile: String, id: String,` | `Result<bool, ()>` |
 | `media_player` | `mediaPlayer` | `d:lib.rs` | `caller: WebviewWindow, shell: State<'_, Handle>, id: String, action: prev_ipc::MediaPlayerAction,` | `prev_ipc::OperationAdmission` |

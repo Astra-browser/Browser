@@ -24,6 +24,7 @@
     tabs: () => import("./sections/TabsPage.svelte"),
     profiles: () => import("./sections/ProfilesPage.svelte"),
     spaces: () => import("./sections/SpacesPage.svelte"),
+    gallery: () => import("./sections/GalleryPage.svelte"),
     search: () => import("./sections/SearchPage.svelte"),
     privacy: () => import("./sections/PrivacyPage.svelte"),
     extensions: () => import("./sections/ExtensionsPage.svelte"),

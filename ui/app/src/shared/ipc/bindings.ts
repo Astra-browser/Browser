@@ -22,6 +22,7 @@ export const commands = {
 	workRunning: () => __TAURI_INVOKE<boolean>("work_running"),
 	/**  Manifest preview for the composer. Bodies never cross this boundary. */
 	workContextPreview: (expectedProfile: string, purpose: WorkContextPurpose, selection: WorkContextSelectionV1_Deserialize) => __TAURI_INVOKE<WorkContextPreviewV1_Serialize>("work_context_preview", { expectedProfile, purpose, selection }),
+	mediaGallery: (expectedProfile: string, call: GalleryCall) => __TAURI_INVOKE<GalleryResponse>("media_gallery", { expectedProfile, call }),
 	mediaImport: (expectedProfile: string) => typedError<MediaImportV1_Serialize, null>(__TAURI_INVOKE("media_import", { expectedProfile })),
 	/**
 	 *  Opens a non-image asset with the OS default application. The blob is the
@@ -1927,6 +1928,76 @@ export type MediaCaptureView = {
 	camera: CaptureDeviceStateView,
 	microphone: CaptureDeviceStateView,
 };
+
+/**
+ *  One gallery request. `list` pages the scan that is already indexed;
+ *  `refresh` rebuilds it; folder calls change what is watched; `thumbnail`
+ *  returns a bounded, cached picture for one tile or the viewer.
+ */
+export type GalleryCall = { kind: "state" } | { kind: "list"; query?: string; folder?: string | null; offset?: number; limit?: number } | { kind: "refresh" } | { kind: "set_enabled"; enabled: boolean } | { kind: "add_folder" } | { kind: "remove_folder"; path: string } | { kind: "restore_defaults" } | { kind: "thumbnail"; path: string; size?: number } | { kind: "open"; path: string } | { kind: "reveal"; path: string } | { kind: "copy"; path: string } | { kind: "opener"; path: string };
+
+/**  A default folder, a detected Gallery, or a folder a person added. */
+export type GalleryFolder = {
+	path: string,
+	label: string,
+	kind: "downloads" | "documents" | "pictures" | "gallery" | "custom",
+	exists: boolean,
+	removable: boolean,
+};
+
+/**  One indexed picture. Paths stay in the chrome process; the UI only shows
+ *  this list to the local Gallery page. */
+export type GalleryItem = {
+	path: string,
+	name: string,
+	folder: string,
+	folder_label: string,
+	extension: string,
+	size: number,
+	modified: number,
+};
+
+export type GalleryState = {
+	kind: "state",
+	profile: string,
+	enabled: boolean,
+	folders: GalleryFolder[],
+	total: number,
+	scanning: boolean,
+	scanned_at: number | null,
+	truncated: boolean,
+	cache_bytes: number,
+	cache_count: number,
+};
+
+export type GalleryPage = {
+	kind: "list",
+	profile: string,
+	enabled: boolean,
+	folders: GalleryFolder[],
+	items: GalleryItem[],
+	next: number | null,
+	total: number,
+	scanning: boolean,
+	scanned_at: number | null,
+	truncated: boolean,
+};
+
+export type GalleryThumbnail = {
+	kind: "thumbnail",
+	path: string,
+	data: string | null,
+	error: string | null,
+	cached?: boolean,
+};
+
+export type GalleryAction = { kind: "action", action: "open" | "reveal" | "copy", ok: boolean, profile: string };
+
+export type GalleryOpener = { kind: "opener", profile: string, opener: string };
+
+export type GalleryError = { kind: "error", error: string, profile: string };
+
+export type GalleryResponse = GalleryState | GalleryPage | GalleryThumbnail | GalleryAction | GalleryOpener | GalleryError;
 
 /**  Outcome of a native file import into the profile's media store. */
 export type MediaImportV1 = MediaImportV1_Serialize | MediaImportV1_Deserialize;

@@ -56,6 +56,7 @@ import { Work } from "./Work.sys.mjs";
 import { Downloads } from "./Downloads.sys.mjs";
 import { Profiles, __resetProfilesForTests } from "./Profiles.sys.mjs";
 import { Media } from "./Media.sys.mjs";
+import { MediaGallery, __resetGalleryForTests } from "./MediaGallery.sys.mjs";
 import { MediaImport, __resetMediaImportForTests } from "./MediaImport.sys.mjs";
 import { Notes } from "./Notes.sys.mjs";
 import { Bookmarks } from "./Bookmarks.sys.mjs";
@@ -121,6 +122,7 @@ export {
   Downloads,
   Profiles,
   Media,
+  MediaGallery,
   MediaImport,
   Notes,
   Bookmarks,
@@ -188,6 +190,7 @@ export function __resetForTests() {
   Passkeys.__resetForTests();
   __resetTabHistoryForTests();
   Media.__resetForTests();
+  __resetGalleryForTests();
   __resetMediaImportForTests();
   DialogPrompts.__resetForTests();
   PageDialogs.__resetForTests();

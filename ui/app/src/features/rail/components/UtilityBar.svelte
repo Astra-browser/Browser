@@ -2,6 +2,7 @@
   import * as m from "$shared/i18n/messages";
   import {
     Download01Icon,
+    Image02Icon,
     Moon02Icon,
     MusicNote01Icon,
     Note01Icon,
@@ -20,6 +21,7 @@
   import { favicons } from "$domain/favicons";
   import { mediaPlayer } from "$domain/media-player";
   import { preferences } from "$domain/preferences";
+  import { surface as browser } from "$domain/surface";
   import { tabs } from "$domain/tabs";
   import { webext } from "$domain/webext";
   import * as tools from "$session/tools.svelte";
@@ -178,6 +180,18 @@
     type="button"
     class="rail-button"
     style:--step={ontoggle ? 3 : 2}
+    title={m.rail_gallery()}
+    aria-label={m.rail_gallery()}
+    aria-current={browser.currentPage() === "gallery" ? "true" : undefined}
+    onclick={() => void browser.open("gallery")}
+  >
+    <Icon icon={Image02Icon} size={18} />
+  </button>
+
+  <button
+    type="button"
+    class="rail-button"
+    style:--step={ontoggle ? 4 : 3}
     title={m.panel_notes()}
     aria-label={m.panel_notes()}
     aria-current={railToolActive("notes", tools.activeTool()) ? "true" : undefined}
@@ -187,12 +201,12 @@
   </button>
 
   {#if space}
-    <div class="bar-cell" style:--step={ontoggle ? 4 : 3}>
+    <div class="bar-cell" style:--step={ontoggle ? 5 : 4}>
       <RailSpaces active={space} label={m.browse_spaces_all()} />
     </div>
   {/if}
 
-  <div class="bar-cell" style:--step={ontoggle ? 5 : 4}>
+  <div class="bar-cell" style:--step={ontoggle ? 6 : 5}>
     <Disclosure
       label={m.settings_sleeping_tabs()}
       triggerTitle={m.settings_sleeping_tabs()}
@@ -233,7 +247,7 @@
     </Disclosure>
   </div>
 
-  <div class="bar-cell" style:--step={ontoggle ? 6 : 5}>
+  <div class="bar-cell" style:--step={ontoggle ? 7 : 6}>
     <Disclosure
       label={m.webext_page_title()}
       triggerTitle={m.webext_page_title()}
@@ -262,7 +276,7 @@
   <button
     type="button"
     class="rail-button"
-    style:--step={ontoggle ? 7 : 6}
+    style:--step={ontoggle ? 8 : 7}
     title={dark ? m.command_theme_light() : m.command_theme_dark()}
     aria-label={dark ? m.command_theme_light() : m.command_theme_dark()}
     aria-pressed={dark}

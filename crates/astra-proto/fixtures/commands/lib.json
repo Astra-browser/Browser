@@ -239,6 +239,13 @@
       "payload": {}
     },
     {
+      "command": "media_gallery",
+      "payload": {
+        "expected_profile": "x",
+        "call": {}
+      }
+    },
+    {
       "command": "media_player",
       "payload": {
         "id": "x",

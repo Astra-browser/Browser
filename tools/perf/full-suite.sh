@@ -82,7 +82,7 @@ CONTRACTS=(
   chrome_extensions commands_model containers_isolation content_hide content_slot
   diagnostics_model dialog_prompts_auth dialog_prompts_cert dialogs_events dialogs_security
   downloads_model favicons_model first_run frame_model history_mirror history_model history_places
-  hostapi_v1 keymap_model launcher_edit load_state media_import_model media_model
+  hostapi_v1 keymap_model launcher_edit load_state media_gallery media_import_model media_model
   media_selection menu_layer metadata_restore migration_model native_file_picker
   native_nav_model native_surfaces notes_model operations_ledger page_dialogs page_source_model
   passkeys_model permissions_prompt privacy_host profiles_model protected_content
@@ -150,6 +150,7 @@ else
     "multiwindow:tools/perf/stress/gbrowser_multiwindow_probe.py"
     "multi_window_isolation:tools/marionette-probe/multi-window-isolation-probe.py"
     "downloads_lifecycle:tools/marionette-probe/downloads-lifecycle-probe.py"
+    "gallery:tools/marionette-probe/gallery-probe.py"
     "tab_order:tools/marionette-probe/tab-order-probe.py"
     "tabs_churn:tools/marionette-probe/tabs-churn-probe.py"
     "edge_matrix:tools/marionette-probe/edge-matrix.py"
@@ -193,6 +194,7 @@ else
     "bar:tools/marionette-probe/bar-probe.py"
     "search_theme:tools/marionette-probe/search-theme-probe.py"
     "window_radius:tools/marionette-probe/window-radius-probe.py"
+    "fullscreen:tools/marionette-probe/fullscreen-probe.py"
     "native_surfaces:tools/marionette-probe/native-surfaces-probe.py"
     "owner_report:tools/marionette-probe/owner-report-probe.py"
     "sidebar_shield:tools/marionette-probe/sidebar-shield-probe.py"

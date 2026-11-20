@@ -11,6 +11,32 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: a fullscreen video had an invisible wall over it (2026-11-20)
+
+Fullscreening a video on any site (YouTube reported) put an invisible,
+transparent sheet over the page: the pointer never reached the video, so its
+own controls never appeared on hover and a click did nothing.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Fullscreen video ignores hover and clicks, chrome still looks gone | The content slot `.astra-content` is only the rectangle the native tab deck is docked over. The DOM-fullscreen rule raised that empty, transparent slot to `z-index: 10` "so the page fills the window", but the deck paints at `z-index: 2`; the slot therefore sat above the page across the whole window. It is transparent, so the video stayed visible, and it takes the pointer, so the page received nothing. | `shell-chrome.css`: in DOM fullscreen the slot stays under the deck (`z-index: 0`) and is out of hit testing (`pointer-events: none`). The deck owns the window; the slot is a passive rectangle. |
+
+**Evidence before/after (dev build, real DOM fullscreen from a page
+`requestFullscreen()`):** before, `document.elementFromPoint` at the centre
+and all four edges returned `.astra-content`, and a synthetic move never reached
+the page. After, every sampled point returns the page browser (inside
+`#tabbrowser-tabbox`), and the page records the move and the click; the app
+frame is `display: none`, the stage rect is `0 0 1536 864`, and leaving
+fullscreen restores the normal stage and the page's pointer.
+
+**Verification:** new `tools/marionette-probe/fullscreen-probe.py` **12/12**
+PASS on the Windows dev build (enters DOM fullscreen, stage fills the window,
+no chrome above the page, slot `pointer-events: none`, hover + click reach the
+page, exit restores the window); registered in `tools/perf/full-suite.sh` and
+`tools/perf/full-suite.ps1`. `tests/contract/native_surfaces.mjs` now pins the
+rule (slot under the deck, no pointer) — **128/128**. The probe drives a local
+HTML page, not YouTube itself; the layering it proves is site-independent.
+
 ## Owner report: window ground colour on click + the unreachable page bar (2026-11-20)
 
 Two owner reports from the Windows dev build, both traced to chrome layers
@@ -2085,3 +2111,47 @@ Spaces page.
 - Verification: `page_dialogs` 54, `dialogs_events` 104, `wire_coverage` 69
   (baseline regenerated), `boot_model` 31; patch applies with
   `git -C engine apply --check`. Live: `out/audit/fixes/page-dialogs.md`.
+
+## Gallery (2026-11-20)
+
+- **Surface:** the rail's Gallery entry (next to Downloads) opens a full page
+  that indexes pictures in Downloads, Documents and Pictures, plus a `Gallery`
+  folder when this machine has one. Search and a folder filter run over the
+  cached index; clicking a tile opens a morphing viewer with previous/next,
+  Escape/arrow keys, Copy, Show in folder, Manage folders, and the OS handler
+  name (`Open in Photos`). Settings -> Gallery lists the folders, adds and
+  removes them, restores defaults, and warns that more folders cost time and
+  memory.
+- **Wiring:** route `media_gallery` -> `MediaGallery.call`
+  (`overlay/astra/host/MediaGallery.sys.mjs`) with `GalleryCall` /
+  `GalleryResponse`. `browser.gallery` and `settings.section.gallery` were
+  added to `Commands.sys.mjs`; the page is a `BrowserPage` branch in the shell.
+- **Wire shape reason (SCOPE rule 5):** there was no generic gallery route and
+  reusing `media_import` would make a read-only local index look like an import.
+  The row was added to `docs/astra/ipc-surface.md`, `generate.py` now pins 279
+  commands, and `validate.py` was updated. `bindings.ts` has no Specta generator
+  in this checkout, so `mediaGallery(...)` and the gallery types were added by
+  hand next to `mediaImport`, as the page-dialog entry above already did.
+- **Cost controls:** asynchronous `IOUtils` walk in bounded batches (depth 2,
+  96 folders, 1500 pictures, 8 s); partial results stream while scanning; the
+  result is cached for 30 s; thumbnails are decoded only for visible tiles,
+  resized by the decoder, encoded to WebP, cached under
+  `<ProfD>/astra-gallery-thumbs` (480 files / 64 MB, pruned) and kept in a
+  24 MB in-memory LRU. The full original is never loaded by the grid.
+- **Isolation:** private windows render a "not available" state and never call
+  the module. Every file action validates its path against the active roots.
+  A viewer render failure is contained by its own `svelte:boundary`.
+- **Verification:** `tests/contract/media_gallery.mjs` 58 checks (defaults,
+  Gallery detection, scan depth/skips/caps, search/filter/paging, enable,
+  add/remove/restore, path refusal, thumbnails and headers); `wire_coverage`
+  69; `astra-proto validate` PASS (279 commands); UI unit tests for the gallery
+  model 8/8 and the rail component 19/19. Live probe
+  `tools/marionette-probe/gallery-probe.py` **21/21** on the packaged Windows
+  build (rail entry, four pictures, cached data-URL previews, search, viewer,
+  arrows, Escape, settings warning and folder row). Screenshots:
+  `out/gallery-probe/{grid,viewer,settings}.png`.
+- **Deferred:** video and audio are not indexed (pictures only). A filesystem
+  watcher is not installed; a new file appears on the next open after the 30 s
+  cache or on Refresh. The probe used a scratch folder with the default folders
+  excluded so its result is stable; the default rows were verified separately
+  in the contract test.

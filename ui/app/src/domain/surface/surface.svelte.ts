@@ -10,6 +10,7 @@ export type BrowserPage =
   | "extensions"
   | "history"
   | "downloads"
+  | "gallery"
   | "work"
   | "tasks"
   | "notes"
@@ -84,6 +85,7 @@ async function initialize(epoch: number) {
               destination === "extensions" ||
               destination === "history" ||
               destination === "downloads" ||
+              destination === "gallery" ||
               destination === "tasks" ||
               destination === "notes" ||
               destination === "time" ||

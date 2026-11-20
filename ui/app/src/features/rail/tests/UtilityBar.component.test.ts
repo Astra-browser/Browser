@@ -85,7 +85,9 @@ vi.mock("$domain/preferences", () => ({
   },
 }));
 
-vi.mock("$domain/surface", () => ({ surface: { open: native.openPage } }));
+vi.mock("$domain/surface", () => ({
+  surface: { open: native.openPage, currentPage: () => null },
+}));
 
 afterEach(() => {
   tabs.dispose();
@@ -232,10 +234,20 @@ test("the narrow grid still fits the column at its 180px minimum", async () => {
 
 test("every utility entry is named, and each opens its own surface", async () => {
   const screen = await bar();
-  for (const name of ["Media", "Downloads", "Notes", "All Spaces", "Sleeping tabs", "Extensions"]) {
+  for (const name of [
+    "Media",
+    "Downloads",
+    "Gallery",
+    "Notes",
+    "All Spaces",
+    "Sleeping tabs",
+    "Extensions",
+  ]) {
     await expect.element(screen.getByRole("button", { name, exact: true })).toBeVisible();
   }
 
+  await screen.getByRole("button", { name: "Gallery", exact: true }).click();
+  expect(native.openPage).toHaveBeenLastCalledWith("gallery");
   await screen.getByRole("button", { name: "Downloads", exact: true }).click();
   expect(tools.open).toHaveBeenLastCalledWith("downloads");
   await screen.getByRole("button", { name: "Notes", exact: true }).click();

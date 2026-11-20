@@ -98,6 +98,7 @@ export type CommandName =
   | "login_item_set"
   | "login_item_status"
   | "media_admit_remote"
+  | "media_gallery"
   | "media_import"
   | "media_open"
   | "media_player"
@@ -379,6 +380,7 @@ export const COMMANDS: readonly CommandName[] = [
   "login_item_set",
   "login_item_status",
   "media_admit_remote",
+  "media_gallery",
   "media_import",
   "media_open",
   "media_player",
@@ -1125,6 +1127,11 @@ export interface MediaAdmitRemotePayload {
   environment: string;
   element: string;
   url: string;
+}
+/** `media_gallery` (mediaGallery, d:lib.rs). */
+export interface MediaGalleryPayload {
+  expected_profile: string;
+  call: unknown; // prev_ipc::GalleryCall
 }
 /** `media_import` (mediaImport, d:media.rs). */
 export interface MediaImportPayload {
@@ -2137,6 +2144,7 @@ export interface CommandPayloads {
   "login_item_set": LoginItemSetPayload;
   "login_item_status": LoginItemStatusPayload;
   "media_admit_remote": MediaAdmitRemotePayload;
+  "media_gallery": MediaGalleryPayload;
   "media_import": MediaImportPayload;
   "media_open": MediaOpenPayload;
   "media_player": MediaPlayerPayload;

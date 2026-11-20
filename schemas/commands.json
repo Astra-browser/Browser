@@ -8,7 +8,7 @@
     "version": 1
   },
   "version": 1,
-  "count": 278,
+  "count": 279,
   "commands": {
     "about_info": {
       "ts": "aboutInfo",
@@ -2026,6 +2026,33 @@
         },
         "ts": "unknown",
         "rust": "Result<prev_ipc::MediaAdmitV1, ()>"
+      }
+    },
+    "media_gallery": {
+      "ts": "mediaGallery",
+      "rust": "d:lib.rs",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "expected_profile": {
+            "type": "string"
+          },
+          "call": {
+            "x-astra-rust-type": "prev_ipc::GalleryCall"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_profile",
+          "call"
+        ]
+      },
+      "returns": {
+        "schema": {
+          "x-astra-rust-type": "prev_ipc::GalleryResponse"
+        },
+        "ts": "unknown",
+        "rust": "prev_ipc::GalleryResponse"
       }
     },
     "media_import": {

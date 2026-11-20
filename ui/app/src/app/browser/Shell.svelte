@@ -55,6 +55,7 @@
   import * as notices from "$session/notice.svelte";
   import { loadSettingsNavigation } from "$features/settings";
   import { loadLibraryPage } from "$features/library";
+  import { loadGalleryPage } from "$features/gallery";
   import { loadHistoryPage } from "$features/history";
   import { loadSourcePage } from "$features/source";
   import { bookmarkReveal } from "$features/bookmarks";
@@ -1171,6 +1172,14 @@
               {:else if browserPage.currentPage() === "time"}
                 {#key tabs.profile()?.id}<LazyView
                     loader={loadTimePage}
+                    loadingLabel={m.surface_loading()}
+                    failureLabel={m.surface_render_failed()}
+                    retryLabel={m.surface_retry()}
+                    >{#snippet children(View)}<View />{/snippet}</LazyView
+                  >{/key}
+              {:else if browserPage.currentPage() === "gallery"}
+                {#key tabs.profile()?.id}<LazyView
+                    loader={loadGalleryPage}
                     loadingLabel={m.surface_loading()}
                     failureLabel={m.surface_render_failed()}
                     retryLabel={m.surface_retry()}

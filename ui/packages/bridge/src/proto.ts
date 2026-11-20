@@ -16,7 +16,7 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 277 command wire names. */
+/** All 279 command wire names. */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -106,6 +106,7 @@ export type CommandName =
   | "login_item_set"
   | "login_item_status"
   | "media_admit_remote"
+  | "media_gallery"
   | "media_import"
   | "media_open"
   | "media_player"
@@ -389,6 +390,7 @@ export const COMMANDS: readonly CommandName[] = [
   "login_item_set",
   "login_item_status",
   "media_admit_remote",
+  "media_gallery",
   "media_import",
   "media_open",
   "media_player",

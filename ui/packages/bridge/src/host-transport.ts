@@ -40,6 +40,7 @@ export interface HostModules {
   Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Profiles: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
+  MediaGallery: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   MediaImport: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Notes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
   Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
@@ -189,6 +190,7 @@ const ROUTES: Record<string, Route> = {
   profile_avatar_pick: ["Profiles", "avatarPick"],
   profiles_switch: ["Profiles", "switch"],
   media_player: ["Media", "player"],
+  media_gallery: ["MediaGallery", "call"],
   media_import: ["MediaImport", "import"],
   tab_set_muted: ["Tabs", "setMuted", TAB_ARG],
   // Keep / let go and place in one call: the app's drag verb.

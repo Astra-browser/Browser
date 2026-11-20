@@ -7,7 +7,7 @@
 //! Regenerate: `FIX=1 crates/astra-proto/check-drift.sh`.
 
 /// Number of commands in the v1 surface (ipc-surface.md: 278).
-pub const COMMAND_COUNT: usize = 278;
+pub const COMMAND_COUNT: usize = 279;
 /// Number of event channels in the v1 surface (ipc-surface.md: 37).
 pub const EVENT_COUNT: usize = 37;
 
@@ -102,6 +102,7 @@ pub enum CommandName {
     LoginItemSet,
     LoginItemStatus,
     MediaAdmitRemote,
+    MediaGallery,
     MediaImport,
     MediaOpen,
     MediaPlayer,
@@ -426,6 +427,7 @@ pub const COMMANDS: &[&str] = &[
     "login_item_set",
     "login_item_status",
     "media_admit_remote",
+    "media_gallery",
     "media_import",
     "media_open",
     "media_player",
@@ -750,6 +752,7 @@ impl CommandName {
             CommandName::LoginItemSet => "login_item_set",
             CommandName::LoginItemStatus => "login_item_status",
             CommandName::MediaAdmitRemote => "media_admit_remote",
+            CommandName::MediaGallery => "media_gallery",
             CommandName::MediaImport => "media_import",
             CommandName::MediaOpen => "media_open",
             CommandName::MediaPlayer => "media_player",
@@ -1033,6 +1036,7 @@ impl CommandName {
             "login_item_set" => Some(CommandName::LoginItemSet),
             "login_item_status" => Some(CommandName::LoginItemStatus),
             "media_admit_remote" => Some(CommandName::MediaAdmitRemote),
+            "media_gallery" => Some(CommandName::MediaGallery),
             "media_import" => Some(CommandName::MediaImport),
             "media_open" => Some(CommandName::MediaOpen),
             "media_player" => Some(CommandName::MediaPlayer),
