@@ -273,7 +273,28 @@ check("tlauncher is not left blank by a cancelled document",
       json.dumps(launcher))
 
 # --- sleeping tabs driver -------------------------------------------------
+# Marionette's RecommendedPreferences sets browser.tabs.unloadOnLowMemory to
+# false in every automated session, which the product correctly reads as the
+# person having chosen "off". Clear the injected value so the probe observes
+# the default this product ships instead of the harness's own override.
+m.script("""
+try { Services.prefs.clearUserPref("browser.tabs.unloadOnLowMemory"); } catch (e) {}
+return true;
+""")
 perf = m.script("""
+return (async () => {
+  const host = Services.astraHost;
+  return { sleep: await host.Settings.get({ key: "performance.sleep" }),
+           status: host.Performance.status() };
+})();
+""")
+# The pref observer announces the change and the driver schedules itself; give
+# the event one turn before reading the timer.
+for _ in range(40):
+    if perf.get("status", {}).get("running") is True:
+        break
+    time.sleep(0.05)
+    perf = m.script("""
 return (async () => {
   const host = Services.astraHost;
   return { sleep: await host.Settings.get({ key: "performance.sleep" }),

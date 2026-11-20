@@ -8,8 +8,9 @@
 //   - moderate pressure halves the delay; critical discards any inactive tab
 //   - `selectForSleep` returns oldest first and honours the batch cap
 //   - the keep-warm window protects the 6 most recently active eligible tabs,
-//     after the exclusions and before the idle/pressure test, clamped to one
-//     fewer than the set so the oldest is always a candidate
+//     after the exclusions and before the idle/pressure test, and never
+//     protects more than exist: a population at or under the window sleeps
+//     nothing (Rust `select_for_sleep` clamps to `eligible.len()`)
 //   - the idle default is 5 minutes in the policy and in the settings fallback
 //   - `readPolicy` maps performance.sleep/after/memory/exceptions, and
 //     "keep-ready" turns background unload off
@@ -127,6 +128,14 @@ const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
   check(
     "keep-warm holds under critical pressure too",
     selectForSleep(idleMany, NOW, { idle_timeout_ms: MINUTE }, "critical").map((t) => t.id).join(",") === "w7,w6",
+  );
+  // A small set is all warm: the window never protects more tabs than exist,
+  // so four idle tabs sleep nothing (the live settings-parity probe relies on
+  // this and must create more than the window).
+  const fourIdle = idleMany.slice(0, 4);
+  check(
+    "a population at or under the keep-warm window sleeps nothing",
+    selectForSleep(fourIdle, NOW, { idle_timeout_ms: MINUTE }, "critical").length === 0,
   );
 
   const tied = [

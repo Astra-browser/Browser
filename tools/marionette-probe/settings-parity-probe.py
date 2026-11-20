@@ -278,7 +278,10 @@ def main():
         host(m, "Settings.set({key:'performance.sleep',value:'true'})")
         host(m, "Settings.set({key:'performance.exceptions',value:''})")
         ids = []
-        for n in range(1, 5):
+        # The policy keeps the six most recently active tabs warm and never
+        # protects more than exist, so a set at or under six sleeps nothing by
+        # design. Create more than the window to have candidates at all.
+        for n in range(1, 10):
             created = host(
                 m,
                 "Tabs.create({request_id:'parity',url:'https://sleep-"
