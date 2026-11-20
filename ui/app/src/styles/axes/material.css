@@ -38,19 +38,22 @@
 }
 
 /* Let the native acrylic carry the depth; a light theme wash preserves text
-   contrast without stacking an almost opaque color over the system material. */
+   contrast without stacking an almost opaque color over the system material.
+   The window ground stays the theme's own chrome: a translucent one let the
+   OS backdrop through the window's gutter (Mica samples the wallpaper), and
+   Windows only wakes that backdrop for the focused window — so the whole
+   window changed colour the moment anything in it was clicked. */
 :root[data-material="acrylic"] {
-  --wash-window: 28%;
-  --material-window-ground: color-mix(in srgb, var(--color-chrome) var(--wash-window), transparent);
+  --material-window-ground: var(--color-chrome);
   --wash-raised: 56%;
   --wash-launcher: 82%;
 }
 
 /* Mica is near-opaque and already dark-framed, so the wash only lays the
-   theme's colour into it; any heavier and the wallpaper's hue is lost. */
+   theme's colour into it. The window ground is the same opaque chrome as
+   acrylic, for the same reason: the desktop's hue belongs to the desktop. */
 :root[data-material="mica"] {
-  --wash-window: 20%;
-  --material-window-ground: color-mix(in srgb, var(--color-chrome) var(--wash-window), transparent);
+  --material-window-ground: var(--color-chrome);
   --wash-raised: 70%;
   --wash-launcher: 86%;
 }
