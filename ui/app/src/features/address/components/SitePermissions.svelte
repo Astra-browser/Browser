@@ -18,8 +18,9 @@
   } from "../lib/site-info";
 
   /** `origin` is the site's canonical origin. It reads its decisions each time
-   *  `open` turns true, and never while closed. Draws nothing while there is
-   *  nothing to show. */
+   *  `open` turns true, and never while closed. With no decision it lists the
+   *  kinds the page could ask for, each at Ask; it draws nothing only when it
+   *  cannot read the list at all. */
   let {
     origin,
     open,
@@ -68,10 +69,15 @@
       touched,
     ),
   );
+  // Before the site has a decision, the panel lists every kind the page could
+  // ask for instead of nothing: a section that only appeared after a choice
+  // made the site look as if it had no permissions to speak of. Each row then
+  // reads Ask, which is the truth — the page may ask, nothing is saved.
+  let listed = $derived(shown.length > 0 ? shown : (view?.kinds ?? []));
   let saved = $derived(Object.keys(decided).length > 0);
   let unreadable = $derived(loaded && view === null);
   let partial = $derived(view !== null && !view.complete);
-  let present = $derived(shown.length > 0 || unreadable || partial || failed);
+  let present = $derived(listed.length > 0 || unreadable || partial || failed);
 
   async function load() {
     const mine = ++latest;
@@ -148,20 +154,24 @@
     </header>
     {#if unreadable}
       <p class="note">{m.site_settings_unavailable()}</p>
-    {:else if shown.length > 0}
+    {:else if listed.length > 0}
       <ul>
-        {#each shown as kind (kind)}
+        {#each listed as kind (kind)}
+          {@const choice = choosing[kind] ?? choiceOf(kind, decided[kind])}
           <li>
             <span class="name">
               <span aria-hidden="true">{labels[kind]()}</span>
               {#if inUse.has(kind)}<span class="use">{m.site_info_in_use()}</span>{/if}
+              <!-- No decision is a state of its own, not an empty control:
+                   the page asks, and Allow/Block are the answers to it. -->
+              {#if choice === "ask"}<span class="state">{m.permission_ask()}</span>{/if}
             </span>
             <span class="control">
               <SegmentedControl
                 label={labels[kind]()}
                 size="compact"
                 {options}
-                value={choosing[kind] ?? choiceOf(kind, decided[kind])}
+                value={choice}
                 onchange={(value) => void change(kind, value as PermissionChoice)}
               />
             </span>
@@ -245,6 +255,14 @@
 
   .use {
     color: var(--color-danger);
+    font-size: var(--text-caption);
+    line-height: 14px;
+  }
+
+  /* Ask is quiet: it is what every row says before anything has been chosen,
+     and it is the state the answers replace. */
+  .state {
+    color: var(--color-faint);
     font-size: var(--text-caption);
     line-height: 14px;
   }

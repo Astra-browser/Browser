@@ -9,6 +9,7 @@
   import * as m from "$shared/i18n/messages";
   import { Cancel01Icon } from "@hugeicons/core-free-icons";
   import { tabFallbackIcon } from "../lib/tab-icon";
+  import { tabLabel } from "../lib/tab-label";
   import type { TabView } from "$shared/ipc/bindings";
   import FavIcon from "$shared/ui/FavIcon";
   import { favicons } from "$domain/favicons";
@@ -66,6 +67,10 @@
   // A tab with no page yet is a different thing from a page whose site simply
   // supplies no icon, and the row should say which.
   let fallback = $derived(tabFallbackIcon(tab.content));
+  // The row's own name: the committed title, or the host being loaded until
+  // the site commits one, so a fresh row is never blank. The label and both
+  // controls read the same string.
+  let name = $derived(tabLabel(tab, m.untitled_tab()));
   // Depth steps the label in; the row's own inset is a token, so only the
   // steps are arithmetic. `indent` keeps the numeric form the audio control
   // positions itself with.
@@ -126,7 +131,7 @@
     class="tab-open"
     style:padding-inline-start={`calc(var(--tab-inset, 8px) + ${steps}px)`}
     aria-current={active ? "page" : undefined}
-    aria-label={tab.title || m.untitled_tab()}
+    aria-label={name}
     oncontextmenu={(event) => onContextMenu(event, tab)}
     onpointerdown={(event) => onPointerDown(event, tab)}
     onpointermove={onPointerMove}
@@ -147,7 +152,7 @@
       notched={!!tab.audio}
       sleeping={tab.availability?.state === "sleeping"}
     />
-    <span data-astra-tab-label class="tab-label">{tab.title}</span>
+    <span data-astra-tab-label class="tab-label">{name}</span>
   </button>
   {#if tab.audio}
     <AudioControl
@@ -169,7 +174,7 @@
   {#if closable}
     <button
       type="button"
-      aria-label={m.close_named_tab({ title: tab.title || m.untitled_tab() })}
+      aria-label={m.close_named_tab({ title: name })}
       title={m.close_tab()}
       class="tab-close"
       onclick={closeTab}
@@ -270,10 +275,11 @@
   }
 
   /* While the close control shows, the title dissolves before it rather than
-     running underneath it. */
+     running underneath it. The margin clears the control's 24px target plus
+     its 4px inset. */
   .browse-tab:is(:hover, :focus-within) .tab-label,
   :global([data-close-buttons="always"]) .browse-tab:has(.tab-close) .tab-label {
-    margin-inline-end: 20px;
+    margin-inline-end: 24px;
   }
 
   .tab-status {
@@ -289,8 +295,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+
+    /* A 24px hit target in a 28px row: the smallest size WCAG 2.5.8 accepts,
+       and small enough that the row keeps its height. */
+    width: 24px;
+    height: 24px;
     border: 0;
     border-radius: var(--radius-capsule);
     background: transparent;

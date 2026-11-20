@@ -24,18 +24,19 @@ const control = createRawSnippet(() => ({
 
 const box = (element: Element) => element.getBoundingClientRect();
 
-test("a secure page is a green shield, what the control does and the control, on one row", async () => {
+test("a secure page is a green shield, the site, what the control does and the control, on one row", async () => {
   const screen = await render(SiteHead, {
     page: pageOf(),
     label: "Block on this site",
     children: control,
   });
   await expect.element(screen.getByText("Block on this site")).toBeVisible();
+  // The panel names the site it is about, not only what it is doing there.
+  await expect.element(screen.getByText("meet.example")).toBeVisible();
   const shield = screen.getByRole("img", { name: "Secure" });
   await expect.element(shield).toHaveAttribute("title", "Secure");
   expect(shield.element().hasAttribute("data-secure")).toBe(true);
   expect(screen.container.textContent).not.toContain("Secure");
-  expect(screen.container.textContent).not.toContain("meet.example");
 
   const head = screen.container.querySelector<HTMLElement>(".head")!;
   const name = screen.getByText("Block on this site").element();
@@ -59,8 +60,9 @@ test("an unencrypted page has a red alert shield, and says why under the name", 
   expect(box(screen.getByText("Block on this site").element()).bottom).toBeLessThanOrEqual(
     box(status.element()).top,
   );
+  // The port is part of the site a person is deciding about.
+  await expect.element(screen.getByText("meet.example:8080")).toBeVisible();
   expect(screen.container.textContent).not.toContain("Secure");
-  expect(screen.container.textContent).not.toContain("meet.example");
 });
 
 test("a certificate the person continued past is named, never secure", async () => {
@@ -99,6 +101,7 @@ test("a long name takes a second line inside the row rather than leaving it", as
     expect(head.scrollWidth).toBeLessThanOrEqual(head.clientWidth);
     expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
     expect(box(name).right).toBeLessThanOrEqual(box(head.querySelector(".control")!).left);
-    if (width === "228px") expect(head.offsetHeight).toBeLessThanOrEqual(38);
+    // The site line, then up to two lines of the label beside the control.
+    if (width === "228px") expect(head.offsetHeight).toBeLessThanOrEqual(52);
   }
 });

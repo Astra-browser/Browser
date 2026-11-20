@@ -89,15 +89,31 @@ test("it reads again each time it opens", async () => {
   await expect.poll(() => native.list.mock.calls.length).toBe(2);
 });
 
-test("a site with no decision and nothing in use shows no permissions, and says nothing about it", async () => {
+test("a site with no decision lists what the page could ask for, each at Ask", async () => {
   const screen = await details();
   await expect.poll(() => native.list.mock.calls.length).toBe(1);
   await expect
     .element(screen.getByRole("button", { name: "Clear data for this site…" }))
     .toBeVisible();
-  expect(screen.container.querySelector("section")).toBeNull();
-  expect(screen.container.textContent).not.toMatch(/permission/iu);
-  expect(screen.container.textContent).not.toContain("No ");
+  // Every kind the platform keeps is a row before anything is decided: a
+  // section that only appeared after a choice made the site read as if it had
+  // no permissions at all.
+  for (const name of ["Camera", "Microphone", "Location", "Pop-ups & redirects"]) {
+    await expect.element(screen.getByRole("radiogroup", { name })).toBeVisible();
+  }
+  // Nothing saved yet: the rows say they may ask, and there is nothing to reset.
+  expect(screen.container.textContent).toContain("Ask");
+  await expect
+    .element(screen.getByRole("button", { name: "Reset permissions" }))
+    .not.toBeInTheDocument();
+  // Pop-ups are blocked unless a site is allowed, so that row is not at Ask.
+  await expect
+    .element(
+      screen.getByRole("radiogroup", { name: "Pop-ups & redirects" }).getByRole("radio", {
+        name: "Block",
+      }),
+    )
+    .toBeChecked();
 });
 
 test("each decision is a row with Allow and Block, and a press is written through and read back", async () => {
@@ -169,17 +185,24 @@ test("a change that did not go through says so and shows what is saved", async (
   await expect.element(camera.getByRole("radio", { name: "Allow" })).toBeChecked();
 });
 
-test("Reset permissions forgets every decision of this site and the section goes with them", async () => {
+test("Reset permissions forgets every decision of this site and the rows go back to Ask", async () => {
   native.list.mockResolvedValueOnce(view([CAMERA, POPUPS])).mockResolvedValue(view());
   const screen = await details();
   await screen.getByRole("button", { name: "Reset permissions" }).click();
   await expect.poll(() => native.set.mock.calls.length).toBe(2);
   expect(native.set).toHaveBeenCalledWith("https://meet.example", "camera", null);
   expect(native.set).toHaveBeenCalledWith("https://meet.example", "popups", null);
-  await expect.element(screen.getByRole("radiogroup")).not.toBeInTheDocument();
+  // The rows stay — they are what the page could still ask for — and nothing
+  // is saved any more, so there is no Reset left to press.
+  await expect.element(screen.getByRole("radiogroup", { name: "Camera" })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Reset permissions" }))
     .not.toBeInTheDocument();
+  await expect
+    .element(
+      screen.getByRole("radiogroup", { name: "Camera" }).getByRole("radio", { name: "Allow" }),
+    )
+    .not.toBeChecked();
 });
 
 test("permissions that cannot be read are not shown as none", async () => {

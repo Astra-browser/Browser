@@ -153,8 +153,12 @@ function holdUntilRoom(flight: Animation, right: number) {
 export function play(snapshot: Snapshot | null) {
   if (!snapshot) return;
   const incoming = columnOf(snapshot.host);
-  if (!incoming || incoming === snapshot.column || snapshot.column.isConnected) return;
-  release(snapshot);
+  if (!incoming) return;
+  // The column is reused between shapes (the `{#key}` that made a new one was
+  // removed), so there is no ghost to retire — but every mark still has a from
+  // and a to, and must travel between them. Calling `release` here would mark
+  // the live column inert and hide it.
+  if (incoming !== snapshot.column) release(snapshot);
 
   const travelling = new Set<HTMLElement>();
   const time = duration("page");

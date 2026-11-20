@@ -86,6 +86,16 @@
   }
   /** The tab the stage shows, as the last projection named it. */
   let activeTabId = "";
+  /** When a page swap last signalled itself (a `tab.*` burst). A column move
+   *  that arrives inside the window below belongs to that swap. */
+  let pageSwapAt = Number.NEGATIVE_INFINITY;
+  /** How long after a swap's own events a column publish is still its
+   *  consequence. A switch's burst lands well inside this; a toggle a person
+   *  pressed afterwards does not. */
+  const SWAP_WINDOW_MS = 200;
+  /** The tab in front when the shell last accepted a deliberate column move:
+   *  a publish for a *different* tab is the swap's, not a change of shape. */
+  let shownTabAtPublish = "";
   /** The tab and address the stage has already put in front (a real document
    *  commit, not the model's optimistic one). The cover (skeleton + spinner)
    *  ends here, not at the end of the load: the document is painting while its
@@ -868,7 +878,26 @@
       }
     }
 
-    async function refreshTabs() {
+    // One switch emits a burst of `tab.*` events (selection, title, loading,
+    // favicon), and projecting the model per event meant a full `Tabs.list`,
+    // a split rebuild and a window title three or four times for one switch.
+    // One projection per frame is enough: the strip is still current in the
+    // frame the switch lands in, and a burst costs a single call. The strip
+    // itself is the native `mountTabStrip`, which keeps its own projection.
+    let tabsFrame = 0;
+    function refreshTabs() {
+      if (tabsFrame) return;
+      if (typeof win?.requestAnimationFrame !== "function") {
+        void refreshTabsNow();
+        return;
+      }
+      tabsFrame = win.requestAnimationFrame(() => {
+        tabsFrame = 0;
+        void refreshTabsNow();
+      });
+    }
+
+    async function refreshTabsNow() {
       try {
         const list = await host.Tabs.list({ request_id: newRequestId() });
         const snaps = list.tabs ?? [];
@@ -963,6 +992,10 @@
           mirrorFullscreen(event.data?.fullscreen === true);
         }
       } else if (event.type.startsWith("tab.")) {
+        // A page swap in flight: the column may move for it (a hidden column
+        // is held out for a destination that wants it), and that move must
+        // land in place instead of travelling over the native deck.
+        pageSwapAt = performance.now();
         void refreshTabs();
       } else if (event.type === "sidebar.changed") {
         // The app publishes the column's laid-out width. Hidden, the column is
@@ -993,10 +1026,23 @@
         // everything else, and the frame is clipped away from it.
         frameRoot.dataset.astraSidebarHidden = hidden ? "true" : "false";
         if (!hidden) postSidebarEdge(false);
-        // `animate` marks a deliberate change of shape (the app's `travel`):
-        // the page travels with the column. A drag reports false and the page
-        // tracks the pointer without a transition lagging behind it.
-        frameRoot.dataset.astraSidebarAnimate = event.data?.animate === true ? "true" : "false";
+        // `animate` marks a deliberate change of shape (the app's `travel`): a
+        // toggle, a snap, a tool opening, the column held out for a
+        // destination. A drag reports false and the page tracks the pointer
+        // without a transition lagging behind it.
+        //
+        // A page swap is not a change of shape, even when the column moves
+        // because of it (a hidden column held out for the page in front): the
+        // card lands in place instead of sliding 400ms over the native deck,
+        // which is what a switch was paying for on every swap. Two facts say
+        // this publish belongs to a swap — the tab in front is not the one the
+        // last publish was for, or the swap's own `tab.*` burst is still the
+        // most recent thing to have happened.
+        const swapJustNow = performance.now() - pageSwapAt < SWAP_WINDOW_MS;
+        const deliberate =
+          event.data?.animate === true && !swapJustNow && activeTabId === shownTabAtPublish;
+        shownTabAtPublish = activeTabId;
+        frameRoot.dataset.astraSidebarAnimate = deliberate ? "true" : "false";
       } else if (event.type === "ui-command") {
         // Work, Settings, Tasks, Notes and Time are the app's own pages: the
         // real page surface must get out of their way. This command is only
@@ -1019,7 +1065,9 @@
         // The projection names the tab in front, so a background tab's
         // navigation cannot take the stage over.
         if (event.type === "items-changed") {
-          activeTabId = typeof event.data?.active === "string" ? event.data.active : "";
+          const next = typeof event.data?.active === "string" ? event.data.active : "";
+          if (next !== activeTabId) pageSwapAt = performance.now();
+          activeTabId = next;
         }
         const next = slotStateFor(event, {
           activeId: activeTabId,
@@ -1120,7 +1168,8 @@
         slotError = String(e?.message ?? e);
       }
     }
-    void refreshTabs();
+    // The first projection is not a burst: land it now, as it always did.
+    void refreshTabsNow();
     // A window opened "in new window" carries its address on the window
     // object, so the engine's hidden tabbox never fetched the page first. The
     // address goes into this window's own tab model, which owns the browser.
@@ -1150,11 +1199,30 @@
       }
     };
     let menuTimer = 0;
+    let focusBeforeMenu = null;
     function setMenuOpen(open) {
       clearTimeout(menuTimer);
       frameRoot.dataset.astraMenuOpen = open ? "true" : "false";
       if (open) {
+        // The menu lives in the app frame, but real keyboard focus still sits
+        // in the page under it, so Escape and the arrows never reached the
+        // menu. Move focus into the frame for the menu's life and give it back
+        // to whatever had it afterwards.
+        try {
+          focusBeforeMenu = frameRoot.ownerDocument.activeElement;
+          appApi?.element?.contentWindow?.focus();
+        } catch {
+          focusBeforeMenu = null;
+        }
         menuTimer = setTimeout(() => setMenuOpen(false), 30000);
+      } else if (focusBeforeMenu) {
+        const previous = focusBeforeMenu;
+        focusBeforeMenu = null;
+        try {
+          previous.focus?.();
+        } catch {
+          // The element went away with its tab.
+        }
       }
     }
     // A page peek is drawn in the app frame, which normally sits under the
@@ -1305,6 +1373,9 @@
       } catch {
         // Already torn down with the window.
       }
+      // A queued projection must not run against a window that is going away.
+      if (tabsFrame) win.cancelAnimationFrame(tabsFrame);
+      tabsFrame = 0;
       win.removeEventListener("message", onWindowMenu);
       win.removeEventListener("keydown", onGlobalKey, true);
       win.removeEventListener("mousedown", onGlobalMouse, true);
@@ -1663,7 +1734,10 @@
      document, not this one, so the values are mirrored here. The top edge is
      never animated: it belongs to the bar's mode, which flips as part of a tab
      switch, and a travelling card read as the page sliding into place.
-     A drag reports animate=false: the page must track the pointer, not chase it. */
+     A drag reports animate=false: the page must track the pointer, not chase it.
+     `data-astra-sidebar-animate` is only true for a change that keeps the page
+     in front: a publish that arrives with a tab switch lands in place, because
+     moving the card 400ms over the native deck was most of what a swap cost. */
   :global(.astra-frame[data-astra-sidebar-animate="true"] .astra-content) {
     transition: inset-inline-start 400ms cubic-bezier(0.16, 1, 0.3, 1);
   }

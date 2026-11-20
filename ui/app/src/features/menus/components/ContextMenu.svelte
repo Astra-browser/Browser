@@ -7,6 +7,43 @@
   let panel = $state<HTMLDivElement | null>(null);
   let left = $state(0);
   let top = $state(0);
+  // What held the keyboard when the menu opened. A menu takes it away, so it
+  // must give it back — otherwise closing leaves the person on <body> with
+  // nothing to press and no way to tell where they are.
+  let opener: HTMLElement | null = null;
+  let open = $derived(current() !== null);
+
+  const rows = () => [
+    ...(panel?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? []),
+  ];
+
+  /**
+   * Gives the keyboard back to the opener. `force` is for a close the menu
+   * commanded itself (Escape); otherwise an action that put the keyboard
+   * somewhere of its own (a field it opened, another surface) keeps it, and
+   * only a menu that strands it on <body> hands it back.
+   */
+  function restoreFocus(force: boolean) {
+    const target = opener;
+    opener = null;
+    if (!target || !target.isConnected) return;
+    const active = document.activeElement;
+    if (!force && active !== null && active !== document.body) return;
+    target.focus({ preventScroll: true });
+  }
+
+  function dismiss(force: boolean) {
+    if (!open) return;
+    close();
+    restoreFocus(force);
+  }
+
+  function dismissWithChoice(id: string) {
+    choose(id);
+    // `choose` closes and runs the action; a row that moved focus itself is
+    // left alone, one that did not gives the keyboard back.
+    restoreFocus(false);
+  }
 
   // The chrome sends viewport coordinates. Keep the panel inside the window
   // even when the press happened at the last pixel, then focus the first row so
@@ -14,6 +51,10 @@
   $effect(() => {
     const menu = current();
     if (!menu || !panel) return;
+    if (opener === null) {
+      const active = document.activeElement;
+      opener = active instanceof HTMLElement && active !== document.body ? active : null;
+    }
     left = Math.max(EDGE, Math.min(menu.x, window.innerWidth - (panel.offsetWidth || 240) - EDGE));
     top = Math.max(EDGE, Math.min(menu.y, window.innerHeight - (panel.offsetHeight || 200) - EDGE));
     void tick().then(() => {
@@ -21,10 +62,52 @@
     });
   });
 
+  // The panel is not the only place keys land. Escape, the arrows and Tab are
+  // heard while the menu is up wherever the focus went (a row, the panel, a
+  // control inside it), and Tab wraps inside the layer instead of walking out
+  // to the window controls behind it.
+  $effect(() => {
+    if (!open) return;
+    window.addEventListener("keydown", onKeydown, true);
+    // Focus that left the layer for something else (a shortcut, a press on
+    // another surface) closes the menu with it: a menu left open over a column
+    // that no longer owns the keyboard reads as a frozen window.
+    window.addEventListener("focusin", onFocusIn);
+    return () => {
+      window.removeEventListener("keydown", onKeydown, true);
+      window.removeEventListener("focusin", onFocusIn);
+    };
+  });
+
+  function onFocusIn(event: FocusEvent) {
+    const target = event.target;
+    if (target instanceof Node && panel?.contains(target)) return;
+    dismiss(false);
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close();
+      // The app's own shortcut layer is on the same key: a menu that is up
+      // owns Escape, and nothing behind it may act on the same press.
+      event.stopPropagation();
+      dismiss(true);
+      return;
+    }
+    const list = rows();
+    if (event.key === "Tab") {
+      if (list.length === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const at = list.indexOf(document.activeElement as HTMLButtonElement);
+      const step = event.shiftKey ? -1 : 1;
+      const next =
+        at === -1
+          ? event.shiftKey
+            ? list.length - 1
+            : 0
+          : (at + step + list.length) % list.length;
+      list[next]?.focus();
       return;
     }
     if (
@@ -35,21 +118,19 @@
     ) {
       return;
     }
-    const rows = [
-      ...(panel?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? []),
-    ];
-    if (rows.length === 0) return;
+    if (list.length === 0) return;
     event.preventDefault();
-    const at = rows.indexOf(document.activeElement as HTMLButtonElement);
+    event.stopPropagation();
+    const at = list.indexOf(document.activeElement as HTMLButtonElement);
     const next =
       event.key === "Home"
         ? 0
         : event.key === "End"
-          ? rows.length - 1
+          ? list.length - 1
           : event.key === "ArrowDown"
-            ? (at + 1) % rows.length
-            : (at - 1 + rows.length) % rows.length;
-    rows[next]?.focus();
+            ? (at + 1) % list.length
+            : (at - 1 + list.length) % list.length;
+    list[next]?.focus();
   }
 </script>
 
@@ -59,7 +140,7 @@
     class="menu-backdrop"
     role="presentation"
     onpointerdown={(event) => {
-      if (event.target === event.currentTarget) close();
+      if (event.target === event.currentTarget) dismiss(false);
     }}
     oncontextmenu={(event) => event.preventDefault()}
   >
@@ -70,7 +151,6 @@
       tabindex="-1"
       style:left={`${left}px`}
       style:top={`${top}px`}
-      onkeydown={onKeydown}
     >
       {#each menu.items as entry, index (index)}
         {#if entry.kind === "separator"}
@@ -84,7 +164,7 @@
             role="menuitem"
             disabled={entry.disabled}
             data-danger={entry.danger || undefined}
-            onclick={() => choose(entry.id)}
+            onclick={() => dismissWithChoice(entry.id)}
           >
             <span class="shell-menu-icon" aria-hidden="true">
               {#if entry.icon}<Icon icon={entry.icon} size={15} />{/if}
@@ -175,8 +255,18 @@
     color: var(--color-faint);
   }
 
-  .shell-menu-item:focus-visible,
-  .shell-menu-item:hover:not(:disabled) {
+  /* The pointer gets a quiet wash: a row under the cursor is obvious because
+     the cursor is on it. The keyboard has no such pointer, so its row also
+     carries the product's focus ring inside the plate — the same 1.5px ring
+     every other keyboard stop gets — and the wash goes up one step. A 4% wash
+     alone measured 1.1:1 against the panel, which is not a highlight. */
+  .shell-menu-item:focus-visible {
+    background: var(--row-pressed);
+    box-shadow: inset 0 0 0 1.5px var(--color-ring);
+    outline: none;
+  }
+
+  .shell-menu-item:hover:not(:disabled, :focus-visible) {
     background: var(--row-hover);
     outline: none;
   }
@@ -195,8 +285,12 @@
     color: var(--color-faint);
   }
 
-  .shell-menu-item[data-danger]:focus-visible,
-  .shell-menu-item[data-danger]:hover:not(:disabled) {
+  .shell-menu-item[data-danger]:focus-visible {
+    background: color-mix(in srgb, var(--color-danger) 22%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--color-danger);
+  }
+
+  .shell-menu-item[data-danger]:hover:not(:disabled, :focus-visible) {
     background: color-mix(in srgb, var(--color-danger) 16%, transparent);
   }
 
@@ -263,6 +357,10 @@
     .shell-menu {
       animation: shell-menu-fade var(--motion-instant) linear;
     }
+
+    .shell-menu-item {
+      transition: none;
+    }
   }
 
   @media (forced-colors: active) {
@@ -275,6 +373,9 @@
     .shell-menu-item:hover:not(:disabled) {
       background: Highlight;
       color: HighlightText;
+      box-shadow: none;
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
     }
   }
 </style>

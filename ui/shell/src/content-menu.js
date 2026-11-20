@@ -722,15 +722,10 @@ export async function runChromeAction(win, host, id, { browser = null } = {}) {
         return { accepted: false };
       }
     case "page.print":
-      try {
-        if (!browser) return { accepted: false };
-        win.PrintUtils.startPrintWindow(browser.browsingContext, {
-          printToFile: false,
-        });
-        return { accepted: true };
-      } catch {
-        return { accepted: false };
-      }
+      // The host refuses `page.print` by name (no Astra print surface yet) and
+      // never routes it here. Keeping a native print launch in the shell would
+      // make an unreachable path that violates D-38 if it ever came back.
+      return { accepted: false, reason: "unavailable" };
     case "page.viewSource":
       host.emit?.("ui-command", "browser.source");
       return { accepted: true };

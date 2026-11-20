@@ -104,8 +104,14 @@ export class RowDrag {
     ) {
       const target = event.currentTarget;
       if (target instanceof HTMLElement) {
-        target.setPointerCapture(event.pointerId);
-        this.#capture = { element: target, pointerId: event.pointerId };
+        try {
+          target.setPointerCapture(event.pointerId);
+          this.#capture = { element: target, pointerId: event.pointerId };
+        } catch {
+          // The pointer is already gone (a synthetic or cancelled one): the
+          // drag still works from the window listeners, only without capture.
+          this.#capture = null;
+        }
       }
       this.#dragging = true;
       this.#listen();

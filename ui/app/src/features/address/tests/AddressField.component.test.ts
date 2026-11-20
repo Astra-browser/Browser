@@ -164,11 +164,12 @@ test("a launcher hand-off that the host refuses raises nothing", async () => {
     emitNativeEvent("uiCommand", "url.focus");
     await vi.waitFor(() => expect(native.editCalls).toBe(1));
     // The shortcut hands the address to the launcher; when that cannot be
-    // delivered the field must not leave a rejected promise behind, and it
-    // must not quietly take the caret into the sidebar field instead.
+    // delivered the field must not leave a rejected promise behind. It takes
+    // the caret instead of doing nothing: a refused hand-off is what these
+    // tests caught Ctrl+L doing silently before.
     await new Promise((done) => setTimeout(done, 50));
     expect(rejections).toEqual([]);
-    expect(document.activeElement).not.toBe(input);
+    expect(document.activeElement).toBe(input);
   } finally {
     window.removeEventListener("unhandledrejection", caught);
     uiCommands.dispose();

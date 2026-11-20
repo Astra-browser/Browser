@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-svelte";
 import { flushSync } from "svelte";
@@ -6,6 +6,7 @@ import "$styles/global.css";
 import type { SidebarNodeView } from "$shared/ipc/bindings";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, tabFixture } from "$shared/testing/fixtures";
+import { installPointerCapture } from "$shared/testing/pointer";
 import { tabs } from "$domain/tabs";
 import TabList from "../components/TabList.svelte";
 import { sidebarTree } from "../lib/sidebar-model";
@@ -34,6 +35,14 @@ afterEach(() => {
   tabs.dispose();
   native.setEssential.mockClear();
 });
+
+// A synthetic pointer has no native capture; without this the drag aborts
+// before it sets any state.
+let restorePointerCapture = installPointerCapture();
+beforeEach(() => {
+  restorePointerCapture = installPointerCapture();
+});
+afterEach(() => restorePointerCapture());
 
 const open = ["a", "b", "c", "d"].map((id) => tabFixture({ id, title: `Tab ${id}` }));
 
@@ -76,12 +85,18 @@ async function list(section: "today" | "pinned" = "today") {
 function drag(handle: HTMLElement, to: { x: number; y: number }) {
   const from = handle.getBoundingClientRect();
   const start = { x: from.left + 20, y: from.top + from.height / 2 };
-  const init = { bubbles: true, pointerId: 1, button: 0, isPrimary: true };
+  const init = { bubbles: true, pointerId: 1, button: 0, buttons: 1, isPrimary: true };
   handle.dispatchEvent(
     new PointerEvent("pointerdown", { ...init, clientX: start.x, clientY: start.y }),
   );
+  // Below the 9px threshold: a press, not yet a drag.
   handle.dispatchEvent(
     new PointerEvent("pointermove", { ...init, clientX: start.x, clientY: start.y + 8 }),
+  );
+  // The drag begins at the pointer's position when it crosses the threshold,
+  // and measures travel from there: cross it 10px in, then go to the target.
+  handle.dispatchEvent(
+    new PointerEvent("pointermove", { ...init, clientX: start.x, clientY: start.y + 10 }),
   );
   handle.dispatchEvent(new PointerEvent("pointermove", { ...init, clientX: to.x, clientY: to.y }));
   return { init, handle };

@@ -57,7 +57,7 @@ test("a proxy is named as the proxy", async () => {
     .toHaveTextContent("The proxy proxy.corp:3128 asks you to sign in");
 });
 
-test("Enter signs in with what was typed and clears the fields", async () => {
+test("Enter signs in with what was typed and keeps it until the card closes", async () => {
   signIn();
   await userEvent.type(page.getByLabelText("Username"), "admin");
   await userEvent.type(page.getByLabelText("Password"), "hunter2{Enter}");
@@ -65,7 +65,9 @@ test("Enter signs in with what was typed and clears the fields", async () => {
     username: "admin",
     password: "hunter2",
   });
-  await expect.element(page.getByLabelText("Password")).toHaveValue("");
+  // A refused answer must not blank the form, so the values stay while the
+  // card is open; the card goes away with the request, not with the submit.
+  await expect.element(page.getByLabelText("Password")).toHaveValue("hunter2");
 });
 
 test("Enter inside the card never submits the address form around it", async () => {

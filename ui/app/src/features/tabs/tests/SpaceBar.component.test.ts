@@ -123,10 +123,12 @@ test("a row and its section label carry the refresh geometry", async () => {
   const section = [...screen.container.querySelectorAll<HTMLElement>(".tab-section")].at(-1)!;
   expect(section.textContent).toBe("Open tabs");
   const sectionStyle = getComputedStyle(section);
-  expect(sectionStyle.fontSize).toBe("11px");
-  expect(sectionStyle.fontWeight).toBe("600");
-  expect(sectionStyle.textTransform).toBe("uppercase");
-  expect(sectionStyle.letterSpacing).toBe("0.44px");
+  // The section label is a quiet sliver of the column now: the type scale's
+  // label size, no tracking and no shouting capitals.
+  expect(sectionStyle.fontSize).toBe("12px");
+  expect(sectionStyle.fontWeight).toBe("500");
+  expect(sectionStyle.letterSpacing).toBe("normal");
+  expect(sectionStyle.textTransform).toBe("none");
 });
 
 test("the switcher lists every space, checks the one shown and moves to another", async () => {
