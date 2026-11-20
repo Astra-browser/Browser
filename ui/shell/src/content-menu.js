@@ -257,6 +257,185 @@ export function devTabFor(win, browser) {
   return tab;
 }
 
+/** The size a floating toolbox needs to be usable, in CSS pixels. Below this
+ *  the panels cannot lay out: at the engine's 900x320 default the inspector's
+ *  own sidebar is taller than the window and everything scrolls in a sliver. */
+export const DEVTOOLS_MIN_WIDTH = 760;
+export const DEVTOOLS_MIN_HEIGHT = 420;
+
+function positive(value, fallback) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function finite(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function clamp(value, low, high) {
+  return Math.min(Math.max(value, low), Math.max(low, high));
+}
+
+/**
+ * Where the floating toolbox should go for one browser window.
+ *
+ * The engine opens `toolbox-window.xhtml` at its own 900x320 default and then
+ * remembers that size forever (`persist="… width height sizemode"`). Astra
+ * always uses the window host (the native tabbox is hidden), so without this
+ * the product's Inspect surface is a strip on every later open, not just the
+ * first. The person's own size is kept once it is usable; only a degenerate
+ * window is grown, and a window that opened off the work area is moved back.
+ *
+ * Pure: it reads the two windows and returns the rect, so the layout rule is
+ * testable without DevTools.
+ *
+ * @param {{screenX?: number, screenY?: number, outerWidth?: number, outerHeight?: number,
+ *          screen?: {availLeft?: number, availTop?: number, availWidth?: number, availHeight?: number}}} win
+ *   the browser window
+ * @param {{left?: number, top?: number, width?: number, height?: number}} [current]
+ *   the toolbox window's present rect
+ * @returns {{left: number, top: number, width: number, height: number}|null}
+ *   null when the toolbox is already usable and fully on the work area
+ */
+export function devToolsWindowRect(win, current = {}) {
+  const screen = win?.screen ?? {};
+  const avail = {
+    left: Math.round(finite(screen.availLeft, 0)),
+    top: Math.round(finite(screen.availTop, 0)),
+    width: Math.round(positive(screen.availWidth, 1280)),
+    height: Math.round(positive(screen.availHeight, 800)),
+  };
+  const browser = {
+    left: Math.round(finite(win?.screenX, avail.left)),
+    top: Math.round(finite(win?.screenY, avail.top)),
+    width: Math.round(positive(win?.outerWidth, avail.width)),
+    height: Math.round(positive(win?.outerHeight, avail.height)),
+  };
+  const width = Math.round(positive(current.width, 0));
+  const height = Math.round(positive(current.height, 0));
+  const usable = width >= DEVTOOLS_MIN_WIDTH && height >= DEVTOOLS_MIN_HEIGHT;
+  const left = Math.round(finite(current.left, browser.left));
+  const top = Math.round(finite(current.top, browser.top));
+  // Half of the toolbox has to be on the work area for a person to grab it.
+  const onScreen =
+    left + width / 2 > avail.left &&
+    left + width / 2 < avail.left + avail.width &&
+    top >= avail.top - 8 &&
+    top + 24 < avail.top + avail.height;
+  if (usable && onScreen) {
+    return null;
+  }
+  // Never grow the toolbox beyond the display it is going on.
+  const targetWidth = Math.min(
+    Math.max(Math.round(browser.width * 0.72), 900),
+    1400,
+    avail.width,
+  );
+  const targetHeight = Math.min(
+    Math.max(Math.round(browser.height * 0.62), 560),
+    1000,
+    avail.height,
+  );
+  const nextWidth = usable
+    ? Math.min(width, avail.width)
+    : Math.min(Math.max(width, targetWidth), avail.width);
+  const nextHeight = usable
+    ? Math.min(height, avail.height)
+    : Math.min(Math.max(height, targetHeight), avail.height);
+  // Centre it over the browser window, then keep it on the work area.
+  return {
+    left: clamp(
+      browser.left + Math.round((browser.width - nextWidth) / 2),
+      avail.left,
+      avail.left + avail.width - nextWidth,
+    ),
+    top: clamp(
+      browser.top + Math.round((browser.height - nextHeight) / 2),
+      avail.top,
+      avail.top + avail.height - nextHeight,
+    ),
+    width: nextWidth,
+    height: nextHeight,
+  };
+}
+
+/** The toolbox window this browser window's DevTools is in, if any. */
+function toolboxWindow(win) {
+  try {
+    return win?.Services?.wm?.getMostRecentWindow?.("devtools:toolbox") ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** When to re-check the toolbox window after it opens. A new toolbox window is
+ *  reported by `Services.wm` before XUL has applied its persisted
+ *  `width`/`height` and before the toolbox is loaded; a resize issued earlier
+ *  is ignored or overwritten. The first open of a session also imports the
+ *  DevTools modules, so the later ticks matter. */
+export const DEVTOOLS_PLACEMENT_RETRY_MS = [
+  0, 100, 200, 400, 700, 1100, 1600, 2400, 3400, 4600, 6000,
+];
+
+/**
+ * Place the toolbox over a short settle window.
+ *
+ * One placement is not enough: the engine restores the toolbox window's own
+ * persisted size as it opens, and ignores a resize until the window is loaded.
+ * Each tick re-checks the live window and stops as soon as it is usable (or as
+ * soon as the person already had a usable window, which is never touched).
+ */
+export function scheduleToolboxPlacement(
+  win,
+  attempts = DEVTOOLS_PLACEMENT_RETRY_MS,
+) {
+  const tick = (index) => {
+    const toolbox = toolboxWindow(win);
+    const loaded = !toolbox || toolbox.document?.readyState === "complete";
+    if (toolbox && loaded && !placeToolboxWindow(win, toolbox)) {
+      return;
+    }
+    if (index + 1 >= attempts.length) {
+      return;
+    }
+    try {
+      const timer = win?.setTimeout ?? setTimeout;
+      timer(() => tick(index + 1), attempts[index + 1] - attempts[index]);
+    } catch {
+      // No timer on this window; a later call places it.
+    }
+  };
+  tick(0);
+}
+
+/**
+ * Give a freshly opened (or reused) toolbox window a size a person can work in.
+ * Returns the rect it applied, or null when the window was already fine.
+ */
+export function placeToolboxWindow(win, toolbox = toolboxWindow(win)) {
+  if (!toolbox || typeof toolbox.resizeTo !== "function") {
+    return null;
+  }
+  const rect = devToolsWindowRect(win, {
+    left: toolbox.screenX,
+    top: toolbox.screenY,
+    width: toolbox.outerWidth,
+    height: toolbox.outerHeight,
+  });
+  if (!rect) {
+    return null;
+  }
+  try {
+    toolbox.resizeTo(rect.width, rect.height);
+    if (typeof toolbox.moveTo === "function") {
+      toolbox.moveTo(rect.left, rect.top);
+    }
+  } catch {
+    // A window the OS refused to move is still a working toolbox.
+    return null;
+  }
+  return rect;
+}
+
 /** Open or close DevTools for an Astra content browser.
  *
  *  `DevToolsShim` is the supported entry point: it initialises DevTools lazily
@@ -296,6 +475,10 @@ export async function showDevTools(
       hostType: "window",
       reason,
     });
+    // The engine's toolbox window opens at its own 900x320 default and then
+    // remembers that size, so the product's Inspect surface would otherwise be
+    // a strip on every later open. Leave a usable size/position to the person.
+    scheduleToolboxPlacement(win);
     return { accepted: true };
   } catch (error) {
     // The caller reports "accepted: false" to the app, so a refusal must

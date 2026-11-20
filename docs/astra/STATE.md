@@ -11,6 +11,52 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: DevTools opens as a sliver (2026-11-20, branch `fix/devtools-window`)
+
+The owner reported DevTools as "laggy, unresponsive" on YouTube and said the
+DevTools window itself was the slow part. Measured first on the installed
+0.1.758 with a copy of the owner's profile (their last YouTube tab), because a
+wrong fix here would hide the real cost:
+
+| Measurement (DevTools open) | Result |
+|---|---|
+| Toolbox window appears / ready | 162–229 ms / 0.4–0.9 s |
+| Chrome main-thread rAF, idle and settled | 59–60 fps, no long tasks |
+| YouTube video, DevTools open | 0 dropped frames / 856 |
+| Console, Inspector, Network, Debugger + scrolling | max 168 ms frame gap, no ≥250 ms stall |
+| Toolbox window's own rAF (both 322 px and 713 px tall) | 59.9 fps |
+| OS window ping (`WM_NULL`, browser + toolbox) | ≤2.2 ms, 0 hung replies |
+
+The lag itself did **not** reproduce: the chrome is idle while DevTools is open
+and the toolbox renders at 60 fps. What was genuinely broken is the window:
+`toolbox-window.xhtml` is **900x320** and `persist`s that size, and Astra always
+uses the window host (the native tabbox is hidden). The owner's profile was
+stuck at **1250x322**, with the inspector sidebar taller than the window.
+
+**Fix:** `ui/shell/src/content-menu.js` now gives the toolbox a usable size and
+position when it opens (`devToolsWindowRect` / `placeToolboxWindow` /
+`scheduleToolboxPlacement`, all pure except the two window calls):
+
+- a degenerate window grows to at least 760x420 and up to 72%×62% of the
+  browser window (900–1400 px wide, 560–1000 px tall), centred over it and
+  clamped to the work area;
+- a usable size the person set is never touched (and an off-work-area window is
+  only moved);
+- placement is re-checked for 6 s because XUL restores the persisted size and
+  ignores resizes until the toolbox has loaded; the first open of a session
+  also imports the DevTools modules.
+
+**Verified:** `node --test ui/shell/src` **86/86**; `tools/marionette-probe/devtools-window-probe.py`
+**6/6** against the installed build (fresh profile: 900x320 → 932x560 centred;
+reopen stable; a 900x300 sliver grows back; a person's 1000x700 at 60,60 kept);
+the owner's real profile: **1250x322 → 1250x560** centred over 1511x791.
+The shell bundle was rebuilt (`build:chrome` path unchanged) and prettier is
+clean on both touched sources.
+
+**Deferred:** the owner's lag report itself needs a retest on this build. If it
+returns, the probe to extend is `devtools-window-probe.py` (add panel switches
+and console typing); the numbers above are the baseline it must beat.
+
 ## Owner report: window ground colour on click + the unreachable page bar (2026-11-20)
 
 Two owner reports from the Windows dev build, both traced to chrome layers
