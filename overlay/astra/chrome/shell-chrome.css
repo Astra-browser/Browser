@@ -8,14 +8,25 @@
  * NOT size elements inside XUL layout (measured 0x0 in GUI, D-30) while flex
  * sizing mirrors #tabbrowser-tabbox. P1-T10 reworks this into the
  * content-slot layout (tabs as <browser> elements placed by CSS). */
-#navigator-toolbox,
-#tabbrowser-tabbox,
-#sidebar-container,
-#sidebar-box,
-#sidebar-splitter,
-#sidebar-launcher-splitter,
-#ai-window-box,
-#ai-window-splitter {
+/* A page's window.open popup keeps the engine's own reduced chrome and never
+   mounts the product shell (the shell marks it data-astra-popup). The engine
+   also marks a popup before that script runs, so the chromehidden check holds
+   the first paint too. */
+:root:not([data-astra-popup]):not([chromehidden~="toolbar"]) :is(
+    #navigator-toolbox,
+    #tabbrowser-tabbox,
+    #sidebar-container,
+    #sidebar-box,
+    #sidebar-splitter,
+    #sidebar-launcher-splitter,
+    #ai-window-box,
+    #ai-window-splitter
+  ) {
+  display: none !important;
+}
+
+:root[data-astra-popup] #astra-root,
+:root[chromehidden~="toolbar"] #astra-root {
   display: none !important;
 }
 
@@ -26,7 +37,7 @@
    on for a tiled or maximized window (the usual Hyprland shape here); only a
    fullscreen surface is square, because there is no desktop beside it. */
 @media (-moz-platform: linux) {
-  #main-window:not([sizemode="fullscreen"]):not([inDOMFullscreen]) {
+  #main-window:not([data-astra-popup]):not([chromehidden~="toolbar"]):not([sizemode="fullscreen"]):not([inDOMFullscreen]) {
     --astra-window-radius: 14px;
     overflow: hidden;
     border-radius: var(--astra-window-radius);

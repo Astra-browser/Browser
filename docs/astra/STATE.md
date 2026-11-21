@@ -11,6 +11,38 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: a sign-in popup opened as a full Astra window (2026-11-21, branch `fix/popup-windows`)
+
+**Symptom:** a site that signs in with `window.open(url, name, "width=520,height=640")`
+(Canva, Atlassian) opened a full Astra window: the product shell (column, tab
+row, address field) appeared, the window filled the screen, and it looked like
+a second browser instead of the engine's small popup. The owner's reference is
+Chrome/Firefox: a titlebar, the URL bar the site asked for, the requested
+window size, and `window.close()` at the end of the flow.
+
+**Cause (three stacked defects):**
+
+| Layer | Why the window was wrong | Fix |
+|---|---|---|
+| Shell | `browser.xhtml` mounts the Astra shell in every chrome window, popups included, so the product chrome replaced the engine's reduced popup chrome. | `ui/shell/src/main.js` asks `isPopupWindow(window)` (`ui/shell/src/popup.js`: hidden toolbar, or `chromehidden` carrying `toolbar`/`location`); a popup gets `data-astra-popup`, its `#astra-root` is removed and the Svelte shell never mounts. `shell-chrome.css` only hides the native chrome on non-popup windows, so the native titlebar/URL bar and content deck answer. |
+| Engine geometry | The popup restored the browser window's persisted size, position and size mode before `nsWindowWatcher` applied the features, so a 520x640 request became the main window's geometry. | `patches/ASTRA-0021`: a content-created chrome window with no toolbar or location bar ignores XUL persistence (`mIgnoreXULSize`/`Position`/`SizeMode`). |
+| Engine sizing | On the fresh popup the primary content element had no layout yet (`0x0`), so the chrome/content difference was the whole window; the security clamp then expanded the requested inner height to the work area. `SetPrimaryRemoteTabSize` also added the whole request to the current window. | `ASTRA-0021`: treat a zero-sized primary content as "not laid out" and size the shell directly instead of by delta; do not count an unlaid-out content area as chrome. |
+
+**Result on the packaged Windows dev build:** the popup is 534x678 outer with
+a **520x640 page viewport** at the requested position, no Astra frame, root or
+adoption, the native deck visible, and `window.close()` from the page removes
+the window while the browser window survives.
+
+**Verification:** `tools/marionette-probe/popup-window-probe.py` **20/20** on
+the Windows dev build (real `window.open` with features; asserts popup chrome,
+requested viewport, no shell, native deck, parent untouched, page close, parent
+survival); `tests/contract/native_surfaces.mjs` **141/141** (three new shell
+checks); `ui/shell/src/popup.test.mjs` **6/6**; `forge lint` 21 patches clean;
+`state-check` and `brand-lint` clean. The probe is registered in
+`tools/perf/full-suite.sh` and `.ps1`.
+
+**Still deferred:** none for this surface.
+
 ## Owner report: upgrade shows "Firefox is already running" (2026-11-21)
 
 **Symptom:** after installing a new build, a native Firefox dialog said the old

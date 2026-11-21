@@ -323,6 +323,22 @@ check(
   Boolean(fullscreenSlot) && /pointer-events:\s*none\s*;/u.test(fullscreenSlot[1]),
 );
 
+// A page's window.open popup keeps the engine's reduced chrome: the product
+// shell must not mount there and the native chrome must stay visible.
+const shellEntry = fs.readFileSync(path.join(ROOT, "ui", "shell", "src", "main.js"), "utf8");
+check(
+  "a popup window never mounts the product shell",
+  shellEntry.includes("isPopupWindow(window)") && shellEntry.includes("target.remove()"),
+);
+check(
+  "the popup keeps the native chrome visible",
+  /:root:not\(\[data-astra-popup\]\):not\(\[chromehidden~="toolbar"\]\)/u.test(chromeCss),
+);
+check(
+  "the popup marks its document for the shell CSS",
+  shellEntry.includes("POPUP_ATTRIBUTE"),
+);
+
 console.log(`\nnative surfaces: ${passed}/${passed + failed} checks passed`);
 if (failed > 0) {
   console.error(`${failed} FAILED`);
