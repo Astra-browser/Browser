@@ -2,12 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Child half of the page blocker: injects the CSS selectors and scriptlet
-// payload the engine returned for this document, then re-asks as new
-// classes/ids appear. The parent performs the lookup; this module only
-// touches the page. It owns one observer, one agent sheet (or a fallback
-// style node) and one throttle timer per document, all released when the
-// document goes away.
+// Child half of the page blocker: injects the CSS selectors the engine
+// returned for this document, then re-asks as new classes/ids appear. The
+// parent performs the lookup; this module only touches the page. It owns one
+// observer, one agent sheet (or a fallback style node) and one throttle timer
+// per document, all released when the document goes away. Scriptlet injection
+// is delegated to the long-lived process actor (`AstraBlockerProcess`), which
+// can run it before the parser executes the document's first script.
 
 const STYLE_ID = "astra-blocker-style";
 const MAX_SELECTORS = 4096;
@@ -23,6 +24,7 @@ const MAX_MUTATION_NODES = 2048;
 // class names forever.
 const REFRESH_FLOOR_MS = 500;
 const IMMEDIATE_BATCHES = 32;
+const PROCESS_ACTOR = "AstraBlockerProcess";
 
 export class AstraBlockerChild extends JSWindowActorChild {
   #style = null;
@@ -31,6 +33,7 @@ export class AstraBlockerChild extends JSWindowActorChild {
   #sheetUris = [];
   #sheetCss = "";
   #url = "";
+  #document = null;
   #started = false;
   #seenClasses = new Set();
   #seenIds = new Set();
@@ -42,15 +45,55 @@ export class AstraBlockerChild extends JSWindowActorChild {
   #scriptInjected = false;
   #request = 0;
   #refreshed = false;
+  #observerAttached = false;
+  #lastCss = "";
 
   handleEvent(event) {
-    if (event.type === "DOMContentLoaded") {
-      void this.#start();
+    const doc = this.document;
+    if (!doc) return;
+    // The actor lives as long as the window global, and a window global can
+    // host several documents (same-origin navigation, bfcache restore). Every
+    // document owns its own CSS sheet, observer, timer, seen names and
+    // scriptlet, so a document change starts from a clean slate.
+    if (doc !== this.#document) {
+      this.#releaseDocument();
+      this.#document = doc;
+    }
+    if (!this.#started) {
+      // DOMWindowCreated is the earliest document event; the scriptlet itself
+      // is injected by the process actor, which does not depend on this
+      // per-document actor being ready in time.
+      void this.#start(doc);
+      return;
+    }
+    if (event.type === "DOMContentLoaded" || event.type === "load") {
+      // A very early start may have run before the root element existed; the
+      // observer and the initial walk belong here.
+      this.#observe(doc);
+    } else if (event.type === "pageshow") {
+      this.#observe(doc);
+      // A bfcache restore keeps the same document and its state; re-run the
+      // live-DOM actions so a page that came back matches the current DOM.
+      this.#applyProcedural(doc);
     }
   }
 
   didDestroy() {
+    this.#releaseDocument();
+    this.#document = null;
+  }
+
+  #releaseDocument() {
     this.#stop();
+    this.#seenClasses.clear();
+    this.#seenIds.clear();
+    this.#procedural = [];
+    this.#scriptInjected = false;
+    this.#refreshed = false;
+    this.#observerAttached = false;
+    this.#lastCss = "";
+    this.#request = 0;
+    this.#url = "";
   }
 
   #stop() {
@@ -78,19 +121,33 @@ export class AstraBlockerChild extends JSWindowActorChild {
     this.#started = false;
   }
 
-  async #start() {
-    if (this.#started) return;
-    const doc = this.document;
-    if (!doc || !doc.documentElement) return;
-    this.#url = this.contentWindow?.location?.href ?? "";
-    if (!/^https?:/iu.test(this.#url)) return;
+  async #start(doc) {
+    if (this.#started || !doc) return;
+    const href = doc.location?.href ?? "";
+    if (!/^https?:/iu.test(href)) return;
     this.#started = true;
+    this.#url = href;
 
-    const observed = collectObserved(doc);
-    for (const name of observed.classes) this.#remember(this.#seenClasses, name);
-    for (const name of observed.ids) this.#remember(this.#seenIds, name);
+    // The parent computes the scriptlet payload when the top-level request
+    // starts and hands it to the content process. Reading it here is
+    // synchronous, so the scriptlet is in the page before its first inline
+    // script; without it the async lookup below is still complete, just later.
+    let prefetched = null;
+    try {
+      prefetched =
+        ChromeUtils.domProcessChild?.getActor(PROCESS_ACTOR)?.take(href) ??
+        null;
+    } catch {
+      prefetched = null;
+    }
+    if (prefetched) {
+      this.#apply(doc, prefetched);
+      this.#observe(doc);
+      return;
+    }
+
     const reply = await this.#ask([], []);
-    if (!this.#started || !this.document) return;
+    if (!this.#started || this.document !== doc) return;
     if (reply?.enabled === false) {
       // The blocker is off (or both cosmetic payloads are off): no observer,
       // no DOM walk, no per-mutation query.
@@ -98,6 +155,20 @@ export class AstraBlockerChild extends JSWindowActorChild {
       return;
     }
     this.#apply(doc, reply);
+    this.#observe(doc);
+  }
+
+  /** Attach the observer and do the first walk once the root element exists. */
+  #observe(doc) {
+    if (!doc || !doc.documentElement) return;
+    this.#applyCss(doc);
+    if (this.#observerAttached) return;
+    this.#observerAttached = true;
+
+    const observed = collectObserved(doc);
+    for (const name of observed.classes)
+      this.#remember(this.#seenClasses, name);
+    for (const name of observed.ids) this.#remember(this.#seenIds, name);
 
     if (typeof this.contentWindow?.MutationObserver === "function") {
       this.#observer = new this.contentWindow.MutationObserver((records) => {
@@ -222,43 +293,63 @@ export class AstraBlockerChild extends JSWindowActorChild {
 
   #apply(doc, reply) {
     if (!doc || !reply) return;
-    const selectors = Array.isArray(reply.selectors)
-      ? reply.selectors.slice(0, MAX_SELECTORS)
-      : [];
-    const css = selectors
-      .map((selector) => `${selector}{display:none!important;}`)
-      .join("\n");
-    if (!this.#applySheet(css)) {
-      // No `windowUtils` seam (or the sheet was refused): fall back to a
-      // document style node. A page with a strict `style-src` rejects that
-      // node, which is exactly why the agent sheet path comes first.
-      if (css) {
-        if (!this.#style || !this.#style.isConnected) {
-          this.#style = doc.createElement("style");
-          this.#style.id = STYLE_ID;
-          this.#style.setAttribute("data-astra-blocker", "1");
-          (doc.head || doc.documentElement).append(this.#style);
-        }
-        this.#style.textContent = css;
-      } else if (this.#style) {
-        this.#style.textContent = "";
-      }
-    }
-
+    // The scriptlet is the time-critical layer (an ad JSON hook must exist
+    // before the page's inline scripts), so it goes in before the CSS sheet.
     if (
       !this.#scriptInjected &&
       typeof reply.script === "string" &&
       reply.script !== ""
     ) {
-      this.#scriptInjected = true;
-      injectScriptlet(this.contentWindow, reply.script, this.#url);
+      try {
+        this.#scriptInjected =
+          ChromeUtils.domProcessChild
+            ?.getActor(PROCESS_ACTOR)
+            ?.inject(doc, reply.script, this.#url) ?? false;
+      } catch {
+        this.#scriptInjected = false;
+      }
     }
+    const selectors = Array.isArray(reply.selectors)
+      ? reply.selectors.slice(0, MAX_SELECTORS)
+      : [];
+    this.#lastCss = selectors
+      .map((selector) => `${selector}{display:none!important;}`)
+      .join("\n");
+    this.#applyCss(doc);
     if (Array.isArray(reply.procedural) && reply.procedural.length > 0) {
       this.#procedural = reply.procedural.slice(0, MAX_PROCEDURAL);
     } else {
       this.#procedural = [];
     }
     this.#applyProcedural(doc);
+  }
+
+  /**
+   * Install the current selector CSS. Called as soon as the lookup returns
+   * (possibly before the root element exists) and again when the root does
+   * exist, because the style-node fallback needs a parent to attach to.
+   */
+  #applyCss(doc) {
+    if (!doc) return;
+    const css = this.#lastCss;
+    if (!this.#applySheet(css)) {
+      // No `windowUtils` seam (or the sheet was refused): fall back to a
+      // document style node. A page with a strict `style-src` rejects that
+      // node, which is exactly why the agent sheet path comes first.
+      if (!css) {
+        if (this.#style) this.#style.textContent = "";
+        return;
+      }
+      const root = doc.head || doc.documentElement;
+      if (!root) return;
+      if (!this.#style || !this.#style.isConnected) {
+        this.#style = doc.createElement("style");
+        this.#style.id = STYLE_ID;
+        this.#style.setAttribute("data-astra-blocker", "1");
+        root.append(this.#style);
+      }
+      this.#style.textContent = css;
+    }
   }
 
   /**
@@ -366,7 +457,8 @@ function collectMutated(records) {
 /** Monotonic time in the page's realm, with a wall-clock fallback. */
 function now(win) {
   try {
-    if (typeof win?.performance?.now === "function") return win.performance.now();
+    if (typeof win?.performance?.now === "function")
+      return win.performance.now();
   } catch {
     // The window is gone; fall through.
   }
@@ -403,21 +495,6 @@ function collectObserved(doc) {
   return { classes: [...classes], ids: [...ids] };
 }
 
-/** Best-effort scriptlet injection into the page's own realm. */
-function injectScriptlet(window, script, url) {
-  try {
-    const sandbox = Cu.Sandbox(window, {
-      sandboxPrototype: window,
-      wantXrays: false,
-      sandboxName: "astra-blocker-scriptlet",
-    });
-    Cu.evalInSandbox(script, sandbox, "latest", url, 1);
-  } catch {
-    // A scriptlet that needs an unsupported helper fails alone; CSS and
-    // network blocking are unaffected.
-  }
-}
-
 /**
  * The engine returns procedural filters as JSON or as the normalized
  * `selector:action()` text. Support the common action subset; unknown
@@ -438,7 +515,10 @@ function runProcedural(doc, action) {
           style = entry.value;
         } else if (entry?.type === "remove") {
           remove = true;
-        } else if (entry?.type === "has-text" && typeof entry.value === "string") {
+        } else if (
+          entry?.type === "has-text" &&
+          typeof entry.value === "string"
+        ) {
           text = entry.value;
         }
       }
