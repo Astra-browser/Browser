@@ -23,6 +23,8 @@
   import { arrive, spaceSwipe, stepSpace } from "../lib/space-swipe";
   import { closeOnMiddleClick } from "../lib/middle-click";
   import { preferences } from "$domain/preferences";
+  import { splitDropTarget } from "../lib/split-drop";
+  import * as notices from "$session/notice.svelte";
 
   let {
     entries,
@@ -56,12 +58,34 @@
 
   // Order and membership, never content: see TabList.
   let list = $state<HTMLUListElement>();
+  function canSplit(dragged: string, target: string): boolean {
+    if (dragged === target) return false;
+    const source = tabs.splitGroupFor(dragged);
+    const other = tabs.splitGroupFor(target);
+    if (source !== null && other !== null && source !== other) return false;
+    const joining = source ?? other;
+    if (joining === null) return true;
+    const max = Number(preferences.value("split.max-panes")) || 3;
+    return joining.members.length < max;
+  }
   // The rail's rows reorder in place like the list's; let go over the kept
   // sites and the tab is kept, anywhere else and native decides (a page).
   const drag = new RowDrag({
     list: () => list,
     region: () => scroller,
     reorder: () => ({ essential: false }),
+    splitTarget: (id, over, x, y) =>
+      splitDropTarget({
+        dragged: id,
+        over,
+        x,
+        y,
+        enabled: preferences.value("split.drag-tab") !== "false",
+        canJoin: (target) => canSplit(id, target),
+      }),
+    split: (id, target) => {
+      void tabs.splitWith(id, target).catch(() => notices.show(m.split_failed()));
+    },
     drop: ({ id, x, y, over, before }) => {
       const essential = !!over?.closest("[data-essentials-drop]");
       // A tab that cannot be kept goes back where it was.
@@ -69,6 +93,9 @@
       if (tabs.inSplit(id) && (essential || over?.closest("[data-tabs-drop]")))
         void tabDrag.leaveSplit(id, essential || before ? { essential, before } : null);
       else if (essential) void tabDrag.move(id, true, before);
+      // A row under the pointer that did not become a reorder or a split is
+      // not a page-edge drop.
+      else if (over?.closest("[data-astra-tab-id]")) return;
       else tabs.dropTab(id, x, y);
     },
   });

@@ -105,8 +105,8 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 | # | Surface | Required behaviour | Status |
 |---|---|---|---|
 | S1 | Side-by-side browsing | 2–3 real tabs share the content stage via one native split view; every boundary has its own resize handle; panes stay active when one is selected | done |
-| S2 | Tab-based split | Tab menu and sidebar choose mode call `tabs_split`; never `unknown_command` | done |
-| S3 | Drag-and-drop split | Dragging a tab onto the page's left/right edge opens it as a pane; drop inside reorders/leaves | done |
+| S2 | Tab-based split | The tab menu's row opens Astra's picker; choosing an open tab or "New tab" sends both tab ids to `tabs_split`/`split_open_url` and never `unknown_command` | done |
+| S3 | Drag-and-drop split | Dragging a tab onto the middle of another tab pairs them (setting `split.drag-tab`); the page's left/right edge still opens a pane; drop inside reorders/leaves | done |
 | S4 | Bookmark split | Bookmark row menu opens the bookmark beside the current page | done |
 | S5 | Pinned tab split | Pinned tab menu opens its URL as a pane (native excludes pinned tabs from a split) | done |
 | S6 | Link split | Page context menu has “Open Link in Split View” | done |
@@ -114,6 +114,8 @@ Legend: `todo` · `doing` · `done` (live-probed) · `blocked` (written reason).
 | S8 | Arrangement bookmarking | Save/restore a named split arrangement (tabs + order + ratio + space) | done |
 | S9 | Group integration | Native tab groups are projected and rendered in Astra's sidebar; split cards sit at the head of the section behind a separator, the head opens the split, and each pane is a row below it | done |
 | S10 | Restoration | Arrangements restore after a real quit/relaunch, reconciled against live tab ids; no duplicate tabs | done |
+| S11 | Independent split views | Each split card is its own native `TabSplitView` (2–3 panes); starting another split from a tab outside it never merges the two, and parked splits keep their card and panes in the sidebar | done |
+| S12 | Pane detach | A pane row's detach control (or dragging it out) leaves the split as an ordinary tab in front without reloading its page or resizing the remaining panes | done |
 
 ### 3.2 Peek (floating preview)
 

@@ -23,6 +23,11 @@ type Options = {
   region?: () => HTMLElement | undefined;
   /** A drop anywhere but back into the list's own order. */
   drop: (drop: Drop) => void;
+  /** The tab under the pointer that this drop should pair with in a split,
+   *  or null for an ordinary placement. */
+  splitTarget?: (id: string, over: Element | null, x: number, y: number) => string | null;
+  /** Runs a tab-on-tab split instead of a placement. */
+  split?: (id: string, target: string) => void;
 };
 
 /** The tab a drop goes before: the one under the pointer, or the one after it
@@ -167,6 +172,16 @@ export class RowDrag {
     this.#reset();
     if (!dragged) return;
     this.#swallow = true;
+
+    // A drop on the middle of another tab is a split gesture, not a
+    // placement. It is resolved before the reorder commits so the list never
+    // records a move that the split then contradicts.
+    const splitTarget = this.#options.splitTarget?.(id, over, event.clientX, event.clientY) ?? null;
+    if (splitTarget !== null) {
+      reorder?.release();
+      this.#options.split?.(id, splitTarget);
+      return;
+    }
 
     const placed = reorder?.target();
     if (reorder && placed?.changed) {

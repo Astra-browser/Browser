@@ -91,6 +91,7 @@ const defaults = {
   "split.remember-width": "true",
   "split.link-target": "split",
   "split.drag-edge": "true",
+  "split.drag-tab": "true",
   "split.double-click-reset": "true",
   "split.groups": "true",
   "split.group-collapse": "true",

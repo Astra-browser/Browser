@@ -32,6 +32,7 @@
   <PreferenceSwitch id="split.remember-width" preference="split.remember-width" />
   <PreferenceSelect id="split.link-target" preference="split.link-target" />
   <PreferenceSwitch id="split.drag-edge" preference="split.drag-edge" />
+  <PreferenceSwitch id="split.drag-tab" preference="split.drag-tab" />
   <PreferenceSwitch id="split.double-click-reset" preference="split.double-click-reset" />
   <PreferenceSwitch id="split.groups" preference="split.groups" />
   <PreferenceSwitch id="split.group-collapse" preference="split.group-collapse" />

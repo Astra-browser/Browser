@@ -417,6 +417,12 @@ export const fields = {
     description: () => "Drop a tab on the page's left or right edge to open it as a pane.",
     initial: true,
   },
+  "split.drag-tab": {
+    section: "tabs",
+    label: () => "Drag a tab onto a tab to split",
+    description: () => "Drop a tab on the middle of another tab to show both beside each other.",
+    initial: true,
+  },
   "split.double-click-reset": {
     section: "tabs",
     label: () => "Double-click resets the divider",

@@ -38,6 +38,8 @@
   import { loadNavigationError, loadTabCapacityState } from "$features/tabs";
   import { selectionGlide } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
+  import * as splitPicker from "$session/split-picker.svelte";
+  import { SplitPicker } from "$features/split";
   import { requestTab } from "$session/work-tab.svelte";
   import { expanded as sidebarWidth, isCompact, isHidden } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
@@ -237,14 +239,16 @@
       void noteListener.then((stop) => stop());
     };
   });
-  let splitting = $state(false);
+  // The picker is the one way a split starts from a tab: it names the tab the
+  // person chose and lists the panes it may pair with. The sidebar still reads
+  // `splitting` to mark candidates while the picker is open.
+  let splitting = $derived(splitPicker.isOpen());
   onMount(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (tabs.replacePane() === null && !splitting) return;
+      if (tabs.replacePane() === null) return;
       event.preventDefault();
       tabs.cancelReplace();
-      splitting = false;
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -511,7 +515,10 @@
     if (command.seq === 0 || command.seq === handledCommand) return;
     handledCommand = command.seq;
     untrack(() => {
-      if (command.id === "split.choose") splitting = true;
+      if (command.id === "split.choose") {
+        const source = tabs.activeId();
+        if (source) splitPicker.open(source);
+      }
       if (command.id === "page.copyLink") void tabs.copyActiveLink().then(linkCopied);
       if (command.id === "page.clearSiteData") clearRequest.ask(tabs.activeTab()?.url);
       if (command.id === "find.show") findInPage.show(tabs.activeId());
@@ -770,9 +777,11 @@
       return;
     }
     if (splitting) {
-      tabs.split(id);
-      splitting = false;
-      return;
+      const source = splitPicker.sourceId();
+      if (source !== null && source !== id) {
+        void tabs.splitWith(source, id).catch(() => {});
+        return;
+      }
     }
     // In Work a tab opens over the canvas; the work stays where it is.
     if (inWork) requestTab(id);
@@ -1219,6 +1228,7 @@
 </div>
 {#if ClearSiteData}<ClearSiteData />{/if}
 <ContextMenu />
+<SplitPicker />
 
 <style>
   /* Keyboard-only way past the chrome: hidden until it takes focus, then a

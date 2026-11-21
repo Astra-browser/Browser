@@ -7,7 +7,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import * as m from "$shared/i18n/messages";
-  import { Cancel01Icon } from "@hugeicons/core-free-icons";
+  import { Cancel01Icon, ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
   import { tabFallbackIcon } from "../lib/tab-icon";
   import { tabLabel } from "../lib/tab-label";
   import type { TabView } from "$shared/ipc/bindings";
@@ -33,6 +33,7 @@
     autoPeek = false,
     onSelect,
     onClose,
+    onDetach,
     onContextMenu,
     onPointerDown,
     onPointerMove,
@@ -52,6 +53,8 @@
     autoPeek?: boolean;
     onSelect: (id: string, event?: MouseEvent) => void;
     onClose: (id: string) => void;
+    /** Takes a split pane out of its split and leaves it as an ordinary tab. */
+    onDetach?: (id: string) => void;
     onContextMenu: (event: MouseEvent, tab: TabView) => void;
     onPointerDown: (event: PointerEvent, tab: TabView) => void;
     onPointerMove: (event: PointerEvent) => void;
@@ -171,6 +174,20 @@
       />
     </span>
   {/if}
+  {#if onDetach}
+    <button
+      type="button"
+      aria-label={m.split_detach_tab({ title: name })}
+      title={m.split_detach()}
+      class="tab-detach"
+      onclick={(event) => {
+        event.stopPropagation();
+        onDetach(tab.id);
+      }}
+    >
+      <Icon icon={ArrowUpRight01Icon} size={12} />
+    </button>
+  {/if}
   {#if closable}
     <button
       type="button"
@@ -289,7 +306,8 @@
     gap: 2px;
   }
 
-  .tab-close {
+  .tab-close,
+  .tab-detach {
     position: absolute;
     inset-inline-end: 4px;
     display: flex;
@@ -312,18 +330,29 @@
       color var(--motion-fast) var(--ease-out);
   }
 
-  .tab-close:hover {
+  .tab-detach {
+    inset-inline-end: 30px;
+  }
+
+  .tab-close:hover,
+  .tab-detach:hover {
     background: var(--row-pressed);
     color: var(--color-text);
   }
 
   :global([data-close-buttons="always"]) .tab-close,
-  .tab-close:focus-visible {
+  .tab-close:focus-visible,
+  .tab-detach:focus-visible {
     opacity: 1;
   }
 
-  .browse-tab:hover .tab-close {
+  .browse-tab:hover .tab-close,
+  .browse-tab:hover .tab-detach {
     opacity: 1;
+  }
+
+  .browse-tab:has(.tab-detach):is(:hover, :focus-within) .tab-label {
+    margin-inline-end: 48px;
   }
 
   @media (forced-colors: active) {

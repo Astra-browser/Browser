@@ -12,7 +12,20 @@ import { peek } from "$domain/peek";
 import { preferences } from "$domain/preferences";
 import { clearRequest } from "$domain/site-data";
 import * as notices from "$session/notice.svelte";
+import * as splitPicker from "$session/split-picker.svelte";
 import * as m from "$shared/i18n/messages";
+
+/** The split row, if this tab can take another pane. A tab outside a split
+ *  can always start one (the picker offers a blank pane); a tab already in a
+ *  split can add until the configured cap. */
+function splitAction(id: string): { label: string; disabled?: boolean } | null {
+  if (preferences.value("split.enabled") === "false") return null;
+  const group = tabs.splitGroupFor(id);
+  if (group === null) return { label: m.native_open_in_split_view() };
+  const max = Number(preferences.value("split.max-panes")) || 3;
+  if (group.members.length >= max) return { label: "Split view full", disabled: true };
+  return { label: "Add Pane to Split View…" };
+}
 
 /** The shape `openAt` accepts, so the rows are checked against the renderer. */
 type MenuItems = Parameters<typeof openAt>[0]["items"];
@@ -51,6 +64,7 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
   const kept = tabs.isKept(id);
   const muted = tab.audio?.muted ?? false;
   const others = tabs.profileSpaces().filter((space) => space.id !== tabs.activeSpaceId());
+  const splitRow = splitAction(id);
   const rows: MenuItems = [
     { kind: "item", id: "tab.new", label: m.native_new_tab() },
     ...(page
@@ -70,8 +84,15 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
       id: "tab.keep",
       label: kept ? m.native_remove_from_essentials() : m.native_add_to_essentials(),
     },
-    ...(tabs.canSplitWith(id) && !tabs.inSplit(id)
-      ? [{ kind: "item" as const, id: "tab.split", label: m.native_open_in_split_view() }]
+    ...(splitRow
+      ? [
+          {
+            kind: "item" as const,
+            id: "tab.split",
+            label: splitRow.label,
+            disabled: splitRow.disabled === true,
+          },
+        ]
       : []),
     ...(tabs.inSplit(id)
       ? [
@@ -161,7 +182,7 @@ function present(id: string, x: number, y: number, mediaOnly: boolean) {
         },
         () => notices.show("This tab could not be duplicated"),
       );
-    } else if (choice === "tab.split") tabs.split(id);
+    } else if (choice === "tab.split") splitPicker.open(id);
     else if (choice === "tab.replacePane") tabs.beginReplace(id);
     else if (choice === "tab.group")
       void createTabGroup(id).catch(() => notices.show("The tabs could not be grouped"));
