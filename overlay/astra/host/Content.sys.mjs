@@ -53,6 +53,7 @@ import {
 } from "./ContentHide.sys.mjs";
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+const XHTML_NS = "http://www.w3.org/1999/xhtml";
 
 export function loadWatchStep({
   loading,
@@ -597,7 +598,112 @@ export const Content = {
     // only when the page publishes them.
     const mediaStates = new Map(); // astra_tab_id -> state
     const mediaSuppressed = new Map(); // astra_tab_id -> play generation at close
+    const artworkCache = new Map(); // artwork source -> data URL (or null)
+    const artworkPending = new Map();
+    const ARTWORK_SIDE = 96;
+    const ARTWORK_CACHE_MAX = 64;
+    const ARTWORK_MAX_BYTES = 4 * 1024 * 1024;
     let mediaClock = 0;
+    const pickArtwork = (artwork) => {
+      if (!Array.isArray(artwork)) return "";
+      let best = "";
+      let bestArea = -1;
+      for (const item of artwork) {
+        const src = typeof item?.src === "string" ? item.src : "";
+        if (src === "") continue;
+        let area = 0;
+        for (const part of String(item.sizes || "").split(/\s+/)) {
+          const match = /^(\d+)x(\d+)$/i.exec(part);
+          if (match) area = Math.max(area, Number(match[1]) * Number(match[2]));
+        }
+        if (best === "" || area > bestArea) {
+          best = src;
+          bestArea = area;
+        }
+      }
+      return best;
+    };
+    const resolveArtwork = (src, base) => {
+      if (src === "" || /^(?:[a-z][a-z0-9+.-]*:|data:)/i.test(src)) return src;
+      try {
+        return new win.URL(src, base).href;
+      } catch {
+        return src;
+      }
+    };
+    const rasterArtwork = (src) => {
+      if (artworkCache.has(src)) return Promise.resolve(artworkCache.get(src));
+      const pending = artworkPending.get(src);
+      if (pending) return pending;
+      const remember = (value) => {
+        if (artworkCache.size >= ARTWORK_CACHE_MAX) {
+          const oldest = artworkCache.keys().next().value;
+          if (oldest !== undefined) artworkCache.delete(oldest);
+        }
+        artworkCache.set(src, value);
+        artworkPending.delete(src);
+        return value;
+      };
+      const task = (async () => {
+        if (src.startsWith("data:image/")) {
+          return remember(src.length <= 1_500_000 ? src : null);
+        }
+        // Page metadata is untrusted: never let it name a privileged scheme.
+        if (!/^https?:/i.test(src)) return remember(null);
+        try {
+          const response = await win.fetch(src, {
+            credentials: "omit",
+            cache: "force-cache",
+          });
+          if (!response.ok) return remember(null);
+          const type = response.headers.get("content-type") || "";
+          const blob = await response.blob();
+          if (
+            !blob ||
+            blob.size === 0 ||
+            blob.size > ARTWORK_MAX_BYTES ||
+            !type.startsWith("image/")
+          ) {
+            return remember(null);
+          }
+          const bitmap = await win.createImageBitmap(blob);
+          let data = null;
+          try {
+            const canvas = doc.createElementNS(XHTML_NS, "canvas");
+            canvas.width = ARTWORK_SIDE;
+            canvas.height = ARTWORK_SIDE;
+            const ctx = canvas.getContext("2d");
+            if (ctx && bitmap.width > 0 && bitmap.height > 0) {
+              const scale = Math.max(
+                ARTWORK_SIDE / bitmap.width,
+                ARTWORK_SIDE / bitmap.height,
+              );
+              const width = Math.round(bitmap.width * scale);
+              const height = Math.round(bitmap.height * scale);
+              ctx.drawImage(
+                bitmap,
+                Math.round((ARTWORK_SIDE - width) / 2),
+                Math.round((ARTWORK_SIDE - height) / 2),
+                width,
+                height,
+              );
+              data = canvas.toDataURL("image/webp", 0.82);
+            }
+          } finally {
+            try {
+              bitmap.close?.();
+            } catch {
+              // An engine without close() releases it with the bitmap.
+            }
+          }
+          return remember(typeof data === "string" && data.startsWith("data:image/") ? data : null);
+        } catch {
+          return remember(null);
+        }
+      })();
+      artworkPending.set(src, task);
+      return task;
+    };
     const mediaView = (id) => {
       const state = mediaStates.get(id);
       if (!state) return null;
@@ -652,6 +758,31 @@ export const Content = {
       } catch {
         metadata = null;
       }
+      let pageUrl = "";
+      try {
+        pageUrl = state.browser?.currentURI?.spec ?? "";
+      } catch {
+        pageUrl = "";
+      }
+      const artworkSrc = resolveArtwork(pickArtwork(metadata?.artwork), pageUrl);
+      if (artworkSrc !== state.artworkSrc) {
+        state.artworkSrc = artworkSrc;
+        state.artwork = artworkCache.get(artworkSrc) ?? null;
+        if (artworkSrc !== "" && state.artwork === null) {
+          const token = ++state.artworkToken;
+          void rasterArtwork(artworkSrc).then((artwork) => {
+            if (state.artworkToken !== token || mediaStates.get(id) !== state) return;
+            state.artwork = artwork;
+            projectCurrentMedia();
+          });
+        }
+      }
+      let modelIcon = null;
+      try {
+        modelIcon = __tabsState().tabs.get(id)?.icon ?? null;
+      } catch {
+        modelIcon = null;
+      }
       let contentTitle = "";
       try {
         contentTitle = state.browser?.contentTitle ?? "";
@@ -677,8 +808,9 @@ export const Content = {
       return {
         tab_id: id,
         title,
-        artist: String(metadata?.artist || site || ""),
-        icon: null,
+        artist: String(metadata?.artist || site.replace(/^www\./i, "") || ""),
+        icon: modelIcon,
+        artwork: state.artwork,
         duration: state.duration ?? null,
         position: state.position ?? null,
         rate: state.rate ?? null,
@@ -722,7 +854,26 @@ export const Content = {
         clearMedia();
         return;
       }
-      Media.__projectMedia(next, views.get(next) ?? mediaView(next), window_id);
+      const primary = { ...(views.get(next) ?? mediaView(next)) };
+      primary.players = [];
+      for (const candidate of candidates) {
+        if (!candidate.live || candidate.id === next) continue;
+        const view = views.get(candidate.id) ?? mediaView(candidate.id);
+        if (!view) continue;
+        primary.players.push({
+          tab_id: view.tab_id,
+          title: view.title,
+          artist: view.artist,
+          icon: view.icon,
+          artwork: view.artwork,
+          playing: view.playing,
+          muted: view.muted,
+          can_mute: view.can_mute,
+          can_pip: view.can_pip,
+          in_pip: view.in_pip,
+        });
+      }
+      Media.__projectMedia(next, primary, window_id);
     };
     const detachMedia = (id) => {
       const state = mediaStates.get(id);
@@ -772,6 +923,9 @@ export const Content = {
         playing: false,
         playSince: 0,
         activeSince: 0,
+        artwork: null,
+        artworkSrc: "",
+        artworkToken: 0,
         listeners: [],
       };
       // Keep the tab projection's audio flag in step with the engine. The

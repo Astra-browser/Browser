@@ -24,6 +24,9 @@ vi.mock("$domain/media-player", () => ({
   mediaPlayer: {
     view: () => native.player,
     show: native.showPlayer,
+    showTab: native.showTab,
+    playTab: native.playTab,
+    pauseTab: native.pauseTab,
   },
 }));
 
@@ -32,6 +35,10 @@ const native = vi.hoisted(() => ({
   switchSpace: vi.fn(async () => ({ accepted: true, operation_id: null })),
   run: vi.fn(async () => ({ accepted: true, operation_id: null })),
   showPlayer: vi.fn(),
+  showTab: vi.fn(),
+  playTab: vi.fn(),
+  pauseTab: vi.fn(),
+  mute: vi.fn(async (_id: string, _muted: boolean) => ({ accepted: true, operation_id: null })),
   player: null as null | Record<string, unknown>,
   extensions: [] as unknown[],
   openPage: vi.fn(async (_page: string) => {}),
@@ -48,6 +55,7 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     tabsBootstrap: async () => {},
     tabsActivate: native.activate,
+    tabSetMuted: native.mute,
     spacesSwitch: native.switchSpace,
     runCommand: native.run,
     browserOpenUrl: native.openUrl,
@@ -98,6 +106,10 @@ afterEach(() => {
   native.switchSpace.mockClear();
   native.run.mockClear();
   native.showPlayer.mockClear();
+  native.showTab.mockClear();
+  native.playTab.mockClear();
+  native.pauseTab.mockClear();
+  native.mute.mockClear();
   native.player = null;
   native.extensions = [];
   native.setTheme.mockClear();
@@ -301,7 +313,49 @@ test("the media entry follows the active player and brings its tab forward", asy
   await screen.getByRole("button", { name: "Media", exact: true }).click();
   await expect.element(screen.getByRole("menuitem", { name: "Night Drive" })).toBeVisible();
   await screen.getByRole("menuitem", { name: "Night Drive" }).click();
-  expect(native.showPlayer).toHaveBeenCalledOnce();
+  expect(native.showTab).toHaveBeenCalledWith("player-tab");
+});
+
+test("every other playing site keeps its own transport and mute in the list", async () => {
+  native.player = {
+    tab_id: "primary",
+    title: "Night Drive",
+    artist: "youtube.com",
+    icon: null,
+    artwork: "data:image/webp;base64,AAAA",
+    duration: 200,
+    position: 10,
+    rate: 1,
+    playing: true,
+    waiting: false,
+    can_pip: true,
+    in_pip: false,
+    muted: false,
+    can_mute: true,
+    players: [
+      {
+        tab_id: "other",
+        title: "Morning Show",
+        artist: "radio.example",
+        icon: null,
+        artwork: null,
+        playing: false,
+        muted: true,
+        can_mute: true,
+        can_pip: false,
+        in_pip: false,
+      },
+    ],
+  };
+  const screen = await bar();
+  await screen.getByRole("button", { name: "Media", exact: true }).click();
+  await expect.element(screen.getByRole("menuitem", { name: "Morning Show" })).toBeVisible();
+  await screen.getByRole("button", { name: "Play", exact: true }).click();
+  expect(native.playTab).toHaveBeenCalledWith("other");
+  await screen.getByRole("button", { name: "Unmute tab", exact: true }).click();
+  expect(native.mute).toHaveBeenCalledWith("other", false);
+  await screen.getByRole("menuitem", { name: "Morning Show" }).click();
+  expect(native.showTab).toHaveBeenCalledWith("other");
 });
 
 test("sleeping tabs lists native's sleeping pages, and selecting one wakes it", async () => {

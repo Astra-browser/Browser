@@ -75,7 +75,8 @@ try:
       off;
       const step=(name,ok,detail)=>out.steps.push({name,ok:ok===true,detail:detail??null});
       const tabs=async()=>((await host.Tabs.list({request_id:'mt'})).tabs??[]);
-      const view=()=>host.Media.view();
+      const WID=(await tabs())[0]?.window_id || 'win-1';
+      const view=()=>host.Media.view(WID);
       const waitView=async(pred,ms=15000)=>{const end=Date.now()+ms;while(Date.now()<end){const v=view();if(pred(v))return v;await wait(250)}return view()};
       const a=(await host.Tabs.create({request_id:'a',url:'http://127.0.0.1:%d/?a=1',background:false})).astra_tab_id;
       await wait(2500);
@@ -87,7 +88,7 @@ try:
       }
       const b=(await host.Tabs.create({request_id:'b',url:'about:blank',background:true})).astra_tab_id;
       await wait(800);
-      host.Media.player({id:a,action:{kind:'play'}});
+      host.Media.player({id:a,action:{kind:'play'},window_id:WID});
       await waitView(v=>v?.tab_id===a);
       await host.Tabs.select({request_id:'sel-b',astra_tab_id:b});
       await wait(2500);
@@ -101,16 +102,16 @@ try:
       const c=(await host.Tabs.create({request_id:'c',url:'http://127.0.0.1:%d/?c=1',background:false})).astra_tab_id;
       await wait(3000);
       step('a newer playback takes the card', view()?.tab_id===c, view());
-      const closed=await host.Media.player({id:c,action:{kind:'close'}});
+      const closed=await host.Media.player({id:c,action:{kind:'close'},window_id:WID});
       step('close is admitted', closed.accepted===true);
       await wait(2000);
       step('close sticks for that playback', view()?.tab_id!==c, view());
       step('another playing tab remains', view()?.tab_id===a, view());
       out.itemAudio=Math.max(out.itemAudio, (host.Tabs.__itemsSnapshot?.().tabs??[]).filter(t=>t.audio!=null).length);
-      await host.Media.player({id:a,action:{kind:'pause'}});
+      await host.Media.player({id:a,action:{kind:'pause'},window_id:WID});
       await wait(1500);
       step('paused playback keeps its card', view()?.tab_id===a, view());
-      const closedA=await host.Media.player({id:a,action:{kind:'close'}});
+      const closedA=await host.Media.player({id:a,action:{kind:'close'},window_id:WID});
       step('closing the last card is admitted', closedA.accepted===true);
       await wait(1000);
       step('no card is left', view()===null, view());

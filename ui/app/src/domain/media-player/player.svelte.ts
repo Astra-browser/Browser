@@ -61,6 +61,10 @@ function act(action: MediaPlayerAction) {
   if (id) void settle(commands.mediaPlayer(id, action));
 }
 
+function actOn(id: string | null | undefined, action: MediaPlayerAction) {
+  if (id) void settle(commands.mediaPlayer(id, action));
+}
+
 export const play = () => act({ kind: "play" });
 export const pause = () => act({ kind: "pause" });
 export const seek = (seconds: number) => act({ kind: "seek", seconds });
@@ -69,3 +73,8 @@ export const pictureInPicture = () => act({ kind: "picture_in_picture" });
 export const close = () => act({ kind: "close" });
 /** Brings the player's tab to front, in its own space. */
 export const show = () => act({ kind: "show" });
+
+/** Transport for any media tab in this window, not only the card's. */
+export const playTab = (id: string) => actOn(id, { kind: "play" });
+export const pauseTab = (id: string) => actOn(id, { kind: "pause" });
+export const showTab = (id: string) => actOn(id, { kind: "show" });

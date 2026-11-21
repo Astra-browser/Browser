@@ -11,6 +11,42 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: the Now playing card was title-only (2026-11-21, branch `fix/media-now-playing-card`)
+
+The owner reported that the sidebar card showed only a correct title: no
+thumbnail, controls that did not appear to act, no mute state, and no way to
+control a second site playing at the same time. The rail's media entry showed a
+generic note, the page host and no site mark.
+
+| Surface | What changed | Files |
+|---|---|---|
+| Card plate | The card's left plate is the page's own Media Session artwork when it publishes any (fetched and rasterised in chrome to a 96px WebP data URL), else the tab's site mark. The rail's media trigger and every list row use the same mark. | `overlay/astra/host/Content.sys.mjs` (`pickArtwork`, `rasterArtwork`), `features/media/components/MediaPlayer.svelte`, `features/rail/components/UtilityBar.svelte` |
+| Live transport/status | `icon` was hard-coded to `null`; it now comes from the tab projection. Play, pause and mute were already routed, but the projection never carried the site mark, and a later event could overwrite the card with an entry whose fields disagreed. `sameView` now also compares `icon`, `artwork` and the other-player list, so a change is emitted exactly once. | `overlay/astra/host/Content.sys.mjs`, `overlay/astra/host/Media.sys.mjs`, `domain/media-player/player.svelte.ts` |
+| Several players | The projection carries `players`: every other live media tab in the window, each with its own title, mark, playing and muted state. The card's expanded area lists them with play/pause and mute; the rail lists all of them with the same controls. Actions are addressed to the row's own `tab_id` through the existing `media_player` route, so no second transport exists. | `Content.sys.mjs`, `Media.sys.mjs`, `MediaPlayer.svelte`, `UtilityBar.svelte`, `shared/ipc/bindings.ts` |
+
+**Wire note (SCOPE rule 5):** `MediaPlayerView` gained two additive optional
+fields — `artwork?: string | null` and `players?: MediaPlayerEntry[]` — plus the
+`MediaPlayerEntry` type. The Rust Specta source that generated `bindings.ts` is
+no longer in this tree (the Tauri host is gone), so the fields are recorded
+here and added additively to the checked-in generated type; no command, route or
+event name changed. `tests/contract/media_model.mjs` pins the shape and the
+change detection (67/67).
+
+**Verification:** `node tests/contract/media_model.mjs` 67/67;
+`typecheck` 0 errors; MediaPlayer, UtilityBar and RailPlayer component suites
+36/36; `tools/marionette-probe/media-card-probe.py` **20/20 PASS** on the
+packaged Windows dev build — it drives two real pages with Media Session
+artwork and asserts the artwork reaches the card and the rail, card
+play/pause/mute change the engine, both players are listed, and each row's
+play/pause and mute act on its own page. `now-playing-probe.py` was reading the
+default window key after the per-window media split; it now asks the window it
+opened and is **PASS** again (the probe was failing for that reason, not the
+product). `state-check` and `brand-lint` are clean.
+
+**Still deferred:** YouTube's own player was not driven; the probe uses local
+pages that publish the same Media Session metadata and handlers. A page that
+publishes no artwork falls back to the tab's site mark.
+
 ## Owner report: a sign-in popup opened as a full Astra window (2026-11-21, branch `fix/popup-windows`)
 
 **Symptom:** a site that signs in with `window.open(url, name, "width=520,height=640")`

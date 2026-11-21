@@ -70,6 +70,44 @@ test("the compact card plays, pauses and mutes its tab", async () => {
   await expect.element(unmute).toHaveAttribute("aria-pressed", "true");
 });
 
+test("the artwork is the card's plate and every other player keeps its own controls", async () => {
+  const screen = await render(MediaPlayer);
+  emitNativeEvent(
+    "mediaPlayerChanged",
+    view({
+      artwork: "data:image/webp;base64,AAAA",
+      title: "Night Drive",
+      players: [
+        {
+          tab_id: "tab-2",
+          title: "Morning Show",
+          artist: "radio.example",
+          icon: null,
+          artwork: null,
+          playing: true,
+          muted: false,
+          can_mute: true,
+          can_pip: false,
+          in_pip: false,
+        },
+      ],
+    }),
+  );
+  const card = screen.getByRole("region", { name: "Now playing" });
+  await expect.element(card).toBeInTheDocument();
+  const art = card.element().querySelector<HTMLImageElement>("img.media-art");
+  expect(art?.getAttribute("src")).toBe("data:image/webp;base64,AAAA");
+  await card.hover();
+  await screen.getByRole("button", { name: "Pause", exact: true }).nth(1).click();
+  expect(native.player).toHaveBeenLastCalledWith("tab-2", { kind: "pause" });
+  await screen.getByRole("button", { name: "Mute tab", exact: true }).nth(1).click();
+  expect(native.mute).toHaveBeenLastCalledWith("tab-2", true);
+  await screen
+    .getByRole("button", { name: "Go to the tab playing Morning Show", exact: true })
+    .click();
+  expect(native.player).toHaveBeenLastCalledWith("tab-2", { kind: "show" });
+});
+
 test("the rest opens under the pointer: progress, times, picture in picture and close", async () => {
   const screen = await render(MediaPlayer);
   emitNativeEvent("mediaPlayerChanged", view({ playing: false }));
