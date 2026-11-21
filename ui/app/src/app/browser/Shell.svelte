@@ -348,6 +348,12 @@
   // switch here means a new pop-up cannot silently be drawn behind the page.
   let trayRaised = $state(false);
   let popupRaised = $state(false);
+  // The element that owns the raise, not just whether anything is open. A
+  // menu that hands over to a dialog in the same turn keeps `popupRaised`
+  // true, so the shell would never see a second `menu-open` after the menu's
+  // own `menu-close` lowered the frame. Tracking the anchor makes that handover
+  // a visible change and the dialog is raised instead of opening behind the page.
+  let popupAnchor = $state.raw<Element | null>(null);
   let popupOpen = $derived(trayRaised || popupRaised);
   // Only a live page is a separate layer under this frame. Over the New Tab
   // or an internal page the app already owns the pixels, so raising the frame
@@ -372,10 +378,13 @@
     }
   });
   let raisedPosted: boolean | null = null;
+  let raisedAnchor: Element | null = null;
   $effect(() => {
     const open = frameRaised;
-    if (raisedPosted === open) return;
+    const anchor = open ? popupAnchor : null;
+    if (raisedPosted === open && raisedAnchor === anchor) return;
     raisedPosted = open;
+    raisedAnchor = anchor;
     try {
       window.parent.postMessage(
         { ns: "astra-shell", kind: open ? "menu-open" : "menu-close" },
@@ -434,8 +443,12 @@
     popupSync = window.setTimeout(() => {
       popupSync = 0;
       try {
-        popupRaised = [...document.querySelectorAll(POPUP_SELECTOR)].some(popupVisible);
+        const visible =
+          [...document.querySelectorAll(POPUP_SELECTOR)].find(popupVisible) ?? null;
+        popupAnchor = visible;
+        popupRaised = visible !== null;
       } catch {
+        popupAnchor = null;
         popupRaised = false;
       }
     }, 0);

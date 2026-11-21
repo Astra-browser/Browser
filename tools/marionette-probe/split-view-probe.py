@@ -152,6 +152,12 @@ try {
   const labels = await openPicker(a);
   out.checks.menuHasSplit = labels.some((label) => /Open in Split View/i.test(label));
   out.checks.pickerOpened = !!app.querySelector("dialog.split-picker[open]");
+  // The picker replaces a closing menu in the same turn. The shell must still
+  // be told to raise the frame, or the dialog is drawn behind the native page.
+  await sleep(300);
+  out.checks.pickerRaised =
+    document.querySelector(".astra-frame")?.dataset.astraMenuOpen === "true" &&
+    app.documentElement.dataset.astraRaised === "true";
   const sourceLabel = row(a)?.querySelector("[data-astra-tab-label]")?.textContent?.trim() ?? "";
   out.checks.pickerNamesSource =
     sourceLabel !== "" && (app.querySelector(".split-picker")?.textContent ?? "").includes(sourceLabel);
@@ -410,6 +416,7 @@ def main():
     required = {
         "menuHasSplit": True,
         "pickerOpened": True,
+        "pickerRaised": True,
         "pickerNamesSource": True,
         "firstSplit": True,
         "rightClickedIsSource": True,
