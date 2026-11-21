@@ -17,6 +17,7 @@
     isCompact,
     isHidden,
     setPanelExtent,
+    setSidebarCardShown,
     sidebarDragWidth,
     sidebarResizeActive,
     sidebarResizeSettlement,
@@ -236,6 +237,11 @@
   });
   let aside = $state<HTMLElement>();
   let peeking = $state(false);
+  // The card that slides out of a put-away column is the column: its head has
+  // the same page controls and address field. The shell cannot see `away` or
+  // `peeking`, so it asks this module whether the head is on screen.
+  $effect(() => setSidebarCardShown(!away || peeking));
+  $effect(() => () => setSidebarCardShown(false));
   /** True while the card is chrome over a live page: the frame's ground must
    *  go transparent so only the card paints above the page. */
   const chromeOverPage = (on: boolean) => {

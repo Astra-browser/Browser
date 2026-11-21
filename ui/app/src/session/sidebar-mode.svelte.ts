@@ -50,6 +50,16 @@ export const sidebarMode = () => mode;
 export const isCompact = () => mode === "compact";
 export const isHidden = () => mode === "hidden" && !held;
 
+/** Whether the column, or the card a put-away column slides out as, is on
+ *  screen. The card carries the column's own head, so the same control has to
+ *  own the address field while it is out. */
+let cardShown = $state.raw(false);
+export const sidebarCardShown = () => cardShown;
+export function setSidebarCardShown(value: boolean) {
+  if (value === cardShown) return;
+  cardShown = value;
+}
+
 /** A destination that wants the column in view, the rail of Work or a tool,
  *  holds a hidden sidebar out for as long as it is shown. */
 let held = $state.raw(false);
