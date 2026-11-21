@@ -39,8 +39,15 @@ export interface SplitArrangementList {
 /** Fire-and-forget intent: the native projection is the confirmation. */
 const fire = (task: Promise<unknown>) => void task.catch(() => {});
 
-export const splitOpenUrl = (url: string, placement: "left" | "right" = "right") =>
-  invoke<SplitOpenView>("split_open_url", { url, mode: "split", placement });
+export const splitOpenUrl = (url: string, placement: "left" | "right" = "right", pane = "") =>
+  invoke<SplitOpenView>("split_open_url", { url, mode: "split", placement, pane });
+
+/** Split two named tabs. `source` stays the pane in front; `other` joins. */
+export const splitOpen = (source: string, other: string) =>
+  invoke<SplitOpenView>("tabs_split", { source, other });
+
+/** End the split that owns `id`, even when another tab is in front. */
+export const splitUnsplit = (id: string) => invoke<SplitOpenView>("tabs_unsplit", { id });
 
 export const splitReplace = (pane: string, other: string) =>
   invoke<SplitOpenView>("split_replace", { pane, other });

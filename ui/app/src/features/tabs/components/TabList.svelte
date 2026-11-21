@@ -20,6 +20,9 @@
   import { RowDrag } from "$session/row-drag.svelte";
   import { favicons } from "$domain/favicons";
   import DragMark from "$shared/ui/DragMark";
+  import * as notices from "$session/notice.svelte";
+  import * as m from "$shared/i18n/messages";
+  import { splitDropTarget } from "../lib/split-drop";
 
   let {
     entries,
@@ -87,12 +90,37 @@
     return hidden;
   });
 
+  /** Whether dragging one tab onto another can pair them. A tab already in
+   *  another split cannot live in two, and a full split takes no more panes. */
+  function canSplit(dragged: string, target: string): boolean {
+    if (dragged === target) return false;
+    const source = tabs.splitGroupFor(dragged);
+    const other = tabs.splitGroupFor(target);
+    if (source !== null && other !== null && source !== other) return false;
+    const joining = source ?? other;
+    if (joining === null) return true;
+    const max = Number(preferences.value("split.max-panes")) || 3;
+    return joining.members.length < max;
+  }
+
   const drag = new RowDrag({
     list: () => list,
     region: () => list?.closest<HTMLElement>("[data-tabs-drop]") ?? undefined,
     // Only open tabs reorder in place; native places anything dropped in
     // this list among them.
     reorder: () => (variant === "list" && section === "today" ? { essential: false } : null),
+    splitTarget: (id, over, x, y) =>
+      splitDropTarget({
+        dragged: id,
+        over,
+        x,
+        y,
+        enabled: preferences.value("split.drag-tab") !== "false",
+        canJoin: (target) => canSplit(id, target),
+      }),
+    split: (id, target) => {
+      void tabs.splitWith(id, target).catch(() => notices.show(m.split_failed()));
+    },
     drop: ({ id, x, y, over, before }) => {
       // A split's tabs share one row, so they never reorder in place; let go
       // anywhere in the sidebar and the tab leaves its split for there.
@@ -107,6 +135,10 @@
         void tabDrag.move(id, true, before);
         return;
       }
+      // Dropped on another tab without a split: with drag-to-split off this
+      // is a no-op, not a page-edge split. A real reorder was already
+      // committed above.
+      if (section === "today" && over?.closest("[data-astra-tab-id]")) return;
       // Dropped among the open tabs from anywhere else: it joins them there.
       // Dropping onto a row does not pair the two; that is Split View's job,
       // from the menu or by dropping onto the page.
@@ -253,6 +285,7 @@
           ].join(" ")}
           onSelect={select}
           onClose={tabs.close}
+          onDetach={(id) => tabs.leaveSplit(id)}
           onContextMenu={handleContextMenu}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}

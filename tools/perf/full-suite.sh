@@ -154,6 +154,7 @@ else
     "gallery:tools/marionette-probe/gallery-probe.py"
     "tab_order:tools/marionette-probe/tab-order-probe.py"
     "tabs_churn:tools/marionette-probe/tabs-churn-probe.py"
+    "split_view:tools/marionette-probe/split-view-probe.py"
     "edge_matrix:tools/marionette-probe/edge-matrix.py"
     "sessionstore:tools/perf/stress/sessionstore_probe.py"
     "containers_space:tools/perf/stress/containers_space_probe.py"

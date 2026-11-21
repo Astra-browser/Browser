@@ -50,6 +50,42 @@ in the engine, the real Astra tab-row click puts the panel back, and a window
 `activate` repairs the same drift without a click. The probe is registered in
 `tools/perf/full-suite.sh` and `tools/perf/full-suite.ps1`.
 
+## Split view flow: picker, drag-to-tab, independent splits (2026-11-21)
+
+The owner reported that **Open in Split View** in a tab's menu did nothing, and
+asked for a chooser, tab-on-tab dragging, a way out of a split, several
+independent 2–3 pane splits, and no reload/resize or resource cost. The branch
+was merged on the owner's instruction after the checks below.
+
+| Surface | What changed | Files |
+|---|---|---|
+| Open in Split View | The row now opens Astra's picker instead of splitting blindly with the selected tab. The picker names the right-clicked tab, lists the tabs that can join it, and offers a blank "New tab" pane. Both actions send `source` + `other` (or `pane` + `about:blank`) so the right-clicked tab is always the pane in front. | `session/split-picker.svelte.ts`, `features/split/components/SplitPicker.svelte`, `tab-menu.ts`, `Shell.svelte`, `domain/tabs`, `shared/ipc/surfaces.ts` |
+| Drag a tab onto a tab | Dropping on the middle half of another tab pairs the two into a split; the top/bottom quarters still reorder. New setting **Drag a tab onto a tab to split** (`split.drag-tab`, on by default) turns only this gesture off; dragging to the page edge is unchanged. | `features/tabs/lib/split-drop.ts`, `TabList.svelte`, `TabRail.svelte`, `session/row-drag.svelte.ts`, settings catalog + Tabs page |
+| Leave a split | Each pane row has a detach control ("Open in its own tab"); dragging a pane out still works. The detached tab becomes the ordinary tab in front, its page is not reloaded, and the remaining panes keep their exact shares. | `TabRow.svelte`, `SplitGroupRow.svelte`, host `leave`/`expandSplit` |
+| Several splits | Each split is independent and capped at 3 panes (or the configured 2). A parked split whose card changes now reaches the sidebar immediately: `refresh` emits when `split_groups` changes, not only when the active group does. A tab outside a split can start another one; a full split says "Split view full" and never steals a pane. | host `SplitView.sys.mjs` (`refresh`), picker capacity model |
+| No reload / no resize | Only panes that were blank before a split are warmed. A tab that already had a page is moved into the split and never re-requested; a busy tab is not re-loaded by the retry. Adding a pane rebuilds the wrapper in one turn instead of `TabTabs.addTabs`, preserving both the browser and every pane share. Server request counts prove the source page is fetched once across split, detach and re-split. | host `SplitView.sys.mjs` (`isBlankTab`, `tabBusy`, `warmPanes`, `expandSplit`, `sharesForRemaining`) |
+
+**Verification:** `tools/marionette-probe/split-view-probe.py` **29/29 PASS** on
+the packaged Windows dev build (local server pages, real app UI): the menu row
+opens the picker, the right-clicked tab is the source, server hits are 1 for a
+page carried through split/detach, two extra splits stay separate with their own
+cards, a third pane is accepted, a fourth row is disabled, detach leaves the
+tab in front with no handles, drag-to-tab works with the setting on and not with
+it off, `split.enabled` removes/restores the row, `split.max-panes=2` makes a
+2-pane split full, and cleanup leaves 0 split wrappers and 0 resizers. Unit
+suite **1273 passed / 2 skipped**; new `SplitPicker` 3/3, `TabReorder` 9/9
+(including tab-on-tab and the off gesture), `split-drop` 5/5;
+`native_surfaces` **138/138** (new picker/setting/URL/share checks); typecheck,
+eslint and knip clean; `build:chrome` staged 810 files with a clean CSP audit;
+engine `build --faster` green. The full `bun run check` stops on a pre-existing
+stylelint error in `WindowControlsInline.svelte:76` (a `7px` radius, untouched
+by this branch); the touched styles pass stylelint and Prettier.
+
+**Still deferred:** `split.restore`/`remember-width`/`double-click-reset`/
+`drag-edge` and group settings keep their existing host/UI coverage rather than
+a second live pass here. The picker is drawn in the app frame; the shell raises
+that frame through the existing dialog detector.
+
 ## Owner report: a fullscreen video had an invisible wall over it (2026-11-20)
 
 Fullscreening a video on any site (YouTube reported) put an invisible,

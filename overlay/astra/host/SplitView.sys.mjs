@@ -189,6 +189,34 @@ export function validArrangement(value) {
   };
 }
 
+/** Validate an address a tab or pane may open. Pure, exported for tests. */
+export function normalisePaneUrl(value) {
+  if (typeof value !== "string" || value === "") return null;
+  if (value === "about:blank") return value;
+  try {
+    const parsed = new URL(value);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Shares kept after one pane leaves, renormalised to sum to 1.
+ *
+ * A 3-pane 0.3/0.3/0.4 split that loses the middle keeps 0.3/0.4, not a reset
+ * to equal halves: removing a pane must not resize the ones that stay.
+ * Pure, exported for tests. */
+export function sharesForRemaining(shares, keep) {
+  if (!Array.isArray(shares) || shares.length === 0) return null;
+  if (!Array.isArray(keep) || keep.length === 0) return null;
+  const picked = keep.map((index) => shares[index]);
+  if (picked.some((share) => !(Number.isFinite(share) && share > 0)))
+    return null;
+  const sum = picked.reduce((total, share) => total + share, 0);
+  if (!(sum > 0)) return null;
+  return picked.map((share) => share / sum);
+}
+
 // --- native window registry ------------------------------------------------
 
 function bindingFor(window_id) {
@@ -686,11 +714,14 @@ function refresh(binding) {
         members: sv.tabs.map((t) => idOf(binding, t)).filter(Boolean),
       }))
       .filter((group) => group.members.length > 1);
-    __setSplitGroups(allGroups);
+    // A parked split (one that does not own the selected tab) still has to
+    // reach the sidebar. Emitting only on the active group's change left a
+    // second split invisible until an unrelated tab event happened.
+    const groupsChanged = __setSplitGroups(allGroups);
     const changed = __setSplitGroup(members);
-    if (changed) {
+    if (changed || groupsChanged) {
       emitItemsChanged();
-      emit("split.changed", { members });
+      if (changed) emit("split.changed", { members });
     }
   } catch {
     // A window torn down mid-event.
@@ -973,15 +1004,35 @@ function splitViewsIn(binding) {
   return out;
 }
 
+/** A tab that is already fetching its page: asking again would double-load. */
+function tabBusy(tab) {
+  try {
+    return tab?.hasAttribute?.("busy") === true;
+  } catch {
+    return false;
+  }
+}
+
 /** A background tab can still be about:blank; a split must show its page. */
 function ensurePaneLoaded(binding, tab, attempt = 0) {
   if (!tab) return;
+  // The picker's "New Tab" pane is deliberately blank until the person
+  // navigates it; the adoption retries below must not load anything into it.
+  try {
+    if (tab.hasAttribute?.("astra-blank-pane")) return;
+  } catch {
+    // A detached tab.
+  }
   const id = idOf(binding, tab);
   const url = id ? __tabsState()?.tabs?.get(id)?.url : "";
   const blank = () => {
     try {
       const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
-      return !spec || spec === "about:blank" || spec.startsWith("chrome://browser/content/blanktab");
+      return (
+        !spec ||
+        spec === "about:blank" ||
+        spec.startsWith("chrome://browser/content/blanktab")
+      );
     } catch {
       return false;
     }
@@ -989,13 +1040,16 @@ function ensurePaneLoaded(binding, tab, attempt = 0) {
   const retry = (limit) => {
     if (attempt >= limit) return;
     try {
-      setTimeout(() => {
-        try {
-          if (tab.linkedBrowser) ensurePaneLoaded(binding, tab, attempt + 1);
-        } catch {
-          // The tab closed while waiting.
-        }
-      }, 120 * (attempt + 1));
+      setTimeout(
+        () => {
+          try {
+            if (tab.linkedBrowser) ensurePaneLoaded(binding, tab, attempt + 1);
+          } catch {
+            // The tab closed while waiting.
+          }
+        },
+        120 * (attempt + 1),
+      );
     } catch {
       // No timer available in this environment.
     }
@@ -1009,6 +1063,13 @@ function ensurePaneLoaded(binding, tab, attempt = 0) {
   }
   try {
     if (!blank()) return;
+    // The engine may already be fetching the URL the tab was created with.
+    // Issuing it again would request the page twice and replace the first
+    // document mid-load.
+    if (tabBusy(tab)) {
+      retry(6);
+      return;
+    }
     tab.linkedBrowser?.fixupAndLoadURIString(url, {
       triggeringPrincipal: systemPrincipal(),
     });
@@ -1022,23 +1083,82 @@ function ensurePaneLoaded(binding, tab, attempt = 0) {
   if (blank()) retry(6);
 }
 
+/** Whether a tab still shows its starting blank document. */
+function isBlankTab(tab) {
+  try {
+    const spec = tab?.linkedBrowser?.currentURI?.spec ?? "";
+    return (
+      !spec ||
+      spec === "about:blank" ||
+      spec.startsWith("chrome://browser/content/blanktab")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Add one live tab to an existing split by rebuilding the wrapper in the same
+ *  turn. The engine's `addTabs` can hand the new pane a fresh browser and
+ *  reload a page that was already open; rebuilding keeps every browser and
+ *  every pane share, which is both faster and what the person sees. */
+function expandSplit(binding, existing, outsider) {
+  const gb = binding.gb;
+  if (!gb || !existing || !outsider) return null;
+  const previous = [...existing.tabs];
+  if (previous.includes(outsider)) return existing;
+  if (previous.length + 1 > configuredPanes()) return null;
+  const members = [...previous, outsider];
+  const before = ratiosOf(existing);
+  try {
+    existing.unsplitTabs("astra_add");
+  } catch {
+    return null;
+  }
+  let rebuilt = null;
+  try {
+    rebuilt = gb.addTabSplitView(members, { trigger: null });
+  } catch {
+    rebuilt = null;
+  }
+  if (!rebuilt) {
+    // The split was taken apart before the rebuild; put the original panes
+    // back together rather than leaving them scattered.
+    try {
+      gb.addTabSplitView(previous, { trigger: null });
+    } catch {
+      // The engine is already gone with the window.
+    }
+    return null;
+  }
+  if (before && before.length === previous.length) {
+    const count = members.length;
+    const scaled = before.map((share) => (share * previous.length) / count);
+    scaled.push(1 / count);
+    _paneRatios.set(rebuilt, scaled);
+  }
+  return rebuilt;
+}
+
 function addToSplit(binding, tabs) {
   const gb = binding.gb;
   if (!gb || tabs.length < 2) return null;
   const container = tabs[0]?.userContextId ?? 0;
   if (tabs.some((tab) => (tab.userContextId ?? 0) !== container)) return null;
-  for (const tab of tabs) ensurePaneLoaded(binding, tab);
+  // A tab that already has a page is only moved into the split. A tab that
+  // was blank is warmed after the split exists (see `warmPanes`), never before
+  // it: reading a reparented browser's URI is not a reliable "needs a load".
   const existing = tabs[0]?.splitview ?? null;
   if (existing) {
     const current = existing.tabs;
     const added = tabs.slice(1).filter((tab) => !current.includes(tab));
     if (added.length === 0) return existing;
     if (current.length + added.length > configuredPanes()) return null;
-    existing.addTabs(added);
-    // Joining a split can hand the tab a fresh pane browser; the load started
-    // above belonged to the pre-split one, so start it again on the pane.
-    for (const tab of added) ensurePaneLoaded(binding, tab);
-    return existing;
+    let splitview = existing;
+    for (const tab of added) {
+      splitview = expandSplit(binding, splitview, tab);
+      if (!splitview) return null;
+    }
+    return splitview;
   }
   if (tabs.some((tab) => tab.splitview)) return null;
   try {
@@ -1055,37 +1175,32 @@ function sameSpace(binding, a, b) {
   return (a.userContextId ?? 0) === (b.userContextId ?? 0);
 }
 
-/** Visit each pane once so a background tab's pending URL is committed. */
-async function warmPanes(binding, splitview, sourceId) {
-  if (!splitview) return;
+/** Visit each pane that started blank so its pending URL is committed. A
+ *  pane that already had a page is never touched: selecting it is enough, and
+ *  re-reading a reparented browser's URI can see about:blank for a moment. */
+async function warmPanes(binding, splitview, sourceId, blankIds = []) {
+  if (!splitview || blankIds.length === 0) return;
+  const wanted = new Set(blankIds);
   for (const paneTab of splitview.tabs) {
     const id = idOf(binding, paneTab);
-    if (!id || id === sourceId) continue;
+    if (!id || id === sourceId || !wanted.has(id)) continue;
     let uri = "";
     try {
       uri = paneTab.linkedBrowser?.currentURI?.spec ?? "";
     } catch {
       uri = "";
     }
-    // Only a pane still on the blank starting document needs a selection to
-    // commit its URL. Selecting every loaded pane made a split switch the
-    // front document twice while pages were arriving, which is the freeze the
-    // owner sees after dragging a tab into a split.
-    if (uri && uri !== "about:blank" && !uri.startsWith("chrome://browser/content/blanktab")) {
+    if (
+      uri &&
+      uri !== "about:blank" &&
+      !uri.startsWith("chrome://browser/content/blanktab")
+    ) {
       continue;
     }
     try {
-      // Ask for the load before selecting: a direct load reaches the pane
-      // browser once the split has placed it, while selecting a pane can be
-      // refused while the split is still being registered (which is how the
-      // load was skipped altogether and the pane stayed blank).
-      ensurePaneLoaded(binding, paneTab, 6);
       await Tabs.select({ request_id: `split-warm-${id}`, astra_tab_id: id });
-      // Activation can hand the pane a fresh browser; ask again on the one it
-      // has now.
       ensurePaneLoaded(binding, paneTab, 6);
     } catch {
-      // A refused selection must not also cost the pane its load.
       ensurePaneLoaded(binding, paneTab, 6);
     }
   }
@@ -1229,23 +1344,32 @@ export const SplitView = {
         already: true,
       });
     }
+    // Record which panes had no page before the split. The engine can report a
+    // reparented pane as about:blank for a moment; loading that would reload
+    // the page the person already had open.
+    const blankIds = [sourceTab, otherTab]
+      .filter((tab) => isBlankTab(tab))
+      .map((tab) => idOf(binding, tab))
+      .filter(Boolean);
     let splitview = null;
+    let joinedExisting = false;
     if (sourceSplit || otherSplit) {
       const existing = sourceSplit ?? otherSplit;
       const outsider = sourceSplit ? otherTab : sourceTab;
       if (existing.tabs.includes(outsider)) {
         splitview = existing;
+        joinedExisting = true;
       } else if (existing.tabs.length + 1 <= configuredPanes()) {
-        try {
-          existing.addTabs([outsider]);
-          splitview = existing;
-        } catch {
+        const expanded = expandSplit(binding, existing, outsider);
+        if (!expanded) {
           return err(
             request_id,
             "split_refused",
             "the engine refused this pane",
           );
         }
+        splitview = expanded;
+        joinedExisting = true;
       } else {
         return err(
           request_id,
@@ -1264,9 +1388,11 @@ export const SplitView = {
         "split_refused",
         "the engine refused this split view",
       );
-    await warmPanes(binding, splitview, idOf(binding, sourceTab));
+    await warmPanes(binding, splitview, idOf(binding, sourceTab), blankIds);
     focusTab(binding, sourceTab);
-    applyRatio(binding, binding.ratio);
+    // A tab joining a split that already has a layout keeps that layout; only
+    // a brand-new split starts from the remembered share.
+    if (!joinedExisting) applyRatio(binding, binding.ratio);
     scheduleRefresh(binding);
     return ok(request_id, {
       split: true,
@@ -1292,19 +1418,22 @@ export const SplitView = {
       return err(request_id, "no_window", "no chrome window is bound");
     if (typeof url !== "string" || url === "")
       return err(request_id, "invalid_url", "url is required");
-    let targetUrl = url;
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) {
-        return err(
-          request_id,
-          "invalid_url",
-          "only http(s) URLs can open in a tab or pane",
-        );
-      }
-      targetUrl = parsed.href;
-    } catch {
-      return err(request_id, "invalid_url", "url is required");
+    // A pane may start blank: the split picker's "New Tab" opens an empty
+    // pane the person then navigates. Saving an arrangement still refuses it
+    // (a saved pane must be a real page).
+    const blankPane = mode !== "tab" && url === "about:blank";
+    const targetUrl = normalisePaneUrl(url);
+    if (targetUrl === null) {
+      return err(
+        request_id,
+        "invalid_url",
+        blankPane
+          ? "url is required"
+          : "only http(s) URLs can open in a tab or pane",
+      );
+    }
+    if (mode === "tab" && targetUrl === "about:blank") {
+      return err(request_id, "invalid_url", "a tab needs a web address");
     }
     if (mode === "tab") {
       const { userContextId } = containerFor(binding);
@@ -1340,6 +1469,13 @@ export const SplitView = {
     });
     if (!made)
       return err(request_id, "tab_refused", "the engine refused the pane tab");
+    if (blankPane) {
+      try {
+        made.setAttribute("astra-blank-pane", "true");
+      } catch {
+        // A detached tab still opens; it simply has no marker.
+      }
+    }
     const source = nativeTab(binding, pane) ?? selectedTab(binding);
     if (!source || source === made) {
       focusTab(binding, made);
@@ -1350,6 +1486,7 @@ export const SplitView = {
       });
     }
     const ordered = placement === "left" ? [made, source] : [source, made];
+    const sourceWasSplit = !!source.splitview;
     const splitview = addToSplit(binding, ordered);
     if (!splitview) {
       // The tab still opened; report that honestly rather than pretending a
@@ -1363,7 +1500,8 @@ export const SplitView = {
       });
     }
     focusTab(binding, source);
-    applyRatio(binding, binding.ratio);
+    if (!sourceWasSplit) applyRatio(binding, binding.ratio);
+    if (isBlankTab(made)) ensurePaneLoaded(binding, made, 6);
     scheduleRefresh(binding);
     return ok(request_id, {
       opened: true,
@@ -1409,11 +1547,13 @@ export const SplitView = {
         "a split view never spans spaces",
       );
     }
-    const members = splitview.tabs.filter((tab) => tab !== paneTab);
-    if (members.includes(replacement)) {
+    const members = splitview.tabs.map((member) =>
+      member === paneTab ? replacement : member,
+    );
+    if (new Set(members).size !== members.length) {
       return err(request_id, "already_member", "that tab is already a pane");
     }
-    members.push(replacement);
+    const shares = ratiosOf(splitview);
     try {
       splitview.unsplitTabs("astra_replace");
     } catch {
@@ -1426,8 +1566,14 @@ export const SplitView = {
         "split_refused",
         "the engine refused the replacement",
       );
+    // A replacement keeps the slot's share: swapping the page in one pane must
+    // not re-proportion the ones beside it.
+    if (shares && shares.length === members.length) {
+      _paneRatios.set(rebuilt, [...shares]);
+      applyPaneWidths(binding);
+    }
     if (paneTab.selected) focusTab(binding, replacement);
-    applyRatio(binding, binding.ratio);
+    if (isBlankTab(replacement)) ensurePaneLoaded(binding, replacement, 6);
     scheduleRefresh(binding);
     return ok(request_id, {
       replaced: true,
@@ -1445,19 +1591,38 @@ export const SplitView = {
     if (!tab || !splitview)
       return err(request_id, "not_split", "that tab is not in a split view");
     const remaining = splitview.tabs.filter((member) => member !== tab);
+    // Read the shares before the split is taken apart. Rebuilding the
+    // remaining panes must not resize them; a pane that stays where it was is
+    // the difference between leaving a split and the whole layout jumping.
+    const before = ratiosOf(splitview);
+    const keptShares = before
+      ? sharesForRemaining(
+          before,
+          remaining.map((member) => splitview.tabs.indexOf(member)),
+        )
+      : null;
+    // The leaving tab becomes the ordinary tab in front, so "remove from
+    // split" ends on the page the person took out, not on a sibling.
+    focusTab(binding, tab);
     try {
       splitview.unsplitTabs("astra_leave");
     } catch {
       return err(request_id, "split_refused", "the engine refused to unsplit");
     }
-    if (remaining.length >= 2 && !addToSplit(binding, remaining)) {
-      return err(
-        request_id,
-        "split_refused",
-        "the remaining panes could not stay split",
-      );
+    if (remaining.length >= 2) {
+      const rebuilt = addToSplit(binding, remaining);
+      if (!rebuilt) {
+        return err(
+          request_id,
+          "split_refused",
+          "the remaining panes could not stay split",
+        );
+      }
+      if (keptShares) {
+        _paneRatios.set(rebuilt, keptShares);
+        applyPaneWidths(binding);
+      }
     }
-    if (tab.selected) focusTab(binding, remaining[0] ?? tab);
     scheduleRefresh(binding);
     return ok(request_id, {
       left: true,
@@ -1465,12 +1630,13 @@ export const SplitView = {
     });
   },
 
-  /** End the split above the front tab; every tab stays open. */
-  async unsplit({ request_id = "", window_id = "" } = {}) {
+  /** End the split above the front tab (or the split that owns `id`). */
+  async unsplit({ request_id = "", id = "", window_id = "" } = {}) {
     const binding = bindingFor(window_id);
     if (!binding)
       return err(request_id, "no_window", "no chrome window is bound");
-    const splitview = selectedTab(binding)?.splitview ?? null;
+    const anchor = id ? nativeTab(binding, id) : selectedTab(binding);
+    const splitview = anchor?.splitview ?? null;
     if (!splitview) return ok(request_id, { unsplit: false, members: [] });
     const members = splitview.tabs.map((tab) => idOf(binding, tab));
     splitview.unsplitTabs("astra_unsplit");
@@ -1588,6 +1754,10 @@ export const SplitView = {
       return ok(request_id, { accepted: false, reason: "same_tab" });
     // If the front tab is already in a split, the dragged tab joins that
     // split instead of pulling the front tab into a new two-pane one.
+    const blankIds = [source, tab]
+      .filter((member) => isBlankTab(member))
+      .map((member) => idOf(binding, member))
+      .filter(Boolean);
     const existing = source.splitview ?? tab.splitview ?? null;
     let splitview = null;
     if (existing) {
@@ -1599,15 +1769,14 @@ export const SplitView = {
       if (already.length >= configuredPanes()) {
         return ok(request_id, { accepted: false, reason: "pane_limit" });
       }
-      existing.addTabs([adding]);
-      splitview = existing;
+      splitview = expandSplit(binding, existing, adding);
     } else {
       const ordered = placement === "left" ? [tab, source] : [source, tab];
       splitview = addToSplit(binding, ordered);
     }
     if (!splitview)
       return ok(request_id, { accepted: false, reason: "split_refused" });
-    await warmPanes(binding, splitview, idOf(binding, source));
+    await warmPanes(binding, splitview, idOf(binding, source), blankIds);
     focusTab(binding, source);
     scheduleRefresh(binding);
     return ok(request_id, {

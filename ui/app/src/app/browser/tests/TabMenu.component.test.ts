@@ -6,6 +6,7 @@ import { revision, spaceFixture, tabFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { ContextMenu } from "$features/menus";
 import { installTabMenuPresenter } from "../tab-menu";
+import * as splitPicker from "$session/split-picker.svelte";
 
 const native = vi.hoisted(() => ({
   close: vi.fn(),
@@ -119,6 +120,19 @@ test("the menu's rows act on the tab that was right-clicked, not the active one"
   )!;
   keep.click();
   await expect.poll(() => native.keep.mock.calls).toEqual([["b", true, null]]);
+});
+
+test("Open in Split View asks which tab to pair instead of splitting blindly", async () => {
+  tabs.openTabMenu("b", 40, 40);
+  await expect.poll(() => document.querySelectorAll(".shell-menu-item").length).toBeGreaterThan(0);
+  const split = [...document.querySelectorAll<HTMLButtonElement>(".shell-menu-item")].find((row) =>
+    row.textContent?.includes("Open in Split View"),
+  )!;
+  split.click();
+  await expect.poll(() => splitPicker.sourceId()).toBe("b");
+  // No tab was chosen yet, so no native split was asked for.
+  expect(native.split).not.toHaveBeenCalled();
+  splitPicker.close();
 });
 
 test("a kept tab offers its removal, and the lone new tab offers no close", async () => {

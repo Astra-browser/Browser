@@ -16,6 +16,15 @@ const native = vi.hoisted(() => ({
   split: vi.fn(async () => ({ accepted: true, operation_id: null })),
 }));
 
+const surfaces = vi.hoisted(() => ({
+  splitOpen: vi.fn(async () => ({ split: true })),
+}));
+
+vi.mock("$shared/ipc/surfaces", async (original) => ({
+  ...(await original<typeof import("$shared/ipc/surfaces")>()),
+  splitOpen: surfaces.splitOpen,
+}));
+
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
@@ -34,6 +43,7 @@ vi.mock("$domain/operations", () => ({
 afterEach(() => {
   tabs.dispose();
   native.setEssential.mockClear();
+  surfaces.splitOpen.mockClear();
 });
 
 // A synthetic pointer has no native capture; without this the drag aborts
@@ -130,6 +140,20 @@ test("dragging a row down its list opens a slot and drops it there", async () =>
   await expect.poll(() => native.setEssential.mock.calls.length).toBe(1);
   expect(native.setEssential).toHaveBeenCalledWith("a", false, "d");
   expect(native.split).not.toHaveBeenCalled();
+});
+
+test("dragging a tab onto the middle of another tab opens both in a split", async () => {
+  const { row } = await list();
+  const handle = row("a").querySelector<HTMLElement>(".tab-open")!;
+  // The last row does not move during this drag, so its centre is still the
+  // row under the pointer at release.
+  const target = row("d").getBoundingClientRect();
+  const to = { x: target.left + target.width / 2, y: target.top + target.height / 2 };
+  const { init } = drag(handle, to);
+  await frame();
+  handle.dispatchEvent(new PointerEvent("pointerup", { ...init, clientX: to.x, clientY: to.y }));
+  await expect.poll(() => surfaces.splitOpen.mock.calls).toEqual([["a", "d"]]);
+  expect(native.setEssential).not.toHaveBeenCalled();
 });
 
 test("letting go where it started moves nothing and puts every row back", async () => {

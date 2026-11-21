@@ -90,6 +90,14 @@ check("pane widths clamp a tiny share to the floor", (() => {
 })());
 check("pane widths refuse a stage with no geometry", SplitView.paneWidths(0, [0.5, 0.5]) === null);
 check("pane shares are a helper on the module", typeof SplitView.paneWidths === "function");
+check("a blank pane address is allowed for a split", SplitView.normalisePaneUrl("about:blank") === "about:blank");
+check("a pane refuses a non-web scheme", SplitView.normalisePaneUrl("file:///etc/passwd") === null);
+check("a pane normalises a web address", SplitView.normalisePaneUrl("https://example.com/a") === "https://example.com/a");
+check("leaving a pane keeps the others' shares", (() => {
+  const shares = SplitView.sharesForRemaining([0.3, 0.2, 0.5], [0, 2]);
+  return !!shares && Math.abs(shares[0] - 0.375) < 1e-9 && Math.abs(shares[1] - 0.625) < 1e-9;
+})());
+check("leaving a pane refuses a missing share", SplitView.sharesForRemaining([0.5, 0.5], [0, 5]) === null);
 
 // --- host method surface ---------------------------------------------------
 for (const method of [
@@ -272,6 +280,17 @@ for (const name of [
 
 const jar = fs.readFileSync(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");
 check("SplitView is packaged in jar.mn", jar.includes("host/SplitView.sys.mjs"));
+// The split picker is the tab menu's only caller, and drag-to-tab is a real
+// setting rather than a hard-coded gesture.
+const picker = fs.readFileSync(path.join(ROOT, "ui", "app", "src", "features", "split", "components", "SplitPicker.svelte"), "utf8");
+const tabsPage = fs.readFileSync(path.join(ROOT, "ui", "app", "src", "features", "settings", "components", "sections", "TabsPage.svelte"), "utf8");
+const catalogText = fs.readFileSync(path.join(ROOT, "ui", "app", "src", "features", "settings", "lib", "catalog.ts"), "utf8");
+const prefDefaults = fs.readFileSync(path.join(ROOT, "ui", "app", "src", "domain", "preferences", "preferences.svelte.ts"), "utf8");
+check("the split picker names both tabs it pairs", picker.includes("tabs.splitWith(origin, target)"));
+check("the picker offers a new blank pane", picker.includes("tabs.splitNewPane(origin)"));
+check("the drag-to-tab setting has a row", tabsPage.includes('preference="split.drag-tab"'));
+check("the drag-to-tab setting is described", catalogText.includes('"split.drag-tab"'));
+check("the drag-to-tab setting defaults on", prefDefaults.includes('"split.drag-tab": "true"'));
 for (const file of ["Peek", "SpaceHistory", "SpaceExtensions", "SpaceClone", "TabGroups"]) {
   check(`${file} is packaged in jar.mn`, jar.includes(`host/${file}.sys.mjs`));
 }

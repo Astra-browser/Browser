@@ -11,6 +11,7 @@
     class: className = "",
     onSelect,
     onClose,
+    onDetach,
     onContextMenu,
     onPointerDown,
     onPointerMove,
@@ -25,6 +26,7 @@
     class?: string;
     onSelect: (id: string, event?: MouseEvent) => void;
     onClose: (id: string) => void;
+    onDetach?: (id: string) => void;
     onContextMenu: (event: MouseEvent, tab: TabView) => void;
     onPointerDown: (event: PointerEvent, tab: TabView) => void;
     onPointerMove: (event: PointerEvent) => void;
@@ -76,6 +78,7 @@
         splitCandidate={splitting && tab.id !== activeId}
         {onSelect}
         {onClose}
+        {onDetach}
         {onContextMenu}
         {onPointerDown}
         {onPointerMove}

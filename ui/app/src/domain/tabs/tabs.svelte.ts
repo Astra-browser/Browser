@@ -5,7 +5,7 @@ import type { ItemsState, SpaceLookInputV1, TabView } from "$shared/ipc/bindings
 import { settle } from "$domain/operations";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
-import { splitReplace } from "$shared/ipc/surfaces";
+import { splitOpen, splitOpenUrl, splitReplace, splitUnsplit } from "$shared/ipc/surfaces";
 import { TabProjectionModel } from "./tabs-model";
 
 const model = new TabProjectionModel();
@@ -153,7 +153,16 @@ export const reloadActive = onActive((id) => fire(commands.tabsReload(id)));
 export const backActive = onActive((id) => fire(commands.tabsBack(id)));
 export const forwardActive = onActive((id) => fire(commands.tabsForward(id)));
 export const split = (other: string) => fire(commands.tabsSplit(other));
+/** Split `source` with `other` explicitly: the tab that was right-clicked or
+ *  dragged is the pane in front, never "whatever happens to be selected". The
+ *  host settles pane capacity and space rules and its refusal is surfaced by
+ *  the caller instead of being swallowed. */
+export const splitWith = (source: string, other: string) => splitOpen(source, other);
+/** Add a blank pane beside `source`; the person navigates it afterwards. */
+export const splitNewPane = (source: string) => splitOpenUrl("about:blank", "right", source);
 export const unsplit = () => fire(commands.tabsUnsplit());
+/** End the split owning `id`, even when it is parked behind another tab. */
+export const endSplit = (id: string) => splitUnsplit(id);
 export const leaveSplit = (id: string) => fire(commands.tabsLeaveSplit(id));
 // A tab can belong to a split that is not the one in front: the menu must
 // still offer Remove/End for it. Reading only the active `split_group` made
@@ -161,6 +170,16 @@ export const leaveSplit = (id: string) => fire(commands.tabsLeaveSplit(id));
 export const inSplit = (id: string) =>
   (state.split_group?.members.includes(id) ?? false) ||
   (state.split_groups ?? []).some((group) => group.members.includes(id));
+/** Every live split, the one in front first, as the projection reports it. */
+export const splitGroupList = () => {
+  const groups = state.split_groups ?? [];
+  const active = state.split_group;
+  if (!active) return groups;
+  return [active, ...groups.filter((group) => group.members.join() !== active.members.join())];
+};
+/** The split that owns a tab, or null. */
+export const splitGroupFor = (id: string) =>
+  splitGroupList().find((group) => group.members.includes(id)) ?? null;
 /** Pane order for the native split, or null when there is no split. */
 export const splitMembers = () => state.split_group?.members ?? [];
 

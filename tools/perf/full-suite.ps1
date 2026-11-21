@@ -303,6 +303,7 @@ if ($SkipLive) {
         "gallery"               = "tools/marionette-probe/gallery-probe.py"
         "tab_order"             = "tools/marionette-probe/tab-order-probe.py"
         "tabs_churn"            = "tools/marionette-probe/tabs-churn-probe.py"
+        "split_view"            = "tools/marionette-probe/split-view-probe.py"
         "sessionstore"          = "tools/perf/stress/sessionstore_probe.py"
         "containers_space"      = "tools/perf/stress/containers_space_probe.py"
         "containers_private"    = "tools/perf/stress/containers_private_move_probe.py"
