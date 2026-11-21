@@ -162,6 +162,43 @@ dev build (real page, real edge reveal): away
 `{headField:false, barField:true, count:1}`. `eslint` and Prettier are clean on
 the touched files; `build:chrome` staged 811 files with a clean CSP audit.
 
+## Owner report: a hairline strip left of a live page (2026-11-21)
+
+**Symptom:** on a live page (never on Home) a thin line ran down the left edge
+of the page. After a hidden column peeked out and went back, the same narrow
+strip beside the page still looked drawn, as if the column's edge had stayed
+behind.
+
+**Cause:** with the column away, the app hands its page the window's 8px gutter
+(`ui/app/src/styles/browser.css`: the page's inset from the column and the
+`.stage-card` start both go to 0), but the shell kept the native stage at
+`column + 16px` — the 8px gap that only exists beside a visible column. The
+app's page card (edge, 0.5px ring and drop shadow) therefore painted 8px left
+of the real page: that was the line, and the strip a peeking card seemed to
+leave. Home was unaffected because the app's own page and its card shared the
+gutter; only the native page was a gap too far right.
+
+**Fix:** `ui/shell/src/Shell.svelte` puts `.astra-content` on the same 8px
+gutter whenever `data-astra-sidebar-hidden` is set, so the native page, the
+app's card and New Tab share one left edge. The rule carries the same
+`[data-app-booted]` weights as the base rule that sets `column + 16px`;
+without it the base won on specificity. A peek still never moves the page, and
+the top edge keeps the floating-bar rule unchanged.
+
+**Verified:** packaged Windows dev build (`overlay` + `build --faster --jobs 2`),
+local page, `ui.main-bar=auto`, live Marionette readings:
+
+- column in view: page / card / native deck all at x=276 beside the column;
+- column away: page x=8, card x=8, deck x=8 (was 16 / 8 / 16), page top 8;
+- peek: card out at x=8, page still x=8; after it goes back page and card are
+  both still x=8 and no card edge is left in the strip;
+- New Tab with the column away: pane x=8 — Home and live pages share the edge.
+
+Screenshot pixel columns confirm the old 8..16 band (app card edge and its
+drop over the window ground) is gone; the page now starts on the gutter.
+`tools/marionette-probe/sidebar-strip-probe.py` pins those four states and is
+registered in both full-suite manifests (17/17 PASS against the live build).
+
 ## Owner report: upgrade shows "Firefox is already running" (2026-11-21)
 
 **Symptom:** after installing a new build, a native Firefox dialog said the old

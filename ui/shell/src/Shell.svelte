@@ -1773,6 +1773,15 @@
   :global(.astra-frame[data-app-booted="pending"][data-astra-bar="overlay"] .astra-content) {
     inset-block-start: 8px;
   }
+  /* With the column away the page takes the window's own gutter, exactly as
+     the app's home page and its card do once the 8px gap beside the column is
+     gone. Without this the native page stayed 8px inside the card, and the
+     card's edge painted a hairline down the strip where the hidden column had
+     been — most visible just after a peeking card went back. */
+  :global(.astra-frame[data-app-booted="true"][data-astra-sidebar-hidden="true"] .astra-content),
+  :global(.astra-frame[data-app-booted="pending"][data-astra-sidebar-hidden="true"] .astra-content) {
+    inset-inline-start: 8px;
+  }
   /* A deliberate change of shape travels horizontally on the app's own curve
      (`--motion-page` 400ms, `--ease-emphasized`); those tokens live in the app
      document, not this one, so the values are mirrored here. The top edge is
