@@ -155,6 +155,24 @@ export function isPictureInPictureSource(entry) {
   }
 }
 
+/**
+ * A selection of the tab the tabbrowser already has is a no-op: its tabs
+ * element skips `selectedIndex` when the item is already selected, so no
+ * `TabSelect`, no switcher request and no deck update happen. When the deck
+ * has drifted from the selected tab (an interrupted switch, a window that
+ * came back from occlusion, a tab moved under a pending switch), clicking
+ * that tab could never repair it. This says when the deck must be shown the
+ * selected tab explicitly. A tab that has never presented has nothing to
+ * show; its own load path owns the stage.
+ */
+export function needsDeckRepair({
+  alreadySelected = false,
+  presented = false,
+  panelMatches = false,
+} = {}) {
+  return alreadySelected === true && presented === true && panelMatches !== true;
+}
+
 /** Activate every browser in `active` and park every other entry. */
 export function applyTabActivation(browsers, active) {
   if (!browsers) return 0;
@@ -1139,6 +1157,34 @@ export const Content = {
       }
       return { after, before };
     };
+    /**
+     * Show the selected tab on the engine's deck when a redundant selection
+     * left the deck on another panel. The tabbrowser's own selection setter is
+     * a no-op here, so this is the only path that can bring a drifted page
+     * back without asking the person to switch tabs twice.
+     */
+    const presentSelected = (tab) => {
+      try {
+        const browser = tab?.linkedBrowser;
+        const presented = browser?.frameLoader?.remoteTab?.hasPresented === true;
+        const panel = tab && gb.tabContainer?.getRelatedElement?.(tab);
+        const deck = gb.tabpanels;
+        if (
+          !needsDeckRepair({
+            alreadySelected: gb.selectedTab === tab,
+            presented: presented || browser?.isRemoteBrowser !== true,
+            panelMatches: !panel || !deck || deck.selectedPanel === panel,
+          })
+        ) {
+          return false;
+        }
+        deck.selectedPanel = panel;
+        return true;
+      } catch {
+        // A tab mid-teardown keeps whatever the engine is showing.
+        return false;
+      }
+    };
     const selectTab = (id) => {
       const tab = tabOf.get(id);
       if (!tab) return;
@@ -1150,6 +1196,8 @@ export const Content = {
         } finally {
           applying = false;
         }
+      } else {
+        presentSelected(tab);
       }
       // The tabbox is only the visual deck. The page itself has to be told it
       // is hidden, or a background video never fires VideoTabHidden and the
@@ -1441,6 +1489,30 @@ export const Content = {
     gb.tabContainer.addEventListener("TabSelect", onSelect);
     gb.tabContainer.addEventListener("TabClose", onClose);
     gb.tabContainer.addEventListener("TabOpen", onOpen);
+    // A window that comes back from the OS (another app in front, a hidden or
+    // occluded window) can have had its content docshells deactivated by the
+    // engine while the model never changed. The page then looks alive but
+    // takes no input until something selects a tab again. Re-assert the tab
+    // the model already has in front: activation for its panes, and the deck
+    // panel if the engine's deck drifted during the hidden period.
+    const reassertSelected = () => {
+      try {
+        if (win.document.hidden) return;
+        const tab = gb.selectedTab;
+        const id = idOfTab(tab);
+        if (!id) return;
+        presentSelected(tab);
+        const split = tab.splitview;
+        const active = split
+          ? split.tabs.map((member) => idOfTab(member)).filter(Boolean)
+          : [id];
+        applyTabActivation(browsers, active);
+      } catch {
+        // The window is going away.
+      }
+    };
+    win.addEventListener("activate", reassertSelected);
+    win.document.addEventListener("visibilitychange", reassertSelected);
 
     const off = addEventListener((event) => {
       const id = event.data?.astra_tab_id;
@@ -1802,6 +1874,8 @@ export const Content = {
         try { gb.tabContainer.removeEventListener("TabClose", onClose); } catch {}
         try { gb.tabContainer.removeEventListener("TabOpen", onOpen); } catch {}
         try { gb.tabContainer.removeEventListener("TabAttrModified", onAttr); } catch {}
+        try { win.removeEventListener("activate", reassertSelected); } catch {}
+        try { win.document.removeEventListener("visibilitychange", reassertSelected); } catch {}
         for (const type of groupEvents) {
           try { win.removeEventListener(type, projectGroups); } catch {}
         }

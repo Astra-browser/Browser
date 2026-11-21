@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const { docshellState, applyBrowserActivation, applyTabActivation, isPictureInPictureSource } =
+const { docshellState, applyBrowserActivation, applyTabActivation, isPictureInPictureSource, needsDeckRepair } =
   await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")).href);
 
 let passed = 0;
@@ -117,6 +117,30 @@ check(
     ["tab-pip", true],
     ["tab-front", true],
   ],
+);
+
+// A redundant selection is a no-op in the tabbrowser. The deck repair is the
+// only thing that can bring a page back when the deck drifted from the tab the
+// engine already has selected, so it must fire exactly in that case.
+check(
+  "a drifted deck on the already-selected tab is repaired",
+  needsDeckRepair({ alreadySelected: true, presented: true, panelMatches: false }),
+  true,
+);
+check(
+  "a deck already showing the selected tab is left alone",
+  needsDeckRepair({ alreadySelected: true, presented: true, panelMatches: true }),
+  false,
+);
+check(
+  "a real switch is not repaired behind the engine's own switch",
+  needsDeckRepair({ alreadySelected: false, presented: true, panelMatches: false }),
+  false,
+);
+check(
+  "a tab that never presented waits for its own load",
+  needsDeckRepair({ alreadySelected: true, presented: false, panelMatches: false }),
+  false,
 );
 
 if (!process.exitCode) {
