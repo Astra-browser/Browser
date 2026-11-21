@@ -5,9 +5,9 @@
   "counts": {
     "total": 317,
     "routed": 177,
-    "deferred": 108,
-    "unused": 17,
-    "open": 15,
+    "deferred": 110,
+    "unused": 18,
+    "open": 12,
     "calledUnrouted": 124
   },
   "deferred": [
@@ -205,6 +205,20 @@
       "reason": "SCOPE:what-is-not-in-scope",
       "callers": [
         "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "media_admit_remote",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/lib/workspace/pictures.svelte.ts"
+      ]
+    },
+    {
+      "name": "media_open",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/WorkEnvironmentWorkspace.svelte"
       ]
     },
     {
@@ -810,18 +824,6 @@
       ]
     },
     {
-      "name": "media_admit_remote",
-      "callers": [
-        "ui/app/src/features/work/lib/workspace/pictures.svelte.ts"
-      ]
-    },
-    {
-      "name": "media_open",
-      "callers": [
-        "ui/app/src/features/work/components/WorkEnvironmentWorkspace.svelte"
-      ]
-    },
-    {
       "name": "panel_intent",
       "callers": [
         "ui/app/src/app/panel/PanelApp.svelte"
@@ -843,12 +845,6 @@
       "name": "swipe_region",
       "callers": [
         "ui/app/src/features/tabs/lib/native-swipe.ts"
-      ]
-    },
-    {
-      "name": "tab_menu_popup",
-      "callers": [
-        "ui/app/src/features/tabs/lib/tabs-bridge-store.ts"
       ]
     },
     {
@@ -932,6 +928,12 @@
     {
       "name": "spaces_menu_popup",
       "callers": []
+    },
+    {
+      "name": "tab_menu_popup",
+      "callers": [
+        "ui/app/src/features/tabs/lib/tabs-bridge-store.ts"
+      ]
     },
     {
       "name": "tools_menu_popup",

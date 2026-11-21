@@ -1818,9 +1818,9 @@ recorded below; this list is what is still genuinely unwired.
   `ui/packages/bridge/src/manifest.ts` (D-55), not in prose:
   `node tests/contract/wire_manifest.mjs --report` writes
   `tests/contract/wire_gaps.json` with the state of each gap.
-  108 are deferred by decision (D-48 Work 51, SCOPE accounts 28, D-54 AI 29),
-  17 are unused, and 15 are open defects (split dividers, onboarding
-  Essentials, launcher panel, close handshake, updates, haptics, swipe, media).
+  110 are deferred by decision (D-48 Work 53, SCOPE accounts 28, D-54 AI 29),
+  18 are unused, and 12 are open defects (split dividers, onboarding
+  Essentials, launcher panel, close handshake, updates, haptics, swipe).
   `tests/contract/wire_manifest.mjs` fails when a `proto.ts` command has no
   manifest row, and `tests/contract/wire_coverage.mjs` fails when a route
   target does not exist. Close a row with a UI caller, a `routed` row in the
@@ -2569,4 +2569,4 @@ This phase gives the wire one owner. Decisions: D-54, D-55.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1: 177 routes in `manifest.ts`, `ROUTES` built from it and identical to the old literal table (177 entries, 0 diffs); guard and text-coupled tests import the table; mock known-command list derived from it. Slice 2: `wire_baseline.json` now carries channels only (18), and `wire_manifest.mjs` fails when a `proto.ts` command has no manifest row (mutation-proved). Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 108 deferred / 17 unused / 15 open. Verified: wire_coverage 64, wire_manifest 13, bridge 31, contracts 67 green (2 pre-existing red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No live probe: no surface, host module or engine path changed. Next: the mock's default answer, then the 15 open defects. |
+| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1: 177 routes in `manifest.ts`, `ROUTES` built from it and identical to the old literal table (177 entries, 0 diffs); guard and text-coupled tests import the table; mock known-command list derived from it. Slice 2: `wire_baseline.json` carries channels only (18); `wire_manifest.mjs` fails when a `proto.ts` command has no manifest row (mutation-proved). Review fixes: AI/voice and Work-only media deferred by decision; typed union; shared contract loader. Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 110 deferred / 18 unused / 12 open. Verified: wire_coverage 64, wire_manifest 13, bridge 31, contracts 67 green (2 pre-existing red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No live probe: no surface, host module or engine path changed. Next: the 12 open defects need host work and a live probe. |
