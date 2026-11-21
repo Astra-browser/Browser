@@ -111,10 +111,13 @@ check("a refused store write is not a success", refused === false);
 __setPrefsForTests(null);
 
 // === Routing ==============================================================
-const transport = await read("ui/packages/bridge/src/host-transport.ts");
+const { COMMAND_MANIFEST } = await import(
+  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
+);
+const onboardingRoute = COMMAND_MANIFEST.find((entry) => entry.name === "onboarding_finish");
 check(
   "onboarding_finish routes to a host method",
-  /onboarding_finish:\s*\[\s*"Boot"\s*,\s*"onboardingFinish"\s*\]/u.test(transport),
+  onboardingRoute?.module === "Boot" && onboardingRoute?.method === "onboardingFinish",
 );
 check(
   "the route target exists",

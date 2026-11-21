@@ -42,7 +42,7 @@ FIREFOX = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
     ROOT, "engine", "obj-astra-windows", "dist", "bin", "firefox.exe")
 
 BINDINGS = os.path.join(ROOT, "ui", "app", "src", "shared", "ipc", "bindings.ts")
-ROUTES = os.path.join(ROOT, "ui", "packages", "bridge", "src", "host-transport.ts")
+ROUTES = os.path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")
 SETTINGS_DIR = os.path.join(ROOT, "ui", "app", "src", "features", "settings")
 
 # Settings bindings with no host route today. Fix the route, then delete the
@@ -172,8 +172,10 @@ def wiring():
     for m in re.finditer(r"^\s*(\w+):\s*\([^)]*\)\s*=>.*?__TAURI_INVOKE[^(]*\(\s*\"([a-z0-9_]+)\"",
                          text, re.M):
         to_wire.setdefault(m.group(1), m.group(2))
-    routes = set(re.findall(r"^\s+([a-z0-9_]+):\s*\[",
-                            open(ROUTES, encoding="utf-8").read(), re.M))
+    routes = set(re.findall(
+        r'name: "([a-z0-9_]+)", module: "[A-Za-z0-9_]+", method: "[A-Za-z0-9_]+", '
+        r'args: "[a-z]+", state: "routed"',
+        open(ROUTES, encoding="utf-8").read()))
     used = {}
     for base, _, files in os.walk(SETTINGS_DIR):
         for name in files:

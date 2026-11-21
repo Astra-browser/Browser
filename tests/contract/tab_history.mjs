@@ -133,18 +133,28 @@ check("an unknown tab is refused", unknown.error?.code === "no_such_tab");
 
 // --- wire routing ----------------------------------------------------------
 
-const transport = await readFile(
-  path.join(ROOT, "ui", "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
+const { COMMAND_MANIFEST } = await import(
+  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
 );
-check("tabs_history is routed to TabHistory", /\btabs_history: \["TabHistory", "list", TAB_ARG\]/u.test(transport));
+const tabHistoryRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history");
+const tabHistoryGoRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history_go");
+check(
+  "tabs_history is routed to TabHistory",
+  tabHistoryRoute?.module === "TabHistory" &&
+    tabHistoryRoute?.method === "list" &&
+    tabHistoryRoute?.args === "tab",
+);
 check(
   "tabs_history_go is routed to Navigation",
-  /\btabs_history_go: \["Navigation", "goToHistory", TAB_ARG\]/u.test(transport),
+  tabHistoryGoRoute?.module === "Navigation" &&
+    tabHistoryGoRoute?.method === "goToHistory" &&
+    tabHistoryGoRoute?.args === "tab",
 );
 check(
   "HostModules includes TabHistory",
-  /TabHistory: Record<string, \(args: Record<string, unknown>\) => Promise<unknown>>;/u.test(transport),
+  /TabHistory: Record<string, \(args: Record<string, unknown>\) => Promise<unknown>>;/u.test(
+    await readFile(path.join(ROOT, "ui/packages/bridge/src/host-transport.ts"), "utf8"),
+  ),
 );
 const jar = await readFile(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");
 check("TabHistory is packaged in jar.mn", jar.includes("host/TabHistory.sys.mjs"));

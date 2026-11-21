@@ -17,11 +17,11 @@ function mockBridge() {
 }
 
 describe("surface coverage", () => {
-  test("covers all 278 commands and 37 events", () => {
-    expect(mockCommandNames()).toHaveLength(278);
-    expect(mockEventChannels()).toHaveLength(37);
-    expect(COMMANDS).toHaveLength(278);
-    expect(EVENTS).toHaveLength(37);
+  test("covers every command and event the registry declares", () => {
+    expect(mockCommandNames()).toHaveLength(281);
+    expect(mockEventChannels()).toHaveLength(38);
+    expect(COMMANDS).toHaveLength(281);
+    expect(EVENTS).toHaveLength(38);
   });
 
   test("mock answers every command without hanging", async () => {

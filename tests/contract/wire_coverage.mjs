@@ -2,9 +2,12 @@
 // Native-merge guard: every route target exists, and the channels this merge
 // owns are re-dispatched from the bridge onto the DOM.
 //
-// This is deliberately text-based (host-transport.ts is TypeScript) and narrow:
-// it catches a route pointing at a missing method, and a channel the app
-// listens for that chrome-entry forgot to forward.
+// The command list and the route destinations come from the command manifest
+// (`ui/packages/bridge/src/manifest.ts`, D-55), imported as a module. Node
+// strips the type-only import, so no TypeScript parser is involved. The
+// manifest <-> route-table equality is `ui/packages/bridge/src/manifest.test.ts`
+// (under bun); this guard checks the host side: a route points at a real
+// method, and a channel the chrome-entry forgot to forward is caught.
 //
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
@@ -19,9 +22,10 @@ const UI = path.join(ROOT, "ui");
 const host = await import(
   pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
 );
-const transport = await readFile(
-  path.join(UI, "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
+const { ARG_MAPS, COMMAND_MANIFEST } = await import(
+  pathToFileURL(
+    path.join(UI, "packages", "bridge", "src", "manifest.ts"),
+  ).href
 );
 const nativeEvents = await readFile(
   path.join(UI, "app", "src", "shared", "ipc", "native-events.ts"),
@@ -29,10 +33,6 @@ const nativeEvents = await readFile(
 );
 const chromeEntry = await readFile(
   path.join(UI, "app", "chrome-entry", "browser-chrome.ts"),
-  "utf8",
-);
-const proto = await readFile(
-  path.join(UI, "packages", "bridge", "src", "proto.ts"),
   "utf8",
 );
 const baseline = JSON.parse(
@@ -51,18 +51,17 @@ function check(name, cond) {
   }
 }
 
-const routes = [];
-for (const match of transport.matchAll(
-  /^\s*([a-z0-9_]+): \["([A-Za-z0-9_]+)", "([A-Za-z0-9_]+)"([^\]]*)\]/gmu,
-)) {
-  routes.push({
-    name: match[1],
-    module: match[2],
-    method: match[3],
-    mapsTab: /astra_tab_id|TAB_ARG/u.test(match[4] ?? ""),
-  });
-}
-check("the route table was parsed", routes.length > 50);
+const routes = COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map(
+  (entry) => ({
+    name: entry.name,
+    module: entry.module,
+    method: entry.method,
+    mapsTab:
+      entry.args !== "none" &&
+      Object.values(ARG_MAPS[entry.args]).includes("astra_tab_id"),
+  }),
+);
+check("the manifest declares its routes", routes.length > 50);
 const missing = routes.filter(
   (route) => typeof host[route.module]?.[route.method] !== "function",
 );
@@ -157,15 +156,8 @@ for (const name of [
 // The baseline is derived, not curated: `--write-baseline` rewrites it as
 // COMMANDS minus the route table (and declared channels minus forwarders), so
 // an entry that is routed or that is not a command is a real failure below.
-const COMMANDS_HEAD = "export const COMMANDS: readonly CommandName[] = [";
-const commandsSegment = proto.split(COMMANDS_HEAD)[1]?.split("] as const;")[0];
-check("the command registry was parsed", Boolean(commandsSegment));
-const commands = [
-  ...new Set([...(commandsSegment ?? "").matchAll(/"([a-z0-9_]+)"/gu)].map(
-    (match) => match[1],
-  )),
-];
-check(`the command registry has entries (${commands.length} names)`, commands.length > 200);
+const commands = COMMAND_MANIFEST.map((entry) => entry.name);
+check(`the command manifest has entries (${commands.length} names)`, commands.length > 200);
 const routed = new Set(routes.map((route) => route.name));
 const commandSet = new Set(commands);
 const channels = [

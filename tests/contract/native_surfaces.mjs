@@ -197,9 +197,16 @@ const noWindowPeek = await Peek.Peek.open({ url: "https://example.com/" });
 check("a peek without a window is refused", noWindowPeek.error?.code === "no_window");
 
 // --- routing and callers ---------------------------------------------------
-const routeText = fs.readFileSync(
-  path.join(ROOT, "ui", "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
+// The route table is built from the command manifest (D-55), so these checks
+// read the manifest, not the transport's text.
+const { COMMAND_MANIFEST } = await import(
+  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
+);
+const routeModule = new Map(
+  COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map((entry) => [
+    entry.name,
+    entry.module,
+  ]),
 );
 const declared = [
   "tabs_split",
@@ -213,7 +220,7 @@ const declared = [
   "split_bookmark_delete",
 ];
 for (const name of declared) {
-  check(`${name} has a host route`, new RegExp(`\\b${name}: \\["SplitView"`).test(routeText));
+  check(`${name} has a host route`, routeModule.get(name) === "SplitView");
 }
 
 const surfaceRoutes = {
@@ -241,9 +248,9 @@ const surfaceRoutes = {
   tab_group_ungroup: "TabGroups",
 };
 for (const [name, module] of Object.entries(surfaceRoutes)) {
-  check(`${name} routes to ${module}`, new RegExp(`\\b${name}: \\["${module}"`).test(routeText));
+  check(`${name} routes to ${module}`, routeModule.get(name) === module);
 }
-check("history reads through the space index", /\bhistory_call: \["SpaceHistory"/.test(routeText));
+check("history reads through the space index", routeModule.get("history_call") === "SpaceHistory");
 
 const commandText = fs.readFileSync(
   path.join(ROOT, "ui", "app", "src", "shared", "ipc", "surfaces.ts"),
