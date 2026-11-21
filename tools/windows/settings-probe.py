@@ -172,10 +172,13 @@ def wiring():
     for m in re.finditer(r"^\s*(\w+):\s*\([^)]*\)\s*=>.*?__TAURI_INVOKE[^(]*\(\s*\"([a-z0-9_]+)\"",
                          text, re.M):
         to_wire.setdefault(m.group(1), m.group(2))
-    routes = set(re.findall(
-        r'name: "([a-z0-9_]+)", module: "[A-Za-z0-9_]+", method: "[A-Za-z0-9_]+", '
-        r'args: "[a-z]+", state: "routed"',
-        open(ROUTES, encoding="utf-8").read()))
+    routes = set()
+    for line in open(ROUTES, encoding="utf-8"):
+        if 'state: "routed"' not in line:
+            continue
+        found = re.search(r'name: "([a-z0-9_]+)"', line)
+        if found:
+            routes.add(found.group(1))
     used = {}
     for base, _, files in os.walk(SETTINGS_DIR):
         for name in files:

@@ -13,6 +13,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
@@ -133,27 +134,25 @@ check("an unknown tab is refused", unknown.error?.code === "no_such_tab");
 
 // --- wire routing ----------------------------------------------------------
 
-const { COMMAND_MANIFEST } = await import(
-  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
-);
+const { COMMAND_MANIFEST } = await loadManifest();
 const tabHistoryRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history");
 const tabHistoryGoRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history_go");
 check(
   "tabs_history is routed to TabHistory",
   tabHistoryRoute?.module === "TabHistory" &&
     tabHistoryRoute?.method === "list" &&
-    tabHistoryRoute?.args === "tab",
+    tabHistoryRoute?.args === "idToAstraTabId",
 );
 check(
   "tabs_history_go is routed to Navigation",
   tabHistoryGoRoute?.module === "Navigation" &&
     tabHistoryGoRoute?.method === "goToHistory" &&
-    tabHistoryGoRoute?.args === "tab",
+    tabHistoryGoRoute?.args === "idToAstraTabId",
 );
 check(
   "HostModules includes TabHistory",
-  /TabHistory: Record<string, \(args: Record<string, unknown>\) => Promise<unknown>>;/u.test(
-    await readFile(path.join(ROOT, "ui/packages/bridge/src/host-transport.ts"), "utf8"),
+  /\bTabHistory: HostModuleMethods;/u.test(
+    await readFile(path.join(ROOT, "ui/packages/bridge/src/host-modules.ts"), "utf8"),
   ),
 );
 const jar = await readFile(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");

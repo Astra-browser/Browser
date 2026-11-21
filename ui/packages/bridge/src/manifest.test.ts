@@ -11,11 +11,11 @@
 // declare. It runs under bun, which resolves the package's `./x.js` imports.
 
 import { describe, expect, test } from "bun:test";
-import { ARG_MAPS, COMMAND_MANIFEST } from "./manifest.js";
+import { COMMAND_MANIFEST, isRouted, toRoute } from "./manifest.js";
 import { ROUTES, createHostDispatch } from "./host-transport.js";
 import { PROTOCOL_VERSION } from "./proto.js";
 
-const routed = COMMAND_MANIFEST.filter((entry) => entry.state === "routed");
+const routed = COMMAND_MANIFEST.filter(isRouted);
 
 describe("the command manifest owns the routes", () => {
   test("the route table has exactly the manifest's routed names", () => {
@@ -24,13 +24,9 @@ describe("the command manifest owns the routes", () => {
 
   test("every routed row is the table's destination and argument map", () => {
     for (const entry of routed) {
-      const expected =
-        entry.args === "none"
-          ? [entry.module, entry.method]
-          : [entry.module, entry.method, ARG_MAPS[entry.args]];
       expect({ name: entry.name, route: ROUTES[entry.name] }).toEqual({
         name: entry.name,
-        route: expected as never,
+        route: toRoute(entry),
       });
     }
   });

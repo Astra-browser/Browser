@@ -9,7 +9,8 @@
 // unless an override is registered. Events are emitted with a monotonic
 // `event_seq` starting at 1, like `overlay/astra/host/Events.sys.mjs`.
 
-import { COMMANDS, EVENT_RENAMES, EVENTS, PROTOCOL_VERSION } from "./proto.js";
+import { EVENT_RENAMES, EVENTS, PROTOCOL_VERSION } from "./proto.js";
+import { COMMAND_MANIFEST } from "./manifest.js";
 import type { Envelope } from "./proto.js";
 import type { CommandName } from "./proto.js";
 
@@ -204,9 +205,13 @@ export class MockHost {
   }
 }
 
-/** Every command the bridge accepts (281 wire names from `proto.ts`). */
-export function mockCommandNames(): readonly CommandName[] {
-  return COMMANDS;
+/**
+ * Every command the manifest declares (317 wire names, D-55). This is the set
+ * the bridge accepts in mock mode; the frozen registry in `proto.ts` holds 281
+ * of them, and the other 36 are the route names it never carried.
+ */
+export function mockCommandNames(): readonly string[] {
+  return COMMAND_MANIFEST.map((entry) => entry.name);
 }
 
 /** Every event channel the bridge delivers (35 post-rename names). */

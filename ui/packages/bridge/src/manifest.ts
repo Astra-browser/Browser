@@ -13,51 +13,79 @@
 // States:
 //   routed   - a host module and method answer it.
 //   deferred - no route, allowed by `reason` (a D-nn row or a SCOPE anchor).
-//   unused   - no route and no reachable caller; removal is a later slice.
+//   unused   - no route and no caller on a live surface. A reference from
+//              dead code still appears in the report, so the reader can see
+//              why the row was called unused; removal is a later slice.
 //   open     - no route and no permission: a defect.
 //
 // Slice 1 (P7-T01) moved the 177 routes here verbatim and declared the
 // 140 unrouted names. It added no route and changed no behaviour.
 
-import type { HostModules } from "./host-transport.js";
+import type { HostModuleName, Route } from "./host-modules.js";
 
 export type CommandState = "routed" | "deferred" | "unused" | "open";
 
-/** Wire-argument maps. The values are the ones the route table used. */
+/**
+ * Wire-argument maps. Each name reads `<wire key>To<host key>`, so a reader can
+ * tell which vocabulary is being renamed in which direction.
+ */
 export const ARG_MAPS = {
-  tab: { id: "astra_tab_id" },
-  tabInputUrl: { id: "astra_tab_id", input: "url" },
+  idToAstraTabId: { id: "astra_tab_id" },
+  idToAstraTabIdWithUrl: { id: "astra_tab_id", input: "url" },
   idToTab: { id: "tab" },
   idToTabId: { id: "tab_id" },
   tabIdToTabId: { tab_id: "tabId" },
-  promptId: { request_id: "prompt_id" },
+  requestIdToPromptId: { request_id: "prompt_id" },
 } as const;
 
 export type ArgMapName = keyof typeof ARG_MAPS | "none";
 
-export interface CommandEntry {
+interface CommandEntryBase {
   /** Wire name, snake_case. */
   readonly name: string;
-  /** Host module key, or null when nothing answers the command. */
-  readonly module: keyof HostModules | null;
-  /** Host method on that module, or null. */
-  readonly method: string | null;
   /** Which argument map the host method expects. */
   readonly args: ArgMapName;
-  readonly state: CommandState;
+}
+
+/** A command a host module answers. */
+export interface RoutedEntry extends CommandEntryBase {
+  readonly state: "routed";
+  readonly module: HostModuleName;
+  readonly method: string;
+  readonly reason: null;
+}
+
+/** A command nothing answers. `reason` is set only for `deferred`. */
+export interface UnroutedEntry extends CommandEntryBase {
+  readonly state: "deferred" | "unused" | "open";
+  readonly module: null;
+  readonly method: null;
   /** A D-nn id or `SCOPE:<heading-slug>`; only for deferred rows. */
   readonly reason: string | null;
+}
+
+export type CommandEntry = RoutedEntry | UnroutedEntry;
+
+export function isRouted(entry: CommandEntry): entry is RoutedEntry {
+  return entry.state === "routed";
+}
+
+/** The route a routed row describes. The union removes the null cases. */
+export function toRoute(entry: RoutedEntry): Route {
+  return entry.args === "none"
+    ? [entry.module, entry.method]
+    : [entry.module, entry.method, ARG_MAPS[entry.args]];
 }
 
 export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   // ---- routed ----
   { name: "tabs_open", module: "Tabs", method: "create", args: "none", state: "routed", reason: null },
   { name: "tabs_bootstrap", module: "Tabs", method: "bootstrap", args: "none", state: "routed", reason: null },
-  { name: "tabs_close", module: "Tabs", method: "close", args: "tab", state: "routed", reason: null },
+  { name: "tabs_close", module: "Tabs", method: "close", args: "idToAstraTabId", state: "routed", reason: null },
   // Sleeping tabs: the host driver sleeps them on its own timer; these two
   // are the explicit verbs for a surface or a live probe to use the same path.
-  { name: "tabs_discard", module: "Tabs", method: "discard", args: "tab", state: "routed", reason: null },
-  { name: "tabs_wakeup", module: "Tabs", method: "wakeup", args: "tab", state: "routed", reason: null },
+  { name: "tabs_discard", module: "Tabs", method: "discard", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_wakeup", module: "Tabs", method: "wakeup", args: "idToAstraTabId", state: "routed", reason: null },
   // Native split view: the engine's gBrowser owns the panes and their
   // geometry; these routes only ask it to create/move/end the split.
   { name: "tabs_split", module: "SplitView", method: "open", args: "none", state: "routed", reason: null },
@@ -99,19 +127,19 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "tab_group_list", module: "TabGroups", method: "list", args: "none", state: "routed", reason: null },
   { name: "tab_group_collapse", module: "TabGroups", method: "collapse", args: "none", state: "routed", reason: null },
   { name: "tab_group_ungroup", module: "TabGroups", method: "ungroup", args: "none", state: "routed", reason: null },
-  { name: "tabs_activate", module: "Tabs", method: "select", args: "tab", state: "routed", reason: null },
-  { name: "tabs_answer_sign_in", module: "DialogPrompts", method: "answerAuth", args: "tab", state: "routed", reason: null },
-  { name: "tabs_answer_page_request", module: "Tabs", method: "answerPageRequest", args: "tab", state: "routed", reason: null },
-  { name: "tabs_continue_past_certificate", module: "DialogPrompts", method: "answerCert", args: "tab", state: "routed", reason: null },
+  { name: "tabs_activate", module: "Tabs", method: "select", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_answer_sign_in", module: "DialogPrompts", method: "answerAuth", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_answer_page_request", module: "Tabs", method: "answerPageRequest", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_continue_past_certificate", module: "DialogPrompts", method: "answerCert", args: "idToAstraTabId", state: "routed", reason: null },
   { name: "page_dialog_answer", module: "PageDialogs", method: "answer", args: "none", state: "routed", reason: null },
-  { name: "tabs_navigate", module: "Navigation", method: "loadURL", args: "tabInputUrl", state: "routed", reason: null },
-  { name: "tabs_back", module: "Navigation", method: "goBack", args: "tab", state: "routed", reason: null },
-  { name: "tabs_forward", module: "Navigation", method: "goForward", args: "tab", state: "routed", reason: null },
+  { name: "tabs_navigate", module: "Navigation", method: "loadURL", args: "idToAstraTabIdWithUrl", state: "routed", reason: null },
+  { name: "tabs_back", module: "Navigation", method: "goBack", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_forward", module: "Navigation", method: "goForward", args: "idToAstraTabId", state: "routed", reason: null },
   // The Back/Forward menu reads the engine's session history and jumps to the
   // exact entry the row names; a native `history_menu_popup` has no route.
-  { name: "tabs_history", module: "TabHistory", method: "list", args: "tab", state: "routed", reason: null },
-  { name: "tabs_history_go", module: "Navigation", method: "goToHistory", args: "tab", state: "routed", reason: null },
-  { name: "tabs_reload", module: "Navigation", method: "reload", args: "tab", state: "routed", reason: null },
+  { name: "tabs_history", module: "TabHistory", method: "list", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_history_go", module: "Navigation", method: "goToHistory", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_reload", module: "Navigation", method: "reload", args: "idToAstraTabId", state: "routed", reason: null },
   { name: "panel_hide", module: "Panes", method: "hide", args: "none", state: "routed", reason: null },
   { name: "panel_ready", module: "Panes", method: "list", args: "none", state: "routed", reason: null },
   { name: "ui_ready", module: "Boot", method: "handshake", args: "none", state: "routed", reason: null },
@@ -160,9 +188,9 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "media_player", module: "Media", method: "player", args: "none", state: "routed", reason: null },
   { name: "media_gallery", module: "MediaGallery", method: "call", args: "none", state: "routed", reason: null },
   { name: "media_import", module: "MediaImport", method: "import", args: "none", state: "routed", reason: null },
-  { name: "tab_set_muted", module: "Tabs", method: "setMuted", args: "tab", state: "routed", reason: null },
+  { name: "tab_set_muted", module: "Tabs", method: "setMuted", args: "idToAstraTabId", state: "routed", reason: null },
   // Keep / let go and place in one call: the app's drag verb.
-  { name: "tabs_set_essential", module: "Tabs", method: "setEssential", args: "tab", state: "routed", reason: null },
+  { name: "tabs_set_essential", module: "Tabs", method: "setEssential", args: "idToAstraTabId", state: "routed", reason: null },
   { name: "note_call", module: "Notes", method: "call", args: "none", state: "routed", reason: null },
   { name: "bookmark_call", module: "Bookmarks", method: "call", args: "none", state: "routed", reason: null },
   { name: "time_call", module: "Time", method: "call", args: "none", state: "routed", reason: null },
@@ -218,7 +246,7 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "spaces_move_tab", module: "Tabs", method: "moveTabToSpace", args: "none", state: "routed", reason: null },
   // The app's prompt token is the capability, so it travels as `prompt_id`;
   // the envelope `request_id` is the command correlation id, not the fence.
-  { name: "page_permission_respond", module: "Permissions", method: "respond", args: "promptId", state: "routed", reason: null },
+  { name: "page_permission_respond", module: "Permissions", method: "respond", args: "requestIdToPromptId", state: "routed", reason: null },
   { name: "page_permission_card_host", module: "Permissions", method: "cardHost", args: "none", state: "routed", reason: null },
   { name: "site_permissions", module: "Permissions", method: "listSites", args: "none", state: "routed", reason: null },
   { name: "site_permission_set", module: "Permissions", method: "setSite", args: "none", state: "routed", reason: null },
@@ -324,13 +352,13 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "tools_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "update_highlights", module: null, method: null, args: "none", state: "open", reason: null },
   { name: "update_relaunch", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_cancel", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_choose_engine", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_choose_language", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_open_privacy", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_start", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_status", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "voice_stop", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "voice_cancel", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_choose_engine", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_choose_language", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_open_privacy", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_start", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_status", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_stop", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
   { name: "work_activity", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
   { name: "work_admit_folder", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
   { name: "work_cancel_connection_sign_in", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },

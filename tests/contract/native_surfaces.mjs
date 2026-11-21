@@ -8,6 +8,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 import fs from "node:fs";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
@@ -199,9 +200,7 @@ check("a peek without a window is refused", noWindowPeek.error?.code === "no_win
 // --- routing and callers ---------------------------------------------------
 // The route table is built from the command manifest (D-55), so these checks
 // read the manifest, not the transport's text.
-const { COMMAND_MANIFEST } = await import(
-  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
-);
+const { COMMAND_MANIFEST } = await loadManifest();
 const routeModule = new Map(
   COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map((entry) => [
     entry.name,

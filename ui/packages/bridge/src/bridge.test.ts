@@ -17,16 +17,19 @@ function mockBridge() {
 }
 
 describe("surface coverage", () => {
-  test("covers every command and event the registry declares", () => {
-    expect(mockCommandNames()).toHaveLength(281);
-    expect(mockEventChannels()).toHaveLength(38);
+  test("the manifest declares the wire; the registry is the frozen subset", () => {
+    expect(mockCommandNames()).toHaveLength(317);
     expect(COMMANDS).toHaveLength(281);
     expect(EVENTS).toHaveLength(38);
+    expect(mockEventChannels()).toHaveLength(38);
+    const declared = new Set(mockCommandNames());
+    const missing = COMMANDS.filter((name) => !declared.has(name));
+    expect(missing).toEqual([]);
   });
 
   test("mock answers every command without hanging", async () => {
     const b = mockBridge();
-    for (const cmd of COMMANDS) {
+    for (const cmd of mockCommandNames()) {
       await expect(b.invoke(cmd, {})).resolves.toBeDefined();
     }
   }, 30_000);

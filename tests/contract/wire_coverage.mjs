@@ -14,6 +14,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
@@ -22,11 +23,7 @@ const UI = path.join(ROOT, "ui");
 const host = await import(
   pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
 );
-const { ARG_MAPS, COMMAND_MANIFEST } = await import(
-  pathToFileURL(
-    path.join(UI, "packages", "bridge", "src", "manifest.ts"),
-  ).href
-);
+const { ARG_MAPS, COMMAND_MANIFEST } = await loadManifest();
 const nativeEvents = await readFile(
   path.join(UI, "app", "src", "shared", "ipc", "native-events.ts"),
   "utf8",

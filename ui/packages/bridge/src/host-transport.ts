@@ -9,77 +9,17 @@
 // the app wiring layer (`$shared/ipc/bridge.ts`) injects the loader, which
 // keeps the package importable in Node/vitest/standalone builds.
 //
-// Route table: wire command -> Host module method. Only the domains P1-T10
-// specified (Tabs/Navigation/Panes/Boot) are routed; the remaining surface
-// resolves once later phases specify it (P2-T06 live bindings). Unrouted
-// commands fail fast with `unknown_command` instead of hanging the UI.
+//
+// Route table: wire command -> Host module method. The table is built from
+// `manifest.ts`, which owns every command and its state (D-55). A command with
+// no route fails fast with `unknown_command` instead of hanging the UI.
 
 import { PROTOCOL_VERSION } from "./proto.js";
-import { ARG_MAPS, COMMAND_MANIFEST } from "./manifest.js";
+import { COMMAND_MANIFEST, isRouted, toRoute } from "./manifest.js";
+import type { HostModules, Route } from "./host-modules.js";
 import type { Envelope } from "./proto.js";
 
-export interface HostModules {
-  Tabs: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Navigation: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Panes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  SplitView: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Peek: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  SpaceHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  SpaceExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  SpaceClone: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  TabGroups: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Boot: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Sidebar: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  WebExtensions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Settings: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Accounts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Commands: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Zoom: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Keymap: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Launcher: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Work: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Downloads: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Profiles: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Media: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  MediaGallery: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  MediaImport: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Notes: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Bookmarks: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Time: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  HistoryCall: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Favicons: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  System: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Migration: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Resources: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Search: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  PageSource: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Passkeys: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  TabHistory: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  DialogPrompts: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  PageDialogs: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Permissions: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  BrowsingData: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Blocker: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Privacy: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  Operations: Record<string, (args: Record<string, unknown>) => Promise<unknown>>;
-  addEventListener: (fn: (event: { event_seq: number; type: string; data: unknown }) => void) => () => void;
-  eventSeq: () => number;
-}
-
-/**
- * Wire command -> `[module, method, argMap]`. Args are camelCase from the UI.
- *
- * `argMap` renames a wire argument onto the Host API's own name after the
- * camelCase -> snake_case pass. The UI speaks the product's vocabulary (`id`,
- * `input`); the Host API speaks the tab's (`astra_tab_id`, `url`). Without the
- * map the call arrives well-formed but with an empty id, and the host answers
- * `no_such_tab` for a tab the person is looking at.
- */
-type Route = [
-  keyof Omit<HostModules, "addEventListener" | "eventSeq">,
-  string,
-  Record<string, string>?,
-];
+export type { HostModules } from "./host-modules.js";
 
 /**
  * The route table, built from the command manifest (D-55). A row that is not
@@ -88,15 +28,8 @@ type Route = [
  * before the move.
  */
 export const ROUTES: Record<string, Route> = Object.fromEntries(
-  COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map(
-    (entry): [string, Route] => [
-      entry.name,
-      entry.args === "none"
-        ? [(entry.module as Route[0]), (entry.method as string)]
-        : [(entry.module as Route[0]), (entry.method as string), ARG_MAPS[entry.args]],
-    ],
-  ),
-) as Record<string, Route>;
+  COMMAND_MANIFEST.filter(isRouted).map((entry) => [entry.name, toRoute(entry)]),
+);
 
 function toSnakeArgs(args: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};

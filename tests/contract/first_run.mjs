@@ -15,6 +15,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
@@ -111,9 +112,7 @@ check("a refused store write is not a success", refused === false);
 __setPrefsForTests(null);
 
 // === Routing ==============================================================
-const { COMMAND_MANIFEST } = await import(
-  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "manifest.ts")).href
-);
+const { COMMAND_MANIFEST } = await loadManifest();
 const onboardingRoute = COMMAND_MANIFEST.find((entry) => entry.name === "onboarding_finish");
 check(
   "onboarding_finish routes to a host method",
