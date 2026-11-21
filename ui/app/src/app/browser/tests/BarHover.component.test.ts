@@ -106,6 +106,27 @@ test("the floating bar stays down when the pointer moves back to the strip", asy
   await expect.poll(() => bar.getAttribute("data-hidden")).toBe("true");
 });
 
+test("the floating bar keeps the window's field, not a second chrome tone", async () => {
+  const { screen, bar } = await floatingBar();
+  const shell = screen.container.querySelector<HTMLElement>(".shell")!;
+  const field = getComputedStyle(shell).backgroundImage;
+  hover(true);
+  await expect.poll(() => bar.getAttribute("data-hidden")).toBe("false");
+  const barStyle = getComputedStyle(bar);
+
+  // The bar covers a page, so it has to be opaque, but it must be the same
+  // field the window paints around it. A grey `--color-chrome` slab here was
+  // the colour that appeared and vanished as the bar slid in over a page.
+  expect(field).toContain("linear-gradient");
+  expect(barStyle.backgroundImage).toBe(field);
+  expect(barStyle.backgroundAttachment).toBe("fixed");
+  expect(barStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  // A transformed element makes `fixed` resolve against that element, which
+  // would put a differently-anchored slice of the field under the bar. Wait
+  // out the reveal slide first.
+  await expect.poll(() => getComputedStyle(bar).transform).toBe("none");
+});
+
 // A pointer that leaves through the window edge, a native page taking the
 // press, another app coming forward: no `pointerleave` and no `focusout`
 // arrives inside this document for any of them, so the hold has to be dropped
