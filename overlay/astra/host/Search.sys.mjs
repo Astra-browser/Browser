@@ -244,6 +244,19 @@ function searchRow(text, current) {
   });
 }
 
+/** A typed address is opened, never searched. The row says so and carries the
+ *  resolved address itself, so the surface can run it without a second
+ *  resolution round trip. */
+function addressRow(text, address) {
+  let host = address;
+  try {
+    host = new URL(address).host || address;
+  } catch {
+    // Keep the address as given.
+  }
+  return result("url", text, host, { type: "OpenUrl", url: address });
+}
+
 function suggestionRow(suggestion, current) {
   return result("suggestion", suggestion, current.name, {
     type: "OpenUrl",
@@ -461,15 +474,26 @@ export const Search = {
     const text = String(query ?? "").trim();
     const owner = context ?? (await Search.newtabContext({}));
     const current = engine();
-    const rows = text === "" ? [] : [searchRow(text, current)];
+    const address = text === "" ? null : resolve(text);
+    const rows =
+      text === ""
+        ? []
+        : address?.kind === "url"
+          ? [addressRow(text, address.url)]
+          : [searchRow(text, current)];
     const requestId = String(owner.request_id ?? "");
     const session = String(owner.session_id ?? "newtab:tab");
     const echoed = { ...owner, request_id: requestId };
     const token = newtabToken(session, requestId);
     _newtabRequests.set(session, token);
 
+    // An address opens directly; asking a provider about it would only delay
+    // the row that is already the answer, and a host:port is not words.
     const wantsSuggestions =
-      text !== "" && bang(text) === null && suggestionsEnabled();
+      text !== "" &&
+      address?.kind !== "url" &&
+      bang(text) === null &&
+      suggestionsEnabled();
     if (!wantsSuggestions) {
       emitSearch({
         context: echoed,
@@ -557,12 +581,23 @@ export const Search = {
   async launcherSearch({ query = "", requestId = "" } = {}) {
     const text = String(query ?? "").trim();
     const current = engine();
-    const rows = text === "" ? [] : [searchRow(text, current)];
+    const address = text === "" ? null : resolve(text);
+    const rows =
+      text === ""
+        ? []
+        : address?.kind === "url"
+          ? [addressRow(text, address.url)]
+          : [searchRow(text, current)];
     const token = String(requestId || `launcher-${++_sequence}`);
     _launcherRequest = token;
 
+    // An address opens directly; asking a provider about it would only delay
+    // the row that is already the answer, and a host:port is not words.
     const wantsSuggestions =
-      text !== "" && bang(text) === null && suggestionsEnabled();
+      text !== "" &&
+      address?.kind !== "url" &&
+      bang(text) === null &&
+      suggestionsEnabled();
     if (!wantsSuggestions) {
       emitSearch({ context: null, query: text, results: rows, pending: false });
       return true;

@@ -195,6 +195,7 @@ else
     "material_zoom_home:tools/marionette-probe/material-zoom-home-probe.py"
     "profiles_switch:tools/marionette-probe/profiles-switch-probe.py"
     "bar:tools/marionette-probe/bar-probe.py"
+    "address_home:tools/marionette-probe/address-home-probe.py"
     "search_theme:tools/marionette-probe/search-theme-probe.py"
     "window_radius:tools/marionette-probe/window-radius-probe.py"
     "fullscreen:tools/marionette-probe/fullscreen-probe.py"

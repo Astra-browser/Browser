@@ -9,16 +9,30 @@
   // product's one address field, composed by the app and placed here; this
   // wrapper never restyles it.
   //
+  // When the column's head owns the field, the bar keeps only the window's own
+  // controls (Windows), so the bar's whole role here is that trailing cluster.
+  //
   // On Windows the window's own minimise/maximise/close live at this bar's
   // trailing end: the bar is the horizontal top panel, so they are part of it
   // rather than a capsule on top of the page. Elsewhere the platform's own
   // arrangement applies (macOS traffic lights, Linux's overlay cluster).
-  let { field }: { field: Snippet } = $props();
+  let {
+    field,
+    nav = true,
+  }: {
+    field?: Snippet;
+    /** The page's controls. Left out where the column's head already draws them. */
+    nav?: boolean;
+  } = $props();
 </script>
 
 <div class="content-bar" data-content-bar>
-  <PageNav />
-  <div class="content-bar-field">{@render field()}</div>
+  {#if nav}<PageNav />{/if}
+  {#if field}
+    <div class="content-bar-field">{@render field()}</div>
+  {:else}
+    <span class="content-bar-gap" aria-hidden="true"></span>
+  {/if}
   {#if IS_WINDOWS}<WindowControlsInline />{/if}
 </div>
 
@@ -48,6 +62,13 @@
     max-inline-size: 720px;
     margin-inline: auto;
     margin-block-end: calc(-1 * var(--main-bar-inset));
+  }
+
+  /* Without a field the bar holds only the window's controls, which stay at
+     the trailing end. */
+  .content-bar-gap {
+    flex: 1 1 auto;
+    min-inline-size: 0;
   }
 
   /* Window controls belong to the panel, and come to the hand when it is on

@@ -323,12 +323,11 @@ test("a certificate the person continued past is not secure either", async () =>
 test("a new tab keeps its own search field and shows the page bar", async () => {
   native.extensions = true;
   const screen = await shell({ url: null });
-  // The one address field stands in the page bar; on Windows the bar is the
-  // top panel (it carries the window's controls), so the column keeps only its
-  // own controls. On the other platforms the full column still owns the field.
+  // The one address field stands in the column's head, never in the page bar:
+  // the bar's show/hide mode must not take the address away from the column.
   expect(screen.container.querySelector("[data-astra-address]")).not.toBeNull();
-  expect(screen.container.querySelector("[data-content-bar] [data-astra-address]")).not.toBeNull();
-  expect(screen.container.querySelector(".browser-sidebar [data-astra-address]")).toBeNull();
+  expect(screen.container.querySelector(".browser-sidebar [data-astra-address]")).not.toBeNull();
+  expect(screen.container.querySelector("[data-content-bar] [data-astra-address]")).toBeNull();
   expect(screen.container.querySelector("main#astra-stage")).not.toBeNull();
 });
 
