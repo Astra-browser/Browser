@@ -197,7 +197,7 @@ $Contracts = @(
     "sleep_model", "slots_model", "spaces_model", "spaces_profiles_model", "stage_rect",
     "system_model", "tab_history", "tab_lifecycle", "tabs_admission", "tabs_settings",
     "telemetry_blocklist", "time_model", "webext_view", "window_scope", "wire_coverage",
-    "work_model", "zoom_home_material"
+    "wire_manifest", "work_model", "zoom_home_material"
 )
 $Node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $Node) {

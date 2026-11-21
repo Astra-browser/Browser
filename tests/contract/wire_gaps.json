@@ -1,0 +1,933 @@
+{
+  "generatedBy": "node tests/contract/wire_manifest.mjs --report",
+  "note": "Callers are best-effort references in ui/app/src (non-test). A caller in a module nothing imports still appears; reachability is not proven here.",
+  "counts": {
+    "total": 317,
+    "routed": 177,
+    "deferred": 101,
+    "unused": 17,
+    "open": 22,
+    "calledUnrouted": 124
+  },
+  "deferred": [
+    {
+      "name": "account_avatar_discard",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_avatar_pick",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_avatar_remove",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_avatar_save",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_buy",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_cancel_code",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_change_email",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_delete",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_deletion_code",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_email_code",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_export",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_manage",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_plan_confirm",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_plan_dismiss",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_plan_preview",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_reauth_code",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_receipt",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_refresh",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_revoke_session",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_send_code",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_sessions",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_set_daily_limit",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_set_name",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_set_server",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_sign_out",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_sign_out_everywhere",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_usage_history",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "account_verify",
+      "reason": "SCOPE:what-is-not-in-scope",
+      "callers": [
+        "ui/app/src/domain/account/account.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_ask",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_cite",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_close",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_continue",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_decide",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_delete",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_detach",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_focus",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_history",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_new",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_open",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_pick",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_pick_cancel",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_resume",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_status",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_assist_stop",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_style_remove",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_style_remove_for",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/components/PageStyles.svelte"
+      ]
+    },
+    {
+      "name": "page_style_toggle",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_style_toggle_for",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/components/PageStyles.svelte"
+      ]
+    },
+    {
+      "name": "page_styles",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/lib/assist-session.svelte.ts"
+      ]
+    },
+    {
+      "name": "page_styles_all",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/assist/components/PageStyles.svelte"
+      ]
+    },
+    {
+      "name": "work_activity",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-environment/context.svelte.ts",
+        "ui/app/src/domain/work/work.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_admit_folder",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/lib/workspace/placing.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_cancel_connection_sign_in",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_change_memory",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/memory.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_change_skill",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/skills.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_check_connection",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_choose_folder",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/asks/actions.ts"
+      ]
+    },
+    {
+      "name": "work_choose_model",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_clear_decision_key",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-decision/decision.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_clear_provider_key",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_clear_website_data",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/settings/components/WorkWebsiteData.svelte"
+      ]
+    },
+    {
+      "name": "work_connections",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_context_preview",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/composer/ContextManifest.svelte"
+      ]
+    },
+    {
+      "name": "work_decision_preference",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-decision/decision.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_edit_draft",
+      "reason": "D-48",
+      "callers": []
+    },
+    {
+      "name": "work_human_check",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_human_continue",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_human_extend",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_human_pages",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_human_present",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_human_release",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-human/human.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_local_servers",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/onboarding/components/steps/Models.svelte",
+        "ui/app/src/features/settings/components/AiProviderRow.svelte"
+      ]
+    },
+    {
+      "name": "work_memories",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/memory.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_models",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_models_ready",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/bar/ModelPicker.svelte"
+      ]
+    },
+    {
+      "name": "work_more_models",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_operation",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work/work-operations.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_operation_status",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work/work-operations.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_pane_hide",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-pane/work-pane.ts"
+      ]
+    },
+    {
+      "name": "work_pane_set_rect",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-pane/work-pane.ts"
+      ]
+    },
+    {
+      "name": "work_pane_show",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-pane/work-pane.ts"
+      ]
+    },
+    {
+      "name": "work_pick_folder",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/start/WorkStart.svelte",
+        "ui/app/src/features/work/lib/workspace/placing.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_preview_connection",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_release_memory",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/lib/frame-thumbs.ts"
+      ]
+    },
+    {
+      "name": "work_remove_connection",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_reveal_path",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/lib/workspace/placing.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_save_calendar",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/work/components/objects/Plan.svelte"
+      ]
+    },
+    {
+      "name": "work_save_connection",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_screenshot_sites",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/settings/components/WorkScreenshotSites.svelte"
+      ]
+    },
+    {
+      "name": "work_set_decision_key",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-decision/decision.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_set_decision_preference",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-decision/decision.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_set_model_effort",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_set_model_endpoint",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts",
+        "ui/app/src/features/onboarding/components/Onboarding.svelte"
+      ]
+    },
+    {
+      "name": "work_set_provider_key",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_set_screenshot_site",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/features/settings/components/WorkScreenshotSites.svelte"
+      ]
+    },
+    {
+      "name": "work_set_site",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/sites.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_sign_in_connection",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/connections/connections.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_sites",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/sites.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_skill_text",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/skills.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_skills",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/work-context/skills.svelte.ts"
+      ]
+    },
+    {
+      "name": "work_test_provider_key",
+      "reason": "D-48",
+      "callers": [
+        "ui/app/src/domain/ai/models.svelte.ts"
+      ]
+    }
+  ],
+  "open": [
+    {
+      "name": "divider_drag",
+      "callers": [
+        "ui/app/src/domain/layout/layout.svelte.ts"
+      ]
+    },
+    {
+      "name": "divider_grab",
+      "callers": [
+        "ui/app/src/domain/layout/layout.svelte.ts",
+        "ui/app/src/features/split/components/Dividers.svelte"
+      ]
+    },
+    {
+      "name": "divider_release",
+      "callers": [
+        "ui/app/src/domain/layout/layout.svelte.ts",
+        "ui/app/src/features/split/components/Dividers.svelte"
+      ]
+    },
+    {
+      "name": "essentials_keep",
+      "callers": [
+        "ui/app/src/domain/tabs/tabs.svelte.ts"
+      ]
+    },
+    {
+      "name": "essentials_release",
+      "callers": [
+        "ui/app/src/domain/tabs/tabs.svelte.ts"
+      ]
+    },
+    {
+      "name": "haptic",
+      "callers": [
+        "ui/app/src/shared/lib/haptic.ts"
+      ]
+    },
+    {
+      "name": "media_admit_remote",
+      "callers": [
+        "ui/app/src/features/work/lib/workspace/pictures.svelte.ts"
+      ]
+    },
+    {
+      "name": "media_open",
+      "callers": [
+        "ui/app/src/features/work/components/WorkEnvironmentWorkspace.svelte"
+      ]
+    },
+    {
+      "name": "panel_intent",
+      "callers": [
+        "ui/app/src/app/panel/PanelApp.svelte"
+      ]
+    },
+    {
+      "name": "panel_layout",
+      "callers": [
+        "ui/app/src/features/search/components/LauncherPanel.svelte"
+      ]
+    },
+    {
+      "name": "resource_close_ready",
+      "callers": [
+        "ui/app/src/shared/lib/close.ts"
+      ]
+    },
+    {
+      "name": "swipe_region",
+      "callers": [
+        "ui/app/src/features/tabs/lib/native-swipe.ts"
+      ]
+    },
+    {
+      "name": "tab_menu_popup",
+      "callers": [
+        "ui/app/src/features/tabs/lib/tabs-bridge-store.ts"
+      ]
+    },
+    {
+      "name": "update_highlights",
+      "callers": [
+        "ui/app/src/features/updates/lib/notices.svelte.ts"
+      ]
+    },
+    {
+      "name": "update_relaunch",
+      "callers": [
+        "ui/app/src/domain/updates/updates.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_cancel",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_choose_engine",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_choose_language",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_open_privacy",
+      "callers": [
+        "ui/app/src/features/work/components/bar/VoiceView.svelte"
+      ]
+    },
+    {
+      "name": "voice_start",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_status",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_stop",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
+      ]
+    }
+  ],
+  "unused": [
+    {
+      "name": "add_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "bookmark_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "browser_credential_capability",
+      "callers": []
+    },
+    {
+      "name": "browser_passkey_authorization_request",
+      "callers": []
+    },
+    {
+      "name": "chrome_menu_popup",
+      "callers": [
+        "ui/app/src/domain/tabs/tabs.svelte.ts"
+      ]
+    },
+    {
+      "name": "extension_action_menu",
+      "callers": []
+    },
+    {
+      "name": "history_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "link_describe",
+      "callers": []
+    },
+    {
+      "name": "menu_popup",
+      "callers": []
+    },
+    {
+      "name": "onboarding_play_intro",
+      "callers": []
+    },
+    {
+      "name": "profile_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "profile_rename",
+      "callers": [
+        "ui/app/src/domain/tabs/tabs.svelte.ts"
+      ]
+    },
+    {
+      "name": "sidebar_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "sidebar_resize",
+      "callers": []
+    },
+    {
+      "name": "sidebar_resize_guide",
+      "callers": []
+    },
+    {
+      "name": "spaces_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "tools_menu_popup",
+      "callers": []
+    }
+  ]
+}
