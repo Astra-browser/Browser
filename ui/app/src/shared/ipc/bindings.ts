@@ -2041,6 +2041,10 @@ export type MediaPlayerView = {
 	/**  The page's artist, else the site. */
 	artist: string,
 	icon: IconRef | null,
+	/**  The page's own artwork as a data URL, when it publishes one. */
+	artwork?: string | null,
+	/**  Every other tab with live media in this window. */
+	players?: MediaPlayerEntry[],
 	/**  Seconds; absent while unknown and for a live stream. */
 	duration: number | null,
 	/**
@@ -2055,6 +2059,20 @@ export type MediaPlayerView = {
 	in_pip: boolean,
 	muted: boolean,
 	can_mute: boolean,
+};
+
+/**  Another live media tab beside the card's primary player. */
+export type MediaPlayerEntry = {
+	tab_id: string,
+	title: string,
+	artist: string,
+	icon: IconRef | null,
+	artwork?: string | null,
+	playing: boolean,
+	muted: boolean,
+	can_mute: boolean,
+	can_pip: boolean,
+	in_pip: boolean,
 };
 
 export type NoteCall = { kind: "list"; query: NoteQuery } | { kind: "get"; id: string } | { kind: "create"; request_id: string; markdown: string } |

@@ -6,6 +6,7 @@
     VolumeOffIcon,
   } from "@hugeicons/core-free-icons";
   import * as m from "$shared/i18n/messages";
+  import type { IconRef } from "$shared/ipc/bindings";
   import Icon from "$shared/ui/Icon";
   import FavIcon from "$shared/ui/FavIcon";
   import { favicons } from "$domain/favicons";
@@ -19,6 +20,7 @@
   const RING = 17.25;
 
   let player = $derived(mediaPlayer.view());
+  let others = $derived(player?.players ?? []);
   // Native sends the position as of each change; between changes it is
   // arithmetic, redrawn once a second only while something plays.
   let now = $state(performance.now());
@@ -66,6 +68,14 @@
   </svg>
 {/snippet}
 
+{#snippet artwork(view: { artwork?: string | null; icon: IconRef | null }, size: number)}
+  {#if view.artwork}
+    <img class="media-art" src={view.artwork} alt="" draggable="false" width={size} height={size} />
+  {:else}
+    <FavIcon image={favicons.image(view.icon)} tone={favicons.tone(view.icon)} {size} lit />
+  {/if}
+{/snippet}
+
 {#if player}
   {#if compact}
     <!-- The rail has room for the site and what plays it: a plate like its
@@ -92,12 +102,7 @@
           />{/if}
       </svg>
       <span class="media-disc-icon">
-        <FavIcon
-          image={favicons.image(player.icon)}
-          tone={favicons.tone(player.icon)}
-          size={18}
-          lit
-        />
+        {@render artwork(player, 18)}
       </span>
       <span class="media-disc-glyph">{@render playGlyph(player.playing, 14)}</span>
     </button>
@@ -127,12 +132,7 @@
           title={m.media_show_tab({ title: player.title })}
           onclick={() => mediaPlayer.show()}
         >
-          <FavIcon
-            image={favicons.image(player.icon)}
-            tone={favicons.tone(player.icon)}
-            size={20}
-            lit
-          />
+          {@render artwork(player, 20)}
         </button>
         <div class="media-text">
           <span class="media-title" data-media-title>{player.title}</span>
@@ -161,6 +161,50 @@
       </div>
       <div class="media-more" inert={!expanded}>
         <div class="media-more-inner">
+          {#if others.length > 0}
+            <div class="media-queue" aria-label={m.media_player()}>
+              {#each others as other (other.tab_id)}
+                <div class="media-peer">
+                  <button
+                    type="button"
+                    class="media-peer-main"
+                    title={other.title}
+                    aria-label={m.media_show_tab({ title: other.title })}
+                    onclick={() => mediaPlayer.showTab(other.tab_id)}
+                  >
+                    <span class="media-peer-art">{@render artwork(other, 16)}</span>
+                    <span class="media-peer-text">
+                      <span class="media-peer-title">{other.title}</span>
+                      <span class="media-peer-site">{other.artist}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="media-control media-small"
+                    aria-label={other.playing ? m.media_pause() : m.media_play()}
+                    title={other.playing ? m.media_pause() : m.media_play()}
+                    onclick={() =>
+                      other.playing
+                        ? mediaPlayer.pauseTab(other.tab_id)
+                        : mediaPlayer.playTab(other.tab_id)}
+                  >
+                    {@render playGlyph(other.playing, 12)}
+                  </button>
+                  {#if other.can_mute}<button
+                      type="button"
+                      class="media-control media-small"
+                      data-muted={other.muted || undefined}
+                      aria-label={other.muted ? m.tab_unmute() : m.tab_mute()}
+                      aria-pressed={other.muted}
+                      title={other.muted ? m.tab_audio_muted() : m.tab_mute()}
+                      onclick={() => void tabs.setMuted(other.tab_id, !other.muted)}
+                    >
+                      <Icon icon={other.muted ? VolumeOffIcon : VolumeHighIcon} size={13} />
+                    </button>{/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
           {#if duration !== null}
             <input
               class="media-progress"
@@ -275,6 +319,97 @@
   .media-site:active {
     scale: 0.92;
     transition-duration: var(--motion-instant);
+  }
+
+  .media-art {
+    display: block;
+    border-radius: inherit;
+    object-fit: cover;
+    background: var(--color-fill);
+  }
+
+  .media-site .media-art {
+    inline-size: 30px;
+    block-size: 30px;
+  }
+
+  .media-queue {
+    display: grid;
+    gap: 2px;
+    margin-block-start: 6px;
+    padding-block-end: 2px;
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .media-peer {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-block-size: 28px;
+  }
+
+  .media-peer-main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 7px;
+    min-inline-size: 0;
+    min-block-size: 28px;
+    padding: 0 4px 0 2px;
+    border: 0;
+    border-radius: var(--radius-inset);
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    cursor: default;
+  }
+
+  .media-peer-main:hover {
+    background: var(--row-pressed);
+  }
+
+  .media-peer-main:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -1px;
+  }
+
+  .media-peer-art {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--color-fill);
+  }
+
+  .media-peer-art .media-art {
+    inline-size: 24px;
+    block-size: 24px;
+  }
+
+  .media-peer-text {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .media-peer-title,
+  .media-peer-site {
+    overflow: hidden;
+    white-space: nowrap;
+    mask-image: var(--mask-fade-end);
+  }
+
+  .media-peer-title {
+    color: var(--color-text);
+    font-size: var(--text-label);
+  }
+
+  .media-peer-site {
+    color: var(--color-muted);
+    font-size: var(--text-caption);
+    line-height: 1.2;
   }
 
   .media-text {

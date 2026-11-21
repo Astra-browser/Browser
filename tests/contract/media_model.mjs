@@ -119,6 +119,21 @@ for (const action of ACTIONS) {
     title: "Tone",
     artist: "example.test",
     icon: null,
+    artwork: "data:image/webp;base64,AAAA",
+    players: [
+      {
+        tab_id: "tab-other",
+        title: "Other",
+        artist: "other.test",
+        icon: null,
+        artwork: null,
+        playing: true,
+        muted: false,
+        can_mute: true,
+        can_pip: false,
+        in_pip: false,
+      },
+    ],
     duration: 12,
     position: 3,
     rate: 1,
@@ -150,6 +165,24 @@ for (const action of ACTIONS) {
   check("the view reads back", Media.view()?.tab_id === TAB && Media.view()?.playing === true);
   check("a duplicate projection is not emitted", Media.__projectMedia(TAB, { ...VIEW }) === false);
   check("a changed field is emitted", Media.__projectMedia(TAB, { ...VIEW, playing: false }) === true && seen.length === before + 2);
+  check(
+    "a changed artwork is emitted",
+    Media.__projectMedia(TAB, { ...VIEW, artwork: "data:image/webp;base64,BBBB" }) === true,
+  );
+  check(
+    "a changed other-player state is emitted",
+    Media.__projectMedia(TAB, {
+      ...VIEW,
+      players: [{ ...VIEW.players[0], playing: false }],
+    }) === true,
+  );
+  check(
+    "an identical player list is not emitted again",
+    Media.__projectMedia(TAB, {
+      ...VIEW,
+      players: [{ ...VIEW.players[0], playing: false }],
+    }) === false,
+  );
   check("a mismatched tab is rejected", Media.__projectMedia("tab-other", VIEW) === false);
   check("clearing emits once", Media.__projectMedia(TAB, null) === true && Media.view() === null);
 

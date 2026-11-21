@@ -6,9 +6,13 @@
     Moon02Icon,
     MusicNote01Icon,
     Note01Icon,
+    PauseIcon,
+    PlayIcon,
     PuzzleIcon,
     SidebarLeftIcon,
     Sun03Icon,
+    VolumeHighIcon,
+    VolumeOffIcon,
     ZzzIcon,
   } from "@hugeicons/core-free-icons";
   import Icon from "$shared/ui/Icon";
@@ -40,9 +44,11 @@
   const privateWindow = $derived(tabs.profile()?.kind === "incognito");
   const space = $derived(privateWindow ? undefined : tabs.activeSpace());
   const player = $derived(privateWindow ? null : mediaPlayer.view());
+  const peers = $derived(player?.players ?? []);
   const playing = $derived(
     mediaTabs(tabs.tabs(), privateWindow).filter((tab) => tab.id !== player?.tab_id),
   );
+  const extras = $derived(playing.filter((tab) => !peers.some((peer) => peer.tab_id === tab.id)));
   const sleeping = $derived(sleepingTabs(tabs.tabs(), privateWindow));
   const extensionActions = $derived(
     extensions.activeActions(tabs.profile()?.id ?? null, tabs.activeId()),
@@ -111,39 +117,83 @@
       {#snippet trigger()}{#if player !== null || playing.length > 0}<span
             class="rail-pip"
             aria-hidden="true"
-          ></span>{/if}<Icon icon={MusicNote01Icon} size={18} />{/snippet}
+          ></span>{/if}{#if player}{#if player.artwork}<img
+              class="rail-art rail-trigger-art"
+              src={player.artwork}
+              alt=""
+              draggable="false"
+            />{:else}<FavIcon
+              image={favicons.image(player.icon)}
+              tone={favicons.tone(player.icon)}
+              size={17}
+              lit
+            />{/if}{:else}<Icon icon={MusicNote01Icon} size={18} />{/if}{/snippet}
       {#if privateWindow}
         <p class="rail-empty" role="presentation">{m.rail_private_media()}</p>
       {:else if player === null && playing.length === 0}
         <p class="rail-empty" role="presentation">{m.rail_nothing_playing()}</p>
       {:else}
         {#if player}
-          <button
-            type="button"
-            role="menuitem"
-            class="ui-menu-item rail-row"
-            style:--row={0}
-            title={player.title}
-            aria-label={player.title}
-            onclick={() => mediaPlayer.show()}
-          >
-            <span class="rail-row-icon"
-              ><FavIcon
-                image={favicons.image(player.icon)}
-                tone={favicons.tone(player.icon)}
-                size={16}
-              /></span
+          {#each [player, ...peers] as item (item.tab_id)}
+            <div
+              class="rail-row media-row"
+              data-current={item.tab_id === player.tab_id || undefined}
             >
-            <span class="rail-row-title">{player.title}</span>
-            <span class="rail-row-hint">{player.artist || m.media_player()}</span>
-          </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="rail-row-main"
+                title={item.title}
+                aria-label={m.media_show_tab({ title: item.title })}
+                onclick={() => mediaPlayer.showTab(item.tab_id)}
+              >
+                <span class="rail-row-icon">
+                  {#if item.artwork}<img
+                      class="rail-art"
+                      src={item.artwork}
+                      alt=""
+                      draggable="false"
+                    />{:else}<FavIcon
+                      image={favicons.image(item.icon)}
+                      tone={favicons.tone(item.icon)}
+                      size={16}
+                    />{/if}
+                </span>
+                <span class="rail-row-title">{item.title}</span>
+                <span class="rail-row-hint">{item.artist || m.media_player()}</span>
+              </button>
+              <button
+                type="button"
+                class="rail-peer-control"
+                aria-label={item.playing ? m.media_pause() : m.media_play()}
+                title={item.playing ? m.media_pause() : m.media_play()}
+                onclick={() =>
+                  item.playing
+                    ? mediaPlayer.pauseTab(item.tab_id)
+                    : mediaPlayer.playTab(item.tab_id)}
+              >
+                <Icon icon={item.playing ? PauseIcon : PlayIcon} size={14} />
+              </button>
+              {#if item.can_mute}<button
+                  type="button"
+                  class="rail-peer-control"
+                  data-muted={item.muted || undefined}
+                  aria-label={item.muted ? m.tab_unmute() : m.tab_mute()}
+                  aria-pressed={item.muted}
+                  title={item.muted ? m.tab_audio_muted() : m.tab_mute()}
+                  onclick={() => void tabs.setMuted(item.tab_id, !item.muted)}
+                >
+                  <Icon icon={item.muted ? VolumeOffIcon : VolumeHighIcon} size={14} />
+                </button>{/if}
+            </div>
+          {/each}
         {/if}
-        {#each playing as tab, index (tab.id)}
+        {#each extras as tab, index (tab.id)}
           <button
             type="button"
             role="menuitem"
             class="ui-menu-item rail-row"
-            style:--row={player ? index + 1 : index}
+            style:--row={player ? peers.length + index + 1 : index}
             title={tab.title || m.untitled_tab()}
             aria-label={tab.title || m.untitled_tab()}
             onclick={() => tabs.activate(tab.id)}
@@ -479,6 +529,85 @@
     background: transparent;
     font: inherit;
     text-align: start;
+  }
+
+  /* One player row: the name opens its tab, the two marks control it. */
+  .media-row {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding-inline: 2px;
+    border-radius: var(--radius-inset);
+  }
+
+  .media-row[data-current] {
+    background: var(--row-hover);
+  }
+
+  .rail-row-main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-inline-size: 0;
+    min-block-size: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-inset);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: default;
+  }
+
+  .rail-row-main:hover,
+  .rail-row-main:focus-visible {
+    background: var(--row-pressed);
+    outline: none;
+  }
+
+  .rail-peer-control {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-capsule);
+    background: transparent;
+    color: var(--color-faint);
+    cursor: default;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
+  }
+
+  .rail-peer-control:hover,
+  .rail-peer-control:focus-visible {
+    background: var(--row-pressed);
+    color: var(--color-text);
+    outline: none;
+  }
+
+  .rail-peer-control[data-muted] {
+    color: var(--color-accent);
+  }
+
+  .rail-art {
+    display: block;
+    inline-size: 16px;
+    block-size: 16px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: var(--color-fill);
+  }
+
+  .rail-trigger-art {
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: var(--radius-capsule);
   }
 
   /* A list settles in behind its own rows, as the spaces stack does. */

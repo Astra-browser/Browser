@@ -35,6 +35,34 @@ function windowKey(window_id) {
   return typeof window_id === "string" ? window_id : "";
 }
 
+function sameEntry(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.tab_id === b.tab_id &&
+    a.title === b.title &&
+    a.artist === b.artist &&
+    a.icon?.origin === b.icon?.origin &&
+    a.icon?.revision === b.icon?.revision &&
+    a.artwork === b.artwork &&
+    a.playing === b.playing &&
+    a.muted === b.muted &&
+    a.can_mute === b.can_mute &&
+    a.can_pip === b.can_pip &&
+    a.in_pip === b.in_pip
+  );
+}
+
+function samePlayers(a, b) {
+  const left = Array.isArray(a) ? a : [];
+  const right = Array.isArray(b) ? b : [];
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (!sameEntry(left[index], right[index])) return false;
+  }
+  return true;
+}
+
 function sameView(a, b) {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -42,6 +70,10 @@ function sameView(a, b) {
     a.tab_id === b.tab_id &&
     a.title === b.title &&
     a.artist === b.artist &&
+    a.icon?.origin === b.icon?.origin &&
+    a.icon?.revision === b.icon?.revision &&
+    a.artwork === b.artwork &&
+    samePlayers(a.players, b.players) &&
     a.duration === b.duration &&
     a.position === b.position &&
     a.rate === b.rate &&
