@@ -346,6 +346,7 @@ if ($SkipLive) {
         "version"               = "tools/marionette-probe/version-probe.py"
         "work_off"              = "tools/marionette-probe/work-off-probe.py"
         "tab_switch_seam"       = "tools/marionette-probe/tab-switch-seam-probe.py"
+  "tab_reassert"          = "tools/marionette-probe/tab-reassert-probe.py"
         "fullscreen"            = "tools/marionette-probe/fullscreen-probe.py"
         "chrome_ext"            = "tools/perf/stress/chrome_ext_probe.py"
         "real_extensions"       = "tools/perf/stress/real_extensions_probe.py"

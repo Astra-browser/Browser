@@ -11,6 +11,45 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: a tab click did nothing after the window sat hidden (2026-11-21)
+
+**Symptom:** after the window stayed in the background for a while (or after a
+profile/space switch), clicking the tab that was already in front sometimes did
+nothing. Choosing another tab and coming back recovered it. The page itself was
+painted, so the tab strip, the model and the visible document disagreed rather
+than the load failing.
+
+**Root cause:** the native tab deck (`#tabbrowser-tabpanels`) and the engine's
+selected tab (`gBrowser.selectedTab`) can drift apart when a switch is
+interrupted, a tab is moved under a pending switch, or the window returns from
+an occluded/hidden period. Astra's click path re-sent the same selection, but
+the tabbrowser treats that as a no-op: `MozTabs.selectedItem` skips
+`selectedIndex` when the item is already selected, so no `TabSelect`, no
+switcher request and no deck update followed. The host's activation pass only
+made the browser's docshell live; it never asked the deck to show the selected
+panel, so the only way out was a real switch to another tab and back.
+
+**Fix:** `overlay/astra/host/Content.sys.mjs`:
+
+- a `presentSelected()` repair runs when a model selection names the tab the
+  engine already has: it shows that tab's panel on the deck when the tab has
+  presented before (a tab that never presented keeps its own load path);
+- the same repair plus the tab's activation pass runs on the window's
+  `activate` and on `visibilitychange`, so returning from another app puts the
+  page back without any tab switch;
+- both listeners are removed on detach. The pure decision is exported as
+  `needsDeckRepair()` and pinned by the contract.
+
+**Verification:** `node tests/contract/tab_lifecycle.mjs` **21/21** (four new
+deck-repair cases); `tabs_admission` **14/14**, `window_scope` **24/24**,
+`spaces_profiles_model` **39/39**, `state-check` clean; overlay staged and
+`forge build --faster --jobs 2` clean. New live
+`tools/marionette-probe/tab-reassert-probe.py` **7/7** on the Windows dev build:
+with the deck forced onto another tab, re-selecting the tab is proven a no-op
+in the engine, the real Astra tab-row click puts the panel back, and a window
+`activate` repairs the same drift without a click. The probe is registered in
+`tools/perf/full-suite.sh` and `tools/perf/full-suite.ps1`.
+
 ## Owner report: a fullscreen video had an invisible wall over it (2026-11-20)
 
 Fullscreening a video on any site (YouTube reported) put an invisible,
