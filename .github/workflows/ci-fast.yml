@@ -13,6 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/state-check.py
+  docs-check:
+    # Docs stay reachable: every doc is indexed in docs/README.md or cited by
+    # name in the repo (tools/docs-check.mjs). Sediment fails the build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tools/docs-check.mjs
   plan-check:
     runs-on: ubuntu-latest
     steps:
