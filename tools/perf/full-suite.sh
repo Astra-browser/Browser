@@ -209,6 +209,7 @@ else
     "work_off:tools/marionette-probe/work-off-probe.py"
     "tab_switch_seam:tools/marionette-probe/tab-switch-seam-probe.py"
     "tab_reassert:tools/marionette-probe/tab-reassert-probe.py"
+    "sidebar_strip:tools/marionette-probe/sidebar-strip-probe.py"
     "chrome_ext:tools/perf/stress/chrome_ext_probe.py"
     "real_extensions:tools/perf/stress/real_extensions_probe.py"
     "extension_bench:tools/perf/stress/extension_bench.py"
