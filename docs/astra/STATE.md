@@ -1821,14 +1821,13 @@ recorded below; this list is what is still genuinely unwired.
   Add each with a UI caller, a route-table entry, a contract test and a live
   probe.
 - **Download-permission prompts.** Both ends exist and nothing connects them:
-  `Dialogs.requestDownload`/`decideDownload` emit `download.started`
-  (`overlay/astra/host/Dialogs.sys.mjs`) and
-  `features/downloads/lib/download-dialogs.ts` listens and answers, but the
-  event is absent from `proto.ts` `EVENTS`, `decideDownload` is absent from
-  `COMMANDS`, `Dialogs` is absent from `host-transport.ts` `ROUTES`, and no
-  component mounts `DownloadPromptSession`. Wire the event, command and route,
-  mount the prompt, then close it with a live probe; `docs/astra/DOWNLOADS.md`
-  §Bridge gap is the contract.
+  `Dialogs.requestDownload` emits `download.started`, `decideDownload`
+  answers with `download.resolved`, and
+  `features/downloads/lib/download-dialogs.ts` listens and replies, but
+  neither event nor command is on the bridge and no component mounts
+  `DownloadPromptSession`. The full gap (missing `EVENTS` and `COMMANDS`
+  entries, no `Dialogs` route or `HostModules` member) is the contract in
+  `docs/astra/DOWNLOADS.md` section Bridge gap; close it with a live probe.
 - **New Tab tracker figure.** `blocker_stats` is now routed to the live
   engine (D-42); the New Tab figure appears only when the reply is
   `status: "ok"`, so a missing count is hidden rather than drawn as `0`.
