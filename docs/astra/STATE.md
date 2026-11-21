@@ -2567,4 +2567,4 @@ This phase gives the wire one owner. Decisions: D-54, D-55.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1: `manifest.ts` seeded verbatim from the 177 routes, the route table built from it, the guard importing it, a gap report emitted, stale counts corrected. No new route, no host change, no UI change. |
+| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1 done: 177 routes in `manifest.ts`, `ROUTES` built from it and byte-identical to the old literal table (177 entries, 0 diffs), guard and text-coupled tests import the table. Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 101 deferred / 17 unused / 22 open. Verified: wire_coverage 68, wire_manifest 11, bridge 31, contracts 67 green (2 known red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No host or UI change. Next slices: deferral gate, mock hardening, the 22 open defects. |
