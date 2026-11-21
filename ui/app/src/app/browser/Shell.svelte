@@ -1337,6 +1337,7 @@
 
   .stage-column[data-bar-overlay="true"] .stage-bar[data-hidden="false"] {
     opacity: 1;
+
     /* No transform at rest: `background-attachment: fixed` is resolved
        against the viewport only while no ancestor/self transform creates a
        containing block, and the field slice must line up with the window's.

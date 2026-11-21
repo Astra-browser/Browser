@@ -380,7 +380,7 @@
     inline-size: 24px;
     block-size: 24px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: var(--radius-inset);
     background: var(--color-fill);
   }
 

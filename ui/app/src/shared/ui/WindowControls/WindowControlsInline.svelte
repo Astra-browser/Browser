@@ -73,7 +73,7 @@
     block-size: 26px;
     padding: 0;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--radius-control-compact);
     background: transparent;
     color: var(--color-label-secondary);
     cursor: default;
