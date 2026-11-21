@@ -1813,13 +1813,16 @@ recorded below; this list is what is still genuinely unwired.
   defers the process-actor unregistration past the teardown turn and stops the
   late-resource lookup error (bugs 2044741/1944477); the probe's
   `upstream_noise` is now 0/0/0.
-- **The remaining unrouted command ids.** 200 of the 270 generated commands
-  still have no Host route (account, Work models/human/sites, page
-  assist, voice, profiles, import/export, updates, menus, split/drag-drop,
-  downloads manager, media import). They are recorded in
-  `tests/contract/wire_baseline.json`; `wire_coverage` fails on any new gap.
-  Add each with a UI caller, a route-table entry, a contract test and a live
-  probe.
+- **The remaining unrouted command ids.** 177 of the 317 wire names have a Host
+  route; 140 have none. The count and every gap now live in
+  `ui/packages/bridge/src/manifest.ts` (D-55), not in prose:
+  `node tests/contract/wire_manifest.mjs --report` writes
+  `tests/contract/wire_gaps.json` with the state of each gap.
+  101 are deferred by decision (D-48 Work 51, SCOPE accounts 28, D-54 AI 22),
+  17 are unused, and 22 are open defects (split dividers, onboarding
+  Essentials, launcher panel, close handshake, updates, haptics, swipe, media).
+  `tests/contract/wire_coverage.mjs` fails on any new gap. Close a row with a UI
+  caller, a `routed` row in the manifest, a contract test and a live probe.
 - **New Tab tracker figure.** `blocker_stats` is now routed to the live
   engine (D-42); the New Tab figure appears only when the reply is
   `status: "ok"`, so a missing count is hidden rather than drawn as `0`.

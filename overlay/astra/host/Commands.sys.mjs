@@ -10,9 +10,12 @@
 // Native execution belongs here, not in the UI: a command that changes a
 // browser surface announces the change on `ui-command` (the app's surface
 // mirror only moves once native confirms), and a command that acts on a tab
-// calls the Tabs/Navigation modules. The registry this validates against is
-// `crates/astra-core/src/commands.rs`, ported in slices — an id that is not
-// ported yet is refused instead of silently doing nothing.
+// calls the Tabs/Navigation modules. The ids this module answers are the sets
+// below plus the tab verbs it executes here; an id it does not answer is
+// refused by name (`unknown`) instead of silently doing nothing. There is no
+// Rust command registry in this tree: the Tauri host (and the
+// `crates/astra-core/src/commands.rs` this comment used to name) is gone. The
+// wire names live in `ui/packages/bridge/src/manifest.ts` (D-55).
 //
 // The second group below is the keyboard path: ids the keymap already binds
 // (Back, Reload, Bookmark This Page, Developer Tools, …). The ones that move
