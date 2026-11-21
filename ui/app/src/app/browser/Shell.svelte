@@ -443,8 +443,7 @@
     popupSync = window.setTimeout(() => {
       popupSync = 0;
       try {
-        const visible =
-          [...document.querySelectorAll(POPUP_SELECTOR)].find(popupVisible) ?? null;
+        const visible = [...document.querySelectorAll(POPUP_SELECTOR)].find(popupVisible) ?? null;
         popupAnchor = visible;
         popupRaised = visible !== null;
       } catch {
@@ -665,7 +664,7 @@
   // to slide out with it, or the card comes out headless — a column with no
   // way back and no address, which is what the peek used to look like. The
   // bar above the page therefore belongs to the shapes where the column is a
-  // rail or standing beside a panel, and to a bar pinned there on purpose.
+  // rail or standing beside a panel.
   let columnCompact = $derived(
     isCompact() ||
       toolHost.activeTool() !== null ||
@@ -673,15 +672,21 @@
   );
   // A hidden column has no head to carry the field; the floating bar is the
   // only place the address can live while it is away.
-  // The page bar owns the address on Windows: the window's own controls live
-  // at its trailing end, so the bar has to exist in the full-column shape too
-  // (it comes down when the pointer reaches the top edge). The column keeps
-  // only its own controls.
-  let sidebarOwnsBar = $derived(
-    !IS_WINDOWS && !columnCompact && !isHidden() && barMode !== "always",
-  );
+  //
+  // The field itself is pinned to the column whenever the column is in its
+  // full shape and in view, on every platform and whatever `ui.main-bar` says.
+  // The page bar's show/hide mode belongs to the page bar: it must never take
+  // the address away from a person working in the column, and a bar revealed
+  // only at the top edge must not be the only way to reach it.
+  let sidebarOwnsBar = $derived(!columnCompact && !isHidden());
+  // On Windows the window's own controls live at the page bar's trailing end,
+  // so that bar has to exist in the full-column shape too even when it no
+  // longer carries the field. Elsewhere a pinned bar (`ui.main-bar=always`)
+  // keeps its own row, and a column that owns the field otherwise needs no bar
+  // at all.
+  let barPresent = $derived(!sidebarOwnsBar || IS_WINDOWS || barMode === "always");
   let barVisible = $derived(
-    !sidebarOwnsBar &&
+    barPresent &&
       (barMode === "always" || (barMode === "auto" && !pageShown) || barHover || barFocused),
   );
   // The bar floats whenever it is not pinned to a row: over a web page in
@@ -1014,18 +1019,19 @@
       >{/snippet}</Sidebar
   >
   <div class="stage-column" data-bar-overlay={barOverPage}>
-    {#if !sidebarOwnsBar}
+    {#if barPresent}
       <!-- The page's own bar: navigation and the one address field, above the
            stage. The field is composed once at the top of this file, with the
            tray that acts on the page it names, and the bar only places it.
            It stays in the tree on every surface: internal pages keep it in a
            row, and a web page floats it over the page when the person pinned
-           it or reached for the top edge. -->
+           it or reached for the top edge. When the column's head owns the
+           field, the bar keeps only the window's controls (Windows). -->
       <div
         class="stage-bar"
         role="toolbar"
         tabindex="-1"
-        aria-label={m.ui_navigation()}
+        aria-label={sidebarOwnsBar && IS_WINDOWS ? m.ui_window_controls() : m.ui_navigation()}
         data-drag-region
         data-hidden={!barVisible}
         data-mode={barMode}
@@ -1039,12 +1045,13 @@
           barFocused = false;
         }}
       >
-        <ContentBar>
-          {#snippet field()}{@render addressField()}{/snippet}
-        </ContentBar>
+        <ContentBar
+          nav={!sidebarOwnsBar || !IS_WINDOWS}
+          field={sidebarOwnsBar ? undefined : addressField}
+        />
       </div>
     {/if}
-    {#if barOverPage && !sidebarOwnsBar}
+    {#if barOverPage && barPresent}
       <!-- The strip that brings a floating bar back. It stays in the tree
            while the bar is shown so keyboard focus is not dropped; when the
            bar is down it sits beneath it and takes no pointer. -->

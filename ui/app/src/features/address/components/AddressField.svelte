@@ -24,6 +24,7 @@
   import * as find from "../lib/find.svelte";
   import { flushSync, onMount, untrack, type Snippet } from "svelte";
   import { duration, easing, reducedMotion } from "$shared/lib/motion";
+  import { looksLikeAddress, hasScheme } from "$shared/lib/address";
   import {
     addressSecurity,
     editingAddress,
@@ -226,12 +227,6 @@
   const SUGGEST_LIMIT = 6;
   const SUGGEST_DEBOUNCE_MS = 80;
 
-  function looksLikeAddress(text: string): boolean {
-    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
-    if (/^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(\/|$)/i.test(text)) return true;
-    return /^[^\s/]+\.[^\s/]+/.test(text) && !text.includes(" ");
-  }
-
   function closeSuggestions() {
     if (suggestTimer !== undefined) clearTimeout(suggestTimer);
     suggestTimer = undefined;
@@ -245,7 +240,7 @@
   function scheduleSuggestions(text: string) {
     if (compact) return;
     const value = text.trim();
-    if (value === "" || looksLikeAddress(value)) {
+    if (value === "" || hasScheme(value) || looksLikeAddress(value)) {
       closeSuggestions();
       return;
     }

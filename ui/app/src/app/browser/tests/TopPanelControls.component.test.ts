@@ -30,10 +30,11 @@ afterEach(() => {
   preferences.dispose();
 });
 
-// On Windows the page bar is the horizontal top panel: nav, the long address
-// field, then the window's own minimise/maximise/close at its trailing end.
-// Those three come out when the hand is on the panel and are out of the way
-// (and out of the pointer's way) at rest. Nothing floats over the page.
+// On Windows the page bar is the horizontal top panel and carries the window's
+// own minimise/maximise/close at its trailing end. Those three come out when
+// the hand is on the panel and are out of the way (and out of the pointer's
+// way) at rest. Nothing floats over the page. The address itself stays in the
+// column's head, so the bar never owns it in the full-column shape.
 test("the window's controls belong to the page bar, out until it is hovered", async () => {
   await paint();
   const screen = await render(Shell);
@@ -48,9 +49,9 @@ test("the window's controls belong to the page bar, out until it is hovered", as
     "Close",
   ]);
 
-  // The address lives in this bar, not in the column.
-  expect(bar.querySelector(".address-field input, input[data-astra-address]")).not.toBeNull();
-  expect(screen.container.querySelector(".sidebar-top-field")).toBeNull();
+  // The address stays in the column's head; the bar only holds the controls.
+  expect(bar.querySelector(".address-field input, input[data-astra-address]")).toBeNull();
+  expect(screen.container.querySelector(".sidebar-top-field [data-astra-address]")).not.toBeNull();
 
   // At rest the trio is invisible and cannot eat a hover from the field.
   expect(getComputedStyle(controls).opacity).toBe("0");

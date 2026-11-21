@@ -11,6 +11,38 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: the address bar stays in the column, and links open directly (2026-11-21, branch `feat/split-view-ux`)
+
+The owner asked for two things: the address/search bar that lives in the
+sidebar must remain there whatever the page bar is doing (pinned, auto, hidden
+or revealed by a top-edge hover), and a typed link — `http://localhost:3000`,
+`localhost:3000`, a bare host, any `http(s)` address — must open directly
+instead of being searched on the engine. Every other query keeps going to the
+search engine.
+
+| Surface | What changed | Files |
+|---|---|---|
+| Address field home | `sidebarOwnsBar` no longer depends on the platform or on `ui.main-bar`: while the column is in its full shape and in view, the column's head owns the one field. On Windows the page bar stays in the tree as the window-controls strip only; `ContentBar` now takes an optional `field` and `nav`, so the same bar can carry the field elsewhere (rail, panel, column put away). | `app/browser/Shell.svelte`, `features/toolbar/components/ContentBar.svelte` |
+| Typed links | `Search.newtabSearch` and `Search.launcherSearch` resolve the typed line first: an address answers with one `url` row (`Open <address>`) and asks no suggestion provider; words/`!bangs` keep the search row and the provider. The surfaces' Enter takes the address-bar route immediately for an address (`looksLikeAddress`), so a settled or stale row can never hand a link to the engine. | `overlay/astra/host/Search.sys.mjs`, `features/search/lib/search-surface.svelte.ts`, `shared/lib/address.ts`, `features/address/components/AddressField.svelte` (suggestion suppression uses `hasScheme` + `looksLikeAddress`) |
+| Speed | An address skips the 80 ms suggestion debounce, the provider request and the row round trip: the field opens it at once. Word searches are unchanged. | same |
+
+**Verification:** `node tests/contract/search_model.mjs` **71/71** (new checks:
+a typed address answers with one `url` row, no provider is asked, and words
+still search); `shared/lib/tests/address.test.ts` 5/5; `NewTabSearch` 8/8 (new:
+a typed address opens directly, not through the engine); `ContentBar` suite
+23/23 together with `NewTabSearch`; `svelte-check` 0 errors / 0 warnings; full
+unit suite 1278 passed / 2 skipped. `ShellA11y`, `TopPanelControls` and
+`SitePanel` were updated to pin the new home of the field. Live Marionette on
+the packaged Windows dev build
+(`tools/marionette-probe/address-home-probe.py`) **PASS**: the column's head
+carries the one field with `ui.main-bar` set to `always`, `auto` and `hidden`
+and with a top-edge hover, the page bar never owns it in that shape, and typing
+`localhost:3000` committed `http://localhost:3000/` — no Google search.
+
+**Still deferred:** nothing for these two surfaces. `WindowsChrome`'s acrylic
+body-wash assertion fails on this machine (`rgb(31, 31, 34)` vs `28%`); it is a
+material-token check untouched by this change.
+
 ## Split view flow: picker, drag-to-tab, independent splits (2026-11-21, branch `feat/split-view-ux` — NOT MERGED)
 
 The owner reported that **Open in Split View** in a tab's menu did nothing, and

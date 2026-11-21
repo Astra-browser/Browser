@@ -166,6 +166,19 @@ test("Enter runs what was typed even when a local match exists", async () => {
   );
 });
 
+test("a typed address opens directly, not through the search engine", async () => {
+  const screen = await mount({ tabId: "tab" });
+  await screen.getByRole("combobox").fill("localhost:3000");
+  // Even with a stale search row on screen, a typed address is opened now, on
+  // the address bar's own route — a link is never handed to the engine.
+  await reply("localhost:3000", [search("localhost:3000")]);
+  await userEvent.keyboard("{Enter}");
+  await vi.waitFor(() =>
+    expect(native.navigate).toHaveBeenCalledExactlyOnceWith("tab", "localhost:3000"),
+  );
+  expect(native.run).not.toHaveBeenCalled();
+});
+
 test("Enter pressed before the answer searches what was typed immediately", async () => {
   const screen = await mount({ tabId: "tab" });
   const input = screen.getByRole("combobox");

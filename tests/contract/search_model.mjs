@@ -306,6 +306,61 @@ check(
 );
 globalThis.fetch = realFetch;
 
+// --- a typed address is a row of its own ----------------------------------
+// The field resolves an address the same way the address bar does, and never
+// asks a provider about it: a host:port is not words.
+let asked = 0;
+globalThis.fetch = async () => {
+  asked += 1;
+  return { ok: true, text: async () => JSON.stringify(["never", [], []]) };
+};
+seen.length = 0;
+await Search.newtabSearch({
+  query: "localhost:3000",
+  context: { ...context, request_id: "r7" },
+});
+const direct = seen.at(-1);
+check(
+  "a typed address answers with one row",
+  direct.results.length === 1 && direct.results[0].kind === "url",
+);
+check(
+  "the address row opens the resolved address",
+  direct.results[0].action.type === "OpenUrl" &&
+    direct.results[0].action.url === "http://localhost:3000/",
+);
+check(
+  "the address row says it opens rather than searches",
+  direct.results[0].title === "localhost:3000" &&
+    direct.results[0].detail === "localhost:3000",
+);
+check("a typed address asks no provider", asked === 0);
+check("the address answer is settled at once", direct.pending === false);
+
+seen.length = 0;
+await Search.newtabSearch({
+  query: "https://example.com/a",
+  context: { ...context, request_id: "r8" },
+});
+check(
+  "a typed http address opens the same",
+  seen.at(-1).results.length === 1 &&
+    seen.at(-1).results[0].action.url === "https://example.com/a",
+);
+check("and still asks no provider", asked === 0);
+
+seen.length = 0;
+await Search.newtabSearch({
+  query: "hello world",
+  context: { ...context, request_id: "r9" },
+});
+check(
+  "words still go to the engine",
+  seen.at(-1).results.at(-1).action.url ===
+    "https://www.google.com/search?q=hello%20world",
+);
+globalThis.fetch = realFetch;
+
 // A newer request id replaces the older request before its answer lands.
 let release;
 const delayed = new Promise((resolve) => {

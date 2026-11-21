@@ -7,6 +7,7 @@ import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
 import { tabs } from "$domain/tabs";
+import { looksLikeAddress } from "$shared/lib/address";
 import { createSearchController, type SearchSnapshot } from "./search-controller";
 import { calculate, type Calculation } from "./calculator";
 import {
@@ -388,6 +389,13 @@ export function createSearchSurface(options: {
     if (!background && !moved) {
       if (row?.id === CALCULATION_ID || row?.tool) {
         void run(row);
+        return;
+      }
+      // An address opens now, on the address bar's own route. Waiting for the
+      // row list to catch up made a typed link feel slower than the field, and
+      // a link must never be handed to the search engine.
+      if (looksLikeAddress(query)) {
+        void searchTyped();
         return;
       }
       if (settled && row) {
