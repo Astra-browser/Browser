@@ -122,11 +122,7 @@ check(
   "the route target exists",
   typeof bootModule.Boot.onboardingFinish === "function",
 );
-const baseline = JSON.parse(await read("tests/contract/wire_baseline.json"));
-check(
-  "onboarding_finish is no longer a known gap",
-  !(baseline.unrouted ?? []).includes("onboarding_finish"),
-);
+check("onboarding_finish is declared routed", onboardingRoute?.state === "routed");
 
 // === The page is opened before the browser UI =============================
 const browserEntry = await read("ui/app/chrome-entry/browser-chrome.ts");

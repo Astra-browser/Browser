@@ -38,6 +38,9 @@ function check(name, cond) {
 
 const decisions = await readFile(path.join(ROOT, "docs", "astra", "DECISIONS.md"), "utf8");
 const scope = await readFile(path.join(ROOT, "docs", "astra", "SCOPE.md"), "utf8");
+const registry = await import(
+  pathToFileURL(path.join(ROOT, "ui", "packages", "bridge", "src", "proto.ts")).href
+);
 
 let manifest;
 try {
@@ -128,6 +131,26 @@ for (const entry of badReasons.slice(0, 10)) console.error(`  ${entry.name} -> $
 
 const strayReasons = [...unused, ...open].filter((entry) => entry.reason !== null);
 check(`open and unused rows carry no decision reason (${strayReasons.length})`, strayReasons.length === 0);
+
+// The registry -> manifest gate. A command added to proto.ts without a manifest
+// row is an undeclared gap: nothing says whether it is routed, allowed or a
+// defect. This replaces the old "known gaps" baseline, which was a second copy
+// of the same list.
+const registryNames = new Set(registry.COMMANDS);
+const undeclared = registry.COMMANDS.filter((name) => !unique.has(name));
+check(`every registry command is declared (${undeclared.length} undeclared)`, undeclared.length === 0);
+for (const name of undeclared.slice(0, 10)) {
+  console.error(`  ${name} is in proto.ts but not in the manifest`);
+}
+
+// A name the registry never carried is a route added after the generated copy
+// was frozen. It must be routed; an unrouted one would have no provenance.
+const outsideRegistry = entries.filter((entry) => !registryNames.has(entry.name));
+const unroutedOutside = outsideRegistry.filter((entry) => entry.state !== "routed");
+check(
+  `names outside the registry are routed (${unroutedOutside.length} unrouted of ${outsideRegistry.length})`,
+  unroutedOutside.length === 0,
+);
 
 // `--report` writes the visible gap inventory. It scans the app for callers so
 // the reader can go straight to the surface that needs the route. The scan is a
