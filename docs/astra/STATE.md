@@ -2554,3 +2554,14 @@ in this checkout); responses include them, older fixtures may omit them.
 **Deferred:** the list keeps the newest 300 history entries. `clear` removes the
 download's Places URL visit, matching Firefox's own download deletion. The
 private-window public-list policy is unchanged.
+
+## Phase 7 - IPC architecture (from 2026-11-22)
+
+The architecture review of 2026-11-22 found five lists describing the command
+wire that disagree (281 bindings, 279 generated, 281 hand copy, 177 routes, a
+140-gap baseline) and a guard that parses TypeScript with a regular expression.
+This phase gives the wire one owner. Decisions: D-54, D-55.
+
+| ID | Task | Status | Agent | Branch | Notes |
+|---|---|---|---|---|---|
+| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1: `manifest.ts` seeded verbatim from the 177 routes, the route table built from it, the guard importing it, a gap report emitted, stale counts corrected. No new route, no host change, no UI change. |
