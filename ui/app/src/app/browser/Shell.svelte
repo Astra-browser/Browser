@@ -1305,21 +1305,23 @@
   }
 
   /* A floating bar is laid over the page instead of taking a row. The page
-     keeps the whole stage's rectangle; the bar travels on its own layer with
-     a real ground so what passes under it stays readable, and the shell
-     raises/clips the frame to this strip.
-
+     keeps the whole stage's rectangle; the bar travels on its own layer and
+     must paint the window's own field, not a second chrome tone: the bar and
+     the gutter beside it are one surface, and a grey slab over a dark field
+     was an obvious patch of colour that appeared and vanished with the bar.
+     `fixed` anchors the field to the viewport, so the slice under the bar is
+     the same slice of the field the window paints around it. The bar still
+     covers the page (the field is opaque) and keeps its soft edge.
      Its ground is opaque: a 94%-opaque chrome plus a 14px backdrop blur
      bought a slightly softer edge, but a blur over a strip that the page
      slides under is re-computed every frame of every slide — the sidebar's
-     peek made the whole window feel slow. The bar covers the page, so an
-     opaque ground is the honest material anyway. */
+     peek made the whole window feel slow. */
   .stage-column[data-bar-overlay="true"] .stage-bar {
     position: absolute;
     z-index: 30;
     inset-block-start: 0;
     inset-inline: 0;
-    background: var(--color-chrome);
+    background: var(--shell-ground) fixed;
     border-block-end: 1px solid var(--color-border);
     box-shadow: var(--shadow-float);
     transition:
@@ -1335,7 +1337,11 @@
 
   .stage-column[data-bar-overlay="true"] .stage-bar[data-hidden="false"] {
     opacity: 1;
-    transform: translateY(0);
+    /* No transform at rest: `background-attachment: fixed` is resolved
+       against the viewport only while no ancestor/self transform creates a
+       containing block, and the field slice must line up with the window's.
+       The slide still animates from the translated hidden state. */
+    transform: none;
   }
 
   /* The top edge of the stage is free while the bar is away: reaching it

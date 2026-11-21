@@ -1317,6 +1317,24 @@
           : "none";
         frameRoot.dataset.astraMaterial = material;
         frameRoot.dataset.astraDensity = data.density === "compact" ? "compact" : "comfortable";
+        // The window field this frame paints, mirrored onto the shell. While
+        // the floating bar is down the frame is raised and clipped, so the
+        // gutter beside it is painted by the shell; using the app's own ground
+        // (instead of a fixed loading colour) keeps that edge from changing
+        // colour when the bar appears. A `url()` is refused: the ground is a
+        // gradient, never a network or file load.
+        const groundImage =
+          typeof data.groundImage === "string" && !/url\s*\(/i.test(data.groundImage)
+            ? data.groundImage
+            : "";
+        const groundColor =
+          typeof data.groundColor === "string" && !/url\s*\(/i.test(data.groundColor)
+            ? data.groundColor
+            : "";
+        if (groundImage) frameRoot.style.setProperty("--shell-app-ground-image", groundImage);
+        else frameRoot.style.removeProperty("--shell-app-ground-image");
+        if (groundColor) frameRoot.style.setProperty("--shell-app-ground-color", groundColor);
+        else frameRoot.style.removeProperty("--shell-app-ground-color");
         if (win?.document?.documentElement) {
           win.document.documentElement.dataset.astraMaterial = material;
         }
@@ -1620,20 +1638,16 @@
   /* The attribute is set from the app's theme message, so the ancestor is
      global; a scoped selector here is pruned as unreachable. The light
      palette waits until the app is actually in front. */
-  /* A native material sits behind the whole window; the shell's own opaque
-     loading ground would hide it. The app paints its wash over the material. */
-  :global(.astra-frame[data-astra-material]:not([data-astra-material="none"])[data-app-booted="true"]) {
-    background: transparent !important;
-  }
-  /* Windows' tiers (mica, acrylic) are the window's own backdrop, sampled
-     from the desktop. The app paints its ground opaquely there, so leaving
-     the shell clear only exposed the desktop in the gutter and around a
-     peeking card — the colour changed as the window took focus. The other
-     platforms keep their native effect behind the shell. */
-  @media (-moz-platform: windows) {
-    :global(.astra-frame[data-astra-material]:not([data-astra-material="none"])[data-app-booted="true"]) {
-      background: var(--shell-loading-ground) !important;
-    }
+  /* The app paints the window field, and the shell repeats it behind the
+     frame. The two must be one ground: while the page bar floats the shell
+     raises this frame and clips it to the bar's strip, so the gutter around
+     the page is the shell's pixels. A fixed loading colour there made the
+     whole edge change tone when the bar came down; the app's resolved field
+     keeps it still, in every material tier and palette. The loading ground is
+     still the fallback before the app has reported (and while it boots). */
+  :global(.astra-frame[data-app-booted="true"]) {
+    background-color: var(--shell-app-ground-color, var(--shell-loading-ground)) !important;
+    background-image: var(--shell-app-ground-image, none) !important;
   }
   :global(.astra-frame[data-astra-theme="light"][data-app-booted="true"]) {
     --shell-loading-ground: #f1f1f3;

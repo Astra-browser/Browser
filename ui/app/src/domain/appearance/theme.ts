@@ -50,11 +50,19 @@ export function applyUiPreferences(tint: string, reduceMotion: boolean) {
 }
 
 /** The shell document paints the window ground behind this frame, so it has
- *  to hear the same material, theme, accent and density this root resolves. */
+ *  to hear the same material, theme, accent and density this root resolves.
+ *  It also needs the resolved ground itself: while the page bar floats, the
+ *  frame is raised and clipped, and the gutter outside that clip is the
+ *  shell's. A hardcoded shell colour there changed the window on reveal; the
+ *  same ground on both layers keeps the edge still. */
 function publishAppearance() {
   const root = document.documentElement;
   try {
     if (window.parent === window) return;
+    // `.shell` is the element that paints the field, not `body` (a material
+    // tier gives the body its own chrome and the field sits above it).
+    const shell = document.querySelector<HTMLElement>(".shell");
+    const ground = shell ? getComputedStyle(shell) : null;
     window.parent.postMessage(
       {
         ns: "astra-shell",
@@ -63,6 +71,14 @@ function publishAppearance() {
         theme: root.getAttribute("data-theme") === "light" ? "light" : "dark",
         accent: root.getAttribute("data-tint") ?? "graphite",
         density: root.getAttribute("data-density") ?? "comfortable",
+        groundImage:
+          ground && ground.backgroundImage !== "none" && !ground.backgroundImage.includes("url(")
+            ? ground.backgroundImage
+            : "",
+        groundColor:
+          ground?.backgroundColor && ground.backgroundColor !== "rgba(0, 0, 0, 0)"
+            ? ground.backgroundColor
+            : "",
       },
       "*",
     );
