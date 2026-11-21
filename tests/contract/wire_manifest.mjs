@@ -3,8 +3,10 @@
 //
 // What this catches: a duplicate command name, a row with no state, an
 // unrouted row that still carries a module/method, a deferred row whose reason
-// is not a real decision or SCOPE anchor, and any drift in the settled
-// denominators (317 names = 177 routed + 100 deferred + 19 unused + 21 open).
+// is not a real decision or SCOPE anchor, and drift in the settled
+// denominators (317 names, 177 routed, 140 unrouted, states partition). The
+// split of the 140 is reported, not pinned: it moves when a dead caller is
+// deleted on a sibling branch.
 //
 // What it does not catch: whether host-transport.ts actually builds its table
 // from the manifest, or whether a module/method exists at runtime. Those are
@@ -16,7 +18,7 @@
 //
 // Usage: node tests/contract/wire_manifest.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { readFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -132,8 +134,6 @@ check(`open and unused rows carry no decision reason (${strayReasons.length})`, 
 // best-effort reference count, not a reachability proof: a caller in a module
 // nothing imports still shows up, which is the honest answer on this base.
 if (process.argv.includes("--report")) {
-  const { readdir } = await import("node:fs/promises");
-
   const bindings = await readFile(
     path.join(ROOT, "ui", "app", "src", "shared", "ipc", "bindings.ts"),
     "utf8",
@@ -204,6 +204,9 @@ if (process.argv.includes("--report")) {
     note:
       "Callers are best-effort references in ui/app/src (non-test). A caller " +
       "in a module nothing imports still appears; reachability is not proven here.",
+  verification:
+      "No live probe: slice 1 changed no surface, host module or engine path. " +
+      "Contract and unit gates only; see docs/astra/STATE.md P7-T01.",
     counts: {
       total: entries.length,
       routed: routed.length,
@@ -218,7 +221,7 @@ if (process.argv.includes("--report")) {
     open: rowsFor("open"),
     unused: rowsFor("unused"),
   };
-  await (await import("node:fs/promises")).writeFile(
+  await writeFile(
     path.join(ROOT, "tests", "contract", "wire_gaps.json"),
     `${JSON.stringify(report, null, 2)}\n`,
   );

@@ -1,12 +1,13 @@
 {
   "generatedBy": "node tests/contract/wire_manifest.mjs --report",
   "note": "Callers are best-effort references in ui/app/src (non-test). A caller in a module nothing imports still appears; reachability is not proven here.",
+  "verification": "No live probe: slice 1 changed no surface, host module or engine path. Contract and unit gates only; see docs/astra/STATE.md P7-T01.",
   "counts": {
     "total": 317,
     "routed": 177,
-    "deferred": 101,
+    "deferred": 108,
     "unused": 17,
-    "open": 22,
+    "open": 15,
     "calledUnrouted": 124
   },
   "deferred": [
@@ -358,6 +359,55 @@
       "reason": "D-54",
       "callers": [
         "ui/app/src/features/assist/components/PageStyles.svelte"
+      ]
+    },
+    {
+      "name": "voice_cancel",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_choose_engine",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_choose_language",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_open_privacy",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/features/work/components/bar/VoiceView.svelte"
+      ]
+    },
+    {
+      "name": "voice_start",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_status",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/settings.svelte.ts"
+      ]
+    },
+    {
+      "name": "voice_stop",
+      "reason": "D-54",
+      "callers": [
+        "ui/app/src/domain/voice/take.svelte.ts"
       ]
     },
     {
@@ -811,48 +861,6 @@
       "name": "update_relaunch",
       "callers": [
         "ui/app/src/domain/updates/updates.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_cancel",
-      "callers": [
-        "ui/app/src/domain/voice/take.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_choose_engine",
-      "callers": [
-        "ui/app/src/domain/voice/settings.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_choose_language",
-      "callers": [
-        "ui/app/src/domain/voice/settings.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_open_privacy",
-      "callers": [
-        "ui/app/src/features/work/components/bar/VoiceView.svelte"
-      ]
-    },
-    {
-      "name": "voice_start",
-      "callers": [
-        "ui/app/src/domain/voice/take.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_status",
-      "callers": [
-        "ui/app/src/domain/voice/settings.svelte.ts"
-      ]
-    },
-    {
-      "name": "voice_stop",
-      "callers": [
-        "ui/app/src/domain/voice/take.svelte.ts"
       ]
     }
   ],

@@ -1818,8 +1818,8 @@ recorded below; this list is what is still genuinely unwired.
   `ui/packages/bridge/src/manifest.ts` (D-55), not in prose:
   `node tests/contract/wire_manifest.mjs --report` writes
   `tests/contract/wire_gaps.json` with the state of each gap.
-  101 are deferred by decision (D-48 Work 51, SCOPE accounts 28, D-54 AI 22),
-  17 are unused, and 22 are open defects (split dividers, onboarding
+  108 are deferred by decision (D-48 Work 51, SCOPE accounts 28, D-54 AI 29),
+  17 are unused, and 15 are open defects (split dividers, onboarding
   Essentials, launcher panel, close handshake, updates, haptics, swipe, media).
   `tests/contract/wire_coverage.mjs` fails on any new gap. Close a row with a UI
   caller, a `routed` row in the manifest, a contract test and a live probe.
@@ -2567,4 +2567,4 @@ This phase gives the wire one owner. Decisions: D-54, D-55.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1 done: 177 routes in `manifest.ts`, `ROUTES` built from it and byte-identical to the old literal table (177 entries, 0 diffs), guard and text-coupled tests import the table. Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 101 deferred / 17 unused / 22 open. Verified: wire_coverage 68, wire_manifest 11, bridge 31, contracts 67 green (2 known red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No host or UI change. Next slices: deferral gate, mock hardening, the 22 open defects. |
+| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1 done: 177 routes in `manifest.ts`, `ROUTES` built from it and identical to the old literal table (177 entries, 0 diffs), guard and text-coupled tests import the table, mock known-command list derived from it. Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 108 deferred / 17 unused / 15 open. Verified: wire_coverage 68, wire_manifest 11, bridge 31, contracts 67 green (2 pre-existing red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No live probe: no surface, host module or engine path changed. Next slices: deferral gate, mock default answer, the 15 open defects. |
