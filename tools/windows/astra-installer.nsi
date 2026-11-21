@@ -50,7 +50,7 @@ VIAddVersionKey "LegalCopyright" "Astra"
 !define MUI_WELCOMEPAGE_TITLE "Install Astra ${VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "Astra installs for the current user only. No administrator rights are needed.$\r$\n$\r$\nThe browser, the astra-core sidecar and the Windows packaging files are copied to $\"$LOCALAPPDATA\Programs\Astra$\". Your profile stays in $\"%APPDATA%\Astra$\" and is kept when you uninstall."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\astra.exe"
-!define MUI_FINISHPAGE_RUN_PARAMETERS "-profile $\"$APPDATA\Astra\Profiles\default$\" -no-remote"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "-profile $\"$APPDATA\Astra\Profiles\default$\""
 !define MUI_FINISHPAGE_RUN_TEXT "Launch Astra"
 !define MUI_FINISHPAGE_LINK "Open Windows default apps to choose Astra"
 !define MUI_FINISHPAGE_LINK_LOCATION "ms-settings:defaultapps"
@@ -66,7 +66,7 @@ VIAddVersionKey "LegalCopyright" "Astra"
 !insertmacro MUI_LANGUAGE "English"
 
 !macro WriteAppCommand ROOT
-  WriteRegStr HKCU "${ROOT}\shell\open\command" "" "$\"$INSTDIR\astra.exe$\" -profile $\"$APPDATA\Astra\Profiles\default$\" -no-remote $\"%1$\""
+  WriteRegStr HKCU "${ROOT}\shell\open\command" "" "$\"$INSTDIR\astra.exe$\" -profile $\"$APPDATA\Astra\Profiles\default$\" $\"%1$\""
 !macroend
 
 Function .onInit
@@ -89,11 +89,11 @@ Section "Astra" SEC_MAIN
   ; --- shortcuts -----------------------------------------------------------
   CreateDirectory "$SMPROGRAMS\Astra"
   CreateShortCut "$SMPROGRAMS\Astra\Astra.lnk" "$INSTDIR\astra.exe" \
-    '-profile "$APPDATA\Astra\Profiles\default" -no-remote' \
+    '-profile "$APPDATA\Astra\Profiles\default"' \
     "$INSTDIR\astra.exe" 0 SW_SHOWNORMAL
   CreateShortCut "$SMPROGRAMS\Astra\Uninstall Astra.lnk" "$INSTDIR\uninstall.exe"
   CreateShortCut "$DESKTOP\Astra.lnk" "$INSTDIR\astra.exe" \
-    '-profile "$APPDATA\Astra\Profiles\default" -no-remote' \
+    '-profile "$APPDATA\Astra\Profiles\default"' \
     "$INSTDIR\astra.exe" 0 SW_SHOWNORMAL
 
   ; --- install record ------------------------------------------------------
@@ -167,10 +167,13 @@ Section "Astra" SEC_MAIN
   ; Refresh the shell so Open-with and Default apps see the new ProgId.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
-  ; Warm the executable cache and the fresh profile once. Without this the
-  ; first launch pays Windows' first-scan and profile-creation cost (8-10 s
-  ; measured); the headless screenshot exits without showing a window.
-  nsExec::ExecToLog '"$INSTDIR\astra.exe" --headless --screenshot "$TEMP\astra-warm.png" -profile "$APPDATA\Astra\Profiles\default" about:blank'
+  ; Warm the executable cache with a throwaway profile. Never touch the
+  ; person's profile here: Astra may already be running, and asking the same
+  ; profile to start again is what raised the native "Firefox is already
+  ; running" dialog during an upgrade.
+  RMDir /r "$TEMP\astra-warm-profile"
+  nsExec::ExecToLog '"$INSTDIR\astra.exe" --headless --screenshot "$TEMP\astra-warm.png" -no-remote -profile "$TEMP\astra-warm-profile" about:blank'
+  RMDir /r "$TEMP\astra-warm-profile"
   Delete "$TEMP\astra-warm.png"
 SectionEnd
 

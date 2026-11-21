@@ -11,6 +11,32 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Owner report: upgrade shows "Firefox is already running" (2026-11-21)
+
+**Symptom:** after installing a new build, a native Firefox dialog said the old
+process was not responding and must be closed.
+
+**Cause:** two Windows launch paths used `-no-remote` on the live profile:
+
+- every shortcut, ProgId command and the installer's "Launch Astra" passed it,
+  so a second launch could never hand off to the running instance and fell
+  through to the engine's profile-lock dialog;
+- the installer's headless warm-up also opened `%APPDATA%\Astra\Profiles\default`
+  while the person's Astra was running, so a silent upgrade could leave a
+  blocked headless process holding the dialog.
+
+**Fix:** the installed and portable launch paths no longer use `-no-remote`
+(a second launch now opens a window in the running instance and exits), and the
+warm-up uses a throwaway `%TEMP%\astra-warm-profile` with `-no-remote`, removed
+afterwards. `astra.cmd`, the README, shortcuts, ProgId commands and the finish
+page all agree. The dev launcher keeps `-no-remote` because it owns a separate
+dev profile.
+
+**Verified:** 0.1.765 installer runs silently to completion while a live Astra
+0.1.764 instance is open, with no warm-up process left and no dialog; shortcuts
+and ProgId commands contain no `-no-remote`; the live version probe reads
+0.1.765.
+
 ## Owner report: a tab click did nothing after the window sat hidden (2026-11-21)
 
 **Symptom:** after the window stayed in the background for a while (or after a

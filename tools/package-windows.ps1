@@ -98,7 +98,7 @@ setlocal
 set "ASTRA_DIR=%~dp0"
 if not defined ASTRA_PROFILE set "ASTRA_PROFILE=%APPDATA%\Astra\Profiles\default"
 if not exist "%ASTRA_PROFILE%" mkdir "%ASTRA_PROFILE%"
-start "" "%ASTRA_DIR%astra.exe" -profile "%ASTRA_PROFILE%" -no-remote %*
+start "" "%ASTRA_DIR%astra.exe" -profile "%ASTRA_PROFILE%" %*
 '@
 Set-Content -Path (Join-Path $app 'astra.cmd') -Value $launcher -Encoding ASCII
 
@@ -114,7 +114,7 @@ the Astra interface. Work is off in this build (Beta 1 rule).
 Double-click ``astra.cmd``. It keeps its profile in
 ``%APPDATA%\Astra\Profiles\default``, separate from Firefox.
 
-You can also run ``astra.exe -profile <dir> -no-remote`` directly. The
+You can also run ``astra.exe -profile <dir>`` directly. The
 ``firefox.exe`` beside it is the original engine launcher and is kept for
 compatibility.
 
