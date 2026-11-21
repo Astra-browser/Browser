@@ -204,6 +204,7 @@ else
     "native_surfaces:tools/marionette-probe/native-surfaces-probe.py"
     "owner_report:tools/marionette-probe/owner-report-probe.py"
     "sidebar_shield:tools/marionette-probe/sidebar-shield-probe.py"
+    "sidebar_card_head:tools/marionette-probe/sidebar-card-head-probe.py"
     "surface_park:tools/marionette-probe/surface-park-probe.py"
     "notes:tools/marionette-probe/notes-probe.py"
     "theme:tools/marionette-probe/theme-probe.py"

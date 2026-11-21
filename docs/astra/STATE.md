@@ -124,6 +124,44 @@ Canva loads from the address field, and the screenshots are in the run log.
 
 **Still deferred:** none for this surface.
 
+## Owner report: the put-away column's card has no address bar (2026-11-21, branch `fix/sidebar-card-address`)
+
+**Symptom:** with the column put away, reaching the left edge brought the card
+out with its utilities and tab list but without the page controls (Back,
+Forward, Reload, Home) or the address field. Over a live page the page bar is
+floating and hidden, so the window had no address bar at all until the pointer
+reached the very top edge.
+
+**Cause:** `sidebarOwnsBar` asked only `isHidden()`. The card a put-away column
+slides out as is still the column and draws its head from the same `nav` and
+`field` snippets, but the shell handed both to the stage bar, which is hidden
+over a live page. `ffd89c5e` had fixed exactly this headless card; `dcdde4f1`
+reintroduced it when the field was pinned to the column for every bar mode.
+
+**Fix:** the sidebar session publishes whether the column or its card is on
+screen (`sidebarCardShown`, set from `away`/`peeking`). `sidebarOwnsBar` pins
+the page controls and the one address field to the head whenever the full
+column is shown, including the peek card; the bar keeps the field only while
+the column is genuinely away, so the top-edge reveal still works.
+
+**Files:** `app/browser/Shell.svelte`,
+`features/sidebar/components/Sidebar.svelte`,
+`session/sidebar-mode.svelte.ts`; test
+`app/browser/tests/SidebarCardHead.component.test.ts`; live
+`tools/marionette-probe/sidebar-card-head-probe.py` (registered in both
+`full-suite` launchers).
+
+**Verified:** `SidebarCardHead` component suite **1/1 PASS**: while the card is
+out the head carries the page controls (six buttons: Back, Forward, Reload,
+Home, the column's options and the way back) and exactly one address field, and
+the bar keeps none; when the card goes away the field returns to the bar and
+the head drops it. `sidebar-card-head-probe.py` repeats it live on the packaged
+dev build (real page, real edge reveal): away
+`{headField:false, barField:true}`, peeked
+`{headField:true, headNav:6, barField:false, count:1}`, back
+`{headField:false, barField:true, count:1}`. `eslint` and Prettier are clean on
+the touched files; `build:chrome` staged 811 files with a clean CSP audit.
+
 ## Owner report: upgrade shows "Firefox is already running" (2026-11-21)
 
 **Symptom:** after installing a new build, a native Firefox dialog said the old

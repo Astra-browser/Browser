@@ -41,7 +41,12 @@
   import * as splitPicker from "$session/split-picker.svelte";
   import { SplitPicker } from "$features/split";
   import { requestTab } from "$session/work-tab.svelte";
-  import { expanded as sidebarWidth, isCompact, isHidden } from "$session/sidebar-mode.svelte";
+  import {
+    expanded as sidebarWidth,
+    isCompact,
+    isHidden,
+    sidebarCardShown,
+  } from "$session/sidebar-mode.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack, type Component, type Snippet } from "svelte";
   import { clearRequest } from "$domain/site-data";
@@ -677,8 +682,11 @@
   // full shape and in view, on every platform and whatever `ui.main-bar` says.
   // The page bar's show/hide mode belongs to the page bar: it must never take
   // the address away from a person working in the column, and a bar revealed
-  // only at the top edge must not be the only way to reach it.
-  let sidebarOwnsBar = $derived(!columnCompact && !isHidden());
+  // only at the top edge must not be the only way to reach it. A put-away
+  // column that has slid its card out is in view too: the card keeps the
+  // column's head, so the field travels with it instead of waiting in a bar
+  // that is hidden over the page.
+  let sidebarOwnsBar = $derived(!columnCompact && (!isHidden() || sidebarCardShown()));
   // On Windows the window's own controls live at the page bar's trailing end,
   // so that bar has to exist in the full-column shape too even when it no
   // longer carries the field. Elsewhere a pinned bar (`ui.main-bar=always`)
