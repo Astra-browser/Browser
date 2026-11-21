@@ -56,6 +56,7 @@ astra.jar:
   content/astra/res/blocker/seed/astra-telemetry.txt.gz (blocker/seed/astra-telemetry.txt.gz)
   content/astra/res/actors/AstraBlockerParent.sys.mjs (actors/AstraBlockerParent.sys.mjs)
   content/astra/res/actors/AstraBlockerChild.sys.mjs (actors/AstraBlockerChild.sys.mjs)
+  content/astra/res/actors/AstraBlockerProcess.sys.mjs (actors/AstraBlockerProcess.sys.mjs)
   content/astra/res/host/Operations.sys.mjs (host/Operations.sys.mjs)
   content/astra/res/host/Metadata.sys.mjs (host/Metadata.sys.mjs)
   content/astra/res/host/PageSource.sys.mjs (host/PageSource.sys.mjs)

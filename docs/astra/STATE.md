@@ -47,6 +47,37 @@ product). `state-check` and `brand-lint` are clean.
 pages that publish the same Media Session metadata and handlers. A page that
 publishes no artwork falls back to the tab's site mark.
 
+## Owner report: the ad blocker stopped working after a refresh (2026-11-22, branch `fix/blocker-refresh-consistency`)
+
+**Symptom:** on YouTube (and sites that rely on scriptlets) an ad played after
+refreshing the page, and sometimes on the first visit, while the shield read
+active and the blocked counters advanced. It looked random between tabs.
+
+**Cause (three stacked defects in the page half; the network half was fine —
+YouTube serves ad and content media from the same `videoplayback` endpoint):**
+
+| Layer | Why it failed | Fix |
+|---|---|---|
+| Scriptlet harness | adblock-rust ships the uBO scriptlet bodies but not the `scriptletGlobals` object they read. Every scriptlet threw inside adblock-rust's own `try { ... } catch {}` and did nothing, silently, on every site. | `overlay/astra/actors/AstraBlockerProcess.sys.mjs` prepends a harness prelude (`scriptletGlobals`, page-realm aliases). |
+| Page realm | The payload ran in a chrome sandbox: traps landed in the WindowProxy's Xray expando (invisible to page scripts) and `value instanceof Object` was false for page objects, so nested chains such as `ytInitialPlayerResponse.adPlacements` were never trapped. | The prelude binds `window`, `self`, `globalThis` and the standard constructors to `window.wrappedJSObject`, the page's own inner window. |
+| Document timing/lifecycle | The lookup ran from the per-document window actor (`DOMWindowCreated`), which a freshly spawned content process can create too late; per-document state could also survive a document change. | A long-lived process actor (`ChromeUtils.registerProcessActor`) receives the payload the Host computes at `http-on-modify-request` and injects from `document-element-inserted`, before the first script, once per document. The Host warms the process actor at install and broadcasts on a cross-site first navigation. `#releaseDocument` resets every document-scoped field on a document change; `pageshow` stays as the late-actor/bfcache fallback. |
+
+**Verification:** `blocker-refresh-probe.py` **32/32** on the packaged Windows
+dev build (first load, three reloads, a second and third tab, switch-back: CSS
+via agent sheet, scriptlet visible to the page's own inline scripts, nested
+chain trapped, zero ad-image requests); `youtube-ads-probe.py` real watch page:
+before the fix an ad played after reload (10-17 of 30 one-second samples), after
+the fix **0 ad samples** on first load and three reloads, with
+`ytInitialPlayerResponse.adPlacements` pruned where the hand-off landed before
+the inline response; `blocker_coverage` **29/29**, `blocker_host` **97/97**,
+`blocker-probe.py` PASS; `state-check` and `brand-lint` clean; overlay staged
+and `forge build --faster` clean.
+
+**Still deferred:** a rare navigation that commits without the request-time
+hand-off falls back to the async lookup at `DOMContentLoaded`, which installs
+the scriptlet after the document's first inline response. Removing that last
+case needs a content-script-style preload hook in the engine, not a JS actor.
+
 ## Owner report: a sign-in popup opened as a full Astra window (2026-11-21, branch `fix/popup-windows`)
 
 **Symptom:** a site that signs in with `window.open(url, name, "width=520,height=640")`

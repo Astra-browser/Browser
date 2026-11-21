@@ -146,6 +146,51 @@ dependencies are missing from the bundle.
   @astra/frame check` (1238 tests), `bun test` in `ui/packages/bridge`,
   `crates/astra-proto/check-drift.sh`, `state-check`, `brand-lint`.
 
+## Scriptlets actually run, and every document gets its own pass (2026-11-22)
+
+Owner report: YouTube played ads after a refresh, and sometimes on the first
+visit, while the shield read active and the blocked counters advanced. Three
+document-scoped defects in the page half explained both; the network half could
+not hide them because YouTube serves ad and content media from the same
+`videoplayback` endpoint.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Ads play on sites whose lists stop them with scriptlets; the same page sometimes plays no ad at all | **No scriptlet ever ran.** `blocker/resources/resources.json` (the uBO scriptlet set adblock-rust compiles) ships the scriptlet bodies and helpers, but the harness global they read, `scriptletGlobals`, is created by the injecting layer. Astra never created it, so the first `safeSelf()` call threw `ReferenceError: scriptletGlobals is not defined` inside adblock-rust's own `try { ... } catch {}` wrapper: silently, for every scriptlet on every site. For YouTube that meant the ad JSON was never pruned and whether an ad appeared was YouTube's own decision, which looked random per tab and per visit. | `AstraBlockerProcess.sys.mjs` prepends a harness prelude that defines `scriptletGlobals`. |
+| Scriptlets that did evaluate still had no effect on the page (traps on `window`, ad JSON untouched) | The payload ran in a chrome sandbox whose `window` is the page **WindowProxy** and whose intrinsics belong to the sandbox realm. Property traps landed in the Xray expando, invisible to page scripts, and `value instanceof Object` was false for page objects, so a nested chain (`ytInitialPlayerResponse.adPlacements`, the exact YouTube rule) was never trapped. | The prelude binds `window`, `self`, `globalThis` and the standard constructors to the page's own unwrapped inner window (`window.wrappedJSObject`), so traps apply to the objects the page reads and `instanceof` matches. |
+| A reload or a fresh tab sometimes missed the scriptlet while another tab worked | Injection was requested from the per-document window actor at `DOMWindowCreated`; in a freshly spawned content process that actor can be created after the event, and the payload lookup itself is asynchronous. | A process actor (`AstraBlockerProcess`) receives the payload the Host computes when the top-level request starts (`http-on-modify-request`) and injects from `document-element-inserted` — before the parser reaches the first script — once per document (WeakSet). The window actor keeps its synchronous fallback (`take()`) and owns CSS, the observer and procedural actions; a document change resets all of that (`#releaseDocument`). |
+| A page could show a stale scriptlet/CSS state after a same-window document change | Per-document state (seen classes/ids, sheet URIs, observer, timer, procedural set, `#scriptInjected`, `#url`) survived a document change in one actor instance. | `handleEvent` compares `this.document` with the tracked document; a change runs `#releaseDocument()` (full teardown plus every document-scoped field) before `#start()`. `pageshow` is registered beside `DOMWindowCreated`/`DOMContentLoaded` for bfcache restores and late actors. |
+
+**Live evidence (2026-11-22, packaged Windows dev build):**
+
+- `tools/marionette-probe/blocker-refresh-probe.py` **32/32 PASS**: a local page
+  carries a network rule, a cosmetic rule, `##+js(set-constant,
+  astraProbeScriptlet, true)` and a nested `##+js(set-constant,
+  astraNested.adValue, undefined)`. First load, three reloads, a second and a
+  third tab and a switch back all report `display: none`, the page's own inline
+  scripts see the scriptlet (so the trap is in the page realm), the nested chain
+  is trapped, no page `<style>` node exists (agent-sheet path) and the server
+  never sees the ad image. Reloads also assert that the scriptlet precedes the
+  first inline script. Before the fix the scriptlet checks failed on every load.
+- `tools/marionette-probe/youtube-ads-probe.py` drives a real watch page with
+  autoplay enabled. Before the fix an ad played after a reload
+  (`.ad-showing` in 10-17 of 30 one-second samples). After the fix the final
+  run had **0 ad samples** on the first load and across three reloads, and
+  `ytInitialPlayerResponse.adPlacements` was `null` on the navigations where the
+  hand-off landed before the page's inline response.
+- `tests/contract/blocker_coverage.mjs` **29/29** pins the prelude, the
+  page-realm aliases, the process-actor injection, the event set and the
+  prefetch hand-off. `blocker_host.mjs` **97/97** and `blocker-probe.py` PASS.
+
+**Limits (honest):** ad media is still not blocked by URL shape; YouTube serves
+it from the same host and path as the video, so the scriptlet and cosmetic
+layers are doing the work there. The process actor needs the payload computed
+at request time; if a navigation commits without that hand-off (rare, observed
+once in a three-reload run), the window actor's asynchronous lookup still
+installs the scriptlet at `DOMContentLoaded`, which catches later player fetches
+but not the document's first inline response. Closing that last case needs a
+content-script-style preload hook in the engine, not a JS actor.
+
 ## Deferred / limits (honest)
 
 - **CNAME uncloaking is first-party-only and the first request can pass.** The

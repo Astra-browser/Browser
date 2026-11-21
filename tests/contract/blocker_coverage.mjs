@@ -135,12 +135,11 @@ check(
 
 // 4. The shared-domain exception stays path-scoped and the bundled seed
 //    carries the covering path rule.
-const bundled = [
-  "easylist.txt.gz",
-  "easyprivacy.txt.gz",
-]
+const bundled = ["easylist.txt.gz", "easyprivacy.txt.gz"]
   .map((name) =>
-    zlib.gunzipSync(fs.readFileSync(path.join(ROOT, "blocker/seed", name))).toString("utf8"),
+    zlib
+      .gunzipSync(fs.readFileSync(path.join(ROOT, "blocker/seed", name)))
+      .toString("utf8"),
   )
   .join("\n");
 check(
@@ -165,7 +164,11 @@ for (const line of section.split("\n")) {
   if (seen.has(rule)) dups.push(rule);
   seen.add(rule);
 }
-check("generated sections have no duplicate rules", dups.length === 0, dups.slice(0, 5).join(", "));
+check(
+  "generated sections have no duplicate rules",
+  dups.length === 0,
+  dups.slice(0, 5).join(", "),
+);
 
 // 6. The generator's `--check` is green (source inventories and list agree).
 let generatorOk = false;
@@ -176,7 +179,11 @@ try {
 } catch (error) {
   generatorDetail = String(error.stderr || error.message).trim();
 }
-check("strict section is current (superadblock.py --check)", generatorOk, generatorDetail);
+check(
+  "strict section is current (superadblock.py --check)",
+  generatorOk,
+  generatorDetail,
+);
 
 // 7. The packaged gzip is the same text (a stale jar ships stale rules).
 const packed = zlib.gunzipSync(fs.readFileSync(SEED)).toString("utf8");
@@ -204,6 +211,55 @@ check(
   "an unseen class/id batch is looked up immediately",
   actor.includes("IMMEDIATE_BATCHES") && actor.includes("collectMutated"),
 );
+// The scriptlet half of the blocker: the resource bundle carries the uBO
+// scriptlet bodies and helpers but not the harness global they read, so the
+// injector must publish `scriptletGlobals` or every scriptlet throws inside the
+// engine's own try/catch and silently does nothing. It also has to run against
+// the page's own realm (unwrapped window and intrinsics) or traps land in the
+// Xray expando/page-realm `instanceof` checks fail.
+const PROCESS_ACTOR = path.join(
+  ROOT,
+  "overlay/astra/actors/AstraBlockerProcess.sys.mjs",
+);
+const processActor = fs.readFileSync(PROCESS_ACTOR, "utf8");
+check(
+  "scriptlets receive the harness global they read",
+  processActor.includes("const scriptletGlobals = {};") &&
+    processActor.includes("__astraPageWindow") &&
+    processActor.includes("Cu.evalInSandbox(SCRIPTLET_GLOBALS + script"),
+);
+// One injection per document, from the process actor, as early as the root
+// element: a fresh content process can create the window actor too late for
+// `DOMWindowCreated`.
+check(
+  "the process actor injects once per document at its root",
+  processActor.includes('"document-element-inserted"') &&
+    processActor.includes("#injected = new WeakSet()") &&
+    processActor.includes("this.inject(doc, payload.script, href)"),
+);
+// The child actor outlives a document (a window global can host several), so
+// every document must be adopted from a clean slate and a late actor must still
+// start from `pageshow`.
+const BLOCKER_HOST = path.join(ROOT, "overlay/astra/host/Blocker.sys.mjs");
+const blockerHost = fs.readFileSync(BLOCKER_HOST, "utf8");
+const registration = blockerHost.match(
+  /registerWindowActor\("AstraBlocker"[\s\S]*?\n {4}\}\);/,
+);
+check(
+  "the actor starts each document and keeps a pageshow fallback",
+  actor.includes("doc !== this.#document") &&
+    actor.includes("#releaseDocument()") &&
+    !!registration &&
+    /DOMWindowCreated: \{\}/.test(registration[0]) &&
+    /DOMContentLoaded: \{\}/.test(registration[0]) &&
+    /pageshow: \{\}/.test(registration[0]),
+);
+check(
+  "the top-level request hands scriptlets to the content process",
+  blockerHost.includes('registerProcessActor("AstraBlockerProcess"') &&
+    blockerHost.includes('"astra-blocker-prefetch"') &&
+    blockerHost.includes("getAllDOMProcesses"),
+);
 
 // 9. Browser-wide privacy posture stays strengthened. Each target closes a
 //    cheap high-entropy surface; the list is asserted so a later edit cannot
@@ -215,7 +271,9 @@ const overrides = cfg.match(
   /defaultPref\("privacy\.fingerprintingProtection\.overrides",\s*"([^"]+)"\)/,
 );
 const targets = new Set(
-  (overrides ? overrides[1] : "").split(",").map((value) => value.replace(/^\+/, "")),
+  (overrides ? overrides[1] : "")
+    .split(",")
+    .map((value) => value.replace(/^\+/, "")),
 );
 const REQUIRED_TARGETS = [
   "CanvasRandomization",
@@ -338,7 +396,8 @@ const REQUIRED_PREFS = [
   ["astra.blocker.block-scripts", "false"],
 ];
 const missingPrefs = REQUIRED_PREFS.filter(
-  ([pref, value]) => !new RegExp(`defaultPref\\("${escapeRe(pref)}",\\s*${value}\\)`).test(cfg),
+  ([pref, value]) =>
+    !new RegExp(`defaultPref\\("${escapeRe(pref)}",\\s*${value}\\)`).test(cfg),
 );
 check(
   "privacy and blocker defaults are intact",

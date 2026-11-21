@@ -982,8 +982,115 @@ const CSP_OBSERVER = {
   },
 };
 
-let _cspObserved = false;
+// The scriptlet half must be in the page before its first inline script runs.
+// The child asks at DOMWindowCreated, but the engine's cosmetic resources are
+// built lazily per URL, and that build can outlast the page's head. Warm the
+// engine cache as soon as a top-level document request starts, so the child's
+// lookup is a cache hit and the payload lands while the document is still
+// loading.
+const WARM_OBSERVER = {
+  observe(subject, topic) {
+    if (topic !== "http-on-modify-request") return;
+    let url = "";
+    let channel = null;
+    try {
+      channel = subject.QueryInterface(Ci.nsIHttpChannel);
+      const loadInfo = channel.loadInfo;
+      if (!loadInfo) return;
+      if (
+        loadInfo.externalContentPolicyType !== Ci.nsIContentPolicy.TYPE_DOCUMENT
+      ) {
+        return;
+      }
+      const bc = loadInfo.browsingContext;
+      if (bc && bc.parent) return;
+      const uri = channel.URI;
+      if (!uri || (uri.scheme !== "http" && uri.scheme !== "https")) return;
+      url = uri.spec;
+      if (!prefBool(PREF, DEFAULT_ENABLED)) return;
+      if (!prefBool(COSMETIC_PREF, true) && !prefBool(SCRIPTLETS_PREF, true)) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    try {
+      const service = Cc["@astra/blocker;1"].getService(
+        Ci.nsIAstraBlockerService,
+      );
+      const raw = service.cosmeticFor(url, "[]", "[]");
+      const payload = JSON.parse(raw || "{}");
+      if (!payload || typeof payload !== "object") return;
+      // Hand the scriptlet payload to the content process before the document
+      // exists. The window actor is per document, so the hand-off goes
+      // through the process actor and reaches the next document's actor
+      // synchronously at DOMWindowCreated.
+      if (typeof payload.script === "string" && payload.script !== "") {
+        const data = { url, payload };
+        const send = (process) => {
+          try {
+            process
+              ?.getActor("AstraBlockerProcess")
+              ?.sendAsyncMessage("astra-blocker-prefetch", data);
+          } catch {
+            // This process has no child-side actor.
+          }
+        };
+        const process =
+          channel.loadInfo?.browsingContext?.currentWindowGlobal?.domProcess;
+        let sameOrigin = false;
+        try {
+          const current =
+            channel.loadInfo?.browsingContext?.currentWindowGlobal
+              ?.documentPrincipal;
+          sameOrigin = !!current && current.origin === uri.prePath;
+        } catch {
+          sameOrigin = false;
+        }
+        if (process && sameOrigin) {
+          send(process);
+        } else {
+          // A first navigation (about:blank to a site) or a cross-site switch
+          // can commit in a different content process; every candidate needs
+          // the payload because the target is not known before the request.
+          try {
+            for (const candidate of ChromeUtils.getAllDOMProcesses()) {
+              send(candidate);
+            }
+          } catch {
+            // The process list is unavailable.
+          }
+        }
+      }
+    } catch {
+      // Warming is an optimisation; the actor still asks for itself.
+    }
+  },
+};
 
+let _warmObserved = false;
+
+function installWarmObserver() {
+  if (_warmObserved) return;
+  try {
+    Services.obs.addObserver(WARM_OBSERVER, "http-on-modify-request");
+    _warmObserved = true;
+  } catch {
+    _warmObserved = false;
+  }
+}
+
+function uninstallWarmObserver() {
+  if (!_warmObserved) return;
+  try {
+    Services.obs.removeObserver(WARM_OBSERVER, "http-on-modify-request");
+  } catch {
+    // Already gone.
+  }
+  _warmObserved = false;
+}
+
+let _cspObserved = false;
 function installCspObserver() {
   if (_cspObserved) return;
   try {
@@ -1843,7 +1950,9 @@ export function install() {
       try {
         if (Services.prefs.getPrefType(PREF) === Services.prefs.PREF_INVALID) {
           // Define the gate the C++ hook reads; a user value still wins.
-          Services.prefs.getDefaultBranch("").setBoolPref(PREF, DEFAULT_ENABLED);
+          Services.prefs
+            .getDefaultBranch("")
+            .setBoolPref(PREF, DEFAULT_ENABLED);
         }
       } catch {
         // A locked default is fine: the read below reports what exists.
@@ -1851,6 +1960,7 @@ export function install() {
       hydrateState();
       registerActor();
       installCloakObserver();
+      installWarmObserver();
       installCspObserver();
       scheduleRefresh();
       scheduleStartupRefresh();
@@ -1925,7 +2035,14 @@ function registerActor() {
       },
       child: {
         esModuleURI: "resource://astra/actors/AstraBlockerChild.sys.mjs",
-        events: { DOMContentLoaded: {} },
+        // DOMWindowCreated is the earliest point the actor can see: the
+        // lookup is sent before the page parses, so an ad JSON hook exists
+        // before the first inline script. DOMContentLoaded finishes the
+        // document (observer, first class/id walk); pageshow is the fallback
+        // for a document whose parse finished before the actor was registered
+        // (dynamic actors only see events fired after they exist) and for
+        // bfcache restores.
+        events: { DOMWindowCreated: {}, DOMContentLoaded: {}, pageshow: {} },
       },
       allFrames: true,
       includeChrome: false,
@@ -1935,6 +2052,48 @@ function registerActor() {
     // Already registered by another window, or an older engine without
     // dynamic actors. Network blocking does not depend on the actor.
     _actorRegistered = false;
+  }
+  registerProcessActor();
+}
+
+let _processActorRegistered = false;
+
+function registerProcessActor() {
+  const chrome = chromeScope();
+  if (!chrome || _processActorRegistered) return;
+  try {
+    chrome.ChromeUtils.registerProcessActor("AstraBlockerProcess", {
+      child: {
+        esModuleURI: "resource://astra/actors/AstraBlockerProcess.sys.mjs",
+      },
+    });
+    _processActorRegistered = true;
+  } catch {
+    _processActorRegistered = false;
+  }
+  warmProcessActors();
+}
+
+// Creating the child actor on first use would make the first navigation of a
+// session miss its prefetch while the module loads. Touch every content
+// process once, at install time, so the hand-off is ready before any page.
+function warmProcessActors() {
+  const chrome = chromeScope();
+  if (!chrome) return;
+  let processes = [];
+  try {
+    processes = chrome.ChromeUtils.getAllDOMProcesses();
+  } catch {
+    return;
+  }
+  for (const process of processes) {
+    try {
+      process
+        .getActor("AstraBlockerProcess")
+        ?.sendAsyncMessage("astra-blocker-warm");
+    } catch {
+      // The parent process has no child-side actor.
+    }
   }
 }
 
@@ -1957,6 +2116,14 @@ export function uninstall() {
     }
     _actorRegistered = false;
   }
+  if (_processActorRegistered) {
+    try {
+      ChromeUtils.unregisterProcessActor("AstraBlockerProcess");
+    } catch {
+      // The actor was never registered in this process.
+    }
+    _processActorRegistered = false;
+  }
   try {
     Services.prefs.removeObserver(PREF, OBSERVER);
     Services.prefs.removeObserver(CNAME_PREF, OBSERVER);
@@ -1964,6 +2131,7 @@ export function uninstall() {
     // The pref service is already gone.
   }
   uninstallCloakObserver();
+  uninstallWarmObserver();
   uninstallCspObserver();
   _cloakCache.clear();
 }
