@@ -332,7 +332,16 @@ check(
 );
 check(
   "the popup keeps the native chrome visible",
-  /:root:not\(\[data-astra-popup\]\):not\(\[chromehidden~="toolbar"\]\)/u.test(chromeCss),
+  /:root:where\(:not\(\[data-astra-popup\]\):not\(\[chromehidden~="toolbar"\]\)\)/u.test(
+    chromeCss,
+  ),
+);
+check(
+  "the popup hide rule cannot outrank the native deck dock",
+  chromeCss.includes(":root:where(") &&
+    !/:root:not\(\[data-astra-popup\]\):not\(\[chromehidden~="toolbar"\]\)/u.test(
+      chromeCss,
+    ),
 );
 check(
   "the popup marks its document for the shell CSS",

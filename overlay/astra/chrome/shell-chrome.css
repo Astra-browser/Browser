@@ -12,7 +12,7 @@
    mounts the product shell (the shell marks it data-astra-popup). The engine
    also marks a popup before that script runs, so the chromehidden check holds
    the first paint too. */
-:root:not([data-astra-popup]):not([chromehidden~="toolbar"]) :is(
+:root:where(:not([data-astra-popup]):not([chromehidden~="toolbar"])) :where(
     #navigator-toolbox,
     #tabbrowser-tabbox,
     #sidebar-container,

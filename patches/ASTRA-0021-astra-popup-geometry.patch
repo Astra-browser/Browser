@@ -1,26 +1,27 @@
 Patch-Id: ASTRA-0021
 Title: Honor a page popup's window.open size
 Tier: P2
-Upstream-Files: xpfe/appshell/AppWindow.cpp, toolkit/components/windowwatcher/nsWindowWatcher.cpp
-Intent: A page's window.open with features creates a chrome popup. The window must keep the requested size instead of inheriting the main window's persisted geometry (and being forced to the screen's available size when the fresh primary content has no layout yet). The native popup chrome is the only chrome in that window.
+Upstream-Files: xpfe/appshell/AppWindow.cpp, xpfe/appshell/AppWindow.h, toolkit/components/windowwatcher/nsWindowWatcher.cpp
+Intent: A page's window.open with features creates a chrome popup. The window must keep the requested size instead of inheriting the main window's persisted geometry (and being forced to the screen's available size when the fresh primary content has no layout yet). The native popup chrome is the only chrome in that window. The change is scoped to content-created windows so session-restored browser windows keep their normal sizing path.
 Risk: low (content-created chrome windows only; browser windows keep persistence and normal sizing)
 Test: tools/marionette-probe/popup-window-probe.py (20 checks), tests/contract/native_surfaces.mjs
 Verified-On: 153.6.0
 Removal-Plan: drop when upstream no longer restores persisted geometry into content popups or sizes features after first layout
 ---
 diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-index dfa3fe9671..1c7b798566 100644
+index dfa3fe9671..3c195effeb 100644
 --- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
 +++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-@@ -2349,6 +2349,14 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
+@@ -2349,6 +2349,15 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
      CSSIntSize contentSizeCSS = RoundedToInt(contentSize / cssToDevScale);
      chromeWidth = width - contentSizeCSS.width;
      chromeHeight = height - contentSizeCSS.height;
-+    if (hasPrimaryContent && contentSize.width == 0 && contentSize.height == 0) {
-+      // A fresh popup has a primary content element but no layout yet, so the
-+      // difference below would be the whole window. Treating it as chrome
-+      // would shrink the requested inner size and force the popup to the
-+      // screen's available size.
++    if (!aIsCallerChrome && hasPrimaryContent && contentSize.width == 0 &&
++        contentSize.height == 0) {
++      // A fresh content popup has a primary content element but no layout yet,
++      // so the difference below would be the whole window. Treating it as
++      // chrome would shrink the requested inner size and force the popup to
++      // the screen's available size.
 +      chromeWidth = 0;
 +      chromeHeight = 0;
 +    }
@@ -28,27 +29,37 @@ index dfa3fe9671..1c7b798566 100644
  
    // Set up left/top
 diff --git a/xpfe/appshell/AppWindow.cpp b/xpfe/appshell/AppWindow.cpp
-index 8ce7a79d6f..c36184f85a 100644
+index 8ce7a79d6f..b60e3eeb2b 100644
 --- a/xpfe/appshell/AppWindow.cpp
 +++ b/xpfe/appshell/AppWindow.cpp
-@@ -2133,6 +2133,13 @@ AppWindow::SetPrimaryContentSize(int32_t aWidth, int32_t aHeight) {
+@@ -125,6 +125,7 @@ AppWindow::AppWindow(uint32_t aChromeFlags)
+       mIgnoreXULPosition(false),
+       mChromeFlagsFrozen(false),
+       mIgnoreXULSizeMode(false),
++      mContentCreated(false),
+       mDestroying(false),
+       mRegistered(false),
+       mDominantClientSize(false),
+@@ -2133,6 +2134,13 @@ AppWindow::SetPrimaryContentSize(int32_t aWidth, int32_t aHeight) {
  nsresult AppWindow::SetPrimaryRemoteTabSize(int32_t aWidth, int32_t aHeight) {
    int32_t shellWidth, shellHeight;
    GetPrimaryRemoteTabSize(&shellWidth, &shellHeight);
-+  if (shellWidth <= 0 || shellHeight <= 0) {
-+    // The primary content has not been laid out yet (a fresh popup at the
-+    // moment nsWindowWatcher applies its features). The delta below would
-+    // measure the request against a zero content area and add the whole
-+    // request to the current window, which opens the popup at screen size.
++  if (mContentCreated && (shellWidth <= 0 || shellHeight <= 0)) {
++    // A fresh popup has no content layout yet at the moment its features are
++    // applied. The delta below would add the whole request to the current
++    // window and open the popup at screen size. Session-restored windows keep
++    // the normal path so their stored geometry is not reinterpreted.
 +    return SizeShellTo(mDocShell, aWidth, aHeight);
 +  }
    SizeShellToWithLimit(aWidth, aHeight, shellWidth, shellHeight);
    return NS_OK;
  }
-@@ -2260,6 +2267,20 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
+@@ -2259,6 +2267,21 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
+ 
    AppWindow* appWin =
        static_cast<AppWindow*>(static_cast<nsIAppWindow*>(newWindow));
- 
++  appWin->mContentCreated = true;
++
 +  // A content-created chrome window is a popup: its geometry comes from the
 +  // window.open features, applied by nsWindowWatcher after the chrome loads.
 +  // The browser window's persisted size, position and size mode must not be
@@ -62,7 +73,19 @@ index 8ce7a79d6f..c36184f85a 100644
 +    appWin->mIgnoreXULPosition = true;
 +    appWin->mIgnoreXULSizeMode = true;
 +  }
-+
+ 
    // Specify which flags should be used by browser.xhtml to create the initial
    // content browser window.
-   appWin->mInitialOpenWindowInfo = aOpenWindowInfo;
+diff --git a/xpfe/appshell/AppWindow.h b/xpfe/appshell/AppWindow.h
+index a344dd08ad..679bb30df2 100644
+--- a/xpfe/appshell/AppWindow.h
++++ b/xpfe/appshell/AppWindow.h
+@@ -335,6 +335,8 @@ class AppWindow final : public nsIBaseWindow,
+   bool mIgnoreXULPosition;
+   bool mChromeFlagsFrozen;
+   bool mIgnoreXULSizeMode;
++  // True for a window created by nsWindowWatcher for content (a popup).
++  bool mContentCreated;
+   // mDestroying is used to prevent reentry into into Destroy(), which can
+   // otherwise happen due to script running as we tear down various things.
+   bool mDestroying;
