@@ -34,11 +34,14 @@ adoption, the native deck visible, and `window.close()` from the page removes
 the window while the browser window survives.
 
 **Verification:** `tools/marionette-probe/popup-window-probe.py` **20/20** on
-the Windows dev build (real `window.open` with features; asserts popup chrome,
-requested viewport, no shell, native deck, parent untouched, page close, parent
-survival); `tests/contract/native_surfaces.mjs` **141/141** (three new shell
-checks); `ui/shell/src/popup.test.mjs` **6/6**; `forge lint` 21 patches clean;
-`state-check` and `brand-lint` clean. The probe is registered in
+the Windows dev build and **20/20** on the installed 0.1.767 `astra.exe` (real
+`window.open` with features; asserts popup chrome, requested viewport, no
+shell, native deck, parent untouched, page close, parent survival);
+`version-probe.py` **8/8** on the installed build; `tests/contract/native_surfaces.mjs`
+**141/141** (three new shell checks); `ui/shell/src/popup.test.mjs` **6/6**;
+`forge lint` 21 patches clean; `state-check` and `brand-lint` clean. The patch
+is `patches/ASTRA-0021-astra-popup-geometry.patch` and `forge overlay` applies
+it in order on a fresh `forge fetch`. The probe is registered in
 `tools/perf/full-suite.sh` and `.ps1`.
 
 **Still deferred:** none for this surface.
