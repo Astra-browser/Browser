@@ -65,7 +65,14 @@ was merged on the owner's instruction after the checks below.
 | Several splits | Each split is independent and capped at 3 panes (or the configured 2). A parked split whose card changes now reaches the sidebar immediately: `refresh` emits when `split_groups` changes, not only when the active group does. A tab outside a split can start another one; a full split says "Split view full" and never steals a pane. | host `SplitView.sys.mjs` (`refresh`), picker capacity model |
 | No reload / no resize | Only panes that were blank before a split are warmed. A tab that already had a page is moved into the split and never re-requested; a busy tab is not re-loaded by the retry. Adding a pane rebuilds the wrapper in one turn instead of `TabTabs.addTabs`, preserving both the browser and every pane share. Server request counts prove the source page is fetched once across split, detach and re-split. | host `SplitView.sys.mjs` (`isBlankTab`, `tabBusy`, `warmPanes`, `expandSplit`, `sharesForRemaining`) |
 
-**Verification:** `tools/marionette-probe/split-view-probe.py` **29/29 PASS** on
+**Stacking:** a tab menu handing over to the picker kept `popupRaised` true,
+so after the menu's own `menu-close` the shell never received a second
+`menu-open`; the frame stayed under the native page, its backdrop blurred the
+app, and the page covered the dialog. The raise now tracks the popup element
+(not just a boolean), so the handover re-raises the frame. The probe asserts
+`data-astra-menu-open` and `data-astra-raised` after the menu closes.
+
+**Verification:** `tools/marionette-probe/split-view-probe.py` **30/30 PASS** on
 the packaged Windows dev build (local server pages, real app UI): the menu row
 opens the picker, the right-clicked tab is the source, server hits are 1 for a
 page carried through split/detach, two extra splits stay separate with their own
