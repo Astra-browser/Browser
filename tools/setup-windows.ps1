@@ -301,3 +301,4 @@ if (-not $SkipPackage) {
 
 Step 'done'
 Write-Log "log: $log"
+exit 0
