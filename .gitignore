@@ -48,8 +48,12 @@ UI_IDEA
 # Playwright MCP scratch dir (tool artifact, not repo content)
 .playwright-mcp/
 
-# Agent worktrees (tools, not repo content)
+# Agent worktrees and local agent tooling (tools, not repo content)
 .worktrees/
+.agents/
+.scratch/
+skills-lock.json
+.skill-lock.json
 
 # Local Python venv (repo scripts prefer it via tools/venv-python.sh;
 # system python3/python is the fallback, so Linux without .venv is unchanged)
