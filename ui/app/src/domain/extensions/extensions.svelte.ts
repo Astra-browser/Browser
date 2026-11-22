@@ -77,7 +77,7 @@ function publishFailure(
   const generation = slice.current();
   noticeTimer = setTimeout(() => {
     noticeTimer = null;
-    if (generation !== lifecycle) return;
+    if (!slice.isCurrent(generation)) return;
     if (revision !== undefined) model.clearFailure(revision);
     failure = null;
   }, NOTICE_LIFETIME_MS);

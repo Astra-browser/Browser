@@ -4,30 +4,11 @@
 
 export type Unlisten = () => void;
 
-/** Document-lifetime generation guard. Call begin only for a new initialization. */
-export function createLifecycle() {
-  let generation = 0;
-  let active = false;
-  return {
-    begin() {
-      active = true;
-      return ++generation;
-    },
-    isCurrent(value: number) {
-      return active && generation === value;
-    },
-    end() {
-      active = false;
-      generation++;
-    },
-  };
-}
-
 /** A slice registers one listener or a set of them; returning nothing means it
  *  is not listening yet and a later `init()` must try again. */
-export type SliceRegistration = Unlisten | readonly Unlisten[] | undefined;
+type SliceRegistration = Unlisten | readonly Unlisten[] | undefined;
 
-export type SliceContext = {
+type SliceContext = {
   readonly generation: number;
   /** True while this registration still owns the slice. */
   isCurrent(): boolean;
@@ -69,6 +50,7 @@ export function createSlice(options: SliceOptions): Slice {
   let initialized = false;
   let initializing: Promise<void> | null = null;
   let unlisten: Unlisten | null = null;
+  let disposed = false;
 
   function release(registration: SliceRegistration) {
     if (registration === undefined) return;
@@ -84,6 +66,7 @@ export function createSlice(options: SliceOptions): Slice {
     }
 
     const owner = ++generation;
+    disposed = false;
     const context: SliceContext = {
       generation: owner,
       isCurrent: () => generation === owner,
@@ -125,6 +108,8 @@ export function createSlice(options: SliceOptions): Slice {
   }
 
   function dispose() {
+    if (disposed && !initialized && initializing === null && unlisten === null) return;
+    disposed = true;
     generation += 1;
     initialized = false;
     initializing = null;
