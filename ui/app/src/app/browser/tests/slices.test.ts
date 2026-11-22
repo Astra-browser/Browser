@@ -49,6 +49,7 @@ vi.mock("$shared/ipc/bindings", async () => {
   // The model file only: the public barrel also loads `blocker.svelte`, which
   // imports the bindings module this factory is still building, so importing
   // the barrel here deadlocks the mock.
+  // eslint-disable-next-line boundaries/dependencies -- the barrel would deadlock this mock factory
   const { initialBlockerStatus } = await import("$domain/blocker/blocker-model");
   return mockBindings({
     uiInfo: async () => ({ material: "none", materials: [] }),
