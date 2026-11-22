@@ -33,7 +33,8 @@ export type SliceOptions = {
    *  and `isCurrent` guard every callback. */
   register(context: SliceContext): SliceRegistration | Promise<SliceRegistration>;
   /** Reset the slice's own state after the generation is invalidated and its
-   *  listeners released. Runs on every dispose, including a second one. */
+   *  listeners released. Runs on the first dispose of a generation; a repeated
+   *  dispose is a no-op. */
   reset?(): void;
   /** Re-apply state when `init()` is called after the slice is already live. */
   whenInitialized?(): void;
@@ -67,6 +68,7 @@ export function createSlice(options: SliceOptions): Slice {
 
     const owner = ++generation;
     disposed = false;
+    let attached = false;
     const context: SliceContext = {
       generation: owner,
       isCurrent: () => generation === owner,
@@ -78,6 +80,7 @@ export function createSlice(options: SliceOptions): Slice {
         }
         unlisten?.();
         unlisten = stop;
+        attached = true;
       },
     };
 
@@ -85,11 +88,12 @@ export function createSlice(options: SliceOptions): Slice {
       const registration = await options.register(context);
       if (generation !== owner) {
         // A dispose already ran. Release a listener that arrived late; an
-        // earlier `attach` was released by that dispose.
-        if (registration !== undefined && unlisten === null) release(registration);
+        // earlier `attach` was released by that dispose. A newer init may have
+        // installed its own listener since, so do not depend on `unlisten`.
+        if (registration !== undefined && !attached) release(registration);
         return;
       }
-      if (registration !== undefined && unlisten === null) {
+      if (registration !== undefined && !attached) {
         unlisten = () => release(registration);
       }
       if (unlisten !== null) initialized = true;

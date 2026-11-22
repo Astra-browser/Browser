@@ -20,6 +20,29 @@ describe("slice lifecycle", () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
+  it("releases a late listener even after a newer init installed its own", async () => {
+    let resolveFirst!: (stop: () => void) => void;
+    const firstStop = vi.fn();
+    const secondStop = vi.fn();
+    let calls = 0;
+    const slice = createSlice({
+      register: () =>
+        calls++ === 0
+          ? new Promise<() => void>((resolve) => (resolveFirst = resolve))
+          : Promise.resolve(secondStop),
+    });
+    const first = slice.init();
+    slice.dispose();
+    const second = slice.init();
+    await second;
+    resolveFirst(firstStop);
+    await first;
+    expect(firstStop).toHaveBeenCalledOnce();
+    expect(secondStop).not.toHaveBeenCalled();
+    slice.dispose();
+    expect(secondStop).toHaveBeenCalledOnce();
+  });
+
   it("reinitializes after dispose and tolerates a second dispose", async () => {
     const stops: (() => void)[] = [];
     const slice = createSlice({
