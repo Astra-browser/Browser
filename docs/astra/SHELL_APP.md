@@ -120,6 +120,14 @@ which runs `vite build --config vite.chrome.ts` and then
   through `chrome://astra/content/app/`), then audits chrome-CSP
   safety (U-04): no inline `<script>`, no remote `http(s):` script/link URLs,
   no absolute-path subresources. Output names stay hashed (cache-busting).
+- `tools/stage-host-jar.mjs` (stdlib only): regenerates the `# BEGIN/END HOST
+  API` block from `overlay/astra/host/*.sys.mjs` and
+  `overlay/astra/host/schemas/*.json` (sorted, one line per file). Every host
+  file is packaged except the named `BootSidecar.sys.mjs` compatibility
+  re-export (`HOST_API_v1.md` §Modules). Standalone so a host-only change does
+  not need an app build; `build:chrome`, `setup.sh` and
+  `package-release.sh --with-build` run it before `forge overlay` copies the
+  overlay into the engine. Guard: `tests/contract/jar_manifest.mjs`.
 
 ## 3. Packaging (`overlay/astra`)
 
@@ -132,7 +140,8 @@ which runs `vite build --config vite.chrome.ts` and then
   but unused for framing — see §5) plus `% resource astra-app
   %content/astra/app/` so the shell can resolve the staged page to a
   `file://` URL at runtime (no path hardcoded). Hand edits go outside the
-  markers; the script rewrites only the block.
+  markers; the script rewrites only the block. The `# BEGIN/END HOST API`
+  block above it is generated the same way by `tools/stage-host-jar.mjs`.
 - `overlay/astra/chrome/shell/shell.mjs` + `shell.css`: rebuilt from
   `ui/shell/src/` (`bun run --filter @astra/shell-hello build`); the loader
   (`app-frame.js`) creates a chrome-privileged `<iframe>` in

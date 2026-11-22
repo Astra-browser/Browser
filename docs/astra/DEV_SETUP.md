@@ -120,7 +120,7 @@ fixes to the ignored `engine/` tree idempotently.
 |---|---|---|
 | `ui/app/**` | `bun run --filter @astra/frame build:chrome` | ~7 s |
 | `ui/shell/**` | `bun run --filter @astra/shell-hello build` | <1 s |
-| `overlay/astra/**`, `patches/**` | `(cd forge/astra-forge && cargo run -q -- overlay)` | <1 s |
+| `overlay/astra/**`, `patches/**` | `node tools/stage-host-jar.mjs` then `(cd forge/astra-forge && cargo run -q -- overlay)` | <1 s |
 | any of the above | `(cd forge/astra-forge && cargo run -q -- build --faster)` | ~7 s |
 | `engine/**` (C++/Rust) | `(cd forge/astra-forge && cargo run -q -- build --jobs 2)` | ~20 s+ |
 
