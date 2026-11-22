@@ -1813,18 +1813,19 @@ recorded below; this list is what is still genuinely unwired.
   defers the process-actor unregistration past the teardown turn and stops the
   late-resource lookup error (bugs 2044741/1944477); the probe's
   `upstream_noise` is now 0/0/0.
-- **The remaining unrouted command ids.** 177 of the 317 wire names have a Host
-  route; 140 have none. The count and every gap now live in
+- **The remaining unrouted command ids.** 182 of the 317 wire names have a Host
+  route; 135 have none. The count and every gap now live in
   `ui/packages/bridge/src/manifest.ts` (D-55), not in prose:
   `node tests/contract/wire_manifest.mjs --report` writes
   `tests/contract/wire_gaps.json` with the state of each gap.
   110 are deferred by decision (D-48 Work 53, SCOPE accounts 28, D-54 AI 29),
-  18 are unused, and 12 are open defects (split dividers, onboarding
-  Essentials, launcher panel, close handshake, updates, haptics, swipe).
+  25 are unused (dead registrations plus the removed divider overlay, panel
+  intents, haptics and native-swipe callers), and 0 are open defects.
   `tests/contract/wire_manifest.mjs` fails when a `proto.ts` command has no
   manifest row, and `tests/contract/wire_coverage.mjs` fails when a route
-  target does not exist. Close a row with a UI caller, a `routed` row in the
-  manifest, a contract test and a live probe.
+  target does not exist or an imported host module is not in `jar.mn`.
+  Close a deferred row when its decision lifts: a UI caller, a `routed` row in
+  the manifest, a contract test and a live probe.
 - **New Tab tracker figure.** `blocker_stats` is now routed to the live
   engine (D-42); the New Tab figure appears only when the reply is
   `status: "ok"`, so a missing count is hidden rather than drawn as `0`.
@@ -2569,4 +2570,4 @@ This phase gives the wire one owner. Decisions: D-54, D-55.
 
 | ID | Task | Status | Agent | Branch | Notes |
 |---|---|---|---|---|---|
-| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Slice 1: 177 routes in `manifest.ts`, `ROUTES` built from it and identical to the old literal table (177 entries, 0 diffs); guard and text-coupled tests import the table; mock known-command list derived from it. Slice 2: `wire_baseline.json` carries channels only (18); `wire_manifest.mjs` fails when a `proto.ts` command has no manifest row (mutation-proved). Review fixes: AI/voice and Work-only media deferred by decision; typed union; shared contract loader. Report `tests/contract/wire_gaps.json`: 317 names = 177 routed / 110 deferred / 18 unused / 12 open. Verified: wire_coverage 64, wire_manifest 13, bridge 31, contracts 67 green (2 pre-existing red: blocker_coverage, sidecar_spike), vitest 1278, svelte-check 0. No live probe: no surface, host module or engine path changed. Next: the 12 open defects need host work and a live probe. |
+| P7-T01 | One command manifest owns the wire | doing | opencode | refactor/command-manifest | Complete: the manifest owns 317 names. 182 routed — the 12 open rows were closed: `essentials_keep`/`release` -> `Tabs.keepSite`/`releaseSite` (a host catalog drift-checked against the app's), `update_highlights`/`update_relaunch` -> honest `System` answers, `resource_close_ready` -> the new `Close` handshake, and the divider overlay, panel intents, haptics and native-swipe callers removed with the evidence that nothing produces them. 110 deferred by decision (D-48 53, SCOPE 28, D-54 29); 25 unused; 0 open. Live: headed-probe 10/10, split-view-probe 30/30, wire-completion-probe 10/10 (split panes + close handshake in 0.92 s). Verified: wire_coverage 65, wire_manifest 13, bridge 31, contracts green except the two pre-existing red, vitest 1278, svelte-check 0. Next: the mock's default answer, then the deferred clusters as their decisions lift. |
