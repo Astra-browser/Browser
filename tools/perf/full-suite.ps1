@@ -186,7 +186,7 @@ $Contracts = @(
     "blocker_coverage", "blocker_host", "bookmarks_model", "boot_model", "browsing_data_host",
     "chrome_extensions", "close_handshake", "commands_model", "containers_isolation", "content_hide", "content_slot",
     "diagnostics_model", "dialog_prompts_auth", "dialog_prompts_cert", "dialogs_events",
-    "dialogs_security", "downloads_model", "favicons_model", "first_run", "frame_model",
+    "dialogs_security", "downloads_model", "envelope_model", "favicons_model", "first_run", "frame_model",
     "history_mirror", "history_model", "history_places", "hostapi_v1", "jar_manifest", "keymap_model",
     "launcher_edit", "load_state", "media_gallery", "media_import_model", "media_model", "media_selection",
     "menu_layer", "metadata_restore", "migration_model", "native_file_picker",
