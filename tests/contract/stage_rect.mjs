@@ -6,21 +6,9 @@
 import { strict as assert } from "node:assert";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ROOT, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const { stageRectOf, stageStateFor, stageStyle } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "content", "stage-rect.js")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 check("rect rounds to whole pixels", JSON.stringify(
   stageRectOf({ getBoundingClientRect: () => ({ left: 12.4, top: 8.6, width: 800.2, height: 600.7 }) }),
