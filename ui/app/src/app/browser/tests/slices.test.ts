@@ -108,7 +108,7 @@ beforeEach(() => {
   native.state.deferNext = false;
 });
 
-describe.each(browserSlices)("$id lifecycle", ({ slice }) => {
+describe.each(browserSlices)("$id lifecycle", ({ slice, listeners }) => {
   it("exposes the shared slice contract", () => {
     expect(typeof slice.init).toBe("function");
     expect(typeof slice.dispose).toBe("function");
@@ -121,11 +121,10 @@ describe.each(browserSlices)("$id lifecycle", ({ slice }) => {
     expect(slice.init()).toBe(first);
     await first;
 
-    const registered = native.listen.mock.calls.length;
-    expect(registered).toBeGreaterThan(0);
+    expect(native.listen.mock.calls.length).toBe(listeners);
 
     await slice.init();
-    expect(native.listen.mock.calls.length).toBe(registered);
+    expect(native.listen.mock.calls.length).toBe(listeners);
     slice.dispose();
   });
 
@@ -141,6 +140,22 @@ describe.each(browserSlices)("$id lifecycle", ({ slice }) => {
     await task;
 
     expect(deferred.stop).toHaveBeenCalledOnce();
+    expect(native.state.stopCalls).toBe(native.listen.mock.calls.length);
+  });
+
+  it("keeps a newer init intact when the old late listener resolves", async () => {
+    slice.dispose();
+    native.state.deferNext = true;
+    const first = slice.init();
+    const deferred = native.state.deferred!;
+    slice.dispose();
+    await slice.init();
+
+    deferred.resolve();
+    await first;
+    expect(deferred.stop).toHaveBeenCalledOnce();
+
+    slice.dispose();
     expect(native.state.stopCalls).toBe(native.listen.mock.calls.length);
   });
 
