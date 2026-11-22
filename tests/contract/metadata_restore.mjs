@@ -12,24 +12,10 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const { Metadata, buildSnapshot, planRestore, isPersistableUrl, ownerAllows, organisationDiffers } = await import(pathToFileURL(path.join(HOST, "Metadata.sys.mjs")).href);
 const { Tabs, __applyExternalUpdate, __resetTabsForTests: __resetTabs } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const spaceA = { id: "space-1", name: "Space", icon: null, color: 0, theme: null };
 const spaceB = { id: "space-2", name: "Work", icon: null, color: 0, theme: null };

@@ -23,12 +23,9 @@ import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
+import { ROOT, HOST, check, passed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
 const SLOTS = path.join(ROOT, "overlay", "astra", "chrome", "slots");
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 
 const Slots = await import(pathToFileURL(path.join(SLOTS, "Slots.sys.mjs")).href);
 const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
@@ -79,17 +76,6 @@ function makeContainer(doc) {
   const el = new FakeElement("div", doc);
   el.ownerDocument = doc;
   return el;
-}
-
-let passed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    console.error(`FAIL ${name}`);
-    process.exitCode = 1;
-  }
 }
 
 __resetForTests();

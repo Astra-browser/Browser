@@ -25,6 +25,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
 import astra_env  # noqa: E402
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from marionette import Marionette  # noqa: E402
 
 ROOT = astra_env.ROOT
 FIREFOX = astra_env.BINARY
@@ -37,7 +40,6 @@ if not os.path.exists(FIREFOX):
     sys.exit(2)
 
 MARKER = "private-marker-9d1f"
-
 
 class Page(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -54,61 +56,9 @@ class Page(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-
 server = ThreadingHTTPServer(("127.0.0.1", 0), Page)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 URL = f"http://127.0.0.1:{server.server_port}/private"
-
-
-class Marionette:
-    def __init__(self, port):
-        deadline = time.time() + 90
-        while time.time() < deadline:
-            try:
-                self.sock = socket.create_connection(("127.0.0.1", port), timeout=30)
-                break
-            except OSError:
-                time.sleep(0.1)
-        else:
-            raise RuntimeError("no marionette")
-        self.file = self.sock.makefile("rb")
-        self.seq = 0
-        self._read()
-
-    def _read(self):
-        data = b""
-        while b":" not in data:
-            chunk = self.file.read(1)
-            if not chunk:
-                raise EOFError("marionette closed")
-            data += chunk
-        length = int(data.split(b":", 1)[0])
-        rest = data.split(b":", 1)[1]
-        while len(rest) < length:
-            chunk = self.file.read(length - len(rest))
-            if not chunk:
-                raise EOFError("marionette closed mid-message")
-            rest += chunk
-        return json.loads(rest.decode())
-
-    def cmd(self, method, params=None):
-        self.seq += 1
-        payload = json.dumps([0, self.seq, method, params or {}]).encode()
-        self.sock.sendall(str(len(payload)).encode() + b":" + payload)
-        while True:
-            message = self._read()
-            if isinstance(message, list) and len(message) == 4 and message[1] == self.seq:
-                if message[2]:
-                    raise RuntimeError(
-                        f"{method} -> {message[2]}: {json.dumps(message[3])[:300]}"
-                    )
-                return message[3]
-
-    def js(self, script, args=None):
-        return self.cmd(
-            "WebDriver:ExecuteScript", {"script": script, "args": args or []}
-        )["value"]
-
 
 def wait(read, timeout=30, step=0.2):
     deadline = time.time() + timeout
@@ -119,7 +69,6 @@ def wait(read, timeout=30, step=0.2):
             return value
         time.sleep(step)
     return value
-
 
 WINDOWS = """return JSON.stringify((() => {
   const out = [];
@@ -167,7 +116,6 @@ APP_TEXT = """return JSON.stringify((() => {
 passed = 0
 failed = 0
 
-
 def check(name, cond, detail=""):
     global passed, failed
     if cond:
@@ -176,7 +124,6 @@ def check(name, cond, detail=""):
     else:
         failed += 1
         print(f"FAIL {name} {detail}")
-
 
 def main():
     profile = tempfile.mkdtemp(prefix="astra-isolation-", dir=os.environ.get("TMPDIR", "/tmp/opencode"))
@@ -283,7 +230,6 @@ def main():
 
     print(f"\nmulti-window-isolation: {passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

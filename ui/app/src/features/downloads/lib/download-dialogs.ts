@@ -9,8 +9,7 @@ import type { Bridge } from "@astra/bridge";
 // deny a download: the Host API `Dialogs` module emits `download.started`
 // (see `overlay/astra/host/Dialogs.sys.mjs` + `docs/astra/DIALOGS.md`) and
 // the UI answers with `decideDownload`. Framework-free so the unit project
-// (node env) can drive it through MockHost with no DOM — same shape as
-// `features/tabs/lib/tabs-bridge-store.ts`.
+// (node env) can drive it through MockHost with no DOM.
 //
 // BRIDGE GAP (assembly follow-up, see docs/astra/DOWNLOADS.md §Bridge gap):
 // `@astra/bridge` currently routes only Tabs/Navigation/Panes/Boot through

@@ -10,21 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { loadManifest } from "./lib/manifest.mjs";
 import fs from "node:fs";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const SplitView = await import(pathToFileURL(path.join(HOST, "SplitView.sys.mjs")).href);
 const SpaceHistory = await import(pathToFileURL(path.join(HOST, "SpaceHistory.sys.mjs")).href);

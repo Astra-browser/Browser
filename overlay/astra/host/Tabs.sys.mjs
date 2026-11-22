@@ -14,9 +14,10 @@
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
+import { HOST_API_VERSION, admitted, err, ok } from "./Envelope.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
 
-export const HOST_API_VERSION = 1;
+export { HOST_API_VERSION };
 
 export const DEFAULT_WINDOW_ID = "win-1";
 
@@ -200,18 +201,6 @@ function orderForWindow(window_id = "") {
   return activeOrder().filter(
     (id) => !window_id || _tabs.get(id)?.window_id === window_id,
   );
-}
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function admitted(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, operation_id: null, accepted: true, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
 
 function snapshot(id) {

@@ -112,8 +112,8 @@ test.skip("Features, and the Work group as AI and Work go off, both themes", asy
   }
   await page.getByRole("button", { name: "Cancel" }).click();
 
-  emitNativeEvent("uiCommand", "preference.ai.enabled=false");
-  emitNativeEvent("uiCommand", "preference.notes.enabled=false");
+  emitNativeEvent("preferenceChanged", { key: "ai.enabled", value: "false" });
+  emitNativeEvent("preferenceChanged", { key: "notes.enabled", value: "false" });
   await shoot("features-off", "features");
   await shoot("work-ai-off", "work");
 });

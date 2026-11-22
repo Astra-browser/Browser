@@ -13,11 +13,7 @@
 import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed } from "./lib/harness.mjs";
 
 const Hide = await import(pathToFileURL(path.join(HOST, "ContentHide.sys.mjs")).href);
 
@@ -122,16 +118,6 @@ function iframeWith(doc, child) {
 }
 
 // --- Harness ---------------------------------------------------------------
-let passed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    console.error(`FAIL ${name}`);
-    process.exitCode = 1;
-  }
-}
 
 Hide.__resetForTests();
 const events = [];

@@ -20,10 +20,8 @@ import { strict as assert } from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ROOT, check, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
 const SHELL_SRC = path.join(ROOT, "ui", "shell", "src", "Shell.svelte");
 
 const Frame = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "chrome", "frame", "Frame.sys.mjs")).href);
@@ -37,16 +35,6 @@ const { mountSplit } = await import(pathToFileURL(path.join(ROOT, "ui", "shell",
 const { mountUrlBar } = await import(pathToFileURL(path.join(ROOT, "ui", "shell", "src", "urlbar.js")).href);
 const { Windows, __resetWindowsForTests } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Windows.sys.mjs")).href);
 const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Events.sys.mjs")).href);
-
-let failures = 0;
-function check(name, cond) {
-  if (cond) {
-    console.log(`PASS ${name}`);
-  } else {
-    failures += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 // --- Minimal fake DOM (superset of the split-renderer test fake: adds
 // --- dataset, replaceWith, tree querySelector(All) for Frame SELECTORS) ---
@@ -570,5 +558,5 @@ const tabHost = {
   bar.destroy();
 }
 
-console.log(`shell_assembly contract: ${failures === 0 ? "PASS" : `FAIL (${failures} checks)`}`);
-process.exit(failures === 0 ? 0 : 1);
+console.log(`shell_assembly contract: ${failed === 0 ? "PASS" : `FAIL (${failed} checks)`}`);
+process.exit(failed === 0 ? 0 : 1);

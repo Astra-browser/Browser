@@ -3,6 +3,7 @@ import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { BLOCKER_ZERO_REVISION, initialBlockerStatus, newestBlockerStatus } from "./blocker-model";
 import { operations } from "$domain/operations";
+import { createSlice } from "$shared/lib/lifecycle";
 
 let state = $state.raw<BlockerStatusView>(initialBlockerStatus());
 
@@ -11,11 +12,7 @@ const RECONCILE_RETRY_MS = 500;
 const IPC_ATTEMPT_TIMEOUT_MS = 2_000;
 const MUTATION_ADMISSION_TIMEOUT_MS = 5_000;
 
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
 let reconciling: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 
 export const status = () => state;
 
@@ -43,10 +40,10 @@ function apply(candidate: BlockerStatusView) {
 }
 
 async function reconcileStatus(generation: number) {
-  for (let attempt = 0; attempt < RECONCILE_ATTEMPTS && generation === lifecycle; attempt += 1) {
+  for (let attempt = 0; attempt < RECONCILE_ATTEMPTS && slice.isCurrent(generation); attempt += 1) {
     try {
       const response = await boundedIpc(commands.blockerStatus(), IPC_ATTEMPT_TIMEOUT_MS);
-      if (generation !== lifecycle) return;
+      if (!slice.isCurrent(generation)) return;
       if (response.status !== "ok") {
         await delay(RECONCILE_RETRY_MS);
         continue;
@@ -77,55 +74,44 @@ function beginReconciliation(generation: number): Promise<void> {
   return task;
 }
 
-async function initialize(generation: number) {
-  let stop: () => void;
-  try {
-    stop = await events.blockerStatusChanged.listen((event) => {
-      if (generation === lifecycle) apply(event.payload);
-    });
-  } catch {
-    // The bootstrap query still gives the UI an actor-ordered snapshot. Keep
-    // `initialized` false so opening the popover retries event registration.
+export const slice = createSlice({
+  async register({ generation, isCurrent, attach }) {
+    let stop: () => void;
+    try {
+      stop = await events.blockerStatusChanged.listen((event) => {
+        if (isCurrent()) apply(event.payload);
+      });
+    } catch {
+      // The bootstrap query still gives the UI an actor-ordered snapshot. Keep
+      // the listener unregistered so opening the popover retries it.
+      await beginReconciliation(generation);
+      return;
+    }
+    if (!isCurrent()) {
+      stop();
+      return;
+    }
+    attach(stop);
     await beginReconciliation(generation);
-    return;
-  }
-  if (generation !== lifecycle) {
-    stop();
-    return;
-  }
-  unlisten = stop;
-  initialized = true;
-  await beginReconciliation(generation);
-}
+  },
+  reset() {
+    reconciling = null;
+  },
+});
 
-export function init(): Promise<void> {
-  if (initializing !== null) return initializing;
-  if (initialized) return Promise.resolve();
-
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 export async function refresh(): Promise<void> {
-  if (!initialized) {
+  if (!slice.ready()) {
     await init();
     return;
   }
 
-  const generation = lifecycle;
+  const generation = slice.current();
   const active = reconciling;
   if (active !== null) await active;
-  if (generation !== lifecycle || !initialized) return;
+  if (!slice.isCurrent(generation) || !slice.ready()) return;
   await beginReconciliation(generation);
 }
 
@@ -219,17 +205,4 @@ export async function lists(): Promise<BlockerListsView | null> {
   } catch {
     return null;
   }
-}
-
-export function dispose() {
-  if (!initialized && initializing === null && reconciling === null && unlisten === null) {
-    return;
-  }
-
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  reconciling = null;
-  unlisten?.();
-  unlisten = null;
 }

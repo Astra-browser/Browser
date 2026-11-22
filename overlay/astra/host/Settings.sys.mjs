@@ -14,10 +14,23 @@
 // profile, so it survives a restart until the core store is wired in.
 
 import { emit } from "./Events.sys.mjs";
+import { HOST_API_VERSION, operationAccepted } from "./Envelope.sys.mjs";
 
-export const HOST_API_VERSION = 1;
+export { HOST_API_VERSION };
 
 const _values = new Map();
+
+// A write is announced once. The engine's own pref observer can see the same
+// write a moment later, so the last announcement is remembered and the
+// duplicate is dropped: `preference_changed` means "changed to this value".
+let lastAnnouncement = null;
+
+/** Tell every surface that this key now holds this value. */
+function announce(key, value) {
+  if (lastAnnouncement?.key === key && lastAnnouncement.value === value) return;
+  lastAnnouncement = { key, value };
+  emit("preference_changed", { key, value });
+}
 
 /** Astra-owned settings with no Firefox pref of their own. They live in the
  *  profile's pref store under one branch so they survive a restart; the core
@@ -559,7 +572,7 @@ function watch(prefs) {
         const value = readAstra(prefs, key);
         if (value === null) _values.delete(key);
         else _values.set(key, value);
-        emit("ui-command", `preference.${key}=${value ?? ""}`);
+        announce(key, value ?? "");
         return;
       }
       const keys = WATCHED.get(name);
@@ -573,7 +586,7 @@ function watch(prefs) {
         }
         if (value === null || value === undefined) continue;
         _values.set(key, value);
-        emit("ui-command", `preference.${key}=${value}`);
+        announce(key, value);
       }
     },
   };
@@ -588,7 +601,9 @@ function watch(prefs) {
 }
 
 function admission(accepted) {
-  return { operation_id: null, accepted };
+  // `setting_set`'s reply is the two-field admission pinned by
+  // `settings_native`; a refusal deliberately does not grow a `reason` field.
+  return accepted ? operationAccepted(null) : { operation_id: null, accepted: false };
 }
 
 export const Settings = {
@@ -625,13 +640,13 @@ export const Settings = {
   },
 
   async set({ request_id = "", key = "", value = null } = {}) {
-    // Keys are a closed vocabulary the app owns. Anything else could forge a
-    // `ui-command` for another surface (the preference push is a string).
+    // Keys are a closed vocabulary the app owns. A key outside it has no
+    // surface and no event, so it is refused before anything is written.
     if (typeof key !== "string" || !/^[a-z0-9._-]+$/iu.test(key)) {
       return admission(false);
     }
     // A newline is a list separator in startup pages and performance
-    // exceptions. Every other C0 control could forge a `ui-command`.
+    // exceptions. Every other C0 control has no meaning in a stored value.
     if (typeof value !== "string" || /[\u0000-\u0009\u000b-\u001f\u007f]/u.test(value)) {
       return admission(false);
     }
@@ -649,7 +664,7 @@ export const Settings = {
         // Outside chrome (a Node contract test) the session value stands in.
         if (!prefs) {
           _values.set(key, value);
-          emit("ui-command", `preference.${key}=${value}`);
+          announce(key, value);
           return admission(true);
         }
         return admission(false);
@@ -668,9 +683,9 @@ export const Settings = {
       }
       _values.set(key, value);
     }
-    // The app also listens for preference pushes from chrome (`ui-command`);
-    // announce the change so every surface agrees without a re-read.
-    emit("ui-command", `preference.${key}=${value}`);
+    // Announce the write as a typed event so every surface agrees without a
+    // re-read or a string parse.
+    announce(key, value);
     return admission(true);
   },
 
@@ -730,4 +745,5 @@ export function __resetSettingsForTests() {
   injectedPrefs = null;
   injectedContentPrefs = null;
   _values.clear();
+  lastAnnouncement = null;
 }

@@ -21,6 +21,7 @@
 // import the same module.
 
 import { emit } from "./Events.sys.mjs";
+import { operationAccepted } from "./Envelope.sys.mjs";
 
 /** Terminal classifications the actor can establish right now. */
 export const OUTCOMES = new Set([
@@ -117,13 +118,13 @@ function record(outcome, reason) {
  */
 export function admit({ outcome = "applied", reason = "mutation_applied" } = {}) {
   const disposition = record(outcome, reason);
-  return { operation_id: disposition.operation_id, accepted: true };
+  return operationAccepted(disposition.operation_id);
 }
 
 /** Refuse a command before it reaches the engine, with a classified reason. */
 export function refuse(reason = "invalid_input") {
   const disposition = record("rejected", reason);
-  return { operation_id: disposition.operation_id, accepted: true };
+  return operationAccepted(disposition.operation_id);
 }
 
 export const Operations = {

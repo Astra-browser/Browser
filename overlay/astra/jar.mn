@@ -51,6 +51,7 @@ astra.jar:
   content/astra/res/host/DialogPrompts.sys.mjs (host/DialogPrompts.sys.mjs)
   content/astra/res/host/Dialogs.sys.mjs (host/Dialogs.sys.mjs)
   content/astra/res/host/Downloads.sys.mjs (host/Downloads.sys.mjs)
+  content/astra/res/host/Envelope.sys.mjs (host/Envelope.sys.mjs)
   content/astra/res/host/Events.sys.mjs (host/Events.sys.mjs)
   content/astra/res/host/Favicons.sys.mjs (host/Favicons.sys.mjs)
   content/astra/res/host/Helpers.sys.mjs (host/Helpers.sys.mjs)

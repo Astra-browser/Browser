@@ -1,7 +1,7 @@
 import { SvelteMap } from "svelte/reactivity";
 import type { FaviconEntry, IconRef } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
-import { createLifecycle, listenAll, type Unlisten } from "$shared/lib/lifecycle";
+import { createSlice, listenAll } from "$shared/lib/lifecycle";
 
 const SIDE = 32;
 const BYTE_LENGTH = SIDE * SIDE * 4;
@@ -33,9 +33,6 @@ const rasters = new SvelteMap<string, Entry>();
  *  no reference of their own. Lookups use the profile the surface is showing. */
 const sites = new SvelteMap<string, string>();
 let owner = $state<string | null>(null);
-const lifecycle = createLifecycle();
-let initializing: Promise<void> | null = null;
-let unlisten: Unlisten | null = null;
 
 /** Site renderers decode page-controlled image formats. This surface accepts
  *  one fixed-size RGBA buffer and paints it directly. */
@@ -140,38 +137,20 @@ export function tone(ref: IconRef | null | undefined): IconTone {
   return rasters.get(refKey(ref.origin, ref.revision))?.tone ?? "mid";
 }
 
-export function init(): Promise<void> {
-  if (initializing) return initializing;
-  const generation = lifecycle.begin();
-  initializing = listenAll([
-    events.favicons.listen((event) => {
-      if (lifecycle.isCurrent(generation)) {
-        accept(event.payload.profile_id, event.payload.entries);
-      }
-    }),
-  ])
-    .then((listeners) => {
-      if (!lifecycle.isCurrent(generation)) {
-        for (const stop of listeners) stop();
-        return;
-      }
-      unlisten = () => {
-        for (const stop of listeners) stop();
-      };
-    })
-    .catch((error: unknown) => {
-      initializing = null;
-      throw error;
-    });
-  return initializing;
-}
+export const slice = createSlice({
+  register({ isCurrent }) {
+    return listenAll([
+      events.favicons.listen((event) => {
+        if (isCurrent()) accept(event.payload.profile_id, event.payload.entries);
+      }),
+    ]);
+  },
+  reset() {
+    owner = null;
+    rasters.clear();
+    sites.clear();
+  },
+});
 
-export function dispose() {
-  lifecycle.end();
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  owner = null;
-  rasters.clear();
-  sites.clear();
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();

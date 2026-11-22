@@ -590,7 +590,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 38 event channel names (post-rename). */
+/** All 39 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -610,6 +610,7 @@ export type EventChannel =
   | "page-dialog-prompt-changed"
   | "page-permission-prompt-changed"
   | "passkey-prompt-changed"
+  | "preference_changed"
   | "resource-changed"
   | "runtime-status-changed"
   | "search-changed"
@@ -651,6 +652,7 @@ export const EVENTS: readonly EventChannel[] = [
   "page-dialog-prompt-changed",
   "page-permission-prompt-changed",
   "passkey-prompt-changed",
+  "preference_changed",
   "resource-changed",
   "runtime-status-changed",
   "search-changed",

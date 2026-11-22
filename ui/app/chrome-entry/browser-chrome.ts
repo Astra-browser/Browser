@@ -281,6 +281,7 @@ try {
     "page-permission-prompt-changed": "astra:page-permission-prompt",
     "page-dialog-prompt-changed": "astra:page-dialog-prompt",
     "passkey-prompt-changed": "astra:passkey-prompt",
+    "preference_changed": "astra:preference-changed",
     "web-extension-prompt-changed": "astra:web-extension-prompt",
     "nav.find-result": "astra:find",
     "runtime-status-changed": "astra:runtime-status",

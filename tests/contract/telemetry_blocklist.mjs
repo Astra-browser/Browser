@@ -12,23 +12,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ROOT, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
 const LIST = path.join(ROOT, "blocker/lists/astra-telemetry.txt");
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const source = fs.readFileSync(LIST, "utf8");
 const rules = new Set(

@@ -51,15 +51,15 @@ test("custom images remove sky light and hidden-card frost, and failure restores
     tabs: [fresh],
     active: fresh.id,
   });
-  emitNativeEvent("uiCommand", "preference.ui.newtab-tasks=false");
+  emitNativeEvent("preferenceChanged", { key: "ui.newtab-tasks", value: "false" });
   adoptMode("hidden");
   document.documentElement.dataset.material = "mica";
   const screen = await render(Shell);
   const sidebar = () => screen.container.querySelector<HTMLElement>(".browser-sidebar")!;
   await expect.poll(() => sidebar()?.style.getPropertyValue("--sidebar-frost")).toContain("frost-");
   expect(screen.container.querySelector(".sky-light")).not.toBeNull();
-  emitNativeEvent("uiCommand", `preference.ui.newtab-image=${"a".repeat(64)}`);
-  emitNativeEvent("uiCommand", "preference.ui.newtab-background=image");
+  emitNativeEvent("preferenceChanged", { key: "ui.newtab-image", value: "a".repeat(64) });
+  emitNativeEvent("preferenceChanged", { key: "ui.newtab-background", value: "image" });
   await expect.poll(() => screen.container.querySelector(".sky-light")).toBeNull();
   expect(sidebar().style.getPropertyValue("--sidebar-frost")).toBe("");
   expect(document.documentElement.dataset.material).toBe("mica");

@@ -185,13 +185,13 @@ test("a feature switched off takes its tool out, and an empty group its rule", a
   await preferences.init();
   const screen = await render(ToolShelf);
   for (const feature of ["notes", "tasks", "time"])
-    emitNativeEvent("uiCommand", `preference.${feature}.enabled=false`);
+    emitNativeEvent("preferenceChanged", { key: `${feature}.enabled`, value: "false" });
   await expect
     .poll(() => names(screen.container))
     .toEqual(["History", "Downloads", "Bookmarks", "Settings"]);
   expect(screen.container.querySelectorAll(".shelf-rule")).toHaveLength(2);
   for (const feature of ["notes", "tasks", "time"])
-    emitNativeEvent("uiCommand", `preference.${feature}.enabled=true`);
+    emitNativeEvent("preferenceChanged", { key: `${feature}.enabled`, value: "true" });
   preferences.dispose();
 });
 

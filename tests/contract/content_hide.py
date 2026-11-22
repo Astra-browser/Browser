@@ -73,7 +73,14 @@ for symbol in ("hideForPage", "applySelectors", "collectObserved",
 check("module traverses shadow roots", "shadowRoot" in source)
 check("module traverses iframes", "contentDocument" in source)
 check("module references blocker_overrides (no reschema)", "blocker_overrides" in source)
-check("module honours host_api_version 1", "HOST_API_VERSION = 1" in source)
+check(
+    "module takes host_api_version from the shared envelope",
+    re.search(
+        r'import\s*\{[^}]*\bHOST_API_VERSION\b[^}]*\}\s*from\s*"\./Envelope\.sys\.mjs"',
+        source,
+    )
+    is not None,
+)
 
 # P4-T11 live wiring: content-script driver, provider/store adapters, actor
 # registration, packaging, and bridge surface.

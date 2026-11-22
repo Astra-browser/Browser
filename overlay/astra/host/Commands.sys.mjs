@@ -27,6 +27,7 @@
 // Pure logic, no Firefox internals.
 
 import { emit } from "./Events.sys.mjs";
+import { commandNotAdmitted } from "./Envelope.sys.mjs";
 import {
   Tabs,
   __itemsSnapshot,
@@ -164,10 +165,11 @@ function admission(accepted) {
 /**
  * An honest refusal. `reason` is diagnostics, not wire: the UI reads
  * `accepted` (through `settle()`), and a surface that wants to explain a
- * refusal hears it on `ui-command` instead.
+ * refusal hears it on `ui-command` instead. This answers "was the command
+ * admitted?" — no operation exists, unlike `Operations.refuse`.
  */
 function refusal(reason) {
-  return { operation_id: null, accepted: false, reason };
+  return commandNotAdmitted(reason);
 }
 
 function selectedId(window_id = "") {

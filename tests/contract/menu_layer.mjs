@@ -11,22 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
+import { ROOT, check, passed, failed } from "./lib/harness.mjs";
 
 function lastZIndex(css, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");

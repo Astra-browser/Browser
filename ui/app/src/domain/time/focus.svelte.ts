@@ -2,6 +2,7 @@ import type { FocusControl, FocusStatus, FocusView, ShutSiteView } from "$shared
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
+import { createSlice } from "$shared/lib/lifecycle";
 
 const EMPTY: FocusStatus = { session: null, shut: [] };
 
@@ -9,10 +10,6 @@ let state = $state.raw<FocusStatus>(EMPTY);
 let covered = $state<string | null>(null);
 let pending = $state(false);
 let failed = $state(false);
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 let lifetime = new AbortController();
 
 /** The running session, or null between sessions. */
@@ -69,55 +66,28 @@ export const stop = () => control({ kind: "stop" });
 export const skip = () => control({ kind: "skip" });
 export const allow = (site: string) => control({ kind: "allow", site });
 
-async function initialize(generation: number) {
-  // Native projects focus with every bootstrap, so this must listen before
-  // tabs asks for one.
-  const stopStatus = await events.focusChanged.listen((event) => {
-    if (generation === lifecycle) state = event.payload;
-  });
-  const stopCover = await events.uiCommand.listen(({ payload }) => {
-    if (generation !== lifecycle || !payload.startsWith("focus.cover=")) return;
-    covered = payload.slice("focus.cover=".length) || null;
-  });
-  const stopListening = () => {
-    stopStatus();
-    stopCover();
-  };
-  if (generation !== lifecycle) {
-    stopListening();
-    return;
-  }
-  unlisten = stopListening;
-  initialized = true;
-}
+export const slice = createSlice({
+  register({ isCurrent }) {
+    if (lifetime.signal.aborted) lifetime = new AbortController();
+    // Native projects focus with every bootstrap, so this must listen before
+    // tabs asks for one.
+    const statusReady = events.focusChanged.listen((event) => {
+      if (isCurrent()) state = event.payload;
+    });
+    const coverReady = events.uiCommand.listen(({ payload }) => {
+      if (!isCurrent() || !payload.startsWith("focus.cover=")) return;
+      covered = payload.slice("focus.cover=".length) || null;
+    });
+    return Promise.all([statusReady, coverReady]);
+  },
+  reset() {
+    lifetime.abort();
+    state = EMPTY;
+    covered = null;
+    pending = false;
+    failed = false;
+  },
+});
 
-export function init(): Promise<void> {
-  if (initializing !== null) return initializing;
-  if (initialized) return Promise.resolve();
-  if (lifetime.signal.aborted) lifetime = new AbortController();
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  lifetime.abort();
-  unlisten?.();
-  unlisten = null;
-  state = EMPTY;
-  covered = null;
-  pending = false;
-  failed = false;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();

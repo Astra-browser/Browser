@@ -78,7 +78,7 @@ test("the close-button setting reaches the compact rail", async () => {
   await preferences.init();
   const list = () => screen.container.querySelector(".rail-list");
   expect(list()?.getAttribute("data-close-buttons")).toBe("hover");
-  emitNativeEvent("uiCommand", "preference.tabs.close-button=always");
+  emitNativeEvent("preferenceChanged", { key: "tabs.close-button", value: "always" });
   await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
   expect(list()?.getAttribute("data-close-buttons")).toBe("always");
   preferences.dispose();

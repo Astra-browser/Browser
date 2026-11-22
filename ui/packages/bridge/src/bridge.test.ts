@@ -20,8 +20,8 @@ describe("surface coverage", () => {
   test("the manifest declares the wire; the registry is the frozen subset", () => {
     expect(mockCommandNames()).toHaveLength(317);
     expect(COMMANDS).toHaveLength(281);
-    expect(EVENTS).toHaveLength(38);
-    expect(mockEventChannels()).toHaveLength(38);
+    expect(EVENTS).toHaveLength(39);
+    expect(mockEventChannels()).toHaveLength(39);
     const declared = new Set(mockCommandNames());
     const missing = COMMANDS.filter((name) => !declared.has(name));
     expect(missing).toEqual([]);

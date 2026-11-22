@@ -25,9 +25,7 @@
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 // A file URL: `import()` rejects a bare Windows absolute path ("e:" scheme).
 const hostModule = (name) => import(pathToFileURL(path.join(HOST, name)).href);
@@ -55,18 +53,6 @@ const {
   __setClockForTests,
   __resetPerformanceForTests,
 } = PerfMod;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const MINUTE = 60_000;
 const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);

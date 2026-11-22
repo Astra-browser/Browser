@@ -13,7 +13,7 @@
 //
 // Pure logic, no Firefox internals.
 
-export const HOST_API_VERSION = 1;
+import { HOST_API_VERSION } from "./Envelope.sys.mjs";
 
 /** The signed-out account view (bindings.ts: AccountV1). */
 function signedOutAccount() {

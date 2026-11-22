@@ -34,11 +34,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const {
   System,
@@ -53,18 +49,6 @@ const { Boot } = await import(
 /** The pref Firefox reads a content document's `prefers-color-scheme` from. */
 const CONTENT_COLOR_SCHEME_PREF =
   "layout.css.prefers-color-scheme.content-override";
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 /** The commands this module owns, and the method answering each. */
 const COMMANDS = {
