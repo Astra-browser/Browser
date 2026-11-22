@@ -14,8 +14,9 @@
 // profile, so it survives a restart until the core store is wired in.
 
 import { emit } from "./Events.sys.mjs";
+import { HOST_API_VERSION } from "./Envelope.sys.mjs";
 
-export const HOST_API_VERSION = 1;
+export { HOST_API_VERSION };
 
 const _values = new Map();
 
