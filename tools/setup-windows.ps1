@@ -51,6 +51,20 @@ function Find-Makensis {
     return $null
 }
 
+function Find-Nasm216 {
+    if ($env:ASTRA_NASM_DIR -and (Test-Path (Join-Path $env:ASTRA_NASM_DIR 'nasm.exe'))) {
+        return (Resolve-Path $env:ASTRA_NASM_DIR).Path
+    }
+    foreach ($candidate in @(
+        'D:\astra-build\nasm-2.16.03\nasm-2.16.03',
+        'C:\tools\nasm-2.16.03',
+        'C:\tools\nasm-2.16.03\nasm-2.16.03'
+    )) {
+        if (Test-Path (Join-Path $candidate 'nasm.exe')) { return $candidate }
+    }
+    return $null
+}
+
 function Add-UserPaths {
     $paths = @(
         (Join-Path $env:USERPROFILE '.cargo\bin'),
@@ -210,6 +224,24 @@ Run 'regenerating the host jar manifest' { & node (Join-Path $root 'tools\stage-
 Run 'applying overlay + patch series' { & $forge overlay --os windows }
 
 if (-not $SkipBuild) {
+    $nasm = Get-Command nasm.exe -ErrorAction SilentlyContinue
+    if ($nasm) {
+        $nasmVersion = (& $nasm.Source -v 2>&1 | Select-Object -First 1)
+        Write-Log "nasm: $nasmVersion"
+        if ($nasmVersion -match 'NASM version 3\.') {
+            $nasm216 = Find-Nasm216
+            if (-not $nasm216) {
+                Fail 'NASM 3.x crashes the pinned libvpx assembly; install NASM 2.16.x or set ASTRA_NASM_DIR'
+            }
+            $env:ASTRA_NASM_DIR = $nasm216
+            $env:Path = "$nasm216;$env:Path"
+            Write-Log "nasm 2.16: $nasm216 (overriding 3.x for this build)"
+        }
+    }
+    # Force this checkout's rendered mozconfig. The objdir may remember a
+    # different one from another checkout; a changed file also makes mach
+    # regenerate backend.mk with the NASM above.
+    $env:MOZCONFIG = Join-Path $root 'out\mozconfig.windows'
     $buildArgs = @('build', '--os', 'windows', '--jobs', $Jobs)
     if ($Faster) { $buildArgs += '--faster' }
     Run 'building the engine' { & $forge @buildArgs }
