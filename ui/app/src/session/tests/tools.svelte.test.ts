@@ -7,7 +7,10 @@ const host = vi.hoisted(() => ({
   listener: null as ((event: { payload: string }) => void) | null,
   listen: vi.fn(),
 }));
-vi.mock("$domain/surface", () => ({ surface: { currentPage: () => host.page, open: host.open } }));
+vi.mock("$domain/surface", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("$domain/surface")>();
+  return { ...actual, surface: { currentPage: () => host.page, open: host.open } };
+});
 vi.mock("../sidebar-mode.svelte", () => ({ setPanelExtent: host.extent }));
 vi.mock("$shared/ipc/native-events", () => ({ events: { uiCommand: { listen: host.listen } } }));
 beforeEach(() => {

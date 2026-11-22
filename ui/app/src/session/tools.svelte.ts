@@ -1,6 +1,9 @@
 import { setPanelExtent } from "./sidebar-mode.svelte";
 import { events } from "$shared/ipc/native-events";
-export type ToolKind = "notes" | "tasks" | "ai" | "time" | "history" | "downloads" | "bookmarks";
+import { isBrowserPage, isToolKind, type ToolKind } from "$domain/surface";
+
+export type { ToolKind } from "$domain/surface";
+
 let tool = $state<ToolKind | null>(null);
 /** The assistant's conversation breathes wider than a list. */
 const extentOf = (kind: ToolKind) => (kind === "ai" ? 372 : 336);
@@ -24,23 +27,17 @@ async function initialize(owner: number) {
   const unsubscribe = await events.uiCommand.listen(({ payload }) => {
     if (owner !== generation) return;
     const kind = payload.slice(5);
-    if (
-      payload.startsWith("tool.") &&
-      ["notes", "tasks", "ai", "time", "history", "downloads", "bookmarks"].includes(kind)
-    )
-      open(kind as ToolKind);
-    if (
-      [
-        "browser.settings",
-        "browser.history",
-        "browser.downloads",
-        "browser.tasks",
-        "browser.notes",
-        "browser.time",
-      ].includes(payload)
-    ) {
-      tool = null;
-      setPanelExtent(0);
+    if (payload.startsWith("tool.") && isToolKind(kind)) open(kind);
+    // A page that is also a tool takes the room back from the panel; Settings
+    // is the one page that is not a tool and still closes it. Pages with no
+    // tool of the same id (Work, Gallery, Source, Extensions) leave the panel
+    // where it is, exactly as the literal command list did.
+    if (payload.startsWith("browser.")) {
+      const page = payload.slice(8);
+      if (isBrowserPage(page) && (page === "settings" || isToolKind(page))) {
+        tool = null;
+        setPanelExtent(0);
+      }
     }
   });
   if (owner !== generation) unsubscribe();

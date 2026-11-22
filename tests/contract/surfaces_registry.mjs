@@ -89,12 +89,14 @@ check(
     .join(", "),
 );
 
-const ids = SURFACES.map((row) => row.id);
-check(
-  "surface ids are unique",
-  new Set(ids).size === ids.length,
-  ids.filter((id, index) => ids.indexOf(id) !== index).join(", "),
-);
+for (const kind of ["page", "tool"]) {
+  const ids = SURFACES.filter((row) => row.kind === kind).map((row) => row.id);
+  check(
+    `${kind} ids are unique within their kind`,
+    new Set(ids).size === ids.length,
+    ids.filter((id, index) => ids.indexOf(id) !== index).join(", "),
+  );
+}
 
 check(
   "BROWSER_PAGES is exactly the page rows",

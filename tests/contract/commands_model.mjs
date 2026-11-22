@@ -16,6 +16,8 @@ import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
+import { loadSurfaces } from "./lib/surfaces.mjs";
+
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const HOST = path.join(ROOT, "overlay", "astra", "host");
 
@@ -52,17 +54,9 @@ async function capture(fn) {
   return { seen, result };
 }
 
-const PAGES = [
-  "settings",
-  "work",
-  "extensions",
-  "history",
-  "downloads",
-  "tasks",
-  "notes",
-  "time",
-  "source",
-];
+// The surface registry owns the page list; this suite no longer keeps a fifth
+// copy that can quietly omit a page (`gallery` used to be missing here).
+const { BROWSER_PAGES: PAGES } = await loadSurfaces();
 
 for (const page of PAGES) {
   const id = `browser.${page}`;

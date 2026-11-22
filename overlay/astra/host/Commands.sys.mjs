@@ -41,8 +41,14 @@ import { Zoom } from "./Zoom.sys.mjs";
 // last window this process focused".
 import { __windowIdFor } from "./Windows.sys.mjs";
 
-/** Browser surfaces a command can stand over the active tab. */
-const PAGES = new Set([
+/**
+ * Browser surfaces a command can stand over the active tab.
+ *
+ * Exported for `tests/contract/surfaces_registry.mjs`: the host cannot import
+ * the UI registry (these modules are staged into astra.jar and served from
+ * resource://), so the contract asserts this set equals the UI's page rows.
+ */
+export const PAGES = new Set([
   "settings",
   "work",
   "extensions",
@@ -56,7 +62,7 @@ const PAGES = new Set([
 ]);
 
 /** The side-panel tools; `tool.<kind>` opens one the way its shelf row does. */
-const TOOLS = new Set([
+export const TOOLS = new Set([
   "notes",
   "tasks",
   "time",
