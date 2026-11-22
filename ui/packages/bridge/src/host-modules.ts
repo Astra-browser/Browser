@@ -54,6 +54,7 @@ export interface HostModules {
   TabHistory: HostModuleMethods;
   DialogPrompts: HostModuleMethods;
   PageDialogs: HostModuleMethods;
+  Close: HostModuleMethods;
   Permissions: HostModuleMethods;
   BrowsingData: HostModuleMethods;
   Blocker: HostModuleMethods;

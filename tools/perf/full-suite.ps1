@@ -184,13 +184,13 @@ if ($Build) {
 echo "== contracts"
 $Contracts = @(
     "blocker_coverage", "blocker_host", "bookmarks_model", "boot_model", "browsing_data_host",
-    "chrome_extensions", "commands_model", "containers_isolation", "content_hide", "content_slot",
+    "chrome_extensions", "close_handshake", "commands_model", "containers_isolation", "content_hide", "content_slot",
     "diagnostics_model", "dialog_prompts_auth", "dialog_prompts_cert", "dialogs_events",
     "dialogs_security", "downloads_model", "favicons_model", "first_run", "frame_model",
     "history_mirror", "history_model", "history_places", "hostapi_v1", "keymap_model",
     "launcher_edit", "load_state", "media_gallery", "media_import_model", "media_model", "media_selection",
     "menu_layer", "metadata_restore", "migration_model", "native_file_picker",
-    "native_nav_model", "native_surfaces", "notes_model", "operations_ledger",
+    "native_nav_model", "native_surfaces", "notes_model", "onboarding_sites", "operations_ledger",
     "page_dialogs", "page_source_model", "passkeys_model",
     "permissions_prompt", "privacy_host", "profiles_model", "protected_content", "resources_model",
     "search_model", "settings_native", "shell_assembly", "sidecar_spike", "site_permissions_host",

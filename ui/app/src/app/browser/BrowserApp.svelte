@@ -15,7 +15,6 @@
   import { passkeys } from "$domain/passkeys";
   import { updateNotices } from "$features/updates";
   import * as sidebar from "$session/sidebar-mode.svelte";
-  import { Dividers } from "$features/split";
   import { commands } from "$shared/ipc/bindings";
   import { IS_MAC, IS_WINDOWS } from "$shared/platform";
   import { blocker } from "$domain/blocker";
@@ -337,9 +336,6 @@
 <div class="contents" inert={consentActive}>
   <Shell />
   <PeekLayer />
-  {#if !IS_MAC}
-    <Dividers />
-  {/if}
   {#if !IS_MAC && !IS_WINDOWS}
     <WindowControlsOverlay />
   {/if}

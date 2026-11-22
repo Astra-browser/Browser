@@ -19,7 +19,9 @@
 //   open     - no route and no permission: a defect.
 //
 // Slice 1 (P7-T01) moved the 177 routes here verbatim and declared the
-// 140 unrouted names. It added no route and changed no behaviour.
+// 140 unrouted names. The completion slice routed the last five real gaps and
+// moved the rest to `unused` (nothing produces them in this build) or
+// `deferred` (a decision allows them), so no row is `open` any more.
 
 import type { HostModuleName, Route } from "./host-modules.js";
 
@@ -303,13 +305,13 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "browser_credential_capability", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "browser_passkey_authorization_request", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "chrome_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
-  { name: "divider_drag", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "divider_grab", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "divider_release", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "essentials_keep", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "essentials_release", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "divider_drag", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "divider_grab", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "divider_release", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "essentials_keep", module: "Tabs", method: "keepSite", args: "none", state: "routed", reason: null },
+  { name: "essentials_release", module: "Tabs", method: "releaseSite", args: "none", state: "routed", reason: null },
   { name: "extension_action_menu", module: null, method: null, args: "none", state: "unused", reason: null },
-  { name: "haptic", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "haptic", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "history_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "link_describe", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "media_admit_remote", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
@@ -338,20 +340,20 @@ export const COMMAND_MANIFEST: readonly CommandEntry[] = [
   { name: "page_style_toggle_for", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
   { name: "page_styles", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
   { name: "page_styles_all", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
-  { name: "panel_intent", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "panel_layout", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "panel_intent", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "panel_layout", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "profile_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "profile_rename", module: null, method: null, args: "none", state: "unused", reason: null },
-  { name: "resource_close_ready", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "resource_close_ready", module: "Close", method: "ready", args: "none", state: "routed", reason: null },
   { name: "sidebar_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "sidebar_resize", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "sidebar_resize_guide", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "spaces_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
-  { name: "swipe_region", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "swipe_region", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "tab_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
   { name: "tools_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
-  { name: "update_highlights", module: null, method: null, args: "none", state: "open", reason: null },
-  { name: "update_relaunch", module: null, method: null, args: "none", state: "open", reason: null },
+  { name: "update_highlights", module: "System", method: "updateHighlights", args: "none", state: "routed", reason: null },
+  { name: "update_relaunch", module: "System", method: "updateRelaunch", args: "none", state: "routed", reason: null },
   { name: "voice_cancel", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
   { name: "voice_choose_engine", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
   { name: "voice_choose_language", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },

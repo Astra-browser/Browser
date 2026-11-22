@@ -84,8 +84,8 @@ const open = byState("open");
 // than pinned here: it moves when a dead caller is deleted, and pinning it
 // would make the gate depend on unrelated branches.
 check(`the manifest counts 317 commands (${entries.length})`, entries.length === 317);
-check(`177 rows are routed (${routed.length})`, routed.length === 177);
-check(`140 rows are unrouted (${entries.length - routed.length})`, entries.length - routed.length === 140);
+check(`182 rows are routed (${routed.length})`, routed.length === 182);
+check(`135 rows are unrouted (${entries.length - routed.length})`, entries.length - routed.length === 135);
 check(
   "the states partition every row",
   routed.length + deferred.length + unused.length + open.length === entries.length,

@@ -5,8 +5,6 @@
     "astra:page-assist-changed",
     "astra:panel-state",
     "astra:resource-changed",
-    "astra:resource-close",
-    "astra:resource-close-cancelled",
     "astra:swipe",
     "astra:tab",
     "astra:voice-changed",

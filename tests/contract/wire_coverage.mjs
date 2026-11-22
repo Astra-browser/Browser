@@ -14,7 +14,7 @@
 //
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { loadManifest } from "./lib/manifest.mjs";
@@ -62,6 +62,30 @@ const routes = COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map(
   }),
 );
 check("the manifest declares its routes", routes.length > 50);
+
+// A host module the jar does not carry cannot be imported at runtime, and no
+// filesystem import in a contract test can notice: this is the gate for it.
+// Only modules another host module imports must be packaged; a documented
+// compatibility shim that nothing imports is allowed to stay out.
+const hostModules = (await readdir(HOST)).filter((name) => name.endsWith(".sys.mjs"));
+const jarSource = await readFile(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");
+const importedModules = new Set();
+for (const name of hostModules) {
+  const source = await readFile(path.join(HOST, name), "utf8");
+  for (const match of source.matchAll(/from "\.\/([A-Za-z0-9_]+\.sys\.mjs)"/gu)) {
+    importedModules.add(match[1]);
+  }
+}
+const unregisteredModules = [...importedModules].filter(
+  (name) => !jarSource.includes(`host/${name}`),
+);
+check(
+  `every imported host module is packaged in jar.mn (${unregisteredModules.length} missing of ${importedModules.size})`,
+  unregisteredModules.length === 0,
+);
+for (const name of unregisteredModules) {
+  console.error(`  ${name} is imported but not listed in overlay/astra/jar.mn`);
+}
 const missing = routes.filter(
   (route) => typeof host[route.module]?.[route.method] !== "function",
 );

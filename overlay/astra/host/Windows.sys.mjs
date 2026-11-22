@@ -25,6 +25,7 @@
 
 import { emit } from "./Events.sys.mjs";
 import { HOST_API_VERSION, __closeTabsInWindow } from "./Tabs.sys.mjs";
+import { bindClose } from "./Close.sys.mjs";
 
 /**
  * One process-wide binding record:
@@ -198,6 +199,9 @@ function bindNative(id, win, { replace = false } = {}) {
     return;
   }
   record.native.set(id, win);
+  // Ask the app to flush before the window goes (Close.sys.mjs). Bound before
+  // the projection listener, so the handshake sees the close first.
+  bindClose(win);
   const model = record.windows.get(id);
   if (model) {
     model.private = isPrivateWindow(win);

@@ -157,6 +157,27 @@ export function safeTabUrl(url) {
   }
 }
 
+/**
+ * Onboarding's keep list: the address native keeps for each site. Chrome draws
+ * the marks and names a site by id; the address is native's, so both surfaces
+ * cannot disagree about what "kept" means. `tests/contract/onboarding_sites.mjs`
+ * compares this table with `ui/app/src/features/onboarding/lib/catalog.ts`.
+ */
+export const ONBOARDING_SITES = Object.freeze({
+  gmail: "https://mail.google.com/",
+  "google-calendar": "https://calendar.google.com/",
+  slack: "https://app.slack.com/client",
+  whatsapp: "https://web.whatsapp.com/",
+  notion: "https://www.notion.so/",
+  linear: "https://linear.app/",
+  github: "https://github.com/",
+  figma: "https://www.figma.com/files",
+  chatgpt: "https://chatgpt.com/",
+  claude: "https://claude.ai/",
+  youtube: "https://www.youtube.com/",
+  spotify: "https://open.spotify.com/",
+});
+
 const _tabs = new Map(); // astra_tab_id -> tab record
 const _order = []; // astra_tab_id in display order
 const _history = new Map(); // astra_tab_id -> { entries: [url], index: n }
@@ -1463,6 +1484,78 @@ export const Tabs = {
     // has to reach it.
     emitItemsChanged();
     return admitted(request_id, { astra_tab_id, pinned: essential, index });
+  },
+
+  /**
+   * Keep an onboarding catalog site in Essentials. If its address is not open
+   * in this space it opens in the background, then the tab is pinned. The
+   * answer is only an admission: the app reads "kept" from the favorites
+   * projection, so a site never appears kept because a reply said so.
+   */
+  async keepSite({ request_id = "", site = "", window_id = DEFAULT_WINDOW_ID } = {}) {
+    const url = ONBOARDING_SITES[site];
+    if (typeof url !== "string") {
+      return err(request_id, "unknown_site", `unknown site ${site}`);
+    }
+    const open = activeOrder()
+      .map((id) => _tabs.get(id))
+      .find((tab) => tab && tab.space_id === _activeSpaceId && tab.url === url);
+    let astra_tab_id = open?.astra_tab_id ?? "";
+    if (!astra_tab_id) {
+      const created = await Tabs.create({
+        request_id,
+        url,
+        background: true,
+        window_id,
+      });
+      if (created?.error) return created;
+      astra_tab_id = created?.astra_tab_id ?? "";
+    }
+    if (!astra_tab_id) {
+      return err(request_id, "not_created", "the site tab was not created");
+    }
+    const pinned = await Tabs.setEssential({
+      request_id,
+      astra_tab_id,
+      essential: true,
+    });
+    if (pinned?.error) return pinned;
+    return admitted(request_id, { astra_tab_id, url, kept: true });
+  },
+
+  /**
+   * Let go of an onboarding catalog site: unpin the tab native kept at its
+   * address. The tab itself stays, so a site the person was using is not
+   * closed behind their back; closing an Essential keeps it.
+   */
+  async releaseSite({ request_id = "", site = "", window_id = DEFAULT_WINDOW_ID } = {}) {
+    const url = ONBOARDING_SITES[site];
+    if (typeof url !== "string") {
+      return err(request_id, "unknown_site", `unknown site ${site}`);
+    }
+    const kept = activeOrder()
+      .map((id) => _tabs.get(id))
+      .find(
+        (tab) =>
+          tab &&
+          tab.space_id === _activeSpaceId &&
+          tab.pinned === true &&
+          tab.url === url,
+      );
+    if (!kept) {
+      return admitted(request_id, { url, released: false });
+    }
+    const unpinned = await Tabs.setEssential({
+      request_id,
+      astra_tab_id: kept.astra_tab_id,
+      essential: false,
+    });
+    if (unpinned?.error) return unpinned;
+    return admitted(request_id, {
+      astra_tab_id: kept.astra_tab_id,
+      url,
+      released: true,
+    });
   },
 
   // Sleep a tab (live: `gBrowser.discardBrowser`). Keeps history +

@@ -72,6 +72,8 @@ const COMMANDS = {
   system_clock_24h: "systemClock24h",
   update_status: "updateStatus",
   update_check: "updateCheck",
+  update_highlights: "updateHighlights",
+  update_relaunch: "updateRelaunch",
   default_browser_status: "defaultBrowserStatus",
   default_browser_request: "defaultBrowserRequest",
   login_item_status: "loginItemStatus",
@@ -722,6 +724,19 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
   }
   check("junk payloads answer instead of throwing", threw === false);
 }
+
+// --- update availability ----------------------------------------------------
+// The build ships no updater, so both answers are honest refusals rather than
+// `unknown_command`: the About row reads "unavailable" from update_status and
+// never promises a restart that cannot happen.
+check(
+  "update_highlights answers null with no updater",
+  (await System.updateHighlights()) === null,
+);
+check(
+  "update_relaunch refuses with nothing parked",
+  (await System.updateRelaunch()) === false,
+);
 
 console.log(`\nsystem_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

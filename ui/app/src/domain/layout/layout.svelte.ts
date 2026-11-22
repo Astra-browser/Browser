@@ -1,6 +1,5 @@
 import { createLifecycle } from "$shared/lib/lifecycle";
 import type { DividerView, WorkPaneLayout } from "$shared/ipc/bindings";
-import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 
 /** The pane's applied native hole with finite geometry; the wire type admits null for NaN. */
@@ -34,7 +33,6 @@ let workPaneState = $state.raw<WorkPaneHole | null>(null);
 export const dividers = () => dividerState;
 /** The applied native hole of the Work browser pane, or null while no pane is shown. */
 export const workPane = () => workPaneState;
-
 const lifecycle = createLifecycle();
 let initialized = false;
 let initializing: Promise<void> | null = null;
@@ -84,7 +82,3 @@ export function dispose() {
   unlisten = null;
   workPaneState = null;
 }
-
-export const grab = (x: number, y: number) => void commands.dividerGrab(x, y);
-export const drag = (x: number, y: number) => void commands.dividerDrag(x, y);
-export const release = (x: number | null, y: number | null) => void commands.dividerRelease(x, y);

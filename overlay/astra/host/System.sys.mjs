@@ -635,6 +635,26 @@ export const System = {
   },
 
   /**
+   * `UpdateHighlights | null`: what the running release brought. This build
+   * ships no updater and no release-note source, so it answers null instead of
+   * naming a version it cannot substantiate. The day an updater lands, this
+   * reads the parked update's notes.
+   */
+  async updateHighlights() {
+    return null;
+  },
+
+  /**
+   * `boolean`: install the parked update and relaunch through the orderly
+   * shutdown. With no updater connected nothing is parked, so this refuses
+   * rather than pretending to restart. It is a real answer, not an error: the
+   * UI shows "no update is ready" from `update_status` and never calls this.
+   */
+  async updateRelaunch() {
+    return false;
+  },
+
+  /**
    * Opens the release page in a new tab. The About row that asks for it only
    * appears when an update reports a manual download, and this build has no
    * updater, so the call is a guard rather than a common path.

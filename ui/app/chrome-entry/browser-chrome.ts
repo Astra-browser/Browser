@@ -301,6 +301,8 @@ try {
     "browser-return": "astra:browser-return",
     "presentation-tab": "astra:presentation-tab",
     "peek-changed": "astra:peek",
+    "resource-close": "astra:resource-close",
+    "resource-close-cancelled": "astra:resource-close-cancelled",
   };
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {

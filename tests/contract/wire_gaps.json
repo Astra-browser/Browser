@@ -4,11 +4,11 @@
   "verification": "No live probe: slice 1 changed no surface, host module or engine path. Contract and unit gates only; see docs/astra/STATE.md P7-T01.",
   "counts": {
     "total": 317,
-    "routed": 177,
+    "routed": 182,
     "deferred": 110,
-    "unused": 18,
-    "open": 12,
-    "calledUnrouted": 124
+    "unused": 25,
+    "open": 0,
+    "calledUnrouted": 114
   },
   "deferred": [
     {
@@ -784,82 +784,7 @@
       ]
     }
   ],
-  "open": [
-    {
-      "name": "divider_drag",
-      "callers": [
-        "ui/app/src/domain/layout/layout.svelte.ts"
-      ]
-    },
-    {
-      "name": "divider_grab",
-      "callers": [
-        "ui/app/src/domain/layout/layout.svelte.ts",
-        "ui/app/src/features/split/components/Dividers.svelte"
-      ]
-    },
-    {
-      "name": "divider_release",
-      "callers": [
-        "ui/app/src/domain/layout/layout.svelte.ts",
-        "ui/app/src/features/split/components/Dividers.svelte"
-      ]
-    },
-    {
-      "name": "essentials_keep",
-      "callers": [
-        "ui/app/src/domain/tabs/tabs.svelte.ts"
-      ]
-    },
-    {
-      "name": "essentials_release",
-      "callers": [
-        "ui/app/src/domain/tabs/tabs.svelte.ts"
-      ]
-    },
-    {
-      "name": "haptic",
-      "callers": [
-        "ui/app/src/shared/lib/haptic.ts"
-      ]
-    },
-    {
-      "name": "panel_intent",
-      "callers": [
-        "ui/app/src/app/panel/PanelApp.svelte"
-      ]
-    },
-    {
-      "name": "panel_layout",
-      "callers": [
-        "ui/app/src/features/search/components/LauncherPanel.svelte"
-      ]
-    },
-    {
-      "name": "resource_close_ready",
-      "callers": [
-        "ui/app/src/shared/lib/close.ts"
-      ]
-    },
-    {
-      "name": "swipe_region",
-      "callers": [
-        "ui/app/src/features/tabs/lib/native-swipe.ts"
-      ]
-    },
-    {
-      "name": "update_highlights",
-      "callers": [
-        "ui/app/src/features/updates/lib/notices.svelte.ts"
-      ]
-    },
-    {
-      "name": "update_relaunch",
-      "callers": [
-        "ui/app/src/domain/updates/updates.svelte.ts"
-      ]
-    }
-  ],
+  "open": [],
   "unused": [
     {
       "name": "add_menu_popup",
@@ -884,7 +809,23 @@
       ]
     },
     {
+      "name": "divider_drag",
+      "callers": []
+    },
+    {
+      "name": "divider_grab",
+      "callers": []
+    },
+    {
+      "name": "divider_release",
+      "callers": []
+    },
+    {
       "name": "extension_action_menu",
+      "callers": []
+    },
+    {
+      "name": "haptic",
       "callers": []
     },
     {
@@ -902,6 +843,18 @@
     {
       "name": "onboarding_play_intro",
       "callers": []
+    },
+    {
+      "name": "panel_intent",
+      "callers": [
+        "ui/app/src/app/panel/PanelApp.svelte"
+      ]
+    },
+    {
+      "name": "panel_layout",
+      "callers": [
+        "ui/app/src/features/search/components/LauncherPanel.svelte"
+      ]
     },
     {
       "name": "profile_menu_popup",
@@ -927,6 +880,10 @@
     },
     {
       "name": "spaces_menu_popup",
+      "callers": []
+    },
+    {
+      "name": "swipe_region",
       "callers": []
     },
     {
