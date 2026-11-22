@@ -737,6 +737,7 @@ export const events = {
 	pagePermissionPromptChanged: makeEvent<PagePermissionPromptChanged>("page-permission-prompt-changed"),
 	pageDialogPromptChanged: makeEvent<PageDialogPromptChanged>("page-dialog-prompt-changed"),
 	passkeyPromptChanged: makeEvent<PasskeyPromptChanged>("passkey-prompt-changed"),
+	preferenceChanged: makeEvent<PreferenceChanged>("preference_changed"),
 	resourceChanged: makeEvent<ResourceChanged>("resource-changed"),
 	runtimeStatusChanged: makeEvent<RuntimeStatusChanged>("runtime-status-changed"),
 	searchChanged: makeEvent<SearchChanged>("search-changed"),
@@ -2638,6 +2639,18 @@ export type PageAssistSuggestionV1 = "summarize" | "key_points" | "key_numbers" 
 export type PagePermissionKindView = "camera" | "microphone" | "geolocation" | "notifications" | "persistent-storage" | "xr" | "loopback-network" | "local-network";
 
 export type PagePermissionPromptChanged = PagePermissionPromptView;
+
+/**
+ *  A preference was written through `Settings.set`, or changed by the engine.
+ *  The typed answer to a write: no consumer parses `preference.<key>=<value>`
+ *  out of a string command any more.
+ */
+export type PreferenceChanged = {
+	/** One key from the Settings catalogue, such as `appearance.theme`. */
+	key: string,
+	/** The value as the preference store holds it (always a string). */
+	value: string,
+};
 
 /** The page dialog the engine asked Astra to draw (ASTRA-0020). */
 export type PageDialogKind = "alert" | "confirm" | "prompt" | "beforeunload";

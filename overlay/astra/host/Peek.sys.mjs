@@ -24,6 +24,7 @@
 
 import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
+import { Settings } from "./Settings.sys.mjs";
 import { SplitView, __nativeBinding } from "./SplitView.sys.mjs";
 
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -158,25 +159,29 @@ export function readConfig() {
   return base;
 }
 
-function writeConfig(next) {
+const CONFIG_SETTINGS = {
+  enabled: "peek.enabled",
+  trigger: "peek.trigger",
+  delay: "peek.delay",
+  size: "peek.size",
+  position: "peek.position",
+  scale: "peek.scale",
+  restore: "peek.restore",
+  closeOnLeave: "peek.close-leave",
+  showUrl: "peek.show-url",
+  showTitle: "peek.show-title",
+};
+
+/** Every peek setting is a preference, so it is written through
+ *  `Settings.set`: that is the one path that validates the value and emits
+ *  `preference_changed`, and a second writer here would leave every surface
+ *  without its event. */
+async function writeConfig(next) {
   try {
-    const prefs = services()?.prefs;
-    if (!prefs) return false;
-    const mapping = {
-      enabled: "enabled",
-      trigger: "trigger",
-      delay: "delay",
-      size: "size",
-      position: "position",
-      scale: "scale",
-      restore: "restore",
-      closeOnLeave: "close-leave",
-      showUrl: "show-url",
-      showTitle: "show-title",
-    };
-    for (const [key, name] of Object.entries(mapping)) {
+    for (const [key, setting] of Object.entries(CONFIG_SETTINGS)) {
       if (!(key in next)) continue;
-      prefs.setStringPref(`astra.settings.peek.${name}`, String(next[key]));
+      const result = await Settings.set({ key: setting, value: String(next[key]) });
+      if (result?.accepted !== true) return false;
     }
     return true;
   } catch {
@@ -500,7 +505,7 @@ export const Peek = {
         next[key] = value;
       }
     }
-    if (!writeConfig(next)) {
+    if (!(await writeConfig(next))) {
       return err(request_id, "store_failed", "the peek configuration could not be saved");
     }
     publish(window_id);

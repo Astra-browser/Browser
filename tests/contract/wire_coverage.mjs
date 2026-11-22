@@ -98,6 +98,7 @@ const REQUIRED = [
   "astra:focus",
   "astra:search",
   "astra:favicons",
+  "astra:preference-changed",
 ];
 const declared = new Set(
   [...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),

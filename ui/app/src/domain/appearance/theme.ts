@@ -207,9 +207,23 @@ async function initialize(generation: number) {
       }
       return;
     }
+    // A keyboard or menu theme command is also a choice: store it so the next
+    // launch starts in the same mode. Settings' own write arrives typed below.
+    if (!id.startsWith("theme.")) return;
+    const next = id.slice("theme.".length);
+    if (next !== "light" && next !== "dark" && next !== "system") return;
+    commandAppearance = next;
+    appearance = next;
+    apply();
+    void commands.settingSet(APPEARANCE_KEY, next).catch(() => {});
+  });
+  const preferenceListener = events.preferenceChanged.listen(({ payload }) => {
+    if (generation !== lifecycle) return;
+    const key = payload?.key;
+    const value = String(payload?.value ?? "");
     // A material choice is a capability decision, not just a stored string:
     // ask the host to resolve and apply it, then paint the tier it can draw.
-    if (id.startsWith("preference.ui.material=")) {
+    if (key === "ui.material") {
       void commands
         .uiInfo()
         .then((info) => {
@@ -222,37 +236,28 @@ async function initialize(generation: number) {
     // Settings writes the stored `appearance.theme` preference; every other
     // surface hears that push, so the window must apply it too. The old
     // `appearance` spelling is still accepted while profiles migrate.
-    const preference = id.startsWith("preference.appearance.theme=")
-      ? id.slice("preference.appearance.theme=".length)
-      : id.startsWith("preference.appearance=")
-        ? id.slice("preference.appearance=".length)
-        : null;
-    const next = preference ?? id.slice("theme.".length);
-    if (
-      (preference === null && !id.startsWith("theme.")) ||
-      (next !== "light" && next !== "dark" && next !== "system")
-    ) {
-      return;
-    }
-    commandAppearance = next;
-    appearance = next;
+    if (key !== "appearance.theme" && key !== "appearance") return;
+    if (value !== "light" && value !== "dark" && value !== "system") return;
+    commandAppearance = value;
+    appearance = value;
     apply();
-    // A keyboard or menu theme command is also a choice: store it so the next
-    // launch starts in the same mode. Settings' own write arrives as a push.
-    if (preference === null) void commands.settingSet(APPEARANCE_KEY, next).catch(() => {});
   });
+  const stopListeners = async () => {
+    (await listener)();
+    (await preferenceListener)();
+  };
 
   try {
     const info = await commands.uiInfo();
     if (generation !== lifecycle) {
-      (await listener)();
+      await stopListeners();
       return;
     }
     applyMaterial(commandMaterial ?? info.material, info.materials);
 
     let stored = await commands.settingGet(APPEARANCE_KEY);
     if (generation !== lifecycle) {
-      (await listener)();
+      await stopListeners();
       return;
     }
     if (stored === null) {
@@ -260,7 +265,7 @@ async function initialize(generation: number) {
       // Adopt it into the key the core validates.
       const legacy = await commands.settingGet(LEGACY_APPEARANCE_KEY);
       if (generation !== lifecycle) {
-        (await listener)();
+        await stopListeners();
         return;
       }
       if (legacy === "light" || legacy === "dark" || legacy === "system") {
@@ -276,17 +281,20 @@ async function initialize(generation: number) {
     }
     apply();
 
-    const stop = await listener;
+    const [stopCommand, stopPreference] = await Promise.all([listener, preferenceListener]);
     if (generation !== lifecycle) {
-      stop();
+      stopCommand();
+      stopPreference();
       return;
     }
     media.addEventListener("change", apply);
-    unlisten = stop;
+    unlisten = () => {
+      stopCommand();
+      stopPreference();
+    };
     initialized = true;
   } catch (error) {
-    const stop = await listener.catch(() => null);
-    stop?.();
+    await stopListeners().catch(() => {});
     throw error;
   }
 }

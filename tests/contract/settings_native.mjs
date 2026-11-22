@@ -215,22 +215,24 @@ check("an empty read is null", (await read("")) === null);
 // --- a pref change made elsewhere is announced ---------------------------
 const pushed = [];
 const stop = addEventListener((event) => {
-  if (event.type === "ui-command" && typeof event.data === "string") pushed.push(event.data);
+  if (event.type === "preference_changed" && event.data) pushed.push(event.data);
 });
 values.set("ui.prefersReducedMotion", 0);
 notify("ui.prefersReducedMotion");
 values.set("astra.settings.ntp.clock", "true");
 notify("astra.settings.ntp.clock");
 stop();
+const pushedKey = (key, value) =>
+  pushed.some((event) => event.key === key && event.value === value);
 check(
   "an external pref change pushes the decoded value",
-  pushed.includes("preference.ui.reduce-motion=false"),
-  pushed.join(","),
+  pushedKey("ui.reduce-motion", "false"),
+  JSON.stringify(pushed),
 );
 check(
   "an external Astra pref change is announced too",
-  pushed.includes("preference.ntp.clock=true"),
-  pushed.join(","),
+  pushedKey("ntp.clock", "true"),
+  JSON.stringify(pushed),
 );
 check("the changed pref is re-read", (await read("ui.reduce-motion")) === "false");
 check("the changed Astra pref is re-read", (await read("ntp.clock")) === "true");

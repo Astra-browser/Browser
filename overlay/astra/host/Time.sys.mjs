@@ -396,11 +396,11 @@ function startTracking(profile) {
   lastSite = "";
   recordActivity(clock());
   unsubscribeTracking = addEventListener((event) => {
-    if (event.type === "ui-command") {
-      const command = String(event.data ?? "");
+    if (event.type === "preference_changed") {
+      const key = String(event.data?.key ?? "");
       // The setting changed in another surface: re-anchor at the change so
       // the clock stops (or starts) from here, not from the next event.
-      if (command.startsWith("preference.time.track=") || command.startsWith("preference.time.retention=")) {
+      if (key === "time.track" || key === "time.retention") {
         recordActivity(clock());
         persist(true);
       }
