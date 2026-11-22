@@ -22,8 +22,9 @@
 //     nsNavHistory.cpp / History.cpp); such visits are acknowledged with
 //     `{ mirrored: false, reason }` instead of failing the call.
 //
-// Lane isolation: this module has NO static imports (not even Events), so
-// it can be imported by file path in Node contract tests AND in chrome via
+// Lane isolation: this module's only static import is `Envelope.sys.mjs`,
+// which imports nothing, so it can be imported by file path in Node contract
+// tests AND in chrome via
 // `ChromeUtils.importESModule("resource://astra/host/History.sys.mjs")`
 // (or a file:// URL in tests) without pulling in the P2-T06 lane. Event
 // emission goes through an injectable sink: HostAPI wiring connects it to
@@ -32,21 +33,7 @@
 // else a lazy live Places backend is used when running in chrome, else an
 // in-memory backend (Node default).
 
-const HOST_API_VERSION = 1; // Protocol v1; canonical constant lives in
-// Tabs.sys.mjs (P2-T06 lane). Kept literal here to avoid a cross-module
-// import; both must stay 1 until the HostAPI v2 bump.
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return {
-    request_id,
-    host_api_version: HOST_API_VERSION,
-    error: { code, message },
-  };
-}
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 
 // --- Injectable seams (test + HostAPI wiring) -------------------------------
 

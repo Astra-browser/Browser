@@ -30,7 +30,7 @@
 import { emit as defaultEmit } from "./Events.sys.mjs";
 import { Panes as defaultPanes } from "./Panes.sys.mjs";
 import { Containers as defaultContainers } from "./Containers.sys.mjs";
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 
 // --- Injectable seams ------------------------------------------------------
 // The live shell uses the real modules; tests inject doubles with the same
@@ -57,14 +57,6 @@ const _helpers = new Map();
 
 // Slot in the shell layout where helper source panes mount.
 const HELPER_SLOT = "work.helper";
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function paneIdFor(helper_id) {
   return `helper-pane-${helper_id}`;

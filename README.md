@@ -215,7 +215,7 @@ tools/perf/full-suite.sh --skip-build # contracts + live probes + benches
 | Changed | Command | Time |
 |---|---|---|
 | `ui/app/**` | `bun run --filter @astra/frame build:chrome` (from `ui/`) | ~7 s |
-| `overlay/astra/**`, `patches/**` | `cargo run -q -- overlay` (from `forge/astra-forge`) | <1 s |
+| `overlay/astra/**`, `patches/**` | `node tools/stage-host-jar.mjs` then `cargo run -q -- overlay` (from `forge/astra-forge`) | <1 s |
 | any of the above | `cargo run -q -- build --faster` | ~7 s |
 | `engine/**` (C++/Rust) | `cargo run -q -- build --jobs 2` | ~20 s+ |
 

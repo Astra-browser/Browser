@@ -15,20 +15,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
+import { ROOT, HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
 
@@ -55,7 +42,6 @@ check("update.googleapis.com is a KEEP", /class\s*=\s*"KEEP"/.test(endpoint ?? "
 check("update.googleapis.com has owner sign-off", /owner_signoff\s*=\s*true/.test(endpoint ?? ""));
 
 // --- host wiring ---------------------------------------------------------
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Settings, __resetSettingsForTests, __setPrefsForTests, __setContentPrefsForTests } =
   await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);

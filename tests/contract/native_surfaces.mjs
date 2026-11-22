@@ -8,22 +8,9 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 import fs from "node:fs";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const SplitView = await import(pathToFileURL(path.join(HOST, "SplitView.sys.mjs")).href);
 const SpaceHistory = await import(pathToFileURL(path.join(HOST, "SpaceHistory.sys.mjs")).href);
@@ -197,9 +184,14 @@ const noWindowPeek = await Peek.Peek.open({ url: "https://example.com/" });
 check("a peek without a window is refused", noWindowPeek.error?.code === "no_window");
 
 // --- routing and callers ---------------------------------------------------
-const routeText = fs.readFileSync(
-  path.join(ROOT, "ui", "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
+// The route table is built from the command manifest (D-55), so these checks
+// read the manifest, not the transport's text.
+const { COMMAND_MANIFEST } = await loadManifest();
+const routeModule = new Map(
+  COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map((entry) => [
+    entry.name,
+    entry.module,
+  ]),
 );
 const declared = [
   "tabs_split",
@@ -213,7 +205,7 @@ const declared = [
   "split_bookmark_delete",
 ];
 for (const name of declared) {
-  check(`${name} has a host route`, new RegExp(`\\b${name}: \\["SplitView"`).test(routeText));
+  check(`${name} has a host route`, routeModule.get(name) === "SplitView");
 }
 
 const surfaceRoutes = {
@@ -241,9 +233,9 @@ const surfaceRoutes = {
   tab_group_ungroup: "TabGroups",
 };
 for (const [name, module] of Object.entries(surfaceRoutes)) {
-  check(`${name} routes to ${module}`, new RegExp(`\\b${name}: \\["${module}"`).test(routeText));
+  check(`${name} routes to ${module}`, routeModule.get(name) === module);
 }
-check("history reads through the space index", /\bhistory_call: \["SpaceHistory"/.test(routeText));
+check("history reads through the space index", routeModule.get("history_call") === "SpaceHistory");
 
 const commandText = fs.readFileSync(
   path.join(ROOT, "ui", "app", "src", "shared", "ipc", "surfaces.ts"),

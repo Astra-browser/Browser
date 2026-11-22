@@ -20,7 +20,7 @@
 
 import { emit, eventSeq } from "./Events.sys.mjs";
 import { Settings } from "./Settings.sys.mjs";
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { __ensureDefaultWindow } from "./Windows.sys.mjs";
 import { PageDialogs } from "./PageDialogs.sys.mjs";
 
@@ -160,14 +160,6 @@ export function __showBrowserSurface() {
   } catch {
     return false;
   }
-}
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
 
 /**

@@ -34,11 +34,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const {
   System,
@@ -54,24 +50,14 @@ const { Boot } = await import(
 const CONTENT_COLOR_SCHEME_PREF =
   "layout.css.prefers-color-scheme.content-override";
 
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
-
 /** The commands this module owns, and the method answering each. */
 const COMMANDS = {
   about_info: "aboutInfo",
   system_clock_24h: "systemClock24h",
   update_status: "updateStatus",
   update_check: "updateCheck",
+  update_highlights: "updateHighlights",
+  update_relaunch: "updateRelaunch",
   default_browser_status: "defaultBrowserStatus",
   default_browser_request: "defaultBrowserRequest",
   login_item_status: "loginItemStatus",
@@ -722,6 +708,19 @@ const localHour24 = Object.hasOwn(HOUR_24, localCycle)
   }
   check("junk payloads answer instead of throwing", threw === false);
 }
+
+// --- update availability ----------------------------------------------------
+// The build ships no updater, so both answers are honest refusals rather than
+// `unknown_command`: the About row reads "unavailable" from update_status and
+// never promises a restart that cannot happen.
+check(
+  "update_highlights answers null with no updater",
+  (await System.updateHighlights()) === null,
+);
+check(
+  "update_relaunch refuses with nothing parked",
+  (await System.updateRelaunch()) === false,
+);
 
 console.log(`\nsystem_model: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

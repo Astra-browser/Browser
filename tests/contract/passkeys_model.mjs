@@ -6,6 +6,7 @@
 // service stand in for chrome. The real vault and the real `nsIWebAuthnService`
 // are covered by the live Marionette probe.
 import assert from "node:assert/strict";
+import { check, passed, failed } from "./lib/harness.mjs";
 
 const calls = [];
 let status = {
@@ -124,18 +125,6 @@ globalThis.Services = {
 const host = await import(
   new URL("../../overlay/astra/host/Passkeys.sys.mjs", import.meta.url)
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, condition) {
-  if (condition) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 host.activate();
 

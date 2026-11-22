@@ -13,10 +13,11 @@
 // Zoom range mirrors Firefox FullZoom limits (0.3–3.0); the model clamps
 // and the live binding applies via `ZoomManager`/`FullZoom`.
 
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
 import { emitItemsChanged } from "./Tabs.sys.mjs";
 import { resolve as resolveInput } from "./Search.sys.mjs";
-import { HOST_API_VERSION, __historyFor, __pushHistory, __tabsState } from "./Tabs.sys.mjs";
+import { __historyFor, __pushHistory, __tabsState } from "./Tabs.sys.mjs";
 
 export const MIN_ZOOM = 0.3;
 export const MAX_ZOOM = 3.0;
@@ -24,14 +25,6 @@ export const MAX_ZOOM = 3.0;
 const _zoom = new Map(); // astra_tab_id -> zoom level (default 1)
 const _find = new Map(); // astra_tab_id -> { query, matchCount, activeMatch }
 const _reader = new Map(); // astra_tab_id -> { enabled, available }
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function tabOf(astra_tab_id) {
   const { tabs, selectedId } = __tabsState();

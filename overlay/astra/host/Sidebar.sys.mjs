@@ -16,7 +16,7 @@
 // app's own sidebar column instead of covering it.
 // Pure logic, no Firefox internals.
 
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
 
 const _state = {
@@ -28,14 +28,6 @@ const _state = {
   lights: false,
   slide: true,
 };
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function snapshot() {
   return { ..._state };

@@ -1,6 +1,5 @@
 import { tabs } from "$domain/tabs";
 import * as tabDrag from "./tab-drag.svelte";
-import { haptic } from "$shared/lib/haptic";
 import { Reorder } from "./reorder";
 
 /** Where a drag was let go, for the list to decide what that means. */
@@ -73,9 +72,7 @@ export class RowDrag {
   // list arrives.
   #landing: Reorder | null = null;
   #essential = false;
-  #bounds: DOMRect | null = null;
   #slot = -1;
-  #page = false;
 
   constructor(options: Options) {
     this.#options = options;
@@ -122,12 +119,7 @@ export class RowDrag {
       this.#listen();
       tabDrag.begin(this.#id);
       document.body.style.cursor = "grabbing";
-      this.#bounds =
-        target instanceof Element
-          ? (target.closest(".browser-sidebar")?.getBoundingClientRect() ?? null)
-          : null;
       this.#slot = -1;
-      this.#page = false;
       const reorder = this.#options.reorder();
       this.#essential = reorder?.essential ?? false;
       this.#reorder = reorder
@@ -147,7 +139,7 @@ export class RowDrag {
       this.#frame = 0;
       const { x, y } = this.#pointer;
       const inPlace = this.#reorder?.update(x, y) ?? false;
-      this.#feel(inPlace, x);
+      this.#feel(inPlace);
       this.ghost = { id: this.#id, x, y };
       tabDrag.hover(x, y);
       tabs.dragOver(x, y);
@@ -239,16 +231,12 @@ export class RowDrag {
     this.#landing = null;
   }
 
-  /** A tick as the row snaps into a new slot, and a firmer one on reaching the page. */
-  #feel(inPlace: boolean, x: number) {
+  /** Where the row last settled, so a snap is not re-announced per move. */
+  #feel(inPlace: boolean) {
     const slot = this.#reorder?.slot ?? -1;
     if (inPlace && slot !== this.#slot) {
-      if (this.#slot !== -1) haptic("align");
       this.#slot = slot;
     } else if (!inPlace) this.#slot = -1;
-    const page = !inPlace && this.#bounds !== null && x > this.#bounds.right;
-    if (page && !this.#page) haptic("level");
-    this.#page = page;
   }
 
   #release(event: PointerEvent) {

@@ -6,45 +6,38 @@
 import { commands, type KeymapEntry, type KeymapOutcome } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { sameAccelerator } from "$shared/lib/accelerator";
+import { createSlice } from "$shared/lib/lifecycle";
 
 let entries = $state.raw<KeymapEntry[]>([]);
-let epoch = 0;
-let stop: (() => void) | null = null;
-let initializing: Promise<void> | null = null;
 
 export const all = () => entries;
 
 async function refresh(generation: number) {
   try {
     const next = await commands.keymapEntries();
-    if (generation === epoch) entries = next;
+    if (slice.isCurrent(generation)) entries = next;
   } catch {
     // The last known keymap stands; native retries on the next change.
   }
 }
 
-export function init(): Promise<void> {
-  if (initializing) return initializing;
-  const generation = ++epoch;
-  initializing = (async () => {
-    const unsubscribe = await events.keymapChanged.listen(() => void refresh(epoch));
-    if (generation !== epoch) {
+export const slice = createSlice({
+  async register({ generation, isCurrent }) {
+    const unsubscribe = await events.keymapChanged.listen(() => void refresh(slice.current()));
+    if (!isCurrent()) {
       unsubscribe();
       return;
     }
-    stop = unsubscribe;
     await refresh(generation);
-  })();
-  return initializing;
-}
+    return unsubscribe;
+  },
+  reset() {
+    entries = [];
+  },
+});
 
-export function dispose() {
-  epoch += 1;
-  stop?.();
-  stop = null;
-  initializing = null;
-  entries = [];
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 /** The command a chrome key press names, if any. The launcher is global and
  *  Work keys belong to the pane, so neither is matched here. */
@@ -99,7 +92,7 @@ export async function bind(
 ): Promise<KeymapOutcome> {
   try {
     const outcome = await commands.keymapBind(id, accelerator, replace);
-    if (outcome.kind === "applied") await refresh(epoch);
+    if (outcome.kind === "applied") await refresh(slice.current());
     return outcome;
   } catch {
     return { kind: "unavailable" };
@@ -109,7 +102,7 @@ export async function bind(
 export async function reset(id: string | null): Promise<boolean> {
   try {
     const done = await commands.keymapReset(id);
-    if (done) await refresh(epoch);
+    if (done) await refresh(slice.current());
     return done;
   } catch {
     return false;

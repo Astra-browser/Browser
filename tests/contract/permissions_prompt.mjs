@@ -18,9 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const { Permissions, KINDS, KIND_BY_ENGINE_TYPE, ENGINE_PERMISSION_NAME } = await import(pathToFileURL(path.join(HOST, "Permissions.sys.mjs")).href);
 const { Operations, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
@@ -29,18 +27,6 @@ const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).hre
 const schema = JSON.parse(
   await readFile(path.join(HOST, "schemas", "permissions.json"), "utf8"),
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const HEX32 = /^[0-9a-f]{32}$/u;
 const HEX16 = /^[0-9a-f]{16}$/u;

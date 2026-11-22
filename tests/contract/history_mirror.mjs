@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // P2-T07 contract test: History mirror into Places (U-06), stub level.
 //
-// Imports overlay/astra/host/History.sys.mjs by path (zero static imports,
-// no engine internals) and asserts the protocol in
+// Imports overlay/astra/host/History.sys.mjs by path (its only import is the
+// envelope, which imports nothing; no engine internals) and asserts the
+// protocol in
 // overlay/astra/host/schemas/history.json plus the visited/unvisited styling
 // behavior on a local fixture page, modelled at stub level: the mirror's
 // visited-set drives a :visited/:link style resolver with the engine UA
@@ -15,26 +16,10 @@
 import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const mod = await import(pathToFileURL(path.join(HOST, "History.sys.mjs")).href);
 const { History, __setHistoryEventSink, __resetHistoryForTests } = mod;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 __resetHistoryForTests();
 const events = [];
@@ -137,9 +122,10 @@ async function linkColor(url) {
   check("schema defines clear", !!schema.properties.clear);
   check("schema defines isVisited", !!schema.properties.isVisited);
   check("visit requires url", schema.properties.visit.required.includes("url"));
-  assert(schema.$id === "resource://astra/host/schemas/history.json");
-  console.log("PASS schema $id is the resource URL");
-  passed += 1;
+  check(
+    "schema $id is the resource URL",
+    schema.$id === "resource://astra/host/schemas/history.json",
+  );
 }
 
 console.log(`\nhistory_mirror: ${passed} passed, ${failed} failed`);

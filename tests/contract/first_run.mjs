@@ -15,27 +15,15 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const bootModule = await import(pathToFileURL(path.join(HOST, "Boot.sys.mjs")).href);
 const settingsModule = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { Boot, onboardingDecision, onboardingPending, ONBOARDING_KEY } = bootModule;
 const { Settings, __resetSettingsForTests, __setPrefsForTests } = settingsModule;
 
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 const read = (rel) => readFile(path.join(ROOT, rel), "utf8");
 
 // === The decision =========================================================
@@ -111,20 +99,17 @@ check("a refused store write is not a success", refused === false);
 __setPrefsForTests(null);
 
 // === Routing ==============================================================
-const transport = await read("ui/packages/bridge/src/host-transport.ts");
+const { COMMAND_MANIFEST } = await loadManifest();
+const onboardingRoute = COMMAND_MANIFEST.find((entry) => entry.name === "onboarding_finish");
 check(
   "onboarding_finish routes to a host method",
-  /onboarding_finish:\s*\[\s*"Boot"\s*,\s*"onboardingFinish"\s*\]/u.test(transport),
+  onboardingRoute?.module === "Boot" && onboardingRoute?.method === "onboardingFinish",
 );
 check(
   "the route target exists",
   typeof bootModule.Boot.onboardingFinish === "function",
 );
-const baseline = JSON.parse(await read("tests/contract/wire_baseline.json"));
-check(
-  "onboarding_finish is no longer a known gap",
-  !(baseline.unrouted ?? []).includes("onboarding_finish"),
-);
+check("onboarding_finish is declared routed", onboardingRoute?.state === "routed");
 
 // === The page is opened before the browser UI =============================
 const browserEntry = await read("ui/app/chrome-entry/browser-chrome.ts");

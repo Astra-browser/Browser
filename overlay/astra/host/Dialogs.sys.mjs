@@ -61,7 +61,7 @@
 //   browser state) before opening a real dialog for the claim.
 
 import { emit } from "./Events.sys.mjs";
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 
 export { HOST_API_VERSION };
 
@@ -115,14 +115,6 @@ function storePermission(record, decision) {
 
 const _pending = new Map(); // dialog_id -> record
 let _nextDialog = 1;
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 // Trust gate: only chrome-privileged callers may resolve. Returns an error
 // response when the actor is not chrome, else null.

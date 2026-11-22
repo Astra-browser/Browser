@@ -26,6 +26,7 @@ binding allowed to touch live browser elements.
 | `Panes.sys.mjs` | side-panel / Work-canvas surfaces: `show`/`hide`/`list` plus `attach` (shell `slot` + optional tab mirror), `detach`, `setRect`, `get`, and the `check` generation guard (attach/detach bump `generation`; stale producers drop work) |
 | `Content.sys.mjs` | chrome binding: `mountNative` maps the tab model onto native `gBrowser` tabs (adopts the initial tab, mirrors select/close/busy, mute, navigation, load intents; window-scoped, top-level navigations only; background tabs load on activation). Pin/discard/mute now drive native `gBrowser` tabs; engine-created tabs are adopted; cross-space moves recreate the tab in the target container. SessionStore is the live tab source (P5a); Astra organisation (spaces/pins) persists through the Rust sidecar (P5b). Each window mounts its own native tabs; organisation writes are single-writer per process. `attachTabBrowser` registers a tabs progress listener (`makeProgressListener`) feeding external loads/titles back into the model; `applyZoom`/`printPage` perform live zoom/print best-effort |
 | `HostAPI.sys.mjs` | façade: re-exports all modules + `addEventListener`/`emit`/`eventSeq`/`eventsSince` + `__resetForTests` (P1-T05 shape preserved) |
+| `Envelope.sys.mjs` | one owner for the reply envelope (P7-T03): `ok`/`err`/`admitted`, the single `HOST_API_VERSION = 1`, and the two admission shapes — `operationAccepted` (the operation was recorded; `accepted: true`) and `commandNotAdmitted` (the command never reached the engine; `accepted: false`). Imports nothing, so every module can use it in chrome and from a Node test by file path. |
 | `schemas/*.json` | `boot`, `windows`, `tabs`, `navigation`, `panes`, `events` schemas |
 
 History mirroring into Places (`:visited`) is owned by P2-T07 (separate
@@ -77,6 +78,10 @@ lane/files); session snapshot/restore is P2-T09.
 
 ## Verification
 
+- `node tests/contract/envelope_model.mjs` — 25 checks: the `ok`/`err`
+  field set and byte order, `HOST_API_VERSION`, the envelope `admitted`, the
+  two admission shapes staying distinct, and exactly one owner per helper
+  across `overlay/astra/host` (source scan, not a TypeScript regex). PASS.
 - `node tests/contract/content_slot.mjs` — 33 stub checks (P1-T10
   protocol intact: request_id echo, event_seq monotonic, back/forward
   stack, errors). PASS — must stay green for P2-T08/P1-T10.

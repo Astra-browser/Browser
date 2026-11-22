@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// In-memory MOCK host (P2-T08). Answers every command of the 270-command
+// In-memory MOCK host (P2-T08). Answers every command of the 281-command
 // surface without Firefox so the UI runs standalone (goldens/dev). Known
 // commands return shaped fixtures (mirroring
 // `crates/astra-proto/fixtures/`); everything else returns `{ ok: true }`
 // unless an override is registered. Events are emitted with a monotonic
 // `event_seq` starting at 1, like `overlay/astra/host/Events.sys.mjs`.
 
-import { COMMANDS, EVENT_RENAMES, EVENTS, PROTOCOL_VERSION } from "./proto.js";
+import { EVENT_RENAMES, EVENTS, PROTOCOL_VERSION } from "./proto.js";
+import { COMMAND_MANIFEST } from "./manifest.js";
 import type { Envelope } from "./proto.js";
 import type { CommandName } from "./proto.js";
 
@@ -204,9 +205,13 @@ export class MockHost {
   }
 }
 
-/** Every command the bridge accepts (270 wire names from `astra-proto`). */
-export function mockCommandNames(): readonly CommandName[] {
-  return COMMANDS;
+/**
+ * Every command the manifest declares (317 wire names, D-55). This is the set
+ * the bridge accepts in mock mode; the frozen registry in `proto.ts` holds 281
+ * of them, and the other 36 are the route names it never carried.
+ */
+export function mockCommandNames(): readonly string[] {
+  return COMMAND_MANIFEST.map((entry) => entry.name);
 }
 
 /** Every event channel the bridge delivers (35 post-rename names). */

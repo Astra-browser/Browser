@@ -1,4 +1,4 @@
-import { listenAll } from "$shared/lib/lifecycle";
+import { createSlice, listenAll } from "$shared/lib/lifecycle";
 import { flushSync } from "svelte";
 import { flags } from "$shared/flags";
 import { commands } from "$shared/ipc/bindings";
@@ -27,13 +27,9 @@ let selected = $state(false);
 // opened from Work gives the window back to Work, not to Browse.
 let underneath: BrowserPage | null = null;
 let error = $state(false);
-let generation = 0;
 let navigationEpoch = 0;
 let activeTab: string | null = null;
-let stop: (() => void) | null = null;
 let observationLifetime = new AbortController();
-let initialized = false;
-let initializing: Promise<void> | null = null;
 export const currentPage = () => (selected ? page : null);
 /** The page that owns a tab in the list, or null when there is none. */
 export const pageTab = (): PageTab | null =>
@@ -45,104 +41,88 @@ export const hasPage = () => page !== null;
 /** The page selected in front, whichever kind it is. */
 export const pageSelected = () => selected && page !== null;
 export const navigationFailed = () => error;
-async function initialize(epoch: number) {
-  const listeners = await listenAll([
-    events.browserReturn.listen(() => {
-      if (epoch !== generation) return;
-      underneath = null;
-      flushSync(() => {
-        page = null;
-        selected = false;
-      });
-    }),
-    events.itemsChanged.listen(({ payload }) => {
-      if (epoch !== generation) return;
-      const next = typeof payload?.active === "string" ? payload.active : null;
-      // Choosing any tab leaves the page, but the page keeps its own row: the
-      // person can come back to it the way they come back to any tab. Work is
-      // a mode, not a page, so it stays where it is.
-      if (activeTab !== null && next !== activeTab && page !== null && page !== "work") {
-        selected = false;
-      }
-      activeTab = next;
-    }),
-    events.uiCommand.listen(({ payload }) => {
-      if (epoch !== generation) return;
-      if (payload === "browser.return-failed") {
-        navigationEpoch++;
-        error = true;
-        return;
-      }
-      const destination = payload.startsWith("browser.") ? payload.slice(8) : "";
-      // Work leaves with its build flag: a host event cannot open a surface
-      // this build does not ship.
-      if (destination === "work" && !flags.work) return;
-      const confirmed: BrowserPage | null | undefined =
-        destination === "return"
-          ? null
-          : destination === "work" ||
-              destination === "settings" ||
-              destination === "extensions" ||
-              destination === "history" ||
-              destination === "downloads" ||
-              destination === "gallery" ||
-              destination === "tasks" ||
-              destination === "notes" ||
-              destination === "time" ||
-              destination === "source"
-            ? destination
-            : undefined;
-      if (confirmed !== undefined) {
-        navigationEpoch++;
-        if (confirmed === null || confirmed === "work") underneath = null;
-        else if (page === "work") underneath = "work";
+export const slice = createSlice({
+  async register({ isCurrent, attach }) {
+    if (observationLifetime.signal.aborted) observationLifetime = new AbortController();
+    const listeners = await listenAll([
+      events.browserReturn.listen(() => {
+        if (!isCurrent()) return;
+        underneath = null;
         flushSync(() => {
-          error = false;
-          page = confirmed;
-          selected = confirmed !== null;
+          page = null;
+          selected = false;
         });
-      }
-    }),
-  ]);
-  if (epoch !== generation) {
-    for (const unsubscribe of listeners) unsubscribe();
-  } else {
-    initialized = true;
-    stop = () => {
+      }),
+      events.itemsChanged.listen(({ payload }) => {
+        if (!isCurrent()) return;
+        const next = typeof payload?.active === "string" ? payload.active : null;
+        // Choosing any tab leaves the page, but the page keeps its own row: the
+        // person can come back to it the way they come back to any tab. Work is
+        // a mode, not a page, so it stays where it is.
+        if (activeTab !== null && next !== activeTab && page !== null && page !== "work") {
+          selected = false;
+        }
+        activeTab = next;
+      }),
+      events.uiCommand.listen(({ payload }) => {
+        if (!isCurrent()) return;
+        if (payload === "browser.return-failed") {
+          navigationEpoch++;
+          error = true;
+          return;
+        }
+        const destination = payload.startsWith("browser.") ? payload.slice(8) : "";
+        // Work leaves with its build flag: a host event cannot open a surface
+        // this build does not ship.
+        if (destination === "work" && !flags.work) return;
+        const confirmed: BrowserPage | null | undefined =
+          destination === "return"
+            ? null
+            : destination === "work" ||
+                destination === "settings" ||
+                destination === "extensions" ||
+                destination === "history" ||
+                destination === "downloads" ||
+                destination === "gallery" ||
+                destination === "tasks" ||
+                destination === "notes" ||
+                destination === "time" ||
+                destination === "source"
+              ? destination
+              : undefined;
+        if (confirmed !== undefined) {
+          navigationEpoch++;
+          if (confirmed === null || confirmed === "work") underneath = null;
+          else if (page === "work") underneath = "work";
+          flushSync(() => {
+            error = false;
+            page = confirmed;
+            selected = confirmed !== null;
+          });
+        }
+      }),
+    ]);
+    if (!isCurrent()) {
       for (const unsubscribe of listeners) unsubscribe();
-    };
-  }
-}
-export function init(): Promise<void> {
-  if (initializing) return initializing;
-  if (initialized) return Promise.resolve();
-  if (observationLifetime.signal.aborted) observationLifetime = new AbortController();
-  const task = initialize(++generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-export function dispose() {
-  generation++;
-  observationLifetime.abort();
-  initialized = false;
-  initializing = null;
-  navigationEpoch++;
-  stop?.();
-  stop = null;
-  page = null;
-  selected = false;
-  activeTab = null;
-  underneath = null;
-  error = false;
-}
+      return;
+    }
+    attach(() => {
+      for (const unsubscribe of listeners) unsubscribe();
+    });
+  },
+  reset() {
+    observationLifetime.abort();
+    navigationEpoch++;
+    page = null;
+    selected = false;
+    activeTab = null;
+    underneath = null;
+    error = false;
+  },
+});
+
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 export async function open(next: BrowserPage | null) {
   if (next === "work" && !flags.work) return;
   const request = ++navigationEpoch;

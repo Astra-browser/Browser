@@ -10,16 +10,9 @@
 // written by Content (`__setTabGroup`), because it already owns the native
 // tab map.
 
-import { HOST_API_VERSION, __setTabGroup, emitItemsChanged } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
+import { __setTabGroup, emitItemsChanged } from "./Tabs.sys.mjs";
 import { __nativeBinding } from "./SplitView.sys.mjs";
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function groupElements(binding) {
   try {

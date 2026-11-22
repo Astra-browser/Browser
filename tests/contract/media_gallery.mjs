@@ -11,9 +11,7 @@
 import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const gallery = await import(pathToFileURL(path.join(HOST, "MediaGallery.sys.mjs")).href);
 const {
@@ -24,18 +22,6 @@ const {
   parsePathList,
   folderRows,
 } = gallery;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 function parentOf(value) {
   const at = value.lastIndexOf("/");

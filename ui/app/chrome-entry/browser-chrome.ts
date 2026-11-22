@@ -281,6 +281,7 @@ try {
     "page-permission-prompt-changed": "astra:page-permission-prompt",
     "page-dialog-prompt-changed": "astra:page-dialog-prompt",
     "passkey-prompt-changed": "astra:passkey-prompt",
+    "preference_changed": "astra:preference-changed",
     "web-extension-prompt-changed": "astra:web-extension-prompt",
     "nav.find-result": "astra:find",
     "runtime-status-changed": "astra:runtime-status",
@@ -301,6 +302,8 @@ try {
     "browser-return": "astra:browser-return",
     "presentation-tab": "astra:presentation-tab",
     "peek-changed": "astra:peek",
+    "resource-close": "astra:resource-close",
+    "resource-close-cancelled": "astra:resource-close-cancelled",
   };
   for (const [wire, dom] of Object.entries(DOM_CHANNELS)) {
     bridge.listen(wire, (event) => {

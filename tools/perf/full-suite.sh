@@ -74,35 +74,18 @@ if [ "$skip_build" -eq 0 ]; then
   (cd forge/astra-forge && cargo run -q -- overlay && cargo run -q -- build --faster) || exit 1
 fi
 
-# Every tests/contract/*.mjs must be listed here: a suite that exists but is
-# not registered is a hole in the gate, so the completeness check below fails.
+# The suite list comes from run-all.mjs, which globs the directory. There is no
+# second list to drift: a suite that exists is discovered. This runner still
+# owns the per-suite log and result row.
 echo "== contracts"
-CONTRACTS=(
-  blocker_coverage blocker_host bookmarks_model boot_model browsing_data_host
-  chrome_extensions commands_model containers_isolation content_hide content_slot
-  diagnostics_model dialog_prompts_auth dialog_prompts_cert dialogs_events dialogs_security
-  downloads_model favicons_model first_run frame_model history_mirror history_model history_places
-  hostapi_v1 keymap_model launcher_edit load_state media_gallery media_import_model media_model
-  media_selection menu_layer metadata_restore migration_model native_file_picker
-  native_nav_model native_surfaces notes_model operations_ledger page_dialogs page_source_model
-  passkeys_model permissions_prompt privacy_host profiles_model protected_content
-  resources_model search_model settings_native shell_assembly sidecar_spike
-  site_permissions_host sleep_model slots_model spaces_model spaces_profiles_model
-  stage_rect system_model tab_history tab_lifecycle tabs_admission tabs_settings
-  telemetry_blocklist time_model webext_view window_scope wire_coverage work_model
-  zoom_home_material
-)
-for file in tests/contract/*.mjs; do
-  name="$(basename "$file" .mjs)"
-  registered=0
-  for known in "${CONTRACTS[@]}"; do
-    [ "$known" = "$name" ] && registered=1 && break
-  done
-  if [ "$registered" -eq 0 ]; then
-    echo "FAIL contract suite not registered: $name (add it to CONTRACTS)"
-    fail=1
-  fi
-done
+CONTRACTS=()
+while IFS= read -r t; do
+  [ -n "$t" ] && CONTRACTS+=("$t")
+done < <(node tests/contract/run-all.mjs --list)
+if [ "${#CONTRACTS[@]}" -eq 0 ]; then
+  echo "FAIL no contract suites discovered by tests/contract/run-all.mjs"
+  fail=1
+fi
 for t in "${CONTRACTS[@]}"; do
   if [ ! -f "tests/contract/$t.mjs" ]; then
     echo "FAIL contract suite missing: $t"

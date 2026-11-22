@@ -13,26 +13,12 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const { Operations, admit, refuse, retainedCount, __resetOperationsForTests } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
 const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
 
 const HEX16 = /^[0-9a-f]{16}$/u;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 function reset() {
   __resetOperationsForTests();

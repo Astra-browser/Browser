@@ -182,34 +182,21 @@ if ($Build) {
 
 # --- contracts --------------------------------------------------------------
 echo "== contracts"
-$Contracts = @(
-    "blocker_coverage", "blocker_host", "bookmarks_model", "boot_model", "browsing_data_host",
-    "chrome_extensions", "commands_model", "containers_isolation", "content_hide", "content_slot",
-    "diagnostics_model", "dialog_prompts_auth", "dialog_prompts_cert", "dialogs_events",
-    "dialogs_security", "downloads_model", "favicons_model", "first_run", "frame_model",
-    "history_mirror", "history_model", "history_places", "hostapi_v1", "keymap_model",
-    "launcher_edit", "load_state", "media_gallery", "media_import_model", "media_model", "media_selection",
-    "menu_layer", "metadata_restore", "migration_model", "native_file_picker",
-    "native_nav_model", "native_surfaces", "notes_model", "operations_ledger",
-    "page_dialogs", "page_source_model", "passkeys_model",
-    "permissions_prompt", "privacy_host", "profiles_model", "protected_content", "resources_model",
-    "search_model", "settings_native", "shell_assembly", "sidecar_spike", "site_permissions_host",
-    "sleep_model", "slots_model", "spaces_model", "spaces_profiles_model", "stage_rect",
-    "system_model", "tab_history", "tab_lifecycle", "tabs_admission", "tabs_settings",
-    "telemetry_blocklist", "time_model", "webext_view", "window_scope", "wire_coverage",
-    "work_model", "zoom_home_material"
-)
+# The suite list comes from run-all.mjs, which globs the directory. There is no
+# second list to drift: a suite that exists is discovered. This runner still
+# owns the per-suite log and result row.
 $Node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $Node) {
     Write-Host "FAIL node not found: the contract gate cannot run"
     exit 1
 }
-foreach ($file in (Get-ChildItem (Join-Path $Root "tests/contract") -Filter *.mjs)) {
-    if ($Contracts -notcontains $file.BaseName) {
-        Write-Host "FAIL contract suite not registered: $($file.BaseName) (add it to `$Contracts)"
-        $Fail += 1
-        Add-Result "contract" $file.BaseName "FAIL" "not registered in the runner" 0
-    }
+$Contracts = @(
+    & node (Join-Path $Root "tests/contract/run-all.mjs") --list |
+        Where-Object { $_ }
+)
+if ($Contracts.Count -eq 0) {
+    Write-Host "FAIL no contract suites discovered by tests/contract/run-all.mjs"
+    $Fail += 1
 }
 foreach ($name in $Contracts) {
     $path = Join-Path $Root "tests/contract/$name.mjs"

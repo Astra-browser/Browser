@@ -16,7 +16,12 @@
 /** Protocol version (Appendix C envelope `v`). Mismatch fails fast. */
 export const PROTOCOL_VERSION = 1 as const;
 
-/** All 279 command wire names. */
+/**
+ * All 281 command wire names: the 279 in `crates/astra-proto/gen/astra-proto.ts`
+ * plus `onboarding_pending` and `page_dialog_answer`, which later wiring added
+ * after the generated copy could no longer be regenerated. `manifest.ts` is the
+ * authority for names and routes (D-55); this list is the frozen registry.
+ */
 export type CommandName =
   "about_info"
   | "account_avatar_discard"
@@ -585,7 +590,7 @@ export const COMMANDS: readonly CommandName[] = [
   "zoom_call",
 ] as const;
 
-/** All 38 event channel names (post-rename). */
+/** All 39 event channel names (post-rename). */
 export type EventChannel =
   "blocker-status-changed"
   | "browser-credential-capability-changed"
@@ -605,6 +610,7 @@ export type EventChannel =
   | "page-dialog-prompt-changed"
   | "page-permission-prompt-changed"
   | "passkey-prompt-changed"
+  | "preference_changed"
   | "resource-changed"
   | "runtime-status-changed"
   | "search-changed"
@@ -646,6 +652,7 @@ export const EVENTS: readonly EventChannel[] = [
   "page-dialog-prompt-changed",
   "page-permission-prompt-changed",
   "passkey-prompt-changed",
+  "preference_changed",
   "resource-changed",
   "runtime-status-changed",
   "search-changed",
