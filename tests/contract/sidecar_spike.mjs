@@ -20,6 +20,17 @@ import { ROOT, check, failed } from "./lib/harness.mjs";
 
 const STUB = join(ROOT, "out", "sidecar-stub");
 
+// The spike needs a built sidecar binary. CI checks out source only, so a
+// missing stub means the environment cannot run it: exit 2 is the harness's
+// explicit SKIP signal, not a failure.
+if (!existsSync(STUB)) {
+  console.log(
+    `SKIP sidecar spike: missing binary ${STUB} ` +
+      "(build: cargo build --release --manifest-path crates/astra-proto/Cargo.toml && cp ... out/)",
+  );
+  process.exit(2);
+}
+
 const N_RTT = 2000;
 const BURST = 1000;
 const CONCURRENCY = 50;
