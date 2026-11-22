@@ -11,6 +11,43 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Integration: the Phase 7 stack is on main (2026-11-22, owner-directed)
+
+The seven-lane refactor stack was verified lane by lane and merged in order. No
+branch was deleted and no history was rewritten. Candidates #1 (host reply
+envelope), #2 (command manifest), #4 (host jar generation), #5 (typed
+preference event), #7 (slice lifecycle) and #9 (contract harness) came in with
+`refactor/slice-lifecycle`; #3 (surface registry) with
+`refactor/surface-registry`; #6 was already on main. #8 (a split change to
+`Shell.svelte`) and #10 (schemas / `crates/astra-proto`) have no code in this
+stack — their split commits are already on main and their schema work predates
+it — so they need their own design round, not a fabricated change.
+
+| Lane | Head | What it carried |
+|---|---|---|
+| `refactor/slice-lifecycle` | `c6782468` | #1 envelope, #2 manifest, #4 jar generation, #5 preference event, #7 slice lifecycle, #9 harness |
+| `refactor/surface-registry` | `4a03ae4a` (main merged in) | #3 surface registry |
+| `docs/commit-prefixes` | `7fcff494` | `refactor:` and scoped prefixes |
+| `docs/never-delete-branches` | `a54e0c6a` | the owner's branch-retention rule |
+
+Conflicts were `docs/astra/STATE.md` for both lanes plus, after main moved,
+`onboarding.html` (keep the asset reference that exists), `jar.mn` (regenerated
+from the filesystem with `tools/stage-host-jar.mjs`), `commands_model.mjs`
+(harness imports + `loadSurfaces`), both `full-suite` runners (keep the
+run-all-derived list; the registry probe is registered separately) and the two
+slice vs registry files (`surface.svelte.ts`, `session/tools.svelte.ts`: keep the
+slice contract and the registry guards). Every STATE section from both sides is
+kept.
+
+**Gates on the merged main:** typecheck 0/0, eslint 0, stylelint 0, knip 0;
+unit 1358 passed / 2 environment skips; contract 75 suites / 73 passed /
+2 pre-existing reds; `state-check` and `brand-lint` clean. Pre-existing reds,
+all reproduced on `origin/main`: Prettier `format:check` (the Windows checkout
+has CRLF; 1675 files in the main worktree, 93 in the slice worktree);
+`blocker_coverage` (same CRLF cause: the working list is CRLF while the checked
+in gzip is LF; it passes on an LF checkout); and `sidecar_spike` (no
+`out/sidecar-stub`; exits 1, not SKIP). No fourth gate failed in this run.
+
 ## Dead code: the superseded bridge tab model is gone (2026-11-22, branch `chore/delete-bridge-tab-model`)
 
 Found by an architecture review, not by a claimed task row: the work started
