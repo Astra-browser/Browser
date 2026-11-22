@@ -1,5 +1,6 @@
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
+import { createSlice } from "$shared/lib/lifecycle";
 
 import {
   DEFAULT_CONTRAST,
@@ -37,10 +38,6 @@ export type Customization = {
 const media = window.matchMedia("(prefers-color-scheme: light)");
 // The interface ships on its warm light field; dark is the explicit choice.
 let appearance: Appearance = "light";
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 
 /** Only this module writes appearance axes on the document root. */
 export function applyUiPreferences(tint: string, reduceMotion: boolean) {
@@ -190,143 +187,121 @@ function applyMaterial(material: string, materials?: readonly string[]) {
   publishAppearance();
 }
 
-async function initialize(generation: number) {
-  // Establish system dark/light synchronously before the first native IPC
-  // await so the hidden bootstrap document already has deterministic tokens.
-  apply();
-  let commandAppearance: Appearance | null = null;
-  let commandMaterial: string | null = null;
-  const listener = events.uiCommand.listen((e) => {
-    if (generation !== lifecycle) return;
-    const id = e.payload;
-    if (id.startsWith("material.")) {
-      const material = id.slice("material.".length);
-      if (["none", "vibrancy", "liquid_glass", "acrylic", "mica"].includes(material)) {
-        commandMaterial = material;
-        applyMaterial(material);
+export const slice = createSlice({
+  async register({ isCurrent, attach }) {
+    // Establish system dark/light synchronously before the first native IPC
+    // await so the hidden bootstrap document already has deterministic tokens.
+    apply();
+    let commandAppearance: Appearance | null = null;
+    let commandMaterial: string | null = null;
+    const listener = events.uiCommand.listen((e) => {
+      if (!isCurrent()) return;
+      const id = e.payload;
+      if (id.startsWith("material.")) {
+        const material = id.slice("material.".length);
+        if (["none", "vibrancy", "liquid_glass", "acrylic", "mica"].includes(material)) {
+          commandMaterial = material;
+          applyMaterial(material);
+        }
+        return;
       }
-      return;
-    }
-    // A keyboard or menu theme command is also a choice: store it so the next
-    // launch starts in the same mode. Settings' own write arrives typed below.
-    if (!id.startsWith("theme.")) return;
-    const next = id.slice("theme.".length);
-    if (next !== "light" && next !== "dark" && next !== "system") return;
-    commandAppearance = next;
-    appearance = next;
-    apply();
-    void commands.settingSet(APPEARANCE_KEY, next).catch(() => {});
-  });
-  const preferenceListener = events.preferenceChanged.listen(({ payload }) => {
-    if (generation !== lifecycle) return;
-    const key = payload?.key;
-    const value = String(payload?.value ?? "");
-    // A material choice is a capability decision, not just a stored string:
-    // ask the host to resolve and apply it, then paint the tier it can draw.
-    if (key === "ui.material") {
-      void commands
-        .uiInfo()
-        .then((info) => {
-          if (generation !== lifecycle) return;
-          applyMaterial(info.material, info.materials);
-        })
-        .catch(() => {});
-      return;
-    }
-    // Settings writes the stored `appearance.theme` preference; every other
-    // surface hears that push, so the window must apply it too. The old
-    // `appearance` spelling is still accepted while profiles migrate.
-    if (key !== "appearance.theme" && key !== "appearance") return;
-    if (value !== "light" && value !== "dark" && value !== "system") return;
-    commandAppearance = value;
-    appearance = value;
-    apply();
-  });
-  const stopListeners = async () => {
-    (await listener)();
-    (await preferenceListener)();
-  };
+      // A keyboard or menu theme command is also a choice: store it so the next
+      // launch starts in the same mode. Settings' own write arrives typed below.
+      if (!id.startsWith("theme.")) return;
+      const next = id.slice("theme.".length);
+      if (next !== "light" && next !== "dark" && next !== "system") return;
+      commandAppearance = next;
+      appearance = next;
+      apply();
+      void commands.settingSet(APPEARANCE_KEY, next).catch(() => {});
+    });
+    const preferenceListener = events.preferenceChanged.listen(({ payload }) => {
+      if (!isCurrent()) return;
+      const key = payload?.key;
+      const value = String(payload?.value ?? "");
+      // A material choice is a capability decision, not just a stored string:
+      // ask the host to resolve and apply it, then paint the tier it can draw.
+      if (key === "ui.material") {
+        void commands
+          .uiInfo()
+          .then((info) => {
+            if (!isCurrent()) return;
+            applyMaterial(info.material, info.materials);
+          })
+          .catch(() => {});
+        return;
+      }
+      // Settings writes the stored `appearance.theme` preference; every other
+      // surface hears that push, so the window must apply it too. The old
+      // `appearance` spelling is still accepted while profiles migrate.
+      if (key !== "appearance.theme" && key !== "appearance") return;
+      if (value !== "light" && value !== "dark" && value !== "system") return;
+      commandAppearance = value;
+      appearance = value;
+      apply();
+    });
+    const stopListeners = async () => {
+      (await listener)();
+      (await preferenceListener)();
+    };
 
-  try {
-    const info = await commands.uiInfo();
-    if (generation !== lifecycle) {
-      await stopListeners();
-      return;
-    }
-    applyMaterial(commandMaterial ?? info.material, info.materials);
-
-    let stored = await commands.settingGet(APPEARANCE_KEY);
-    if (generation !== lifecycle) {
-      await stopListeners();
-      return;
-    }
-    if (stored === null) {
-      // A profile from before the split kept the choice under `appearance`.
-      // Adopt it into the key the core validates.
-      const legacy = await commands.settingGet(LEGACY_APPEARANCE_KEY);
-      if (generation !== lifecycle) {
+    try {
+      const info = await commands.uiInfo();
+      if (!isCurrent()) {
         await stopListeners();
         return;
       }
-      if (legacy === "light" || legacy === "dark" || legacy === "system") {
-        void commands.settingSet(APPEARANCE_KEY, legacy).catch(() => {});
-        stored = legacy;
+      applyMaterial(commandMaterial ?? info.material, info.materials);
+
+      let stored = await commands.settingGet(APPEARANCE_KEY);
+      if (!isCurrent()) {
+        await stopListeners();
+        return;
       }
+      if (stored === null) {
+        // A profile from before the split kept the choice under `appearance`.
+        // Adopt it into the key the core validates.
+        const legacy = await commands.settingGet(LEGACY_APPEARANCE_KEY);
+        if (!isCurrent()) {
+          await stopListeners();
+          return;
+        }
+        if (legacy === "light" || legacy === "dark" || legacy === "system") {
+          void commands.settingSet(APPEARANCE_KEY, legacy).catch(() => {});
+          stored = legacy;
+        }
+      }
+      if (
+        commandAppearance === null &&
+        (stored === "light" || stored === "dark" || stored === "system")
+      ) {
+        appearance = stored;
+      }
+      apply();
+
+      const [stopCommand, stopPreference] = await Promise.all([listener, preferenceListener]);
+      if (!isCurrent()) {
+        stopCommand();
+        stopPreference();
+        return;
+      }
+      media.addEventListener("change", apply);
+      attach(() => {
+        stopCommand();
+        stopPreference();
+      });
+    } catch (error) {
+      await stopListeners().catch(() => {});
+      throw error;
     }
-    if (
-      commandAppearance === null &&
-      (stored === "light" || stored === "dark" || stored === "system")
-    ) {
-      appearance = stored;
-    }
+  },
+  reset() {
+    media.removeEventListener("change", apply);
+  },
+  whenInitialized() {
     apply();
+  },
+});
 
-    const [stopCommand, stopPreference] = await Promise.all([listener, preferenceListener]);
-    if (generation !== lifecycle) {
-      stopCommand();
-      stopPreference();
-      return;
-    }
-    media.addEventListener("change", apply);
-    unlisten = () => {
-      stopCommand();
-      stopPreference();
-    };
-    initialized = true;
-  } catch (error) {
-    await stopListeners().catch(() => {});
-    throw error;
-  }
-}
-
-export function init(): Promise<void> {
-  if (initializing !== null) return initializing;
-  if (initialized) {
-    apply();
-    return Promise.resolve();
-  }
-
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  if (!initialized && initializing === null && unlisten === null) return;
-
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  media.removeEventListener("change", apply);
-  unlisten?.();
-  unlisten = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
