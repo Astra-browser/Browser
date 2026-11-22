@@ -11,6 +11,29 @@ lock it: no other agent may touch that task, its files, or its branch.
 > pick from **Remaining wiring** below and close a row only when the live
 > Marionette probe passes.
 
+## Dead code: the superseded bridge tab model is gone (2026-11-22, branch `chore/delete-bridge-tab-model`)
+
+Found by an architecture review, not by a claimed task row: the work started
+before the row existed, which `CONTRIBUTING.md` forbids. `state-check` was clean
+throughout and no other agent's files were touched. The deletion was verified
+before it happened: no importer, no barrel export, and its
+`{ astra_tab_id, pinned, discarded }` payload is not the shape the app receives
+any more.
+
+| What | Detail |
+|---|---|
+| Deleted | `ui/app/src/features/tabs/lib/tabs-bridge-store.ts` (417 lines) and `tests/tabs-bridge-store.test.ts` (323 lines) |
+| Kept | `features/downloads/lib/download-dialogs.ts`: a documented bridge gap, not dead code; now recorded under Remaining wiring |
+| Comment fix | `download-dialogs.ts` described its shape by naming the deleted file; the pointer is gone |
+
+**Verification:** `svelte-check` 0 errors / 0 warnings; eslint, stylelint and
+knip clean; vitest 1263 passed, 2 skipped; contracts 66/68 (both failures
+pre-existing: `blocker_coverage` seed drift, `sidecar_spike` exit code when
+`out/sidecar-stub` is absent); `state-check` and `brand-lint` clean. `bun run
+build` fails identically at `origin/main` with the same 12,713 modules
+(startup budget 42 > 24), so the deleted module was never in the bundle graph.
+No live probe: the module had no surface to drive.
+
 ## Owner report: the Now playing card was title-only (2026-11-21, branch `fix/media-now-playing-card`)
 
 The owner reported that the sidebar card showed only a correct title: no
@@ -1820,6 +1843,14 @@ recorded below; this list is what is still genuinely unwired.
   `tests/contract/wire_baseline.json`; `wire_coverage` fails on any new gap.
   Add each with a UI caller, a route-table entry, a contract test and a live
   probe.
+- **Download-permission prompts.** Both ends exist and nothing connects them:
+  `Dialogs.requestDownload` emits `download.started`, `decideDownload`
+  answers with `download.resolved`, and
+  `features/downloads/lib/download-dialogs.ts` listens and replies, but
+  neither event nor command is on the bridge and no component mounts
+  `DownloadPromptSession`. The full gap (missing `EVENTS` and `COMMANDS`
+  entries, no `Dialogs` route or `HostModules` member) is the contract in
+  `docs/astra/DOWNLOADS.md` section Bridge gap; close it with a live probe.
 - **New Tab tracker figure.** `blocker_stats` is now routed to the live
   engine (D-42); the New Tab figure appears only when the reply is
   `status: "ok"`, so a missing count is hidden rather than drawn as `0`.
