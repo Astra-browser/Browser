@@ -16,13 +16,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
 import astra_env  # noqa: E402
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from marionette import Marionette  # noqa: E402
 
 ROOT = astra_env.ROOT
 FIREFOX = astra_env.BINARY
 PORT = 2828
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/sidebar-shield"
 os.makedirs(OUT, exist_ok=True)
-
 
 class Handler(BaseHTTPRequestHandler):
     hits = []
@@ -39,49 +41,11 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-
 server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 site = f"http://127.0.0.1:{server.server_port}"
 threading.Thread(target=server.serve_forever, daemon=True).start()
 
-
-class Marionette:
-    def __init__(self):
-        self.sock = socket.create_connection(("127.0.0.1", PORT), timeout=60)
-        self.f = self.sock.makefile("rb")
-        self.n = 0
-        self._read()
-
-    def _read(self):
-        data = b""
-        while b":" not in data:
-            chunk = self.f.read(1)
-            if not chunk:
-                raise EOFError("closed")
-            data += chunk
-        length = int(data.split(b":")[0])
-        rest = data.split(b":", 1)[1]
-        while len(rest) < length:
-            rest += self.f.read(length - len(rest))
-        return json.loads(rest.decode())
-
-    def cmd(self, method, params=None):
-        self.n += 1
-        payload = json.dumps([0, self.n, method, params or {}]).encode()
-        self.sock.sendall(str(len(payload)).encode() + b":" + payload)
-        while True:
-            msg = self._read()
-            if isinstance(msg, list) and len(msg) == 4 and msg[1] == self.n:
-                if msg[2]:
-                    raise RuntimeError(f"{method}: {msg[2]} {json.dumps(msg[3])[:400]}")
-                return msg[3]
-
-    def script(self, script, args=None):
-        return self.cmd("WebDriver:ExecuteScript", {"script": script, "args": args or []})["value"]
-
-
 passed = failed = 0
-
 
 def check(name, cond, detail=""):
     global passed, failed
@@ -91,7 +55,6 @@ def check(name, cond, detail=""):
     else:
         failed += 1
         print(f"FAIL {name} {detail}")
-
 
 profile = tempfile.mkdtemp(prefix="astra-shield-", dir="/tmp/opencode")
 proc = subprocess.Popen(
@@ -103,7 +66,7 @@ proc = subprocess.Popen(
 m = None
 for _ in range(80):
     try:
-        m = Marionette()
+        m = Marionette(PORT, timeout=60, wait=0)
         break
     except Exception:
         time.sleep(1)

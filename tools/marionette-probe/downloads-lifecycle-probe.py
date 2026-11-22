@@ -26,6 +26,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
 import astra_env  # noqa: E402
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from marionette import Marionette  # noqa: E402
 
 ROOT = astra_env.ROOT
 FIREFOX = astra_env.BINARY
@@ -40,7 +43,6 @@ DELAY = 0.06  # ~3 s per transfer, long enough to pause mid-flight
 if not os.path.exists(FIREFOX):
     print("SKIP no built binary at", FIREFOX)
     sys.exit(2)
-
 
 class SlowFile(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"
@@ -68,62 +70,10 @@ class SlowFile(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-
 server = ThreadingHTTPServer(("127.0.0.1", 0), SlowFile)
 server.daemon_threads = True
 threading.Thread(target=server.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{server.server_port}"
-
-
-class Marionette:
-    def __init__(self, port):
-        deadline = time.time() + 90
-        while time.time() < deadline:
-            try:
-                self.sock = socket.create_connection(("127.0.0.1", port), timeout=30)
-                break
-            except OSError:
-                time.sleep(0.1)
-        else:
-            raise RuntimeError("no marionette")
-        self.file = self.sock.makefile("rb")
-        self.seq = 0
-        self._read()
-
-    def _read(self):
-        data = b""
-        while b":" not in data:
-            chunk = self.file.read(1)
-            if not chunk:
-                raise EOFError("marionette closed")
-            data += chunk
-        length = int(data.split(b":", 1)[0])
-        rest = data.split(b":", 1)[1]
-        while len(rest) < length:
-            chunk = self.file.read(length - len(rest))
-            if not chunk:
-                raise EOFError("marionette closed mid-message")
-            rest += chunk
-        return json.loads(rest.decode())
-
-    def cmd(self, method, params=None):
-        self.seq += 1
-        payload = json.dumps([0, self.seq, method, params or {}]).encode()
-        self.sock.sendall(str(len(payload)).encode() + b":" + payload)
-        while True:
-            message = self._read()
-            if isinstance(message, list) and len(message) == 4 and message[1] == self.seq:
-                if message[2]:
-                    raise RuntimeError(
-                        f"{method} -> {message[2]}: {json.dumps(message[3])[:300]}"
-                    )
-                return message[3]
-
-    def js(self, script, args=None):
-        return self.cmd(
-            "WebDriver:ExecuteScript", {"script": script, "args": args or []}
-        )["value"]
-
 
 def wait(read, timeout=30, step=0.2):
     deadline = time.time() + timeout
@@ -135,14 +85,12 @@ def wait(read, timeout=30, step=0.2):
         time.sleep(step)
     return value
 
-
 LIST = """
 const host = Services.astraHost;
 if (!host) return null;
 return host.Downloads.call({profile:'default', call:{kind:'list', before:null, limit:50}})
   .then(r => JSON.stringify(r));
 """
-
 
 def host_call(session, call):
     script = (
@@ -153,7 +101,6 @@ def host_call(session, call):
     raw = session.js(script, [call])
     return json.loads(raw) if raw else None
 
-
 def list_entries(session):
     raw = session.js(LIST)
     if not raw:
@@ -163,17 +110,14 @@ def list_entries(session):
         return []
     return reply.get("entries") or []
 
-
 def find(session, filename, state=None):
     for entry in list_entries(session) or []:
         if entry.get("filename") == filename and (state is None or entry.get("state") == state):
             return entry
     return None
 
-
 passed = 0
 failed = 0
-
 
 def check(name, cond, detail=""):
     global passed, failed
@@ -183,7 +127,6 @@ def check(name, cond, detail=""):
     else:
         failed += 1
         print(f"FAIL {name} {detail}")
-
 
 def trigger(session, name):
     reply = host_call(
@@ -197,7 +140,6 @@ def trigger(session, name):
         " url: arguments[0], background:false}).then(r => JSON.stringify(r));",
         [f"{BASE}/{name}"],
     )
-
 
 def main():
     base = os.environ.get("TMPDIR") or tempfile.gettempdir()
@@ -359,7 +301,6 @@ def main():
 
     print(f"\ndownloads-lifecycle: {passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
