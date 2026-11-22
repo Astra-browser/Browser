@@ -65,6 +65,22 @@ function Find-Nasm216 {
     return $null
 }
 
+function Find-WasiSysroot {
+    foreach ($candidate in @(
+        $env:MOZ_WASI_SYSROOT,
+        $env:WASI_SYSROOT,
+        'D:\astra-build\wasi-34\wasi-sysroot-34.0',
+        'D:\astra-build\wasi\wasi-sysroot',
+        'C:\tools\wasi-sysroot',
+        (Join-Path $env:USERPROFILE '.mozbuild\wasi-sysroot')
+    )) {
+        if ($candidate -and (Test-Path (Join-Path $candidate 'include'))) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+    return $null
+}
+
 function Add-UserPaths {
     $paths = @(
         (Join-Path $env:USERPROFILE '.cargo\bin'),
@@ -207,6 +223,16 @@ if ($ObjDir) {
     $configArgs += @('--objdir', $ObjDir)
 }
 Run 'rendering mozconfig' { & $forge @configArgs }
+$mozconfig = Join-Path $root 'out\mozconfig.windows'
+$wasi = Find-WasiSysroot
+if ($wasi) {
+    $wasiOption = $wasi -replace '\\', '/'
+    Add-Content -Path $mozconfig -Value "`nac_add_options --with-wasi-sysroot=$wasiOption"
+    Write-Log "wasi sysroot: $wasi"
+} else {
+    Add-Content -Path $mozconfig -Value "`nac_add_options --without-wasm-sandboxed-libraries"
+    Write-Log 'wasi sysroot: not found; building with --without-wasm-sandboxed-libraries'
+}
 
 if (-not $SkipUi) {
     Run 'building the chrome UI bundle' {
