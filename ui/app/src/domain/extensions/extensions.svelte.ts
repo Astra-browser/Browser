@@ -13,6 +13,7 @@ import {
   ExtensionProjectionModel,
   failureForContext,
 } from "./action-model";
+import { createSlice } from "$shared/lib/lifecycle";
 export { chromeStoreListingId, isChromeStoreListing } from "./store-listing";
 
 const NOTICE_LIFETIME_MS = 5_000;
@@ -28,10 +29,6 @@ type VisibleFailure = Omit<ExtensionActionFailedView, "projection_revision"> & {
 let failure = $state.raw<VisibleFailure | null>(null);
 const invoking = new SvelteSet<string>();
 
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 let shortcutTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -77,7 +74,7 @@ function publishFailure(
 ) {
   failure = { reason, profile_id: profileId, tab_id: tabId, projectionRevision: revision };
   if (noticeTimer !== null) clearTimeout(noticeTimer);
-  const generation = lifecycle;
+  const generation = slice.current();
   noticeTimer = setTimeout(() => {
     noticeTimer = null;
     if (generation !== lifecycle) return;
@@ -105,88 +102,69 @@ async function resolveListeners(promises: readonly Promise<Unlisten>[]): Promise
   return listeners;
 }
 
-async function initialize(generation: number) {
-  const listeners = await resolveListeners([
-    events.extensionActionsChanged.listen((event) => {
-      if (generation !== lifecycle || !model.applyActions(event.payload)) return;
-      state = model.actions;
-      shortcutModel.observeContextRevision(model.revision);
-      shortcutState = shortcutModel.view;
-      if (shortcutState === null && shortcutTimer !== null) {
-        clearTimeout(shortcutTimer);
-        shortcutTimer = null;
-      }
-      clearVisibleFailure();
-    }),
-    events.extensionActionFailed.listen((event) => {
-      if (generation !== lifecycle || !model.applyFailure(event.payload)) return;
-      shortcutModel.observeContextRevision(model.revision);
-      shortcutState = shortcutModel.view;
-      if (shortcutState === null && shortcutTimer !== null) {
-        clearTimeout(shortcutTimer);
-        shortcutTimer = null;
-      }
-      publishFailure(
-        event.payload.reason,
-        event.payload.profile_id,
-        event.payload.tab_id,
-        event.payload.projection_revision,
-      );
-    }),
-    events.extensionActionShortcut.listen((event) => {
-      if (generation !== lifecycle || !shortcutModel.apply(event.payload, model.revision)) return;
-      shortcutState = shortcutModel.view;
-      if (shortcutTimer !== null) clearTimeout(shortcutTimer);
-      const revision = event.payload.projection_revision;
-      shortcutTimer = setTimeout(() => {
-        shortcutTimer = null;
-        if (generation !== lifecycle || !shortcutModel.consume(revision)) return;
+export const slice = createSlice({
+  async register({ isCurrent, attach }) {
+    const listeners = await resolveListeners([
+      events.extensionActionsChanged.listen((event) => {
+        if (!isCurrent() || !model.applyActions(event.payload)) return;
+        state = model.actions;
+        shortcutModel.observeContextRevision(model.revision);
         shortcutState = shortcutModel.view;
-      }, ACTION_SHORTCUT_LIFETIME_MS);
-    }),
-  ]);
-  if (generation !== lifecycle) {
-    for (const stop of listeners) stop();
-    return;
-  }
-  unlisten = () => {
-    for (const stop of listeners) stop();
-  };
-  initialized = true;
-}
+        if (shortcutState === null && shortcutTimer !== null) {
+          clearTimeout(shortcutTimer);
+          shortcutTimer = null;
+        }
+        clearVisibleFailure();
+      }),
+      events.extensionActionFailed.listen((event) => {
+        if (!isCurrent() || !model.applyFailure(event.payload)) return;
+        shortcutModel.observeContextRevision(model.revision);
+        shortcutState = shortcutModel.view;
+        if (shortcutState === null && shortcutTimer !== null) {
+          clearTimeout(shortcutTimer);
+          shortcutTimer = null;
+        }
+        publishFailure(
+          event.payload.reason,
+          event.payload.profile_id,
+          event.payload.tab_id,
+          event.payload.projection_revision,
+        );
+      }),
+      events.extensionActionShortcut.listen((event) => {
+        if (!isCurrent() || !shortcutModel.apply(event.payload, model.revision)) return;
+        shortcutState = shortcutModel.view;
+        if (shortcutTimer !== null) clearTimeout(shortcutTimer);
+        const revision = event.payload.projection_revision;
+        shortcutTimer = setTimeout(() => {
+          shortcutTimer = null;
+          if (!isCurrent() || !shortcutModel.consume(revision)) return;
+          shortcutState = shortcutModel.view;
+        }, ACTION_SHORTCUT_LIFETIME_MS);
+      }),
+    ]);
+    if (!isCurrent()) {
+      for (const stop of listeners) stop();
+      return;
+    }
+    attach(() => {
+      for (const stop of listeners) stop();
+    });
+  },
+  reset() {
+    if (noticeTimer !== null) clearTimeout(noticeTimer);
+    noticeTimer = null;
+    if (shortcutTimer !== null) clearTimeout(shortcutTimer);
+    shortcutTimer = null;
+    invoking.clear();
+    shortcutModel.clear();
+    shortcutState = shortcutModel.view;
+    failure = null;
+  },
+});
 
-export function init(): Promise<void> {
-  if (initialized) return Promise.resolve();
-  if (initializing !== null) return initializing;
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  if (noticeTimer !== null) clearTimeout(noticeTimer);
-  noticeTimer = null;
-  if (shortcutTimer !== null) clearTimeout(shortcutTimer);
-  shortcutTimer = null;
-  invoking.clear();
-  shortcutModel.clear();
-  shortcutState = shortcutModel.view;
-  failure = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 export async function invoke(
   profileId: string,

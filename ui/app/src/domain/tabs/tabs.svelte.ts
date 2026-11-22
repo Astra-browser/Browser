@@ -1,4 +1,4 @@
-import { listenAll } from "$shared/lib/lifecycle";
+import { listenAll, createSlice } from "$shared/lib/lifecycle";
 import { forgetDrafts } from "$shared/lib/drafts";
 import { flushSync } from "svelte";
 import type { ItemsState, SpaceLookInputV1, TabView } from "$shared/ipc/bindings";
@@ -33,96 +33,65 @@ export const sidebarNodes = () => state.nodes;
 export const activeTab = (): TabView | undefined =>
   state.tabs.find((tab) => tab.id === state.active);
 
-type Unlisten = () => void;
-
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: Unlisten | null = null;
-
 function publishModelState() {
   state = model.value;
 }
 
-async function initialize(generation: number) {
-  // These calls synchronously install their DOM listeners. Keep every scoped
-  // listener registration before the first await so no privileged projection
-  // can arrive in a gap during startup.
-  const listeners = await listenAll([
-    events.itemsChanged.listen((event) => {
-      if (generation !== lifecycle) return;
-      if (model.applySnapshot(event.payload)) publishModelState();
-    }),
-    events.tabChanged.listen((event) => {
-      if (generation !== lifecycle) return;
-      if (model.applyTab(event.payload)) publishModelState();
-    }),
-    events.browserReturn.listen((event) => {
-      if (generation !== lifecycle) return;
-      flushSync(() => {
+export const slice = createSlice({
+  async register({ isCurrent, attach }) {
+    // These calls synchronously install their DOM listeners. Keep every scoped
+    // listener registration before the first await so no privileged projection
+    // can arrive in a gap during startup.
+    const listeners = await listenAll([
+      events.itemsChanged.listen((event) => {
+        if (!isCurrent()) return;
         if (model.applySnapshot(event.payload)) publishModelState();
-      });
-    }),
-    events.presentationTab.listen((event) => {
-      if (generation !== lifecycle) return;
+      }),
+      events.tabChanged.listen((event) => {
+        if (!isCurrent()) return;
+        if (model.applyTab(event.payload)) publishModelState();
+      }),
+      events.browserReturn.listen((event) => {
+        if (!isCurrent()) return;
+        flushSync(() => {
+          if (model.applySnapshot(event.payload)) publishModelState();
+        });
+      }),
+      events.presentationTab.listen((event) => {
+        if (!isCurrent()) return;
 
-      // Rust verifies the committed chrome in the same synchronous dispatch.
-      // State admission and DOM publication therefore belong to one flush.
-      flushSync(() => {
-        if (model.applyPresentation(event.payload)) publishModelState();
-      });
-    }),
-  ]);
+        // Rust verifies the committed chrome in the same synchronous dispatch.
+        // State admission and DOM publication therefore belong to one flush.
+        flushSync(() => {
+          if (model.applyPresentation(event.payload)) publishModelState();
+        });
+      }),
+    ]);
 
-  if (generation !== lifecycle) {
-    for (const stop of listeners) stop();
-    return;
-  }
-
-  unlisten = () => {
-    for (const stop of listeners) stop();
-  };
-  initialized = true;
-
-  // A cold first run can outrace Tauri setup. Preserve the bounded bootstrap
-  // retry while allowing disposal to cancel further attempts.
-  for (let attempt = 0; attempt < 20 && generation === lifecycle; attempt += 1) {
-    try {
-      await commands.tabsBootstrap();
+    if (!isCurrent()) {
+      for (const stop of listeners) stop();
       return;
-    } catch {
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
     }
-  }
-}
 
-export function init(): Promise<void> {
-  if (initializing !== null) return initializing;
-  if (initialized) return Promise.resolve();
+    attach(() => {
+      for (const stop of listeners) stop();
+    });
 
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
+    // A cold first run can outrace Tauri setup. Preserve the bounded bootstrap
+    // retry while allowing disposal to cancel further attempts.
+    for (let attempt = 0; attempt < 20 && isCurrent(); attempt += 1) {
+      try {
+        await commands.tabsBootstrap();
+        return;
+      } catch {
+        await new Promise<void>((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  },
+});
 
-export function dispose() {
-  if (!initialized && initializing === null && unlisten === null) return;
-
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 /** Fire-and-forget native intent; a refusal is not an unhandled rejection. */
 const fire = (task: Promise<unknown> | undefined) => void task?.catch?.(() => {});
