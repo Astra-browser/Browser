@@ -332,6 +332,7 @@ if ($SkipLive) {
         "sidebar_shield"        = "tools/marionette-probe/sidebar-shield-probe.py"
         "sidebar_card_head"     = "tools/marionette-probe/sidebar-card-head-probe.py"
         "surface_park"          = "tools/marionette-probe/surface-park-probe.py"
+        "surface_registry"      = "tools/marionette-probe/surface-registry-probe.py"
         "notes"                 = "tools/marionette-probe/notes-probe.py"
         "theme"                 = "tools/marionette-probe/theme-probe.py"
         "version"               = "tools/marionette-probe/version-probe.py"
