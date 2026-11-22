@@ -24,7 +24,8 @@
 // tests have no `Services` and keep the module-local record.
 
 import { emit } from "./Events.sys.mjs";
-import { HOST_API_VERSION, __closeTabsInWindow } from "./Tabs.sys.mjs";
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
+import { __closeTabsInWindow } from "./Tabs.sys.mjs";
 import { bindClose } from "./Close.sys.mjs";
 
 /**
@@ -77,14 +78,6 @@ function recordOf() {
     // A frozen Services object still leaves this window working on its own.
     return _local;
   }
-}
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
 
 function snapshot(id) {
