@@ -118,6 +118,17 @@ is a product gap. The rule did not change — the list of shipped surfaces did.
 
 ## Verification gaps
 
+- **The component project is red in this checkout, not by this branch.** On
+  2026-11-22 the 286-file component suite reported 15 failing files. Fourteen
+  reproduce identically on `main`: the Work and assist semantic tests log
+  `[astra] native artifact missing (Phase 2)` for engine assets that are not in
+  this tree, `SelectiveStyles` needs a browser `inspect` API, `DropdownCsp`
+  needs a real CSP, and `WindowsChrome`'s acrylic token check is already
+  recorded above. `SidebarCardHead` passes in isolation on both branches and
+  fails only under parallel load. Treat both lists as environment, not
+  regressions, and re-check on a machine with the native artifacts before
+  calling the component project green.
+
 - **DevTools teardown noise is patched out.** ESR 153 logs `No such
   JSProcessActor 'DevToolsProcess'` (bug 2044741) and the `getGrids`/`pagestyle`
   teardown family (bug 1944477) while a toolbox closes, and logs `Unable to find
