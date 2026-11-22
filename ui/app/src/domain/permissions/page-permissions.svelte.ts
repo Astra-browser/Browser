@@ -90,9 +90,6 @@ export const slice = createSlice({
   },
 });
 
-export const init = () => slice.init();
-export const dispose = () => slice.dispose();
-
 async function settle(
   retained: PagePermissionPromptEntryView,
   decision: PagePermissionPromptDecisionInput,

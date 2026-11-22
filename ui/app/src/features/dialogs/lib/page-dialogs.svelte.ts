@@ -44,9 +44,6 @@ export const slice = createSlice({
   },
 });
 
-export const init = () => slice.init();
-export const dispose = () => slice.dispose();
-
 /**
  * Answers the dialog on screen. The request token is the capability; the
  * host refuses a token that is not pending in this window. The card clears

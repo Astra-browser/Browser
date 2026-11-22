@@ -1,5 +1,5 @@
 import { createSlice } from "$shared/lib/lifecycle";
-import type { DividerView, WorkPaneLayout } from "$shared/ipc/bindings";
+import type { WorkPaneLayout } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 
 /** The pane's applied native hole with finite geometry; the wire type admits null for NaN. */
@@ -27,10 +27,8 @@ function hole(pane: WorkPaneLayout | null): WorkPaneHole | null {
   };
 }
 
-let dividerState = $state.raw<DividerView[]>([]);
 let workPaneState = $state.raw<WorkPaneHole | null>(null);
 
-export const dividers = () => dividerState;
 /** The applied native hole of the Work browser pane, or null while no pane is shown. */
 export const workPane = () => workPaneState;
 
@@ -38,7 +36,6 @@ export const slice = createSlice({
   register({ isCurrent }) {
     return events.layoutChanged.listen((event) => {
       if (!isCurrent()) return;
-      dividerState = event.payload.dividers;
       workPaneState = hole(event.payload.work_pane);
     });
   },
@@ -46,6 +43,3 @@ export const slice = createSlice({
     workPaneState = null;
   },
 });
-
-export const init = () => slice.init();
-export const dispose = () => slice.dispose();
