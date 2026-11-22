@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // P2-T07 contract test: History mirror into Places (U-06), stub level.
 //
-// Imports overlay/astra/host/History.sys.mjs by path (zero static imports,
-// no engine internals) and asserts the protocol in
+// Imports overlay/astra/host/History.sys.mjs by path (its only import is the
+// envelope, which imports nothing; no engine internals) and asserts the
+// protocol in
 // overlay/astra/host/schemas/history.json plus the visited/unvisited styling
 // behavior on a local fixture page, modelled at stub level: the mirror's
 // visited-set drives a :visited/:link style resolver with the engine UA

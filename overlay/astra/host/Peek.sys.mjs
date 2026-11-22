@@ -22,8 +22,8 @@
 // At most MAX_PEEKS cards live in one window. A per-id epoch makes a capture
 // that finishes after its card was closed harmless.
 
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
 import { SplitView, __nativeBinding } from "./SplitView.sys.mjs";
 
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -47,14 +47,6 @@ const CONFIG_KEYS = new Set([
 
 const _peeks = new Map(); // window_id -> Map(peek id -> record)
 const _epochs = new Map(); // peek id -> number
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function services() {
   try {
