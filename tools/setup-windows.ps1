@@ -121,7 +121,13 @@ function Require-Tools {
 function Run([string]$name, [scriptblock]$body) {
     Step $name
     $global:LASTEXITCODE = 0
-    & $body 2>&1 | Tee-Object -FilePath $log -Append
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $body 2>&1 | Tee-Object -FilePath $log -Append
+    } finally {
+        $ErrorActionPreference = $previous
+    }
     if ($LASTEXITCODE -ne 0) { Fail "$name (exit $LASTEXITCODE)" }
 }
 
