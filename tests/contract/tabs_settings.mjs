@@ -20,9 +20,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const {
   Tabs,
@@ -42,18 +40,6 @@ const {
 } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 const { Settings, __resetSettingsForTests } = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
 
 function reset() {
   __resetTabsForTests();

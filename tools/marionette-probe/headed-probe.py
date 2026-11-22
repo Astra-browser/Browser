@@ -31,6 +31,9 @@ import zlib
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
 import astra_env  # noqa: E402
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from marionette import Marionette  # noqa: E402
 
 HOST = "127.0.0.1"
 PORT = 2828
@@ -107,53 +110,16 @@ SNAP_JS = """return JSON.stringify((() => {
   };
 })())"""
 
-
-class Marionette:
-    def __init__(self, port):
-        self.sock = socket.create_connection((HOST, port), timeout=30)
-        self.f = self.sock.makefile("rb")
-        self._id = 0
-        self._read()
-
-    def _read(self):
-        data = b""
-        while b":" not in data:
-            chunk = self.f.read(1)
-            if not chunk:
-                raise EOFError("server closed")
-            data += chunk
-        length = int(data.split(b":")[0])
-        rest = data.split(b":", 1)[1]
-        while len(rest) < length:
-            chunk = self.f.read(length - len(rest))
-            if not chunk:
-                raise EOFError("server closed mid-message")
-            rest += chunk
-        return json.loads(rest.decode())
-
-    def cmd(self, method, params=None):
-        self._id += 1
-        payload = json.dumps([0, self._id, method, params or {}]).encode()
-        self.sock.sendall(str(len(payload)).encode() + b":" + payload)
-        while True:
-            msg = self._read()
-            if isinstance(msg, list) and len(msg) == 4 and msg[1] == self._id:
-                if msg[2]:
-                    raise RuntimeError(f"{method} -> {msg[2]}: {json.dumps(msg[3])[:500]}")
-                return msg[3]
-
-
 def wait_port(proc, port, timeout):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if proc.poll() is not None:
             return None
         try:
-            return Marionette(port)
+            return Marionette(port, host=HOST, wait=0)
         except Exception:
             time.sleep(0.5)
     return None
-
 
 # ---------------------------------------------------------------------------
 # Linux / Hyprland capture (unchanged behaviour)
@@ -185,7 +151,6 @@ def grim_shot(out_path):
     except Exception as e:
         return f"grim-ERR {e}"
 
-
 # ---------------------------------------------------------------------------
 # Windows desktop capture (Win32 GDI, stdlib ctypes only)
 # ---------------------------------------------------------------------------
@@ -197,7 +162,6 @@ def _win32():
     user32 = ctypes.WinDLL("user32", use_last_error=True)
     gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
     return ctypes, wintypes, user32, gdi32
-
 
 def _process_image(pid):
     """Return the executable name owning a window, or "" when Windows denies
@@ -216,7 +180,6 @@ def _process_image(pid):
         return os.path.basename(buf.value)
     finally:
         kernel32.CloseHandle(handle)
-
 
 def _windows_for_pid(pid, title_hint="Astra"):
     """Find the browser's real top-level window.
@@ -268,7 +231,6 @@ def _windows_for_pid(pid, title_hint="Astra"):
     found.sort(key=lambda w: (w["browser"] and w["hinted"], w["ours"], w["caption"], w["area"]),
                reverse=True)
     return found
-
 
 def _capture_hwnd(hwnd):
     """Return (width, height, rgb_rows) from a window via PrintWindow, or the
@@ -347,7 +309,6 @@ def _capture_hwnd(hwnd):
         rows.append(bytes(b for i in range(0, len(line), 4) for b in (line[i + 2], line[i + 1], line[i])))
     return width, height, rows
 
-
 def _write_png(path, width, height, rows):
     def chunk(tag, data):
         return (struct.pack(">I", len(data)) + tag + data
@@ -359,7 +320,6 @@ def _write_png(path, width, height, rows):
         f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)))
         f.write(chunk(b"IDAT", zlib.compress(raw, 6)))
         f.write(chunk(b"IEND", b""))
-
 
 def windows_shot(pid, out_path):
     """Capture the browser's real top-level window and report paint evidence."""
@@ -415,11 +375,9 @@ def windows_shot(pid, out_path):
         "windows": [x["title"] for x in wins],
     }
 
-
 def check(name, ok, detail=""):
     print(("PASS " if ok else "FAIL ") + name + (f" :: {detail}" if detail else ""))
     return bool(ok)
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -570,7 +528,6 @@ def main():
         else:
             print("LEAVING BROWSER OPEN for visual inspection", flush=True)
         errlog.close()
-
 
 if __name__ == "__main__":
     sys.exit(main())

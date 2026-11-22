@@ -17,26 +17,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { loadManifest } from "./lib/manifest.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const bootModule = await import(pathToFileURL(path.join(HOST, "Boot.sys.mjs")).href);
 const settingsModule = await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { Boot, onboardingDecision, onboardingPending, ONBOARDING_KEY } = bootModule;
 const { Settings, __resetSettingsForTests, __setPrefsForTests } = settingsModule;
 
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 const read = (rel) => readFile(path.join(ROOT, rel), "utf8");
 
 // === The decision =========================================================

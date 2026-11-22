@@ -12,25 +12,12 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { DialogPrompts } = await import(pathToFileURL(path.join(HOST, "DialogPrompts.sys.mjs")).href);
 const { Tabs, __resetTabsForTests } = await import(pathToFileURL(path.join(HOST, "Tabs.sys.mjs")).href);
 const { __resetOperationsForTests, Operations } = await import(pathToFileURL(path.join(HOST, "Operations.sys.mjs")).href);
 const Events = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const disposition = async (admission) => (await Operations.status(admission)).disposition;
 

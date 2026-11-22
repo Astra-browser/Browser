@@ -16,26 +16,10 @@
 import { strict as assert } from "node:assert";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const mod = await import(pathToFileURL(path.join(HOST, "History.sys.mjs")).href);
 const { History, __setHistoryEventSink, __resetHistoryForTests } = mod;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 __resetHistoryForTests();
 const events = [];
@@ -138,9 +122,10 @@ async function linkColor(url) {
   check("schema defines clear", !!schema.properties.clear);
   check("schema defines isVisited", !!schema.properties.isVisited);
   check("visit requires url", schema.properties.visit.required.includes("url"));
-  assert(schema.$id === "resource://astra/host/schemas/history.json");
-  console.log("PASS schema $id is the resource URL");
-  passed += 1;
+  check(
+    "schema $id is the resource URL",
+    schema.$id === "resource://astra/host/schemas/history.json",
+  );
 }
 
 console.log(`\nhistory_mirror: ${passed} passed, ${failed} failed`);

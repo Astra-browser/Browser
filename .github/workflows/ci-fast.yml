@@ -20,6 +20,17 @@ jobs:
       # The previous product name must not appear outside the allow-list
       # (PROVENANCE.md carries the required attribution).
       - run: ./tools/brand-lint.sh docs/planning docs/astra tools branding
+  contract-suites:
+    # Every tests/contract/*.mjs suite, discovered by run-all.mjs (no hand
+    # registry). A suite that exits 2 is an environment SKIP; any other
+    # non-zero exit fails the job. No engine build or node_modules needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: node tests/contract/run-all.mjs
   contract-harness:
     # P1-T11: no-browser self-test of the geckodriver contract harness.
     # Proves runner + fixture are sound without a 70-minute engine build.

@@ -16,8 +16,8 @@ import { performance } from "node:perf_hooks";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ROOT, check, failed } from "./lib/harness.mjs";
 
-const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const STUB = join(ROOT, "out", "sidecar-stub");
 
 const N_RTT = 2000;
@@ -209,12 +209,7 @@ async function measureBurst(call) {
   return { n: BURST, lost: errors, secs, per_sec: BURST / secs };
 }
 
-const results = { pass: true, checks: [] };
-function check(name, ok, detail) {
-  results.checks.push({ name, ok, detail });
-  if (!ok) results.pass = false;
-  console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
-}
+const results = {};
 
 if (!existsSync(STUB)) {
   console.error(`missing binary: ${STUB} (build: cargo build --release --manifest-path crates/astra-proto/Cargo.toml && cp ... out/)`);
@@ -288,5 +283,5 @@ results.metrics = {
   ws: { rtt_ms: wsRtt, burst: wsBurst, kill_server_close_ms: wsDownMs },
 };
 console.log("METRICS " + JSON.stringify(results.metrics));
-console.log(results.pass ? "SPIKE PASS" : "SPIKE FAIL");
-process.exit(results.pass ? 0 : 1);
+console.log(failed === 0 ? "SPIKE PASS" : "SPIKE FAIL");
+process.exit(failed === 0 ? 0 : 1);

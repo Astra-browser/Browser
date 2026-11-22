@@ -13,24 +13,11 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Settings, __resetSettingsForTests, __setPrefsForTests, __setContentPrefsForTests } =
   await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
 
 const values = new Map();
 const observers = new Set();

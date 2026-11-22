@@ -21,20 +21,7 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
+import { ROOT, check, passed, failed } from "./lib/harness.mjs";
 
 const decisions = await readFile(path.join(ROOT, "docs", "astra", "DECISIONS.md"), "utf8");
 const scope = await readFile(path.join(ROOT, "docs", "astra", "SCOPE.md"), "utf8");

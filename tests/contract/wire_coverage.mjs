@@ -18,10 +18,7 @@ import { readFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { loadManifest } from "./lib/manifest.mjs";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
-const UI = path.join(ROOT, "ui");
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const host = await import(
   pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
@@ -38,18 +35,6 @@ const chromeEntry = await readFile(
 const baseline = JSON.parse(
   await readFile(path.join(ROOT, "tests", "contract", "wire_baseline.json"), "utf8"),
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const routes = COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map(
   (entry) => ({

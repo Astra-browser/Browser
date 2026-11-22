@@ -15,11 +15,7 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const HostAPI = await import(
   pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
@@ -37,18 +33,6 @@ const TabsMod = await import(
 const { __setPrefsForTests } = await import(
   pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
 
 // --- Firefox pref service stand-in ---------------------------------------
 const values = new Map();
