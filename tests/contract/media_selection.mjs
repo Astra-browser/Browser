@@ -5,21 +5,9 @@
 // Usage: node tests/contract/media_selection.mjs
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { ROOT, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const { chooseMedia } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "MediaSelection.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const tab = (id, extra = {}) => ({
   id,

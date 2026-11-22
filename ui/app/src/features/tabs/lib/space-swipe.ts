@@ -1,9 +1,14 @@
 import { tabs } from "$domain/tabs";
-import { haptic } from "$shared/lib/haptic";
 import { reducedMotion } from "$shared/lib/motion";
-import { attachNativeSwipe, nativeSwipeLive, type SwipeSink } from "./native-swipe";
 import { SwipeTracker, type Reading, type SwipeStep } from "./swipe-track";
 import { advance, atRest, launch, type Motion } from "./sheet-spring";
+
+/** What the trackpad itself says about a swipe, in the order it happens. */
+type SwipeSink = {
+  began: (dx: number, dy: number, time: number) => void;
+  moved: (dx: number, dy: number, time: number) => void;
+  lifted: () => void;
+};
 
 /** Without native, wheel events stop arriving this long after the fingers lift and momentum fades. */
 const IDLE = 90;
@@ -175,7 +180,6 @@ export function spaceSwipe(node: HTMLElement, options: Options) {
   function commit(reading: Extract<Reading, { kind: "commit" }>) {
     clearTimeout(idle);
     idle = undefined;
-    haptic("level");
     if (!reducedMotion()) {
       wake();
       motion.x = Math.max(-spread(), Math.min(spread(), base + reading.offset));
@@ -248,7 +252,7 @@ export function spaceSwipe(node: HTMLElement, options: Options) {
   };
 
   function onwheel(event: Wheel) {
-    if (nativeSwipeLive() || event.ctrlKey || event.deltaMode !== 0 || held !== 0) return;
+    if (event.ctrlKey || event.deltaMode !== 0 || held !== 0) return;
     if (event.target instanceof Element && event.target.closest("input, textarea, select")) return;
     heard = performance.now();
     const natural = event.webkitDirectionInvertedFromDevice !== false;
@@ -283,7 +287,6 @@ export function spaceSwipe(node: HTMLElement, options: Options) {
   });
 
   host.addEventListener("wheel", onwheel, { passive: true });
-  const detach = attachNativeSwipe(host, sink);
   return {
     update(next: Options) {
       current = next;
@@ -297,7 +300,6 @@ export function spaceSwipe(node: HTMLElement, options: Options) {
       tracker.reset();
       controls.delete(node);
       host.removeEventListener("wheel", onwheel);
-      detach();
     },
   };
 }

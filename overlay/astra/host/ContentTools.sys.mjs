@@ -26,8 +26,7 @@
 // Pure logic with injectable seams, so Node contract tests import by path.
 
 import { emit as defaultEmit } from "./Events.sys.mjs";
-
-export const HOST_API_VERSION = 1;
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 
 const MAX_TEXT_CHARS = 8000;
 
@@ -51,14 +50,6 @@ export function setBidiFallback(bidi) {
 
 export function setEventSink(fn) {
   _emitSink = fn;
-}
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
 }
 
 function isHttpUrl(url) {

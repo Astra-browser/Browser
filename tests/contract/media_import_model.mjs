@@ -15,9 +15,8 @@
 import { createHash } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const {
   MediaImport,
   admitMedia,
@@ -36,18 +35,6 @@ const PNG = Buffer.from(
   "base64",
 );
 const DIGEST = createHash("sha256").update(PNG).digest("hex");
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
 
 __resetMediaImportForTests();
 

@@ -14,6 +14,9 @@ import os
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "perf", "stress"))
 import astra_env  # noqa: E402
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from marionette import Marionette  # noqa: E402
 
 HOST, PORT = "127.0.0.1", 2829
 FIREFOX = astra_env.BINARY
@@ -43,42 +46,6 @@ SNAP_JS = """return JSON.stringify((() => {
   };
 })())"""
 
-
-class Marionette:
-    def __init__(self, port):
-        self.sock = socket.create_connection((HOST, port), timeout=30)
-        self.f = self.sock.makefile("rb")
-        self._id = 0
-        self._read()
-
-    def _read(self):
-        data = b""
-        while b":" not in data:
-            chunk = self.f.read(1)
-            if not chunk:
-                raise EOFError("server closed")
-            data += chunk
-        length = int(data.split(b":")[0])
-        rest = data.split(b":", 1)[1]
-        while len(rest) < length:
-            chunk = self.f.read(length - len(rest))
-            if not chunk:
-                raise EOFError("server closed mid-message")
-            rest += chunk
-        return json.loads(rest.decode())
-
-    def cmd(self, method, params=None):
-        self._id += 1
-        payload = json.dumps([0, self._id, method, params or {}]).encode()
-        self.sock.sendall(str(len(payload)).encode() + b":" + payload)
-        while True:
-            msg = self._read()
-            if isinstance(msg, list) and len(msg) == 4 and msg[1] == self._id:
-                if msg[2]:
-                    raise RuntimeError(f"{method} -> {msg[2]}: {json.dumps(msg[3])[:500]}")
-                return msg[3]
-
-
 def main():
     profile, outdir = sys.argv[1], sys.argv[2]
     os.makedirs(outdir, exist_ok=True)
@@ -94,7 +61,7 @@ def main():
     m = None
     for _ in range(60):
         try:
-            m = Marionette(PORT)
+            m = Marionette(PORT, host=HOST, wait=0)
             break
         except Exception:
             time.sleep(1)
@@ -121,6 +88,5 @@ def main():
         print(f"screenshot-ERR {e}", flush=True)
     proc.terminate()
     print("done", flush=True)
-
 
 main()

@@ -13,11 +13,10 @@
 // Usage: node tests/contract/commands_model.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { strict as assert } from "node:assert";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { loadSurfaces } from "./lib/surfaces.mjs";
+import { HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { Commands, addEventListener, __resetForTests } = HostAPI;
@@ -26,18 +25,6 @@ const { Commands, addEventListener, __resetForTests } = HostAPI;
 const { __setReopenForTests, __resetCommandsForTests } = await import(
   pathToFileURL(path.join(HOST, "Commands.sys.mjs")).href
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 __resetForTests();
 
@@ -52,17 +39,9 @@ async function capture(fn) {
   return { seen, result };
 }
 
-const PAGES = [
-  "settings",
-  "work",
-  "extensions",
-  "history",
-  "downloads",
-  "tasks",
-  "notes",
-  "time",
-  "source",
-];
+// The surface registry owns the page list; this suite no longer keeps a fifth
+// copy that can quietly omit a page (`gallery` used to be missing here).
+const { BROWSER_PAGES: PAGES } = await loadSurfaces();
 
 for (const page of PAGES) {
   const id = `browser.${page}`;

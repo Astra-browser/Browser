@@ -18,9 +18,9 @@
 // Private windows may split, but they never write an arrangement or a ratio:
 // `arrangements` and `recall` refuse with `private_context`.
 
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
 import {
-  HOST_API_VERSION,
   __activeSpaceId,
   __setSplitGroup,
   __setSplitGroups,
@@ -43,18 +43,6 @@ export const MIN_PANE_PX = 140;
 /** Pane shares keyed by the engine's split view, so a tab switch or a stage
  *  resize re-applies the same proportions instead of stale pixel widths. */
 let _paneRatios = new WeakMap();
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return {
-    request_id,
-    host_api_version: HOST_API_VERSION,
-    error: { code, message },
-  };
-}
 
 function services() {
   try {

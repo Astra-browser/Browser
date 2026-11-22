@@ -20,8 +20,8 @@
 // recorded. A space id that does not belong to the active profile is refused
 // without confirming that it exists.
 
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import {
-  HOST_API_VERSION,
   __activeProfileId,
   __activeSpaceId,
   __spacesState,
@@ -37,14 +37,6 @@ const MAX_SCAN_PAGES = 8;
 
 let _index = null; // Map url -> entry
 let _timer = null;
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function services() {
   try {

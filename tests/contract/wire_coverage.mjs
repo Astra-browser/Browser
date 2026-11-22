@@ -2,27 +2,28 @@
 // Native-merge guard: every route target exists, and the channels this merge
 // owns are re-dispatched from the bridge onto the DOM.
 //
-// This is deliberately text-based (host-transport.ts is TypeScript) and narrow:
-// it catches a route pointing at a missing method, and a channel the app
-// listens for that chrome-entry forgot to forward.
+// The command list and the route destinations come from the command manifest
+// (`ui/packages/bridge/src/manifest.ts`, D-55), imported as a module. Node
+// strips the type-only import, so no TypeScript parser is involved. Three
+// suites split the work:
+//   - `manifest.test.ts` (bun): manifest <-> route-table equality;
+//   - `wire_manifest.mjs` (node): manifest invariants and the registry ->
+//     manifest gate (a command in proto.ts with no row there fails);
+//   - this guard: every route target exists, and the prompt routes and channel
+//     forwarders the product depends on are present.
 //
 // Usage: node tests/contract/wire_coverage.mjs
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
-const UI = path.join(ROOT, "ui");
+import { loadManifest } from "./lib/manifest.mjs";
+import { ROOT, HOST, UI, check, passed, failed } from "./lib/harness.mjs";
 
 const host = await import(
   pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href
 );
-const transport = await readFile(
-  path.join(UI, "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
-);
+const { ARG_MAPS, COMMAND_MANIFEST } = await loadManifest();
 const nativeEvents = await readFile(
   path.join(UI, "app", "src", "shared", "ipc", "native-events.ts"),
   "utf8",
@@ -31,38 +32,45 @@ const chromeEntry = await readFile(
   path.join(UI, "app", "chrome-entry", "browser-chrome.ts"),
   "utf8",
 );
-const proto = await readFile(
-  path.join(UI, "packages", "bridge", "src", "proto.ts"),
-  "utf8",
-);
 const baseline = JSON.parse(
   await readFile(path.join(ROOT, "tests", "contract", "wire_baseline.json"), "utf8"),
 );
 
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
+const routes = COMMAND_MANIFEST.filter((entry) => entry.state === "routed").map(
+  (entry) => ({
+    name: entry.name,
+    module: entry.module,
+    method: entry.method,
+    mapsTab:
+      entry.args !== "none" &&
+      Object.values(ARG_MAPS[entry.args]).includes("astra_tab_id"),
+  }),
+);
+check("the manifest declares its routes", routes.length > 50);
+
+// A host module the jar does not carry cannot be imported at runtime, and no
+// filesystem import in a contract test can notice: this is the gate for it.
+// Only modules another host module imports must be packaged; a documented
+// compatibility shim that nothing imports is allowed to stay out.
+const hostModules = (await readdir(HOST)).filter((name) => name.endsWith(".sys.mjs"));
+const jarSource = await readFile(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");
+const importedModules = new Set();
+for (const name of hostModules) {
+  const source = await readFile(path.join(HOST, name), "utf8");
+  for (const match of source.matchAll(/from "\.\/([A-Za-z0-9_]+\.sys\.mjs)"/gu)) {
+    importedModules.add(match[1]);
   }
 }
-
-const routes = [];
-for (const match of transport.matchAll(
-  /^\s*([a-z0-9_]+): \["([A-Za-z0-9_]+)", "([A-Za-z0-9_]+)"([^\]]*)\]/gmu,
-)) {
-  routes.push({
-    name: match[1],
-    module: match[2],
-    method: match[3],
-    mapsTab: /astra_tab_id|TAB_ARG/u.test(match[4] ?? ""),
-  });
+const unregisteredModules = [...importedModules].filter(
+  (name) => !jarSource.includes(`host/${name}`),
+);
+check(
+  `every imported host module is packaged in jar.mn (${unregisteredModules.length} missing of ${importedModules.size})`,
+  unregisteredModules.length === 0,
+);
+for (const name of unregisteredModules) {
+  console.error(`  ${name} is imported but not listed in overlay/astra/jar.mn`);
 }
-check("the route table was parsed", routes.length > 50);
 const missing = routes.filter(
   (route) => typeof host[route.module]?.[route.method] !== "function",
 );
@@ -90,6 +98,7 @@ const REQUIRED = [
   "astra:focus",
   "astra:search",
   "astra:favicons",
+  "astra:preference-changed",
 ];
 const declared = new Set(
   [...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
@@ -150,24 +159,14 @@ for (const name of [
   check(`${name} is routed`, routes.some((route) => route.name === name));
 }
 
-// No new gap: every command without a route, and every declared channel
-// without a forwarder, must already be in the recorded baseline. Adding a
-// control that calls an unrouted command now fails this guard.
-//
-// The baseline is derived, not curated: `--write-baseline` rewrites it as
-// COMMANDS minus the route table (and declared channels minus forwarders), so
-// an entry that is routed or that is not a command is a real failure below.
-const COMMANDS_HEAD = "export const COMMANDS: readonly CommandName[] = [";
-const commandsSegment = proto.split(COMMANDS_HEAD)[1]?.split("] as const;")[0];
-check("the command registry was parsed", Boolean(commandsSegment));
-const commands = [
-  ...new Set([...(commandsSegment ?? "").matchAll(/"([a-z0-9_]+)"/gu)].map(
-    (match) => match[1],
-  )),
-];
-check(`the command registry has entries (${commands.length} names)`, commands.length > 200);
+// A command's state is declared in the manifest, not in a second list. The
+// registry -> manifest gate lives in `wire_manifest.mjs`: a command added to
+// proto.ts without a row there fails that suite. This guard keeps the host side
+// (a route points at a real method) and the one channel inventory that has no
+// manifest equivalent yet.
+const commands = COMMAND_MANIFEST.map((entry) => entry.name);
+check(`the command manifest has entries (${commands.length} names)`, commands.length > 200);
 const routed = new Set(routes.map((route) => route.name));
-const commandSet = new Set(commands);
 const channels = [
   ...new Set(
     [...nativeEvents.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
@@ -176,51 +175,23 @@ const channels = [
 const forwardedChannels = new Set(
   [...chromeEntry.matchAll(/"(astra:[a-z-]+)"/gu)].map((match) => match[1]),
 );
-const unroutedCommands = commands.filter((name) => !routed.has(name));
 const unforwardedChannels = channels.filter(
   (name) => !forwardedChannels.has(name),
 );
 
 if (process.argv.includes("--write-baseline")) {
-  const next = {
-    unrouted: [...unroutedCommands].sort(),
-    unforwarded: [...unforwardedChannels].sort(),
-  };
+  const next = { unforwarded: [...unforwardedChannels].sort() };
   await writeFile(
     path.join(ROOT, "tests", "contract", "wire_baseline.json"),
     `${JSON.stringify(next, null, 2)}\n`,
   );
   console.log(
-    `wire baseline: wrote ${next.unrouted.length} unrouted commands, ` +
-      `${next.unforwarded.length} unforwarded channels`,
+    `wire baseline: wrote ${next.unforwarded.length} unforwarded channels`,
   );
   process.exit(0);
 }
 
-// The baseline must stay an inventory of real gaps, or the "known" count lies
-// in both directions and a regression in a pruned name is invisible.
-const baselineUnrouted = baseline.unrouted ?? [];
 const baselineUnforwarded = baseline.unforwarded ?? [];
-check(
-  `the baseline lists no duplicate commands (${baselineUnrouted.length} entries)`,
-  baselineUnrouted.length === new Set(baselineUnrouted).size,
-);
-const nonCommands = baselineUnrouted.filter((name) => !commandSet.has(name));
-check(
-  `every baseline command is a generated command (${nonCommands.length} invalid)`,
-  nonCommands.length === 0,
-);
-for (const name of nonCommands) {
-  console.error(`  ${name} is not in COMMANDS (regenerate with --write-baseline)`);
-}
-const staleRouted = baselineUnrouted.filter((name) => routed.has(name));
-check(
-  `no baseline command is routed (${staleRouted.length} stale)`,
-  staleRouted.length === 0,
-);
-for (const name of staleRouted) {
-  console.error(`  ${name} has a route but is still in the baseline`);
-}
 const unknownChannels = baselineUnforwarded.filter(
   (name) => !channels.includes(name),
 );
@@ -239,16 +210,6 @@ check(
 for (const name of staleForwarded) {
   console.error(`  ${name} is forwarded but is still in the baseline`);
 }
-
-const knownUnrouted = new Set(baselineUnrouted);
-const newGaps = commands.filter(
-  (name) => !routed.has(name) && !knownUnrouted.has(name),
-);
-check(
-  `no new unrouted command (${newGaps.length} new, ${knownUnrouted.size} known of ${commands.length})`,
-  newGaps.length === 0,
-);
-for (const name of newGaps) console.error(`  ${name} has no route`);
 
 const knownUnforwarded = new Set(baselineUnforwarded);
 const newChannels = channels.filter(

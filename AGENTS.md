@@ -41,8 +41,12 @@ is in `docs/astra/DECISIONS.md`, as numbered `D-nn` entries.
 
 ## Standing project rules
 
-- Keep changes inside the current task's file scope; do not touch another agent's
-  locked task or branch (`docs/astra/STATE.md`).
+- Use Context7 for library/framework docs; Firecrawl for web research.
+- Keep changes inside the current task's file scope; do not touch another
+  agent's locked task or branch (`docs/astra/STATE.md`).
+- **Never delete a branch.** Leave every branch in place, local and remote,
+  including merged, superseded and empty ones. Deleting is only allowed when
+  the owner names that exact branch and asks for it in that turn.
 - One logical change per commit, conventional-commit prefixes.
 - Never run the engine build without `--jobs 2` (OOM risk).
 - Brand lint, state check and the contract suites must stay green.

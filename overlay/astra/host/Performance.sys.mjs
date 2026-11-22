@@ -325,30 +325,27 @@ function unscheduled() {
 }
 
 function onHostEvent(event) {
-  if (event.type !== "ui-command") return;
-  const command = String(event.data ?? "");
-  if (command === "preference.performance.sleep=false") {
-    unscheduled();
-    return;
-  }
-  if (command === "preference.performance.sleep=true") {
-    scheduled();
-    void Performance.tick();
+  if (event.type !== "preference_changed") return;
+  const key = String(event.data?.key ?? "");
+  const value = String(event.data?.value ?? "");
+  if (key === "performance.sleep") {
+    if (value === "false") unscheduled();
+    else if (value === "true") {
+      scheduled();
+      void Performance.tick();
+    }
     return;
   }
   // A policy change applies now rather than at the next interval: the driver
   // reads the pref on every tick, and a change wakes one. A resource-policy
   // change can also re-enable background unload after "keep-ready".
-  if (command.startsWith("preference.performance.memory=")) {
+  if (key === "performance.memory") {
     if (readPolicy().background) scheduled();
     else unscheduled();
     void Performance.tick();
     return;
   }
-  if (
-    command.startsWith("preference.performance.after=") ||
-    command.startsWith("preference.performance.exceptions=")
-  ) {
+  if (key === "performance.after" || key === "performance.exceptions") {
     void Performance.tick();
   }
 }

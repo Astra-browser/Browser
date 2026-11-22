@@ -17,7 +17,7 @@ has an owner phase; none is a silent fallback.
 |---|---|---|
 | Save-password doorhanger after HTTP auth | **open** — `LoginManagerAuthPrompter` still shows Firefox's save prompt | decide with `PASSWORD_DECISION.md` (Option B: signon off) |
 | Print | **open** — `PrintUtils.startPrintWindow` (Firefox print window); no Astra print surface exists | Astra print UI (E2E audit, open P2) |
-| Tab context menu, split, drag/drop, menu popups | **resolved 2026-11-20** — the app draws its own menus (`tab-menu.ts`, `.shell-menu`, 0 native XUL popups), split is native `addTabSplitView` panes with a host resizer, and `tabs_split`/`tab_drop` are routed. The old sentence ("the app calls ... which are unrouted") describes the 2026-11-04 build | keep dead leftovers out: `tab_menu_popup`, `chrome_menu_popup`, `divider_*` are in the wire baseline as known-unrouted |
+| Tab context menu, split, drag/drop, menu popups | **resolved 2026-11-20** — the app draws its own menus (`tab-menu.ts`, `.shell-menu`, 0 native XUL popups), split is native `addTabSplitView` panes with a host resizer, and `tabs_split`/`tab_drop` are routed. The old sentence ("the app calls ... which are unrouted") describes the 2026-11-04 build | keep dead leftovers out: the dead `tab_menu_popup`/`chrome_menu_popup` pages and the divider overlay's three commands are `unused` in the manifest, and their callers were removed on 2026-11-22 (nothing emits `astra:layout`, and the host owns the native resizers) |
 | Extension toolbar action buttons | **resolved 2026-11-20** — `extension_action_invoke` is routed, the action list is populated, and `webext_action_probe.py` is registered in the suite | — |
 | Certificate error page | **open** — detected from the error-page flag; the engine page can flash before the app pane replaces it | optional `LoadURIDelegate` actor |
 
@@ -31,15 +31,27 @@ The 2026-11-04 list here is out of date in both directions. Re-checked
   resource media and media import (`Resources`, `media_player`/`media_import`),
   time/focus (`Time`), tasks (`Resources`). Updates has a host module too
   (`System.updateStatus`), but it answers `unavailable` because the build ships
-  `--disable-updater`; `update_relaunch`/`update_highlights` are still unrouted,
-  so "restart to update" will be a silent no-op the day an updater lands.
+  `--disable-updater`. `update_highlights` and `update_relaunch` are routed to
+  honest answers (`null` / `false`); the day an updater lands they read the
+  parked update instead of starting from a silent no-op.
 - **Still behind an off build flag, by decision (D-48):** Work, the AI/assist
   and voice surfaces, page styles, and the account/plan pages. Their commands
   are in the wire baseline as known-unrouted, not unknown.
 - **Still genuinely missing:** popup-blocking and external-protocol cards (the
   card component exists, no producer raises it), the first-run onboarding page
-  (built but neither staged nor opened), the window-close handshake
-  (`astra:resource-close` has no producer), and print.
+  (built but neither staged nor opened), the launcher window (the panel
+  document is not packaged, so `panel_intent`/`panel_layout` have no surface),
+  and print. Haptics and trackpad swipe have no platform source on Windows
+  (`haptic`, `swipe_region`), so their callers were removed rather than left
+  calling a command nothing answers.
+- **Window-close handshake — resolved 2026-11-22.** `overlay/astra/host/Close.sys.mjs`
+  intercepts the window's own close, announces `astra:resource-close`, waits for
+  the app's `resource_close_ready(token, success)` and then closes; a 12.5 s cap
+  means an app that never answers cannot trap the window. The live probe caught
+  a real bug in the first version: a `<dialog>` close inside the
+  chrome-privileged app frame reached the window's capture listener and shut the
+  browser when the split picker closed. The listener now ignores any event whose
+  target is not the window, and the contract test pins that case.
 
 `unknown_command` for a flag-off surface is expected; for a shipped surface it
 is a product gap. The rule did not change — the list of shipped surfaces did.
@@ -105,6 +117,17 @@ is a product gap. The rule did not change — the list of shipped surfaces did.
   task, not a wiring gap.
 
 ## Verification gaps
+
+- **The component project is red in this checkout, not by this branch.** On
+  2026-11-22 the 286-file component suite reported 15 failing files. Fourteen
+  reproduce identically on `main`: the Work and assist semantic tests log
+  `[astra] native artifact missing (Phase 2)` for engine assets that are not in
+  this tree, `SelectiveStyles` needs a browser `inspect` API, `DropdownCsp`
+  needs a real CSP, and `WindowsChrome`'s acrylic token check is already
+  recorded above. `SidebarCardHead` passes in isolation on both branches and
+  fails only under parallel load. Treat both lists as environment, not
+  regressions, and re-check on a machine with the native artifacts before
+  calling the component project green.
 
 - **DevTools teardown noise is patched out.** ESR 153 logs `No such
   JSProcessActor 'DevToolsProcess'` (bug 2044741) and the `getGrids`/`pagestyle`

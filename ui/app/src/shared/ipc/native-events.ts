@@ -29,6 +29,7 @@ import type {
   PagePermissionPromptChanged,
   PageDialogPromptChanged,
   PasskeyPromptChanged,
+  PreferenceChanged,
   RuntimeStatusChanged,
   SearchChanged,
   TabChanged,
@@ -84,6 +85,7 @@ export const nativeEventNames = {
   pagePermissionPromptChanged: "astra:page-permission-prompt",
   pageDialogPromptChanged: "astra:page-dialog-prompt",
   passkeyPromptChanged: "astra:passkey-prompt",
+  preferenceChanged: "astra:preference-changed",
   webExtensionAccessRequested: "astra:web-extension-access",
   webExtensionPromptChanged: "astra:web-extension-prompt",
   webExtensionStoreClicked: "astra:web-extension-store-click",
@@ -148,6 +150,8 @@ export const events = {
     nativeEventNames.pageDialogPromptChanged,
   ),
   passkeyPromptChanged: scopedEvent<PasskeyPromptChanged>(nativeEventNames.passkeyPromptChanged),
+  /** A typed preference write: the key and the value, never a string command. */
+  preferenceChanged: scopedEvent<PreferenceChanged>(nativeEventNames.preferenceChanged),
   webExtensionAccessRequested: scopedEvent<WebExtensionAccessRequested>(
     nativeEventNames.webExtensionAccessRequested,
   ),

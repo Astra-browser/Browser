@@ -2,6 +2,7 @@ import { observe, pause } from "$shared/lib/observe";
 import type { OperationDisposition } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
+import { createSlice } from "$shared/lib/lifecycle";
 
 // Rust retains every accepted operation in its bounded process-local ledger
 // until this privileged WebView acknowledges the actor's disposition. Keep a
@@ -23,11 +24,7 @@ const pendingAcks = new Set<string>();
 const acknowledgementsInFlight = new Set<string>();
 const settlementSignals = new Map<string, Set<() => void>>();
 
-let lifecycle = 0;
 let observationLifetime = new AbortController();
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 let ackTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function boundedIpc<T>(request: Promise<T>, milliseconds: number): Promise<T> {
@@ -58,7 +55,7 @@ function scheduleAcknowledgements(after: number) {
 }
 
 function flushAcknowledgements() {
-  const generation = lifecycle;
+  const generation = slice.current();
   const available =
     MAX_ACKNOWLEDGEMENTS_IN_FLIGHT -
     Math.min(MAX_ACKNOWLEDGEMENTS_IN_FLIGHT, acknowledgementsInFlight.size);
@@ -80,71 +77,52 @@ function flushAcknowledgements() {
       })
       .finally(() => {
         acknowledgementsInFlight.delete(operationId);
-        if (generation === lifecycle) scheduleAcknowledgements(ACK_RETRY_MS);
+        if (slice.isCurrent(generation)) scheduleAcknowledgements(ACK_RETRY_MS);
       });
   }
 }
 
 async function reconcile(generation: number) {
-  for (let attempt = 0; attempt < RECONCILE_ATTEMPTS && generation === lifecycle; attempt++) {
+  for (let attempt = 0; attempt < RECONCILE_ATTEMPTS && slice.isCurrent(generation); attempt++) {
     try {
       const dispositions = await boundedIpc(commands.operationsReconcile(), IPC_ATTEMPT_TIMEOUT_MS);
-      if (generation !== lifecycle) return;
+      if (!slice.isCurrent(generation)) return;
       for (const disposition of dispositions) remember(disposition);
       return;
     } catch {
-      if (generation !== lifecycle) return;
+      if (!slice.isCurrent(generation)) return;
       await pause(RECONCILE_RETRY_MS, observationLifetime.signal);
     }
   }
 }
 
-async function initialize(generation: number) {
-  const stop = await events.operationProcessed.listen((event) => {
-    if (generation === lifecycle) remember(event.payload);
-  });
-  if (generation !== lifecycle) {
-    stop();
-    return;
-  }
-  unlisten = stop;
-  initialized = true;
-  void reconcile(generation);
-  scheduleAcknowledgements(0);
-}
+export const slice = createSlice({
+  async register({ generation, isCurrent, attach }) {
+    if (observationLifetime.signal.aborted) observationLifetime = new AbortController();
+    const stop = await events.operationProcessed.listen((event) => {
+      if (isCurrent()) remember(event.payload);
+    });
+    if (!isCurrent()) {
+      stop();
+      return;
+    }
+    attach(stop);
+    void reconcile(generation);
+    scheduleAcknowledgements(0);
+  },
+  reset() {
+    observationLifetime.abort();
+    if (ackTimer !== null) clearTimeout(ackTimer);
+    ackTimer = null;
+    for (const signals of settlementSignals.values()) {
+      for (const signal of signals) signal();
+    }
+    settlementSignals.clear();
+  },
+});
 
-export function init(): Promise<void> {
-  if (initialized) return Promise.resolve();
-  if (initializing !== null) return initializing;
-  const generation = ++lifecycle;
-  if (observationLifetime.signal.aborted) observationLifetime = new AbortController();
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  lifecycle += 1;
-  observationLifetime.abort();
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  if (ackTimer !== null) clearTimeout(ackTimer);
-  ackTimer = null;
-  for (const signals of settlementSignals.values()) {
-    for (const signal of signals) signal();
-  }
-  settlementSignals.clear();
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 export const result = (operationId: string) => recent.get(operationId);
 
@@ -241,13 +219,13 @@ async function observeDisposition(
   const cached = recent.get(operationId);
   if (cached !== undefined) return { state: "processed", disposition: cached };
 
-  const generation = lifecycle;
+  const generation = slice.current();
   const boundedTimeout = Number.isFinite(timeoutMs)
     ? Math.max(0, Math.min(timeoutMs, DEFAULT_SETTLEMENT_TIMEOUT_MS))
     : 0;
   const deadline = Date.now() + boundedTimeout;
 
-  while (generation === lifecycle && !signal?.aborted) {
+  while (slice.isCurrent(generation) && !signal?.aborted) {
     const remembered = recent.get(operationId);
     if (remembered !== undefined) return { state: "processed", disposition: remembered };
 
@@ -259,7 +237,7 @@ async function observeDisposition(
         Math.min(remainingBeforeQuery, IPC_ATTEMPT_TIMEOUT_MS),
         signal,
       );
-      if (generation !== lifecycle || signal?.aborted) break;
+      if (!slice.isCurrent(generation) || signal?.aborted) break;
       if (observed.state !== "received") throw new Error("ledger observation unavailable");
       const status = observed.value;
       const afterQuery = recent.get(operationId);
@@ -274,7 +252,7 @@ async function observeDisposition(
       // query at a low fixed rate until the same bounded deadline.
     }
 
-    if (generation !== lifecycle || signal?.aborted) break;
+    if (!slice.isCurrent(generation) || signal?.aborted) break;
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     await waitForSettlementSignal(operationId, Math.min(remaining, SETTLEMENT_POLL_MS), signal);

@@ -9,29 +9,13 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-
-const ROOT = path.dirname(
-  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
-);
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
 const { Keymap, __resetKeymapForTests, __keymapRecording, featureOf } =
   await import(pathToFileURL(path.join(HOST, "Keymap.sys.mjs")).href);
 const { addEventListener, __resetEventsForTests } = await import(
   pathToFileURL(path.join(HOST, "Events.sys.mjs")).href
 );
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 const byId = (entries, id) => entries.find((entry) => entry.id === id);
 

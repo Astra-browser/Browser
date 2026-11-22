@@ -1,5 +1,4 @@
 <script lang="ts">
-  const loadWorkWorkspace = () => import("./WorkWorkspace.svelte");
   // Loaded on the first visit to Work, the only place it shows.
   let accountButton: ReturnType<typeof importAccountButton> | null = null;
   function importAccountButton() {
@@ -10,15 +9,12 @@
   // lazy too; loaded once and kept, like the account foot.
   let settingsNavigation: ReturnType<typeof loadSettingsNavigation> | null = null;
   const importSettingsNavigation = () => (settingsNavigation ??= loadSettingsNavigation());
-  // Dynamic like the panel's own path to Notes, so the feature's entry is
-  // never a startup request.
-  const loadNotesPage = () => import("$features/notes").then((notes) => notes.loadNotesPage());
   import LazyView from "$shared/ui/LazyView";
   import type { TabView } from "$shared/ipc/bindings";
   import { newTabImage } from "$session/newtab-background.svelte";
   import SkyLight from "./SkyLight.svelte";
   import RenderBoundary from "$shared/ui/RenderBoundary";
-  import { loadClearSiteData, loadSettings } from "$features/settings";
+  import { loadClearSiteData } from "$features/settings";
   import { EssentialTile } from "$features/essentials";
   import { AddressField, SiteDetails, SiteHead, findInPage } from "$features/address";
   import { SidebarPagePermission } from "$features/permissions";
@@ -29,7 +25,7 @@
   import { UpdateNotice } from "$features/updates";
   import { EssentialsRail } from "$features/essentials";
   import { ExtensionsSection, PinnedExtensions } from "$features/extensions";
-  import { loadWebExtensionManager, StoreInstallBanner, StoreInstallRail } from "$features/webext";
+  import { StoreInstallBanner, StoreInstallRail } from "$features/webext";
   import { sidebarTree } from "$features/tabs";
   import { SidebarBody } from "$features/tabs";
   import { TabList } from "$features/tabs";
@@ -56,18 +52,13 @@
   import { events } from "$shared/ipc/native-events";
   import { askSettings, handleNativeSection } from "$features/settings";
   import * as m from "$shared/i18n/messages";
-  import { surface as browserPage } from "$domain/surface";
+  import { pageSurface, surface as browserPage } from "$domain/surface";
   import { loadToolSlot } from "$features/tools";
   import * as toolHost from "$session/tools.svelte";
   import * as notices from "$session/notice.svelte";
   import { loadSettingsNavigation } from "$features/settings";
-  import { loadLibraryPage } from "$features/library";
-  import { loadGalleryPage } from "$features/gallery";
-  import { loadHistoryPage } from "$features/history";
-  import { loadSourcePage } from "$features/source";
   import { bookmarkReveal } from "$features/bookmarks";
-  import { loadTasksPage } from "$features/tasks";
-  import { loadFocusCover, loadTimePage } from "$features/time";
+  import { loadFocusCover } from "$features/time";
   import { focus } from "$domain/time";
   import { loadNewTabSearch } from "$features/search";
   import { loadNewTab } from "$features/newtab";
@@ -259,6 +250,12 @@
     return () => window.removeEventListener("keydown", onKey, true);
   });
   let inWork = $derived(browserPage.currentPage() === "work");
+  // The registry row owns which component a page mounts; this stage owns only
+  // where it mounts and the per-page props/keying the mount has always used.
+  let pageRow = $derived.by(() => {
+    const id = browserPage.currentPage();
+    return id === null ? null : pageSurface(id);
+  });
   // Settings stands beside the rail the way a tool panel does.
   let paneled = $derived(
     toolHost.activeTool() !== null || browserPage.currentPage() === "settings",
@@ -1154,85 +1151,30 @@
         </div>
       </main>
     {/if}
-    {#if browserPage.currentPage() !== null}
+    {#if pageRow}
       <main class="internal-stage" id="astra-stage" tabindex="-1">
         <!-- Each destination arrives as its own page: the ground settles in
-           while its content rises onto it. -->
-        {#key browserPage.currentPage()}<div
-            class="stage-page"
-            data-page={browserPage.currentPage()}
-          >
+           while its content rises onto it. Which component arrives comes from
+           the surface registry; the keying and props a page already used stay
+           with the stage. -->
+        {#key pageRow.id}<div class="stage-page" data-page={pageRow.id}>
             <RenderBoundary title={m.surface_render_failed()} retryLabel={m.surface_retry()}>
-              {#if browserPage.currentPage() === "settings"}
-                <LazyView
-                  loader={loadSettings}
-                  loadingLabel={m.surface_loading()}
-                  failureLabel={m.surface_render_failed()}
-                  retryLabel={m.surface_retry()}
-                  >{#snippet children(View)}<View />{/snippet}</LazyView
-                >
-              {:else if browserPage.currentPage() === "extensions"}
-                <LazyView
-                  loader={loadWebExtensionManager}
-                  loadingLabel={m.surface_loading()}
-                  failureLabel={m.surface_render_failed()}
-                  retryLabel={m.surface_retry()}
-                  >{#snippet children(View)}<View />{/snippet}</LazyView
-                >
-              {:else if flags.work && browserPage.currentPage() === "work"}
+              {#if pageRow.id === "work" || pageRow.id === "notes" || pageRow.id === "time" || pageRow.id === "gallery"}
                 {#key tabs.profile()?.id}<LazyView
-                    loader={loadWorkWorkspace}
+                    loader={pageRow.loader}
                     loadingLabel={m.surface_loading()}
                     failureLabel={m.surface_render_failed()}
                     retryLabel={m.surface_retry()}
-                    >{#snippet children(View)}<View />{/snippet}</LazyView
+                    >{#snippet children(View)}
+                      {#if pageRow.id === "notes"}<View
+                          profile={tabs.profile()?.id ?? ""}
+                          onclose={() => void browserPage.close()}
+                        />{:else}<View />{/if}
+                    {/snippet}</LazyView
                   >{/key}
-              {:else if browserPage.currentPage() === "notes"}
-                {#key tabs.profile()?.id}<LazyView
-                    loader={loadNotesPage}
-                    loadingLabel={m.surface_loading()}
-                    failureLabel={m.surface_render_failed()}
-                    retryLabel={m.surface_retry()}
-                    >{#snippet children(View)}<View
-                        profile={tabs.profile()?.id ?? ""}
-                        onclose={() => void browserPage.close()}
-                      />{/snippet}</LazyView
-                  >{/key}
-              {:else if browserPage.currentPage() === "tasks"}
-                <LazyView
-                  loader={loadTasksPage}
-                  loadingLabel={m.surface_loading()}
-                  failureLabel={m.surface_render_failed()}
-                  retryLabel={m.surface_retry()}
-                  >{#snippet children(View)}<View />{/snippet}</LazyView
-                >
-              {:else if browserPage.currentPage() === "time"}
-                {#key tabs.profile()?.id}<LazyView
-                    loader={loadTimePage}
-                    loadingLabel={m.surface_loading()}
-                    failureLabel={m.surface_render_failed()}
-                    retryLabel={m.surface_retry()}
-                    >{#snippet children(View)}<View />{/snippet}</LazyView
-                  >{/key}
-              {:else if browserPage.currentPage() === "gallery"}
-                {#key tabs.profile()?.id}<LazyView
-                    loader={loadGalleryPage}
-                    loadingLabel={m.surface_loading()}
-                    failureLabel={m.surface_render_failed()}
-                    retryLabel={m.surface_retry()}
-                    >{#snippet children(View)}<View />{/snippet}</LazyView
-                  >{/key}
-              {:else if browserPage.currentPage() === "history"}
-                <LazyView
-                  loader={loadHistoryPage}
-                  loadingLabel={m.surface_loading()}
-                  failureLabel={m.surface_render_failed()}
-                  retryLabel={m.surface_retry()}
-                  >{#snippet children(View)}<View />{/snippet}</LazyView
-                >
-              {:else if browserPage.currentPage() === "source"}
+              {:else if pageRow.id === "source"}
                 {#key tabs.activeId()}<LazyView
-                    loader={loadSourcePage}
+                    loader={pageRow.loader}
                     loadingLabel={m.surface_loading()}
                     failureLabel={m.surface_render_failed()}
                     retryLabel={m.surface_retry()}
@@ -1242,12 +1184,15 @@
                   >{/key}
               {:else}
                 <LazyView
-                  loader={loadLibraryPage}
+                  loader={pageRow.loader}
                   loadingLabel={m.surface_loading()}
                   failureLabel={m.surface_render_failed()}
                   retryLabel={m.surface_retry()}
-                  >{#snippet children(View)}<View kind="downloads" />{/snippet}</LazyView
-                >{/if}
+                  >{#snippet children(View)}
+                    {#if pageRow.id === "downloads"}<View kind="downloads" />{:else}<View />{/if}
+                  {/snippet}</LazyView
+                >
+              {/if}
             </RenderBoundary>
           </div>{/key}
       </main>

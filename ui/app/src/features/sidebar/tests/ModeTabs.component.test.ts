@@ -79,7 +79,7 @@ test("with Work off the column has no switch at either width, and it comes back 
   await expect.element(rail.getByRole("button", { name: "Work" })).not.toBeInTheDocument();
   expect(wide.container.textContent?.trim()).toBe("");
 
-  emitNativeEvent("uiCommand", "preference.work.enabled=true");
+  emitNativeEvent("preferenceChanged", { key: "work.enabled", value: "true" });
   await expect.element(wide.getByRole("radio", { name: "Work", exact: true })).toBeVisible();
   await expect.element(rail.getByRole("button", { name: "Work", exact: true })).toBeVisible();
 });

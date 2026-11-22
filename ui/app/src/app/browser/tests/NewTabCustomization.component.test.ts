@@ -49,7 +49,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     settingGet: async (key) => native.settings[key] ?? null,
     settingSet: async (key, value) => {
       native.settings[key] = value;
-      emitNativeEvent("uiCommand", `preference.${key}=${value}`);
+      emitNativeEvent("preferenceChanged", { key, value });
       return { accepted: true, operation_id: null };
     },
     mediaImport: native.import,

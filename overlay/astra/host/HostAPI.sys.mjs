@@ -81,6 +81,7 @@ import { Metadata } from "./Metadata.sys.mjs";
 import { PageSource, __resetPageSourceForTests } from "./PageSource.sys.mjs";
 import * as Passkeys from "./Passkeys.sys.mjs";
 import { TabHistory, __resetTabHistoryForTests } from "./TabHistory.sys.mjs";
+import { Close, __resetCloseForTests, bindClose } from "./Close.sys.mjs";
 import { DialogPrompts } from "./DialogPrompts.sys.mjs";
 import { PageDialogs } from "./PageDialogs.sys.mjs";
 import { Operations, __resetOperationsForTests } from "./Operations.sys.mjs";
@@ -147,6 +148,8 @@ export {
   TabHistory,
   DialogPrompts,
   PageDialogs,
+  Close,
+  bindClose,
   addEventListener,
   emit,
   eventSeq,

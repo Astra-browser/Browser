@@ -380,7 +380,7 @@
         (element) => element.reference.kind === "browser" && element.reference.tab === paneTab.id,
       ),
   );
-  onMount(() => void layout.init());
+  onMount(() => void layout.slice.init());
   $effect(() => {
     const applied = paneLayout;
     const current = pane;

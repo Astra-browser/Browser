@@ -52,28 +52,26 @@
     let liveLanguage = false;
     const liveFeatures: string[] = [];
     const liveLook: string[] = [];
-    const motionListener = events.uiCommand.listen(({ payload }) => {
+    const motionListener = events.preferenceChanged.listen(({ payload }) => {
       if (disposed) return;
-      const look = theme.customizationKeys.find((key) => payload.startsWith(`preference.${key}=`));
+      const { key, value } = payload;
+      const look = theme.customizationKeys.find((name) => name === key);
       if (look) {
         liveLook.push(look);
-        theme.customize(look, payload.slice(`preference.${look}=`.length));
+        theme.customize(look, value);
       }
-      const feature = FEATURES.find((key) => payload.startsWith(`preference.${key}.enabled=`));
+      const feature = FEATURES.find((name) => key === `${name}.enabled`);
       if (feature) {
         liveFeatures.push(feature);
-        setFeature(feature, payload.endsWith("=false"));
+        setFeature(feature, value === "false");
       }
-      if (payload.startsWith("preference.ui.language=")) {
+      if (key === "ui.language") {
         liveLanguage = true;
-        void applyLanguage(payload.slice("preference.ui.language=".length));
+        void applyLanguage(value);
       }
-      if (
-        payload === "preference.ui.reduce-motion=true" ||
-        payload === "preference.ui.reduce-motion=false"
-      ) {
+      if (key === "ui.reduce-motion") {
         liveMotion = true;
-        theme.setReducedMotion(payload.endsWith("=true"));
+        theme.setReducedMotion(value === "true");
       }
     });
     const listener = events.panelState.listen((event) => {

@@ -13,24 +13,12 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { loadManifest } from "./lib/manifest.mjs";
+import { ROOT, HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const HostAPI = await import(pathToFileURL(path.join(HOST, "HostAPI.sys.mjs")).href);
 const { TabHistory, __resetTabHistoryForTests } = await import(pathToFileURL(path.join(HOST, "TabHistory.sys.mjs")).href);
 const { Tabs, Navigation, addEventListener, __resetForTests } = HostAPI;
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 // --- TabHistory.list -------------------------------------------------------
 
@@ -133,18 +121,26 @@ check("an unknown tab is refused", unknown.error?.code === "no_such_tab");
 
 // --- wire routing ----------------------------------------------------------
 
-const transport = await readFile(
-  path.join(ROOT, "ui", "packages", "bridge", "src", "host-transport.ts"),
-  "utf8",
+const { COMMAND_MANIFEST } = await loadManifest();
+const tabHistoryRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history");
+const tabHistoryGoRoute = COMMAND_MANIFEST.find((entry) => entry.name === "tabs_history_go");
+check(
+  "tabs_history is routed to TabHistory",
+  tabHistoryRoute?.module === "TabHistory" &&
+    tabHistoryRoute?.method === "list" &&
+    tabHistoryRoute?.args === "idToAstraTabId",
 );
-check("tabs_history is routed to TabHistory", /\btabs_history: \["TabHistory", "list", TAB_ARG\]/u.test(transport));
 check(
   "tabs_history_go is routed to Navigation",
-  /\btabs_history_go: \["Navigation", "goToHistory", TAB_ARG\]/u.test(transport),
+  tabHistoryGoRoute?.module === "Navigation" &&
+    tabHistoryGoRoute?.method === "goToHistory" &&
+    tabHistoryGoRoute?.args === "idToAstraTabId",
 );
 check(
   "HostModules includes TabHistory",
-  /TabHistory: Record<string, \(args: Record<string, unknown>\) => Promise<unknown>>;/u.test(transport),
+  /\bTabHistory: HostModuleMethods;/u.test(
+    await readFile(path.join(ROOT, "ui/packages/bridge/src/host-modules.ts"), "utf8"),
+  ),
 );
 const jar = await readFile(path.join(ROOT, "overlay", "astra", "jar.mn"), "utf8");
 check("TabHistory is packaged in jar.mn", jar.includes("host/TabHistory.sys.mjs"));

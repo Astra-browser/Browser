@@ -7,23 +7,10 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const mod = await import(pathToFileURL(path.join(HOST, "ChromeExtensions.sys.mjs")).href);
 const { WebExtensions } = await import(pathToFileURL(path.join(HOST, "WebExtensions.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-  }
-}
 
 // --- store URL rule -------------------------------------------------------
 const ID = "ddkjiahejlhfcafbddmgiahcphecmpfh";

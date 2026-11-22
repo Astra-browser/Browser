@@ -49,6 +49,12 @@ with_build=0
 [ "${1:-}" = "--with-build" ] && with_build=1
 
 if [ "$with_build" = 1 ]; then
+  echo "== regenerate the host jar manifest"
+  command -v node >/dev/null 2>&1 || {
+    echo "package-release.sh: node is required to generate overlay/astra/jar.mn" >&2
+    exit 1
+  }
+  node "$ROOT/tools/stage-host-jar.mjs"
   echo "== stage overlay + build (--faster)"
   ( cd "$ROOT" && "$FORGE" overlay )
   ( cd "$ROOT" && "$FORGE" build --faster --jobs 2 )

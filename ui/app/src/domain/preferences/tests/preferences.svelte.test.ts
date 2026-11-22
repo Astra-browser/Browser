@@ -4,23 +4,36 @@ const native = vi.hoisted(() => ({
   set: vi.fn(),
   settle: vi.fn(),
   stop: vi.fn(),
+  stopPreference: vi.fn(),
   listener: null as null | ((event: { payload: string }) => void),
+  preferenceListener: null as null | ((event: { payload: { key: string; value: string } }) => void),
   listen: vi.fn(),
+  listenPreference: vi.fn(),
 }));
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({ settingGet: native.get, settingSet: native.set });
 });
 vi.mock("$domain/operations", () => ({ settle: native.settle }));
-vi.mock("$shared/ipc/native-events", () => ({ events: { uiCommand: { listen: native.listen } } }));
+vi.mock("$shared/ipc/native-events", () => ({
+  events: {
+    uiCommand: { listen: native.listen },
+    preferenceChanged: { listen: native.listenPreference },
+  },
+}));
 beforeEach(() => {
   vi.resetModules();
   vi.useFakeTimers();
   vi.resetAllMocks();
   native.listener = null;
+  native.preferenceListener = null;
   native.listen.mockImplementation((listener: typeof native.listener) => {
     native.listener = listener;
     return Promise.resolve(native.stop);
+  });
+  native.listenPreference.mockImplementation((listener: typeof native.preferenceListener) => {
+    native.preferenceListener = listener;
+    return Promise.resolve(native.stopPreference);
   });
   native.get.mockResolvedValue(null);
   native.set.mockResolvedValue({ accepted: true, operation_id: "0000000000000001" });
@@ -54,61 +67,69 @@ describe("preference observation lifecycle", () => {
     const first = preferences.init();
     expect(preferences.init()).toBe(first);
     await Promise.resolve();
-    native.listener?.({ payload: "preference.ui.accent=sage" });
+    await Promise.resolve();
+    native.preferenceListener?.({ payload: { key: "ui.accent", value: "sage" } });
     finish("sky");
     await first;
     expect(native.listen).toHaveBeenCalledOnce();
+    expect(native.listenPreference).toHaveBeenCalledOnce();
     expect(preferences.value("ui.accent")).toBe("sage");
     preferences.dispose();
     expect(native.stop).toHaveBeenCalledOnce();
+    expect(native.stopPreference).toHaveBeenCalledOnce();
   });
-  it("cannot leave a hung readback pending forever", async () => {
+  it("resolves a write on the matching event with no re-read", async () => {
     const preferences = await import("../preferences.svelte");
     await preferences.init();
-    native.get.mockImplementation(() => new Promise(() => {}));
+    native.get.mockClear();
+    const pending = preferences.set("ui.accent", "sky");
+    await Promise.resolve();
+    native.preferenceListener?.({ payload: { key: "ui.accent", value: "sky" } });
+    await pending;
+    expect(preferences.saving()).toBe(false);
+    expect(preferences.saveFailed()).toBe(false);
+    expect(preferences.value("ui.accent")).toBe("sky");
+    expect(native.get).not.toHaveBeenCalled();
+    preferences.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("a lost event fails the write instead of fabricating a save", async () => {
+    const preferences = await import("../preferences.svelte");
+    await preferences.init();
+    native.get.mockClear();
     const pending = preferences.set("ui.accent", "sky");
     await vi.advanceTimersByTimeAsync(1500);
     await pending;
     expect(preferences.saving()).toBe(false);
     expect(preferences.saveFailed()).toBe(true);
     expect(preferences.value("ui.accent")).toBe("graphite");
+    expect(native.get).not.toHaveBeenCalled();
     preferences.dispose();
     expect(vi.getTimerCount()).toBe(0);
   });
-  it("cancels readback observation on disposal without overwriting the next generation", async () => {
+  it("an event for another value does not settle the write", async () => {
     const preferences = await import("../preferences.svelte");
     await preferences.init();
-    let finish!: (value: string) => void;
-    native.get.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+    const pending = preferences.set("ui.accent", "sky");
+    await Promise.resolve();
+    native.preferenceListener?.({ payload: { key: "ui.accent", value: "rose" } });
+    expect(preferences.saving()).toBe(true);
+    native.preferenceListener?.({ payload: { key: "ui.accent", value: "sky" } });
+    await pending;
+    expect(preferences.saveFailed()).toBe(false);
+    expect(preferences.value("ui.accent")).toBe("sky");
+    preferences.dispose();
+  });
+  it("cancels a pending write on disposal without overwriting the next generation", async () => {
+    const preferences = await import("../preferences.svelte");
+    await preferences.init();
     const pending = preferences.set("ui.accent", "sky");
     await Promise.resolve();
     preferences.dispose();
     await pending;
-    native.get.mockResolvedValue(null);
     await preferences.init();
-    finish("sky");
-    await Promise.resolve();
     expect(preferences.value("ui.accent")).toBe("graphite");
     expect(preferences.saveFailed()).toBe(false);
-    preferences.dispose();
-  });
-  it("uses confirmed readback when the event was missed, without replacing a newer event", async () => {
-    const preferences = await import("../preferences.svelte");
-    await preferences.init();
-    native.get.mockResolvedValue("sky");
-    await preferences.set("ui.accent", "sky");
-    expect(preferences.value("ui.accent")).toBe("sky");
-    native.get.mockImplementation(async () => {
-      native.listener?.({ payload: "preference.ui.accent=rose" });
-      return "sage";
-    });
-    await preferences.set("ui.accent", "sage");
-    expect(preferences.value("ui.accent")).toBe("rose");
     preferences.dispose();
   });
 });

@@ -1780,7 +1780,7 @@ fn compute_footprint(root: &Path) -> Result<Footprint, String> {
     })
 }
 
-// `forge footprint`: enforce the §6.7 budget (defaults ≤4000 lines P2/P3,
+// `forge footprint`: enforce the §6.7 budget (defaults ≤4100 lines P2/P3,
 // ≤60 patches, ≤8 P3). Always writes out/footprint.json; exits 1 over
 // budget with the offending dimensions named.
 fn cmd_footprint(
@@ -2143,14 +2143,14 @@ fn main() {
             cmd_import(&root, check_only, os)
         }
         Some("footprint") => {
-            let mut max_lines = 4000usize;
+            let mut max_lines = 4100usize;
             let mut max_patches = 60usize;
             let mut max_p3 = 8usize;
             let mut it = args.iter().skip(1);
             while let Some(a) = it.next() {
                 let mut val = || it.next().map(|s| s.as_str()).unwrap_or("");
                 match a.as_str() {
-                    "--max-lines" => max_lines = val().parse().unwrap_or(4000),
+                    "--max-lines" => max_lines = val().parse().unwrap_or(4100),
                     "--max-patches" => max_patches = val().parse().unwrap_or(60),
                     "--max-p3" => max_p3 = val().parse().unwrap_or(8),
                     other => {

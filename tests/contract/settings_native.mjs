@@ -13,24 +13,11 @@
 // Exit 0 on PASS, 1 on FAIL. Stdlib only.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const { Settings, __resetSettingsForTests, __setPrefsForTests, __setContentPrefsForTests } =
   await import(pathToFileURL(path.join(HOST, "Settings.sys.mjs")).href);
 const { addEventListener, __resetEventsForTests } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail = "") {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
-  }
-}
 
 const values = new Map();
 const observers = new Set();
@@ -228,22 +215,24 @@ check("an empty read is null", (await read("")) === null);
 // --- a pref change made elsewhere is announced ---------------------------
 const pushed = [];
 const stop = addEventListener((event) => {
-  if (event.type === "ui-command" && typeof event.data === "string") pushed.push(event.data);
+  if (event.type === "preference_changed" && event.data) pushed.push(event.data);
 });
 values.set("ui.prefersReducedMotion", 0);
 notify("ui.prefersReducedMotion");
 values.set("astra.settings.ntp.clock", "true");
 notify("astra.settings.ntp.clock");
 stop();
+const pushedKey = (key, value) =>
+  pushed.some((event) => event.key === key && event.value === value);
 check(
   "an external pref change pushes the decoded value",
-  pushed.includes("preference.ui.reduce-motion=false"),
-  pushed.join(","),
+  pushedKey("ui.reduce-motion", "false"),
+  JSON.stringify(pushed),
 );
 check(
   "an external Astra pref change is announced too",
-  pushed.includes("preference.ntp.clock=true"),
-  pushed.join(","),
+  pushedKey("ntp.clock", "true"),
+  JSON.stringify(pushed),
 );
 check("the changed pref is re-read", (await read("ui.reduce-motion")) === "false");
 check("the changed Astra pref is re-read", (await read("ntp.clock")) === "true");

@@ -12,18 +12,10 @@
 // (v1 protocol, P1-T10); bindings emit `pane.attached` / `pane.detached` /
 // `pane.rect-changed`. Pure logic, no Firefox internals.
 
+import { HOST_API_VERSION, err, ok } from "./Envelope.sys.mjs";
 import { emit } from "./Events.sys.mjs";
-import { HOST_API_VERSION } from "./Tabs.sys.mjs";
 
 const _panes = new Map(); // pane_id -> { pane_id, visible, slot, rect, astra_tab_id, generation }
-
-function ok(request_id, data = {}) {
-  return { request_id, host_api_version: HOST_API_VERSION, ...data };
-}
-
-function err(request_id, code, message) {
-  return { request_id, host_api_version: HOST_API_VERSION, error: { code, message } };
-}
 
 function snapshot(pane_id) {
   const pane = _panes.get(pane_id);

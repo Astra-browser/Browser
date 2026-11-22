@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
   let commandListener: ((event: { payload: string }) => void) | undefined;
+  let preferenceListener:
+    | ((event: { payload: { key: string; value: string } }) => void)
+    | undefined;
 
   return {
     order: [] as string[],
@@ -13,13 +16,23 @@ const harness = vi.hoisted(() => {
       removeEventListener: vi.fn(),
     },
     stop: vi.fn(),
+    stopPreference: vi.fn(),
     listen: vi.fn((listener: (event: { payload: string }) => void) => {
       harness.order.push("listen");
       commandListener = listener;
       return Promise.resolve(harness.stop);
     }),
+    listenPreference: vi.fn(
+      (listener: (event: { payload: { key: string; value: string } }) => void) => {
+        preferenceListener = listener;
+        return Promise.resolve(harness.stopPreference);
+      },
+    ),
     emit(command: string) {
       commandListener?.({ payload: command });
+    },
+    emitPreference(key: string, value: string) {
+      preferenceListener?.({ payload: { key, value } });
     },
     uiInfo: vi.fn(async (): Promise<UiInfo> => {
       harness.order.push("uiInfo");
@@ -46,6 +59,9 @@ vi.mock("$shared/ipc/native-events", () => ({
   events: {
     uiCommand: {
       listen: harness.listen,
+    },
+    preferenceChanged: {
+      listen: harness.listenPreference,
     },
   },
 }));
@@ -162,9 +178,9 @@ describe("theme startup lifecycle", () => {
     const theme = await import("../theme");
     await theme.init();
 
-    harness.emit("preference.appearance=dark");
+    harness.emitPreference("appearance", "dark");
     expect(harness.attributes.get("data-theme")).toBe("dark");
-    harness.emit("preference.appearance=light");
+    harness.emitPreference("appearance", "light");
     expect(harness.attributes.get("data-theme")).toBe("light");
     theme.dispose();
   });

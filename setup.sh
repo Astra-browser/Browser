@@ -165,6 +165,13 @@ else
 fi
 
 # --- overlay + engine --------------------------------------------------------------
+# The host half of jar.mn is generated from overlay/astra/host. build:chrome also
+# runs this, but `--skip-ui` and host-only changes do not, and the manifest must
+# be current before `forge overlay` copies it into the engine.
+step "regenerating the host jar manifest"
+command -v node >/dev/null 2>&1 || die "node is required to generate overlay/astra/jar.mn"
+node "$ROOT/tools/stage-host-jar.mjs"
+
 step "applying overlay + patch series"
 "$FORGE" overlay
 

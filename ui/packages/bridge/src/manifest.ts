@@ -1,0 +1,415 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+// The command manifest: one row per wire command (D-55).
+//
+// This file is the single authority for command names and their host
+// destination. `host-transport.ts` builds its route table from it, the
+// coverage guard imports it instead of parsing TypeScript, and the gap
+// report derives from it. It is data, not behaviour: host modules, payload
+// shapes and `bindings.ts` types stay hand-written (SCOPE rule 5).
+//
+// States:
+//   routed   - a host module and method answer it.
+//   deferred - no route, allowed by `reason` (a D-nn row or a SCOPE anchor).
+//   unused   - no route and no caller on a live surface. A reference from
+//              dead code still appears in the report, so the reader can see
+//              why the row was called unused; removal is a later slice.
+//   open     - no route and no permission: a defect.
+//
+// Slice 1 (P7-T01) moved the 177 routes here verbatim and declared the
+// 140 unrouted names. The completion slice routed the last five real gaps and
+// moved the rest to `unused` (nothing produces them in this build) or
+// `deferred` (a decision allows them), so no row is `open` any more.
+
+import type { HostModuleName, Route } from "./host-modules.js";
+
+export type CommandState = "routed" | "deferred" | "unused" | "open";
+
+/**
+ * Wire-argument maps. Each name reads `<wire key>To<host key>`, so a reader can
+ * tell which vocabulary is being renamed in which direction.
+ */
+export const ARG_MAPS = {
+  idToAstraTabId: { id: "astra_tab_id" },
+  idToAstraTabIdWithUrl: { id: "astra_tab_id", input: "url" },
+  idToTab: { id: "tab" },
+  idToTabId: { id: "tab_id" },
+  tabIdToTabId: { tab_id: "tabId" },
+  requestIdToPromptId: { request_id: "prompt_id" },
+} as const;
+
+export type ArgMapName = keyof typeof ARG_MAPS | "none";
+
+interface CommandEntryBase {
+  /** Wire name, snake_case. */
+  readonly name: string;
+  /** Which argument map the host method expects. */
+  readonly args: ArgMapName;
+}
+
+/** A command a host module answers. */
+export interface RoutedEntry extends CommandEntryBase {
+  readonly state: "routed";
+  readonly module: HostModuleName;
+  readonly method: string;
+  readonly reason: null;
+}
+
+/** A command nothing answers. `reason` is set only for `deferred`. */
+export interface UnroutedEntry extends CommandEntryBase {
+  readonly state: "deferred" | "unused" | "open";
+  readonly module: null;
+  readonly method: null;
+  /** A D-nn id or `SCOPE:<heading-slug>`; only for deferred rows. */
+  readonly reason: string | null;
+}
+
+export type CommandEntry = RoutedEntry | UnroutedEntry;
+
+export function isRouted(entry: CommandEntry): entry is RoutedEntry {
+  return entry.state === "routed";
+}
+
+/** The route a routed row describes. The union removes the null cases. */
+export function toRoute(entry: RoutedEntry): Route {
+  return entry.args === "none"
+    ? [entry.module, entry.method]
+    : [entry.module, entry.method, ARG_MAPS[entry.args]];
+}
+
+export const COMMAND_MANIFEST: readonly CommandEntry[] = [
+  // ---- routed ----
+  { name: "tabs_open", module: "Tabs", method: "create", args: "none", state: "routed", reason: null },
+  { name: "tabs_bootstrap", module: "Tabs", method: "bootstrap", args: "none", state: "routed", reason: null },
+  { name: "tabs_close", module: "Tabs", method: "close", args: "idToAstraTabId", state: "routed", reason: null },
+  // Sleeping tabs: the host driver sleeps them on its own timer; these two
+  // are the explicit verbs for a surface or a live probe to use the same path.
+  { name: "tabs_discard", module: "Tabs", method: "discard", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_wakeup", module: "Tabs", method: "wakeup", args: "idToAstraTabId", state: "routed", reason: null },
+  // Native split view: the engine's gBrowser owns the panes and their
+  // geometry; these routes only ask it to create/move/end the split.
+  { name: "tabs_split", module: "SplitView", method: "open", args: "none", state: "routed", reason: null },
+  { name: "tab_drag_over", module: "SplitView", method: "dragOver", args: "none", state: "routed", reason: null },
+  { name: "tab_drop", module: "SplitView", method: "drop", args: "none", state: "routed", reason: null },
+  { name: "tabs_unsplit", module: "SplitView", method: "unsplit", args: "none", state: "routed", reason: null },
+  { name: "tabs_leave_split", module: "SplitView", method: "leave", args: "none", state: "routed", reason: null },
+  { name: "split_open_url", module: "SplitView", method: "openUrl", args: "none", state: "routed", reason: null },
+  { name: "split_replace", module: "SplitView", method: "replace", args: "none", state: "routed", reason: null },
+  { name: "split_focus", module: "SplitView", method: "focus", args: "none", state: "routed", reason: null },
+  { name: "split_ratio", module: "SplitView", method: "ratio", args: "none", state: "routed", reason: null },
+  { name: "split_drop", module: "SplitView", method: "drop", args: "none", state: "routed", reason: null },
+  { name: "split_state", module: "SplitView", method: "state", args: "none", state: "routed", reason: null },
+  { name: "split_bookmark_save", module: "SplitView", method: "bookmarkSave", args: "none", state: "routed", reason: null },
+  { name: "split_bookmark_list", module: "SplitView", method: "bookmarkList", args: "none", state: "routed", reason: null },
+  { name: "split_bookmark_restore", module: "SplitView", method: "bookmarkRestore", args: "none", state: "routed", reason: null },
+  { name: "split_bookmark_delete", module: "SplitView", method: "bookmarkDelete", args: "none", state: "routed", reason: null },
+  // Bounded page previews (never a hidden live browser per card).
+  { name: "peek_open", module: "Peek", method: "open", args: "none", state: "routed", reason: null },
+  { name: "peek_close", module: "Peek", method: "close", args: "none", state: "routed", reason: null },
+  { name: "peek_close_all", module: "Peek", method: "closeAll", args: "none", state: "routed", reason: null },
+  { name: "peek_capture", module: "Peek", method: "capture", args: "none", state: "routed", reason: null },
+  { name: "peek_list", module: "Peek", method: "list", args: "none", state: "routed", reason: null },
+  { name: "peek_open_tab", module: "Peek", method: "openTab", args: "none", state: "routed", reason: null },
+  { name: "peek_open_split", module: "Peek", method: "openSplit", args: "none", state: "routed", reason: null },
+  { name: "peek_restore", module: "Peek", method: "restore", args: "none", state: "routed", reason: null },
+  { name: "peek_configure", module: "Peek", method: "configure", args: "none", state: "routed", reason: null },
+  // Per-space history, extension sets and cloning.
+  { name: "space_history_note", module: "SpaceHistory", method: "note", args: "none", state: "routed", reason: null },
+  { name: "space_history_list", module: "SpaceHistory", method: "list", args: "none", state: "routed", reason: null },
+  { name: "space_history_clear", module: "SpaceHistory", method: "clear", args: "none", state: "routed", reason: null },
+  { name: "space_history_status", module: "SpaceHistory", method: "status", args: "none", state: "routed", reason: null },
+  { name: "space_extensions_list", module: "SpaceExtensions", method: "list", args: "none", state: "routed", reason: null },
+  { name: "space_extensions_assign", module: "SpaceExtensions", method: "assign", args: "none", state: "routed", reason: null },
+  { name: "space_extensions_copy", module: "SpaceExtensions", method: "copy", args: "none", state: "routed", reason: null },
+  { name: "space_extensions_apply", module: "SpaceExtensions", method: "apply", args: "none", state: "routed", reason: null },
+  { name: "tabs_clone_to_space", module: "SpaceClone", method: "clone", args: "idToTab", state: "routed", reason: null },
+  { name: "tab_group_create", module: "TabGroups", method: "create", args: "none", state: "routed", reason: null },
+  { name: "tab_group_list", module: "TabGroups", method: "list", args: "none", state: "routed", reason: null },
+  { name: "tab_group_collapse", module: "TabGroups", method: "collapse", args: "none", state: "routed", reason: null },
+  { name: "tab_group_ungroup", module: "TabGroups", method: "ungroup", args: "none", state: "routed", reason: null },
+  { name: "tabs_activate", module: "Tabs", method: "select", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_answer_sign_in", module: "DialogPrompts", method: "answerAuth", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_answer_page_request", module: "Tabs", method: "answerPageRequest", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_continue_past_certificate", module: "DialogPrompts", method: "answerCert", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "page_dialog_answer", module: "PageDialogs", method: "answer", args: "none", state: "routed", reason: null },
+  { name: "tabs_navigate", module: "Navigation", method: "loadURL", args: "idToAstraTabIdWithUrl", state: "routed", reason: null },
+  { name: "tabs_back", module: "Navigation", method: "goBack", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_forward", module: "Navigation", method: "goForward", args: "idToAstraTabId", state: "routed", reason: null },
+  // The Back/Forward menu reads the engine's session history and jumps to the
+  // exact entry the row names; a native `history_menu_popup` has no route.
+  { name: "tabs_history", module: "TabHistory", method: "list", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_history_go", module: "Navigation", method: "goToHistory", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "tabs_reload", module: "Navigation", method: "reload", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "panel_hide", module: "Panes", method: "hide", args: "none", state: "routed", reason: null },
+  { name: "panel_ready", module: "Panes", method: "list", args: "none", state: "routed", reason: null },
+  { name: "ui_ready", module: "Boot", method: "handshake", args: "none", state: "routed", reason: null },
+  { name: "onboarding_finish", module: "Boot", method: "onboardingFinish", args: "none", state: "routed", reason: null },
+  { name: "onboarding_pending", module: "Boot", method: "onboardingPendingView", args: "none", state: "routed", reason: null },
+  { name: "sidebar_set_width", module: "Sidebar", method: "setWidth", args: "none", state: "routed", reason: null },
+  { name: "sidebar_set_hidden", module: "Sidebar", method: "setHidden", args: "none", state: "routed", reason: null },
+  { name: "sidebar_peek", module: "Sidebar", method: "peek", args: "none", state: "routed", reason: null },
+  { name: "web_extension_list", module: "WebExtensions", method: "list", args: "none", state: "routed", reason: null },
+  { name: "web_extension_set_enabled", module: "WebExtensions", method: "setEnabled", args: "none", state: "routed", reason: null },
+  { name: "web_extension_uninstall", module: "WebExtensions", method: "uninstall", args: "none", state: "routed", reason: null },
+  { name: "web_extension_open_options", module: "WebExtensions", method: "openOptions", args: "none", state: "routed", reason: null },
+  { name: "web_extension_prepare", module: "WebExtensions", method: "prepare", args: "none", state: "routed", reason: null },
+  { name: "web_extension_retry", module: "WebExtensions", method: "retry", args: "none", state: "routed", reason: null },
+  { name: "web_extension_review_update", module: "WebExtensions", method: "reviewUpdate", args: "none", state: "routed", reason: null },
+  { name: "web_extension_set_access", module: "WebExtensions", method: "setAccess", args: "none", state: "routed", reason: null },
+  { name: "web_extension_set_pinned", module: "WebExtensions", method: "setPinned", args: "none", state: "routed", reason: null },
+  { name: "web_extension_answer_access", module: "WebExtensions", method: "answerAccess", args: "none", state: "routed", reason: null },
+  { name: "web_extension_answer_prompt", module: "WebExtensions", method: "answerPrompt", args: "none", state: "routed", reason: null },
+  { name: "extension_action_invoke", module: "WebExtensions", method: "invokeAction", args: "none", state: "routed", reason: null },
+  { name: "web_extension_store_button", module: "WebExtensions", method: "storeButton", args: "none", state: "routed", reason: null },
+  { name: "web_extension_choose_file", module: "WebExtensions", method: "chooseFile", args: "none", state: "routed", reason: null },
+  { name: "web_extension_prepare_file", module: "WebExtensions", method: "prepareFile", args: "none", state: "routed", reason: null },
+  { name: "web_extension_confirm", module: "WebExtensions", method: "confirm", args: "none", state: "routed", reason: null },
+  { name: "web_extension_cancel", module: "WebExtensions", method: "cancel", args: "none", state: "routed", reason: null },
+  { name: "setting_get", module: "Settings", method: "get", args: "none", state: "routed", reason: null },
+  { name: "setting_set", module: "Settings", method: "set", args: "none", state: "routed", reason: null },
+  { name: "zoom_call", module: "Zoom", method: "call", args: "none", state: "routed", reason: null },
+  { name: "account_get", module: "Accounts", method: "get", args: "none", state: "routed", reason: null },
+  { name: "run_command", module: "Commands", method: "run", args: "none", state: "routed", reason: null },
+  { name: "keymap_entries", module: "Keymap", method: "entries", args: "none", state: "routed", reason: null },
+  { name: "keymap_bind", module: "Keymap", method: "bind", args: "none", state: "routed", reason: null },
+  { name: "keymap_reset", module: "Keymap", method: "reset", args: "none", state: "routed", reason: null },
+  { name: "keymap_record", module: "Keymap", method: "record", args: "none", state: "routed", reason: null },
+  { name: "work_running", module: "Work", method: "running", args: "none", state: "routed", reason: null },
+  { name: "work_call", module: "Work", method: "call", args: "none", state: "routed", reason: null },
+  { name: "download_call", module: "Downloads", method: "call", args: "none", state: "routed", reason: null },
+  { name: "download_open_access_settings", module: "Downloads", method: "openAccessSettings", args: "none", state: "routed", reason: null },
+  { name: "profiles_get", module: "Profiles", method: "get", args: "none", state: "routed", reason: null },
+  { name: "profiles_create", module: "Profiles", method: "create", args: "none", state: "routed", reason: null },
+  { name: "profiles_rename", module: "Profiles", method: "rename", args: "none", state: "routed", reason: null },
+  { name: "profiles_delete", module: "Profiles", method: "remove", args: "none", state: "routed", reason: null },
+  { name: "profiles_set_avatar", module: "Profiles", method: "setAvatar", args: "none", state: "routed", reason: null },
+  { name: "profile_avatar_pick", module: "Profiles", method: "avatarPick", args: "none", state: "routed", reason: null },
+  { name: "profiles_switch", module: "Profiles", method: "switch", args: "none", state: "routed", reason: null },
+  { name: "media_player", module: "Media", method: "player", args: "none", state: "routed", reason: null },
+  { name: "media_gallery", module: "MediaGallery", method: "call", args: "none", state: "routed", reason: null },
+  { name: "media_import", module: "MediaImport", method: "import", args: "none", state: "routed", reason: null },
+  { name: "tab_set_muted", module: "Tabs", method: "setMuted", args: "idToAstraTabId", state: "routed", reason: null },
+  // Keep / let go and place in one call: the app's drag verb.
+  { name: "tabs_set_essential", module: "Tabs", method: "setEssential", args: "idToAstraTabId", state: "routed", reason: null },
+  { name: "note_call", module: "Notes", method: "call", args: "none", state: "routed", reason: null },
+  { name: "bookmark_call", module: "Bookmarks", method: "call", args: "none", state: "routed", reason: null },
+  { name: "time_call", module: "Time", method: "call", args: "none", state: "routed", reason: null },
+  { name: "focus_control", module: "Time", method: "focus", args: "none", state: "routed", reason: null },
+  // History is read through the space index; `SpaceHistory.call` delegates
+  // closed-tab/forget kinds to the Places-backed HistoryCall module.
+  { name: "history_call", module: "SpaceHistory", method: "call", args: "none", state: "routed", reason: null },
+  { name: "about_info", module: "System", method: "aboutInfo", args: "none", state: "routed", reason: null },
+  { name: "diagnostics_report", module: "System", method: "diagnosticsReport", args: "none", state: "routed", reason: null },
+  { name: "diagnostics_show_logs", module: "System", method: "diagnosticsShowLogs", args: "none", state: "routed", reason: null },
+  { name: "import_sources", module: "Migration", method: "importSources", args: "none", state: "routed", reason: null },
+  { name: "import_start", module: "Migration", method: "importStart", args: "none", state: "routed", reason: null },
+  { name: "import_cancel", module: "Migration", method: "importCancel", args: "none", state: "routed", reason: null },
+  { name: "import_open_permission", module: "Migration", method: "importOpenPermission", args: "none", state: "routed", reason: null },
+  { name: "export_browser_data", module: "Migration", method: "exportBrowserData", args: "none", state: "routed", reason: null },
+  { name: "system_clock_24h", module: "System", method: "systemClock24h", args: "none", state: "routed", reason: null },
+  { name: "update_status", module: "System", method: "updateStatus", args: "none", state: "routed", reason: null },
+  { name: "update_check", module: "System", method: "updateCheck", args: "none", state: "routed", reason: null },
+  { name: "default_browser_status", module: "System", method: "defaultBrowserStatus", args: "none", state: "routed", reason: null },
+  { name: "default_browser_request", module: "System", method: "defaultBrowserRequest", args: "none", state: "routed", reason: null },
+  { name: "login_item_status", module: "System", method: "loginItemStatus", args: "none", state: "routed", reason: null },
+  { name: "login_item_set", module: "System", method: "loginItemSet", args: "none", state: "routed", reason: null },
+  { name: "login_item_open_settings", module: "System", method: "loginItemOpenSettings", args: "none", state: "routed", reason: null },
+  { name: "open_software_update", module: "System", method: "openSoftwareUpdate", args: "none", state: "routed", reason: null },
+  { name: "windows_reputation_managed", module: "System", method: "windowsReputationManaged", args: "none", state: "routed", reason: null },
+  { name: "windows_diagnostics_settings", module: "System", method: "windowsDiagnosticsSettings", args: "none", state: "routed", reason: null },
+  { name: "favicon_probe", module: "Favicons", method: "probe", args: "none", state: "routed", reason: null },
+  { name: "ui_info", module: "System", method: "uiInfo", args: "none", state: "routed", reason: null },
+  { name: "resource_call", module: "Resources", method: "call", args: "none", state: "routed", reason: null },
+  { name: "page_source", module: "PageSource", method: "pageSource", args: "idToTabId", state: "routed", reason: null },
+  { name: "passkey_call", module: "Passkeys", method: "call", args: "none", state: "routed", reason: null },
+  { name: "passkey_answer_prompt", module: "Passkeys", method: "answer", args: "none", state: "routed", reason: null },
+  { name: "page_find", module: "Navigation", method: "pageFind", args: "none", state: "routed", reason: null },
+  { name: "browser_open_url", module: "Search", method: "openUrl", args: "none", state: "routed", reason: null },
+  { name: "newtab_search_context", module: "Search", method: "newtabContext", args: "tabIdToTabId", state: "routed", reason: null },
+  { name: "newtab_search", module: "Search", method: "newtabSearch", args: "none", state: "routed", reason: null },
+  { name: "newtab_run", module: "Search", method: "newtabRun", args: "none", state: "routed", reason: null },
+  { name: "newtab_cancel", module: "Search", method: "newtabCancel", args: "none", state: "routed", reason: null },
+  { name: "launcher_search", module: "Search", method: "launcherSearch", args: "none", state: "routed", reason: null },
+  { name: "launcher_run", module: "Search", method: "launcherRun", args: "none", state: "routed", reason: null },
+  { name: "launcher_edit", module: "Launcher", method: "edit", args: "none", state: "routed", reason: null },
+  { name: "launcher_trigger", module: "Launcher", method: "trigger", args: "none", state: "routed", reason: null },
+  { name: "launcher_set_shortcut", module: "Launcher", method: "setShortcut", args: "none", state: "routed", reason: null },
+  { name: "launcher_record_shortcut", module: "Launcher", method: "recordShortcut", args: "none", state: "routed", reason: null },
+  { name: "launcher_set_double_tap", module: "Launcher", method: "setDoubleTap", args: "none", state: "routed", reason: null },
+  { name: "launcher_open_accessibility", module: "Launcher", method: "openAccessibility", args: "none", state: "routed", reason: null },
+  { name: "spaces_create", module: "Tabs", method: "createSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_update", module: "Tabs", method: "updateSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_delete", module: "Tabs", method: "deleteSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_reorder", module: "Tabs", method: "reorderSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_switch", module: "Tabs", method: "switchSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_step", module: "Tabs", method: "stepSpace", args: "none", state: "routed", reason: null },
+  { name: "spaces_move_tab", module: "Tabs", method: "moveTabToSpace", args: "none", state: "routed", reason: null },
+  // The app's prompt token is the capability, so it travels as `prompt_id`;
+  // the envelope `request_id` is the command correlation id, not the fence.
+  { name: "page_permission_respond", module: "Permissions", method: "respond", args: "requestIdToPromptId", state: "routed", reason: null },
+  { name: "page_permission_card_host", module: "Permissions", method: "cardHost", args: "none", state: "routed", reason: null },
+  { name: "site_permissions", module: "Permissions", method: "listSites", args: "none", state: "routed", reason: null },
+  { name: "site_permission_set", module: "Permissions", method: "setSite", args: "none", state: "routed", reason: null },
+  { name: "browsing_data_call", module: "BrowsingData", method: "call", args: "none", state: "routed", reason: null },
+  { name: "blocker_status", module: "Blocker", method: "status", args: "none", state: "routed", reason: null },
+  { name: "blocker_lists", module: "Blocker", method: "lists", args: "none", state: "routed", reason: null },
+  { name: "blocker_configure", module: "Blocker", method: "configure", args: "none", state: "routed", reason: null },
+  { name: "blocker_reset_stats", module: "Blocker", method: "resetStats", args: "none", state: "routed", reason: null },
+  { name: "blocker_stats", module: "Blocker", method: "stats", args: "none", state: "routed", reason: null },
+  { name: "blocker_set_enabled", module: "Blocker", method: "setEnabled", args: "none", state: "routed", reason: null },
+  { name: "blocker_refresh_sources", module: "Blocker", method: "refreshSources", args: "none", state: "routed", reason: null },
+  { name: "blocker_retry", module: "Blocker", method: "retry", args: "none", state: "routed", reason: null },
+  { name: "blocker_site_change", module: "Blocker", method: "siteChange", args: "none", state: "routed", reason: null },
+  { name: "blocker_picker", module: "Blocker", method: "picker", args: "none", state: "routed", reason: null },
+  { name: "privacy_state", module: "Privacy", method: "state", args: "none", state: "routed", reason: null },
+  { name: "privacy_configure", module: "Privacy", method: "configure", args: "none", state: "routed", reason: null },
+  { name: "privacy_site_state", module: "Privacy", method: "siteState", args: "none", state: "routed", reason: null },
+  { name: "privacy_site_configure", module: "Privacy", method: "siteConfigure", args: "none", state: "routed", reason: null },
+  { name: "privacy_forget_site", module: "Privacy", method: "forgetSite", args: "none", state: "routed", reason: null },
+  { name: "operation_status", module: "Operations", method: "status", args: "none", state: "routed", reason: null },
+  { name: "operations_reconcile", module: "Operations", method: "reconcile", args: "none", state: "routed", reason: null },
+  { name: "operation_acknowledge", module: "Operations", method: "acknowledge", args: "none", state: "routed", reason: null },
+  // ---- unrouted ----
+  { name: "account_avatar_discard", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_avatar_pick", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_avatar_remove", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_avatar_save", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_buy", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_cancel_code", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_change_email", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_delete", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_deletion_code", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_email_code", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_export", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_manage", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_plan_confirm", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_plan_dismiss", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_plan_preview", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_reauth_code", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_receipt", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_refresh", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_revoke_session", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_send_code", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_sessions", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_set_daily_limit", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_set_name", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_set_server", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_sign_out", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_sign_out_everywhere", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_usage_history", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "account_verify", module: null, method: null, args: "none", state: "deferred", reason: "SCOPE:what-is-not-in-scope" },
+  { name: "add_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "bookmark_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "browser_credential_capability", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "browser_passkey_authorization_request", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "chrome_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "divider_drag", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "divider_grab", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "divider_release", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "essentials_keep", module: "Tabs", method: "keepSite", args: "none", state: "routed", reason: null },
+  { name: "essentials_release", module: "Tabs", method: "releaseSite", args: "none", state: "routed", reason: null },
+  { name: "extension_action_menu", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "haptic", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "history_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "link_describe", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "media_admit_remote", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "media_open", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "onboarding_play_intro", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "page_assist_ask", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_cite", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_close", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_continue", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_decide", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_delete", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_detach", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_focus", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_history", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_new", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_open", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_pick", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_pick_cancel", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_resume", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_status", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_assist_stop", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_style_remove", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_style_remove_for", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_style_toggle", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_style_toggle_for", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_styles", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "page_styles_all", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "panel_intent", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "panel_layout", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "profile_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "profile_rename", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "resource_close_ready", module: "Close", method: "ready", args: "none", state: "routed", reason: null },
+  { name: "sidebar_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "sidebar_resize", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "sidebar_resize_guide", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "spaces_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "swipe_region", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "tab_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "tools_menu_popup", module: null, method: null, args: "none", state: "unused", reason: null },
+  { name: "update_highlights", module: "System", method: "updateHighlights", args: "none", state: "routed", reason: null },
+  { name: "update_relaunch", module: "System", method: "updateRelaunch", args: "none", state: "routed", reason: null },
+  { name: "voice_cancel", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_choose_engine", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_choose_language", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_open_privacy", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_start", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_status", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "voice_stop", module: null, method: null, args: "none", state: "deferred", reason: "D-54" },
+  { name: "work_activity", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_admit_folder", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_cancel_connection_sign_in", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_change_memory", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_change_skill", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_check_connection", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_choose_folder", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_choose_model", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_clear_decision_key", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_clear_provider_key", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_clear_website_data", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_connections", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_context_preview", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_decision_preference", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_edit_draft", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_check", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_continue", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_extend", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_pages", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_present", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_human_release", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_local_servers", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_memories", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_models", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_models_ready", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_more_models", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_operation", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_operation_status", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_pane_hide", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_pane_set_rect", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_pane_show", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_pick_folder", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_preview_connection", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_release_memory", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_remove_connection", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_reveal_path", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_save_calendar", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_save_connection", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_screenshot_sites", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_decision_key", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_decision_preference", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_model_effort", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_model_endpoint", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_provider_key", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_screenshot_site", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_set_site", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_sign_in_connection", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_sites", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_skill_text", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_skills", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+  { name: "work_test_provider_key", module: null, method: null, args: "none", state: "deferred", reason: "D-48" },
+];

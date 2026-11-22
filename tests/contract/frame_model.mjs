@@ -16,14 +16,7 @@ import {
   createSidebar,
   createToolbar,
 } from "../../ui/shell/src/frame/frame.js";
-
-let failures = [];
-function check(name, ok) {
-  console.log((ok ? "PASS " : "FAIL ") + name);
-  if (!ok) {
-    failures.push(name);
-  }
-}
+import { check, failedNames } from "./lib/harness.mjs";
 
 // --- Minimal fake DOM -------------------------------------------------
 function fakeElement() {
@@ -237,8 +230,8 @@ function fakeHost() {
   check("toolbar setDisabled", tb.element.children[0].disabled === true);
 }
 
-if (failures.length) {
-  console.log(`frame model contract: FAIL (${failures.length} checks)`);
+if (failedNames.length) {
+  console.log(`frame model contract: FAIL (${failedNames.length} checks)`);
   process.exit(1);
 }
 console.log("frame model contract: PASS");

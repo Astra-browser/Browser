@@ -8,18 +8,10 @@
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
+import { HOST, check, failed } from "./lib/harness.mjs";
 
 const { Launcher } = await import(pathToFileURL(path.join(HOST, "Launcher.sys.mjs")).href);
 const { addEventListener } = await import(pathToFileURL(path.join(HOST, "Events.sys.mjs")).href);
-
-let failed = 0;
-function check(name, ok, detail = "") {
-  console.log((ok ? "PASS " : "FAIL ") + name + (detail ? " :: " + detail : ""));
-  if (!ok) failed += 1;
-}
 
 const seen = [];
 const stop = addEventListener((event) => {
