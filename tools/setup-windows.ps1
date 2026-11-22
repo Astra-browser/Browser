@@ -122,7 +122,6 @@ function Run([string]$name, [scriptblock]$body) {
     Step $name
     $global:LASTEXITCODE = 0
     & $body 2>&1 | Tee-Object -FilePath $log -Append
-    if (-not $?) { Fail $name }
     if ($LASTEXITCODE -ne 0) { Fail "$name (exit $LASTEXITCODE)" }
 }
 
