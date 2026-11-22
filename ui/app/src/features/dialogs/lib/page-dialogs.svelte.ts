@@ -1,6 +1,7 @@
 import type { PageDialogPromptChanged } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
+import { createSlice } from "$shared/lib/lifecycle";
 
 // One dialog is shown at a time; the engine may raise several from one page
 // (an alert storm queues them) and each waits for its own token. A closed
@@ -8,10 +9,6 @@ import { events } from "$shared/ipc/native-events";
 
 let queue = $state.raw<PageDialogPromptChanged[]>([]);
 let answering = $state(false);
-let unlisten: (() => void) | null = null;
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
 
 export const prompt = () => queue[0] ?? null;
 export const busy = () => answering;
@@ -34,45 +31,21 @@ function apply(entry: PageDialogPromptChanged) {
   queue = [...queue, entry];
 }
 
-async function initialize(generation: number) {
-  const stop = await events.pageDialogPromptChanged.listen((event) => {
-    if (generation !== lifecycle) return;
-    apply(event.payload);
-  });
-  if (generation !== lifecycle) {
-    stop();
-    return;
-  }
-  unlisten = stop;
-  initialized = true;
-}
+export const slice = createSlice({
+  register({ isCurrent }) {
+    return events.pageDialogPromptChanged.listen((event) => {
+      if (!isCurrent()) return;
+      apply(event.payload);
+    });
+  },
+  reset() {
+    queue = [];
+    answering = false;
+  },
+});
 
-export function init(): Promise<void> {
-  if (initialized) return Promise.resolve();
-  if (initializing !== null) return initializing;
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  lifecycle += 1;
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  queue = [];
-  answering = false;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 /**
  * Answers the dialog on screen. The request token is the capability; the

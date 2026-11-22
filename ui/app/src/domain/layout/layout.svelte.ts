@@ -1,4 +1,4 @@
-import { createLifecycle } from "$shared/lib/lifecycle";
+import { createSlice } from "$shared/lib/lifecycle";
 import type { DividerView, WorkPaneLayout } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 
@@ -33,52 +33,19 @@ let workPaneState = $state.raw<WorkPaneHole | null>(null);
 export const dividers = () => dividerState;
 /** The applied native hole of the Work browser pane, or null while no pane is shown. */
 export const workPane = () => workPaneState;
-const lifecycle = createLifecycle();
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 
-async function initialize(generation: number) {
-  const stop = await events.layoutChanged.listen((event) => {
-    if (!lifecycle.isCurrent(generation)) return;
-    dividerState = event.payload.dividers;
-    workPaneState = hole(event.payload.work_pane);
-  });
+export const slice = createSlice({
+  register({ isCurrent }) {
+    return events.layoutChanged.listen((event) => {
+      if (!isCurrent()) return;
+      dividerState = event.payload.dividers;
+      workPaneState = hole(event.payload.work_pane);
+    });
+  },
+  reset() {
+    workPaneState = null;
+  },
+});
 
-  if (!lifecycle.isCurrent(generation)) {
-    stop();
-    return;
-  }
-
-  unlisten = stop;
-  initialized = true;
-}
-
-export function init(): Promise<void> {
-  if (initializing !== null) return initializing;
-  if (initialized) return Promise.resolve();
-
-  const generation = lifecycle.begin();
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  if (!initialized && initializing === null && unlisten === null) return;
-
-  lifecycle.end();
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  workPaneState = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
