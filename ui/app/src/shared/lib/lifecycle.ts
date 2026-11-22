@@ -41,6 +41,8 @@ export type SliceContext = {
 export type Slice = {
   init(): Promise<void>;
   dispose(): void;
+  /** Whether a registration is currently installed. */
+  ready(): boolean;
   isCurrent(generation: number): boolean;
   current(): number;
 };
@@ -135,6 +137,7 @@ export function createSlice(options: SliceOptions): Slice {
   return {
     init,
     dispose,
+    ready: () => initialized,
     isCurrent: (value: number) => generation === value,
     current: () => generation,
   };

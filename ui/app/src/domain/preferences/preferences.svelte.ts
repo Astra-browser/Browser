@@ -4,6 +4,7 @@ import { IS_WINDOWS } from "$shared/platform";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
+import { createSlice } from "$shared/lib/lifecycle";
 
 const defaults = {
   "appearance.theme": "light",
@@ -121,10 +122,6 @@ export type PreferenceKey = keyof typeof defaults;
 const values = $state<Record<PreferenceKey, string>>({ ...defaults });
 let pending = $state<PreferenceKey | null>(null);
 let failed = $state(false);
-let epoch = 0;
-let stop: (() => void) | null = null;
-let initialized = false;
-let initializing: Promise<void> | null = null;
 let lifetime: AbortController | null = null;
 const versions: Partial<Record<PreferenceKey, number>> = {};
 export const value = (key: PreferenceKey) => values[key];
@@ -185,7 +182,7 @@ function announce(key: PreferenceKey, next: string) {
     if (
       waiter.key === key &&
       waiter.value === next &&
-      waiter.generation === epoch &&
+      slice.isCurrent(waiter.generation) &&
       (versions[key] ?? 0) > waiter.version
     ) {
       waiter.settle(true);
@@ -230,90 +227,74 @@ function waitForChange(
   });
   return { promise, cancel: () => waiter.settle(false) };
 }
-async function initialize(generation: number, signal: AbortSignal) {
-  const updated: Partial<Record<PreferenceKey, true>> = {};
-  const unsubscribe = await events.uiCommand.listen(({ payload }) => {
-    if (generation !== epoch) return;
-    // The remaining string command in this channel is the keyboard/menu theme
-    // choice; preference writes arrive typed on their own channel.
-    if (!payload.startsWith("theme.")) return;
-    updated["appearance.theme"] = true;
-    apply("appearance.theme", payload.slice("theme.".length));
-  });
-  const unsubscribePreference = await events.preferenceChanged.listen(({ payload }) => {
-    if (generation !== epoch) return;
-    const key = payload?.key;
-    if (typeof key !== "string" || !Object.hasOwn(defaults, key)) return;
-    updated[key as PreferenceKey] = true;
-    announce(key as PreferenceKey, String(payload.value ?? ""));
-  });
-  if (generation !== epoch) {
-    unsubscribe();
-    unsubscribePreference();
-    return;
-  }
-  stop = () => {
-    unsubscribe();
-    unsubscribePreference();
-  };
-  await Promise.all(
-    (Object.keys(defaults) as PreferenceKey[]).map(async (key) => {
-      try {
-        const stored = await observe(commands.settingGet(key), 2000, signal);
-        if (generation === epoch && !updated[key] && stored.state === "received")
-          apply(key, stored.value ?? defaults[key]);
-      } catch {
-        /* Retain safe defaults if a read is unavailable. */
-      }
-    }),
-  );
-  if (generation === epoch) initialized = true;
-}
+export const slice = createSlice({
+  async register({ isCurrent, attach }) {
+    lifetime = new AbortController();
+    const signal = lifetime.signal;
+    const updated: Partial<Record<PreferenceKey, true>> = {};
+    const unsubscribe = await events.uiCommand.listen(({ payload }) => {
+      if (!isCurrent()) return;
+      // The remaining string command in this channel is the keyboard/menu theme
+      // choice; preference writes arrive typed on their own channel.
+      if (!payload.startsWith("theme.")) return;
+      updated["appearance.theme"] = true;
+      apply("appearance.theme", payload.slice("theme.".length));
+    });
+    const unsubscribePreference = await events.preferenceChanged.listen(({ payload }) => {
+      if (!isCurrent()) return;
+      const key = payload?.key;
+      if (typeof key !== "string" || !Object.hasOwn(defaults, key)) return;
+      updated[key as PreferenceKey] = true;
+      announce(key as PreferenceKey, String(payload.value ?? ""));
+    });
+    const release = () => {
+      unsubscribe();
+      unsubscribePreference();
+    };
+    if (!isCurrent()) {
+      release();
+      return;
+    }
+    attach(release);
+    try {
+      await Promise.all(
+        (Object.keys(defaults) as PreferenceKey[]).map(async (key) => {
+          try {
+            const stored = await observe(commands.settingGet(key), 2000, signal);
+            if (isCurrent() && !updated[key] && stored.state === "received")
+              apply(key, stored.value ?? defaults[key]);
+          } catch {
+            /* Retain safe defaults if a read is unavailable. */
+          }
+        }),
+      );
+    } catch (error) {
+      if (isCurrent()) lifetime.abort();
+      release();
+      throw error;
+    }
+  },
+  reset() {
+    lifetime?.abort();
+    lifetime = null;
+    pending = null;
+    failed = false;
+    for (const key of Object.keys(defaults) as PreferenceKey[]) {
+      values[key] = defaults[key];
+      delete versions[key];
+    }
+  },
+});
 
-export function init(): Promise<void> {
-  if (initializing) return initializing;
-  if (initialized) return Promise.resolve();
-  lifetime = new AbortController();
-  const generation = ++epoch;
-  const task = initialize(generation, lifetime.signal);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (generation === epoch) {
-        stop?.();
-        stop = null;
-        lifetime?.abort();
-      }
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-export function dispose() {
-  epoch++;
-  lifetime?.abort();
-  lifetime = null;
-  initializing = null;
-  initialized = false;
-  stop?.();
-  stop = null;
-  pending = null;
-  failed = false;
-  for (const key of Object.keys(defaults) as PreferenceKey[]) {
-    values[key] = defaults[key];
-    delete versions[key];
-  }
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 export async function set(key: PreferenceKey, next: string) {
-  if (!initialized) {
+  if (!slice.ready()) {
     failed = true;
     return;
   }
   if (pending !== null || values[key] === next) return;
-  const generation = epoch;
+  const generation = slice.current();
   const signal = lifetime?.signal;
   pending = key;
   failed = false;
@@ -328,13 +309,13 @@ export async function set(key: PreferenceKey, next: string) {
     // pending presentation ends only when the matching change arrives; a lost
     // event fails the write instead of showing a fabricated "Saved".
     const observed = await waited.promise;
-    if (generation !== epoch || signal?.aborted) return;
+    if (!slice.isCurrent(generation) || signal?.aborted) return;
     if (!observed) throw new Error("preference change not observed");
   } catch {
     waited.cancel();
-    if (generation === epoch) failed = true;
+    if (slice.isCurrent(generation)) failed = true;
   } finally {
-    if (generation === epoch) pending = null;
+    if (slice.isCurrent(generation)) pending = null;
   }
 }
 
