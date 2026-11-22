@@ -275,8 +275,8 @@ if (-not $SkipBuild) {
 
 if (-not $SkipPackage) {
     $package = Join-Path $root 'tools\package-windows.ps1'
-    $packageArgs = @()
-    if (-not $SkipInstaller) { $packageArgs += '-Installer' }
+    $packageArgs = @{}
+    if (-not $SkipInstaller) { $packageArgs.Installer = $true }
     Run 'packaging Windows release' { & $package @packageArgs }
 
     Step 'verifying the package'
