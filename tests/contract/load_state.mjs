@@ -6,23 +6,9 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ROOT, checkEqual, passed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const { loadWatchStep } = await import(pathToFileURL(path.join(ROOT, "overlay", "astra", "host", "Content.sys.mjs")).href);
-
-let passed = 0;
-function check(name, actual, expected) {
-  try {
-    assert.deepEqual(actual, expected);
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } catch (error) {
-    console.error(`FAIL ${name}`);
-    console.error(`  expected ${JSON.stringify(expected)}`);
-    console.error(`  actual   ${JSON.stringify(actual)}`);
-    process.exitCode = 1;
-  }
-}
 
 const base = {
   loading: false,
@@ -36,7 +22,7 @@ const base = {
 
 // The bug: a local page finishes between polls. The first poll sees the final
 // URL and no loading flag; that is a completed load, not "not started yet".
-check("fast local load is done on the first poll", loadWatchStep({
+checkEqual("fast local load is done on the first poll", loadWatchStep({
   ...base,
   currentUrl: base.requestedUrl,
 }), {
@@ -46,7 +32,7 @@ check("fast local load is done on the first poll", loadWatchStep({
 });
 
 // A server that has not sent a byte yet must still show the skeleton.
-check(
+checkEqual(
   "slow request before first byte stays live",
   loadWatchStep({ ...base, elapsedMs: 500 }),
   { live: true, seenLoading: false, fastDone: false },
@@ -54,7 +40,7 @@ check(
 
 // Requesting a new URL while the old page is still in the browser is also a
 // pre-commit state: do not hide the skeleton just because a document exists.
-check(
+checkEqual(
   "previous page is not the requested page",
   loadWatchStep({
     ...base,
@@ -65,7 +51,7 @@ check(
 );
 
 // A load that was actually observed keeps the normal two-quiet-polls grace.
-check(
+checkEqual(
   "observed load is live",
   loadWatchStep({
     ...base,
@@ -76,7 +62,7 @@ check(
   }),
   { live: true, seenLoading: true, fastDone: false },
 );
-check(
+checkEqual(
   "observed load clears after it reaches the target",
   loadWatchStep({
     ...base,
@@ -89,7 +75,7 @@ check(
 );
 
 // Redirects land on a different URL: that is still a committed document.
-check(
+checkEqual(
   "redirect is a committed load",
   loadWatchStep({
     ...base,
@@ -101,7 +87,7 @@ check(
 );
 
 // A request that never starts still has the bounded 15 s fallback.
-check(
+checkEqual(
   "never-started request hits the bounded fallback",
   loadWatchStep({
     ...base,
@@ -113,7 +99,7 @@ check(
 );
 
 // Reloading the same URL: the document is already there; show it.
-check(
+checkEqual(
   "same-URL reload can clear immediately",
   loadWatchStep({
     ...base,

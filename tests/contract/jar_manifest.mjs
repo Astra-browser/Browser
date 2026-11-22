@@ -22,9 +22,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { ROOT, HOST, check, passed, failed } from "./lib/harness.mjs";
 
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const HOST = path.join(ROOT, "overlay", "astra", "host");
 const JAR = path.join(ROOT, "overlay", "astra", "jar.mn");
 
 const BEGIN =
@@ -35,19 +34,6 @@ const END = "  # END HOST API";
 const EXCLUDED = new Map([
   ["BootSidecar.sys.mjs", "compatibility re-export; HOST_API_v1.md §Modules"],
 ]);
-
-let passed = 0;
-let failed = 0;
-function check(name, cond, detail) {
-  if (cond) {
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } else {
-    failed += 1;
-    console.error(`FAIL ${name}`);
-    if (detail) console.error(`  ${detail}`);
-  }
-}
 
 const source = await readFile(JAR, "utf8");
 const lines = source.split("\n");
