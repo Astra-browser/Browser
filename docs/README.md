@@ -8,6 +8,7 @@ Start here before changing code:
 | Task state + remaining wiring backlog | [`astra/STATE.md`](astra/STATE.md) |
 | Decisions / rationale | [`astra/DECISIONS.md`](astra/DECISIONS.md) |
 | Run + rebuild the dev build | [`astra/DEV_SETUP.md`](astra/DEV_SETUP.md) |
+| One-command setup + reproducibility | [`astra/SETUP.md`](astra/SETUP.md) |
 | Verification and performance gates | [`astra/TESTING.md`](astra/TESTING.md) |
 | Known limits and deferred work | [`astra/KNOWN_LIMITS.md`](astra/KNOWN_LIMITS.md) |
 

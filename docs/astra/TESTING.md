@@ -37,6 +37,7 @@ repaired, never to make the run look complete.
 
 | Layer | What it proves |
 |---|---|
+| `./setup.sh --dry-run` + `tests/contract/setup_model.mjs` | The public one-command install path still parses and plans on Linux/Windows (CI `setup-dry-run`) |
 | `tests/contract/*.mjs` | Wire shapes, fences, state machines (Node, no browser) |
 | `node --test ui/shell/src` | Shell pure logic (slot state, stage rect, host model) |
 | `bun run --filter @astra/frame check` | Svelte/TS types, lint, 1200+ unit/component tests |
