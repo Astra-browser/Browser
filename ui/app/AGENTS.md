@@ -1,17 +1,12 @@
 # Frontend implementation rules
 
-> **⚠️ Current phase: UI + WIRING (D-38).** Build the interface and the
-> route → host module → engine path it needs. A surface is done when it works
-> in the packaged dev build, not when it renders. Do not leave Firefox's own
-> menu, dialog or window answering an action; Astra's UI is the only UI. Empty,
-> mock or `unknown_command` states are bugs when a real backend exists. Keep
-> private/multi-window state isolated, and release every listener, observer and
-> reference. Read `docs/astra/SCOPE.md` first and verify with the live Marionette
-> probe.
+Phase rules, scope and verification live in the root `AGENTS.md` and
+`docs/astra/SCOPE.md`; read those first. This file covers how the frontend code is
+shaped.
 
-Read `docs/astra/SCOPE.md` (scope contract) and this app's `README.md` for the
-module layout. The Rust/host side owns durable state and **is wired from this
-phase on**: a UI control that needs it must have a real caller, not a fixture.
+Read this app's `README.md` for the module layout. The Rust/host side owns durable
+state and **is wired from this phase on**: a UI control that needs it must have a
+real caller, not a fixture.
 
 - Features expose a small `index.ts`. Put rendered UI and component composition in
   `components/`, supporting behavior/state/selectors in `lib/`, and verification in

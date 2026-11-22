@@ -82,6 +82,13 @@ ui_inspiration/
 !/release/README-alpha.md
 /.opencode
 /site/*
+
+# Agent skills installed with the `skills` CLI (local tooling, not repo content).
+# `.agents/skills` is a project-compat source OpenCode discovers, so the install
+# works without a link; the lockfile pins that local install only.
+/.agents/
+/skills-lock.json
+
 # A tool run from the repo root (vite/vitest) drops its cache here; the real
 # dependency trees live under ui/.
 /node_modules
