@@ -178,7 +178,22 @@ function functionBodies(source, name) {
   while (at !== -1) {
     const before = at === 0 ? "" : source[at - 1];
     if (!/[\w$]/u.test(before)) {
-      const open = source.indexOf("{", at + needle.length);
+      // Find the body brace after the parameter list; a default parameter
+      // (`data = {}`) has braces of its own before the body.
+      const openParen = at + needle.length - 1;
+      let parens = 0;
+      let open = -1;
+      for (let index = openParen; index < source.length; index += 1) {
+        const char = source[index];
+        if (char === "(") parens += 1;
+        else if (char === ")") {
+          parens -= 1;
+          if (parens === 0) {
+            open = source.indexOf("{", index);
+            break;
+          }
+        }
+      }
       if (open !== -1) {
         let depth = 0;
         let close = -1;
