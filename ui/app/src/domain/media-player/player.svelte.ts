@@ -2,13 +2,11 @@ import type { MediaPlayerAction, MediaPlayerView } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { settle } from "$domain/operations";
+import { createSlice } from "$shared/lib/lifecycle";
 
 type Held = { view: MediaPlayerView; at: number };
 
 let held = $state.raw<Held | null>(null);
-let lifecycle = 0;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 
 /** The sidebar's player, or null while there is none. */
 export const view = () => held?.view ?? null;
@@ -26,35 +24,20 @@ export function position(now: number): number {
   return view.duration == null ? from + ran : Math.min(view.duration, from + ran);
 }
 
-export function init(): Promise<void> {
-  if (initializing) return initializing;
-  const generation = ++lifecycle;
-  const task = events.mediaPlayerChanged
-    .listen((event) => {
-      if (generation === lifecycle)
-        held = event.payload ? { view: event.payload, at: performance.now() } : null;
-    })
-    .then((stop) => {
-      if (generation === lifecycle) unlisten = stop;
-      else stop();
+export const slice = createSlice({
+  register({ isCurrent }) {
+    return events.mediaPlayerChanged.listen((event) => {
+      if (!isCurrent()) return;
+      held = event.payload ? { view: event.payload, at: performance.now() } : null;
     });
-  initializing = task;
-  void task
-    .finally(() => {
-      // A failed listen must not poison every later init.
-      if (initializing === task) initializing = null;
-    })
-    .catch(() => {});
-  return task;
-}
+  },
+  reset() {
+    held = null;
+  },
+});
 
-export function dispose() {
-  lifecycle += 1;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  held = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 function act(action: MediaPlayerAction) {
   const id = held?.view.tab_id;

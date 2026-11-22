@@ -8,6 +8,7 @@ import * as m from "$shared/i18n/messages";
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { operations } from "$domain/operations";
+import { createSlice } from "$shared/lib/lifecycle";
 import {
   PagePermissionPromptProjectionModel,
   initialPagePermissionPrompt,
@@ -20,10 +21,6 @@ const model = new PagePermissionPromptProjectionModel();
 let state = $state.raw<PagePermissionPromptView>(model.view);
 let responding = $state(false);
 let notice = $state<string | null>(null);
-let lifecycle = 0;
-let initialized = false;
-let initializing: Promise<void> | null = null;
-let unlisten: (() => void) | null = null;
 
 export const prompt = () => state.prompt;
 export const busy = () => responding || state.prompt?.processing === true;
@@ -71,54 +68,30 @@ function dispositionMessage(disposition: OperationDisposition): string | null {
   }
 }
 
-async function initialize(generation: number) {
-  const stop = await events.pagePermissionPromptChanged.listen((event) => {
-    if (generation !== lifecycle || !model.apply(event.payload)) return;
-    state = model.view;
+export const slice = createSlice({
+  register({ isCurrent }) {
+    return events.pagePermissionPromptChanged.listen((event) => {
+      if (!isCurrent() || !model.apply(event.payload)) return;
+      state = model.view;
+      responding = false;
+      notice = null;
+    });
+  },
+  reset() {
+    if (hostRetry !== null) {
+      clearTimeout(hostRetry);
+      hostRetry = null;
+    }
+    sidebarHosts = 0;
+    reportedHost = null;
+    state = initialPagePermissionPrompt();
     responding = false;
     notice = null;
-  });
-  if (generation !== lifecycle) {
-    stop();
-    return;
-  }
-  unlisten = stop;
-  initialized = true;
-}
+  },
+});
 
-export function init(): Promise<void> {
-  if (initialized) return Promise.resolve();
-  if (initializing !== null) return initializing;
-  const generation = ++lifecycle;
-  const task = initialize(generation);
-  initializing = task;
-  void task.then(
-    () => {
-      if (initializing === task) initializing = null;
-    },
-    () => {
-      if (initializing === task) initializing = null;
-    },
-  );
-  return task;
-}
-
-export function dispose() {
-  lifecycle += 1;
-  if (hostRetry !== null) {
-    clearTimeout(hostRetry);
-    hostRetry = null;
-  }
-  sidebarHosts = 0;
-  reportedHost = null;
-  initialized = false;
-  initializing = null;
-  unlisten?.();
-  unlisten = null;
-  state = initialPagePermissionPrompt();
-  responding = false;
-  notice = null;
-}
+export const init = () => slice.init();
+export const dispose = () => slice.dispose();
 
 async function settle(
   retained: PagePermissionPromptEntryView,
@@ -130,7 +103,7 @@ async function settle(
   // generation, not the prompt identity, as the liveness test; the failure
   // notice must still reach a prompt that is on screen (e.g. a store refusal
   // that arrives before the close event).
-  const generation = lifecycle;
+  const generation = slice.current();
   responding = true;
   notice = null;
   try {
@@ -150,7 +123,7 @@ async function settle(
       IPC_TIMEOUT_MS,
     );
     if (!admission.accepted || admission.operation_id === null) {
-      if (generation === lifecycle) {
+      if (slice.isCurrent(generation)) {
         notice = m.page_permission_unavailable();
         responding = false;
       }
@@ -160,7 +133,7 @@ async function settle(
       admission.operation_id,
       SETTLEMENT_TIMEOUT_MS,
     );
-    if (generation !== lifecycle) return;
+    if (!slice.isCurrent(generation)) return;
     if (resolution.state === "processed") {
       notice = dispositionMessage(resolution.disposition);
       responding = false;
@@ -172,7 +145,7 @@ async function settle(
       responding = false;
     }
   } catch {
-    if (generation === lifecycle) {
+    if (slice.isCurrent(generation)) {
       notice = m.page_permission_service_unavailable();
       responding = false;
     }
