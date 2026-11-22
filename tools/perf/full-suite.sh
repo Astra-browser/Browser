@@ -88,7 +88,7 @@ CONTRACTS=(
   passkeys_model permissions_prompt privacy_host profiles_model protected_content
   resources_model search_model settings_native shell_assembly sidecar_spike
   site_permissions_host sleep_model slots_model spaces_model spaces_profiles_model
-  stage_rect system_model tab_history tab_lifecycle tabs_admission tabs_settings
+  stage_rect surfaces_registry system_model tab_history tab_lifecycle tabs_admission tabs_settings
   telemetry_blocklist time_model webext_view window_scope wire_coverage wire_manifest
   work_model zoom_home_material
 )
