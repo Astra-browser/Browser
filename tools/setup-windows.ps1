@@ -39,6 +39,18 @@ function Fail([string]$text) {
 }
 function Have([string]$name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 
+function Find-Makensis {
+    $cmd = Get-Command makensis.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    foreach ($candidate in @(
+        (Join-Path $env:ProgramFiles 'NSIS\makensis.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe')
+    )) {
+        if (Test-Path $candidate) { return $candidate }
+    }
+    return $null
+}
+
 function Add-UserPaths {
     $paths = @(
         (Join-Path $env:USERPROFILE '.cargo\bin'),
@@ -93,7 +105,10 @@ function Require-Tools {
         if (-not (Test-Path $vswhere)) { $missing += 'Visual Studio Build Tools' }
     }
     if (-not $SkipInstaller) {
-        if (-not (Install-Winget 'NSIS.NSIS' 'makensis')) { $missing += 'makensis' }
+        if (-not (Find-Makensis)) {
+            if (-not (Install-Winget 'NSIS.NSIS' 'makensis.exe')) { $missing += 'makensis' }
+        }
+        if (-not (Find-Makensis)) { $missing += 'makensis' }
     }
     if ($missing.Count -gt 0) {
         Write-Log ("missing prerequisites: " + ($missing -join ', '))
