@@ -228,8 +228,8 @@ if (process.argv.includes("--report")) {
       "Callers are best-effort references in ui/app/src (non-test). A caller " +
       "in a module nothing imports still appears; reachability is not proven here.",
   verification:
-      "No live probe: slice 1 changed no surface, host module or engine path. " +
-      "Contract and unit gates only; see docs/astra/STATE.md P7-T01.",
+      "This report is generated from the manifest; the live evidence for the " +
+      "slice is recorded in docs/astra/STATE.md (P7-T01).",
     counts: {
       total: entries.length,
       routed: routed.length,
