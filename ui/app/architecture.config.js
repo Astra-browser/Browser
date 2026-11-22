@@ -129,6 +129,15 @@ export const architecture = {
             from: { element: { type: "features", captured: { module: "library" } } },
             allow: { to: { element: { type: "features", captured: { module: "downloads" } } } },
           },
+          // The surface registry (P7-T03) is the one table that says which
+          // page mounts where. It is data with lazy loaders, so it names each
+          // owning feature's public loader and the Work page's app component;
+          // no view is imported eagerly, and the registry is the only domain
+          // module allowed to name page implementations.
+          {
+            from: { element: { type: "domain", captured: { module: "surface" } } },
+            allow: { to: element(["app", "features"]) },
+          },
           {
             from: { file: { categories: "entry" } },
             allow: { to: element(["app", "shared", "styles"]) },

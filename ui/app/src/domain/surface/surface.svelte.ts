@@ -4,18 +4,9 @@ import { flags } from "$shared/flags";
 import { commands } from "$shared/ipc/bindings";
 import { settle } from "$domain/operations";
 import { events } from "$shared/ipc/native-events";
+import { isBrowserPage, type BrowserPage } from "./surfaces";
 
-export type BrowserPage =
-  | "settings"
-  | "extensions"
-  | "history"
-  | "downloads"
-  | "gallery"
-  | "work"
-  | "tasks"
-  | "notes"
-  | "time"
-  | "source";
+export type { BrowserPage } from "./surfaces";
 /** The pages that stand in the tab list as their own tab. */
 export type PageTab = "settings" | "extensions";
 let page = $state<BrowserPage | null>(null);
@@ -76,20 +67,7 @@ export const slice = createSlice({
         // this build does not ship.
         if (destination === "work" && !flags.work) return;
         const confirmed: BrowserPage | null | undefined =
-          destination === "return"
-            ? null
-            : destination === "work" ||
-                destination === "settings" ||
-                destination === "extensions" ||
-                destination === "history" ||
-                destination === "downloads" ||
-                destination === "gallery" ||
-                destination === "tasks" ||
-                destination === "notes" ||
-                destination === "time" ||
-                destination === "source"
-              ? destination
-              : undefined;
+          destination === "return" ? null : isBrowserPage(destination) ? destination : undefined;
         if (confirmed !== undefined) {
           navigationEpoch++;
           if (confirmed === null || confirmed === "work") underneath = null;

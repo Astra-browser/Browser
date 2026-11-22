@@ -21,7 +21,8 @@ disagree, the plan wins.
 ## Commit rules
 
 - One logical change per commit; commit every change (no batching).
-- Prefixes: `feat:`, `fix:`, `patch:`, `test:`, `ci:`, `docs:`, `chore:`.
+- Prefixes: `feat:`, `fix:`, `refactor:`, `patch:`, `test:`, `ci:`, `docs:`,
+  `chore:`. Scoped forms are allowed (`fix(tabs):`).
 - Upstream patches carry the header in plan §6.3 and stay ≤ footprint budget.
 
 ## Brand and license

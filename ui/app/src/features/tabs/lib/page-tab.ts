@@ -1,6 +1,12 @@
 import type { TabView } from "$shared/ipc/bindings";
 import * as m from "$shared/i18n/messages";
-import type { PageTab } from "$domain/surface";
+import { pageSurface, type PageTab } from "$domain/surface";
+
+/** The name a page tab wears comes from the one surface registry. */
+function pageTitle(kind: PageTab): string {
+  const messages = m as unknown as Record<string, () => string>;
+  return messages[pageSurface(kind).labelKey]?.() ?? kind;
+}
 
 /** The synthetic tab ids page tabs carry; native tabs never use this shape. */
 const PAGE_TAB_PREFIX = "astra-page:";
@@ -18,7 +24,7 @@ export function pageTabView(kind: PageTab): TabView {
   return {
     id: pageTabId(kind),
     projection_revision: "0000000000000000",
-    title: kind === "settings" ? m.settings_title() : m.webext_page_title(),
+    title: pageTitle(kind),
     url: null,
     content: kind,
     loading: false,
