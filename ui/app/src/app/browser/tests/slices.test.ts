@@ -46,6 +46,9 @@ vi.mock("$shared/ipc/native-events", () => ({
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
+  // The model file only: the public barrel also loads `blocker.svelte`, which
+  // imports the bindings module this factory is still building, so importing
+  // the barrel here deadlocks the mock.
   const { initialBlockerStatus } = await import("$domain/blocker/blocker-model");
   return mockBindings({
     uiInfo: async () => ({ material: "none", materials: [] }),
