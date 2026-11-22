@@ -7,37 +7,25 @@
     WebExtensionInstallPrompt,
     WebExtensionReview,
   } from "$features/webext";
-  import { PeekLayer, peek } from "$features/peek";
+  import { PeekLayer } from "$features/peek";
   import { webext } from "$domain/webext";
   import { PagePermissionPrompt } from "$features/permissions";
   import { PageDialogPrompt, pageDialogs } from "$features/dialogs";
   import { PasskeyPrompt } from "$features/passkeys";
   import { passkeys } from "$domain/passkeys";
-  import { updateNotices } from "$features/updates";
   import * as sidebar from "$session/sidebar-mode.svelte";
   import { commands } from "$shared/ipc/bindings";
   import { IS_MAC, IS_WINDOWS } from "$shared/platform";
-  import { blocker } from "$domain/blocker";
   import { extensions } from "$domain/extensions";
-  import { favicons } from "$domain/favicons";
-  import { layout } from "$domain/layout";
-  import { operations } from "$domain/operations";
   import { pagePermissions } from "$domain/permissions";
-  import { runtime } from "$domain/runtime";
-  import { mediaPlayer } from "$domain/media-player";
-  import { updates } from "$domain/updates";
-  import { focus } from "$domain/time";
   import { tabs } from "$domain/tabs";
   import { theme } from "$domain/appearance";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { surface as browserPage } from "$domain/surface";
   import * as motion from "$session/motion.svelte";
   import * as notices from "$session/notice.svelte";
-  import * as tools from "$session/tools.svelte";
   import { preferences } from "$domain/preferences";
   import { keymap } from "$domain/keymap";
-  import { browserImport, nativeImportAdapter } from "$domain/browser-import";
-  import { findInPage } from "$features/address";
   import { acceleratorFrom, sameAccelerator } from "$shared/lib/accelerator";
   import { applyLanguage } from "$shared/lib/locale.svelte";
   import { applySpaceTheme, spaceThemeValues } from "$features/tabs";
@@ -45,6 +33,7 @@
   import Shell from "./Shell.svelte";
   import { LauncherOverlay } from "$features/launcher";
   import { WindowControlsOverlay } from "$shared/ui/WindowControls";
+  import { createBrowserLifecycle } from "./lifecycle";
 
   // Follows the stored preference and nothing else. Adopting reads the
   // sidebar's own shape; tracked, that read made every toggle re-adopt the
@@ -222,63 +211,21 @@
   onMount(() => {
     let disposed = false;
 
-    // Each async initializer performs its synchronous setup before its first
-    // await. In particular, tabs installs every scoped projection listener
-    // before bootstrap can ask native code for a snapshot.
-    const themeReady = theme.init();
-
-    // Runtime status is emitted by the same actor-ordered bootstrap that
-    // supplies tabs, so its listener must exist before tabs starts bootstrap.
-    const toolsReady = tools.init();
-    const browserPageReady = browserPage.init();
-    const preferencesReady = preferences.init();
-    const runtimeReady = runtime.init();
-    // Native offers the player with the same bootstrap that supplies tabs.
-    void mediaPlayer.init();
-    void peek.init();
-    void focus.init();
-    void updates.init();
-    void updateNotices.init();
-    const extensionsReady = extensions.init();
-    void webext.refresh();
-    const stopAccess = webext.listenForAccess();
-    const stopPrompt = webext.listenForPrompt();
-    const stopStoreClicks = webext.listenForStoreClicks();
-    const stopDrops = webext.listenForDrops(() => browserPage.currentPage() !== "work");
-    const pagePermissionsReady = pagePermissions.init();
-    const pageDialogsReady = pageDialogs.init();
-
-    // Rasters are emitted immediately before the projection that references
-    // them, so this listener must exist before tabs asks native to bootstrap.
-    const faviconsReady = favicons.init();
-    const tabsReady = tabs.init();
-    const sidebarReady = sidebar.init();
-    const uiEventsReady = ui.init();
-    void keymap.init();
-    // An embedder (a test) may have provided its own port already.
-    const ownsImport = !browserImport.available();
-    if (ownsImport) browserImport.provide(nativeImportAdapter());
-    void operations.init();
-    void blocker.init();
-    if (!IS_MAC) void layout.init();
-    document.addEventListener("keydown", handleKeydown);
+    // One ordered table owns startup and teardown. Array order is startup;
+    // each entry's teardown rank is the order the two hand-written lists used
+    // to spell out separately. Conditions are evaluated once, for both lists.
+    const entries = createBrowserLifecycle({ handleKeydown });
+    const active = entries.filter((entry) => entry.when === undefined || entry.when());
+    const started: Record<string, unknown> = {};
+    for (const entry of active) {
+      if (entry.start !== undefined) started[entry.id] = entry.start();
+    }
 
     void (async () => {
       try {
-        await Promise.all([
-          toolsReady,
-          browserPageReady,
-          preferencesReady,
-          themeReady,
-          runtimeReady,
-          extensionsReady,
-          pagePermissionsReady,
-          pageDialogsReady,
-          faviconsReady,
-          tabsReady,
-          uiEventsReady,
-          sidebarReady,
-        ]);
+        await Promise.all(
+          active.filter((entry) => entry.awaitStartup === true).map((entry) => started[entry.id]),
+        );
         if (disposed) return;
         await applyLanguage(preferences.value("ui.language"));
         if (disposed) return;
@@ -300,35 +247,13 @@
 
     return () => {
       disposed = true;
-      theme.dispose();
-      browserPage.dispose();
-      tools.dispose();
-      motion.dispose();
-      preferences.dispose();
-      operations.dispose();
-      blocker.dispose();
-      runtime.dispose();
-      mediaPlayer.dispose();
-      peek.dispose();
-      updates.dispose();
-      updateNotices.dispose();
-      focus.dispose();
-      extensions.dispose();
-      webext.dispose();
-      pagePermissions.dispose();
-      pageDialogs.dispose();
-      void stopAccess.then((stop) => stop());
-      void stopPrompt.then((stop) => stop());
-      void stopStoreClicks.then((stop) => stop());
-      void stopDrops.then((stop) => stop());
-      favicons.dispose();
-      tabs.dispose();
-      ui.dispose();
-      keymap.dispose();
-      findInPage.dispose();
-      if (ownsImport) browserImport.provide(null);
-      if (!IS_MAC) layout.dispose();
-      document.removeEventListener("keydown", handleKeydown);
+      for (const entry of [...active].sort((left, right) => left.teardown - right.teardown)) {
+        try {
+          void entry.stop?.(started[entry.id]);
+        } catch {
+          // Keep releasing the rest of the window.
+        }
+      }
     };
   });
 </script>
