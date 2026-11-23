@@ -2703,3 +2703,7 @@ accepted }`) and no other command dialect changed. What was added (SCOPE rule
 `tests/contract/preference_event.mjs` pins all of it. No gap resync is needed:
 the event carries the complete key and value and the writer fails closed when
 no matching event arrives.
+
+**E-05 finding (2026-11-23): `forge config` skips the WASI sysroot, and `MOZ_OBJDIR` must use forward slashes.** Two configure failures that only the `forge` path shows. (1) `--objdir D:\astra-build\obj-160-windows` is written verbatim into `out/mozconfig.windows`, and mozbuild mangles the backslashes into `D:/astra-buildobject-160-windows`, silently building into a stray directory; pass `D:/astra-build/obj-160-windows`. (2) `tools/setup-windows.ps1` owns a `Find-WasiSysroot` routine that appends `ac_add_options --with-wasi-sysroot=`, but `forge config` renders `config/mozconfig.windows` itself and never runs it, so mach stops at `Cannot find wasi headers`. The sysroot is `D:\astra-build\wasi-34\wasi-sysroot-34.0`. Anyone following `UPSTREAM.md` instead of `setup.sh` hits both.
+
+**E-05 finding: the blocker crate needs a completed vendor.** `mach build` compiles for ~2 minutes and then stops at `error: no matching package named adblock found` (`config/.deps/cbindgen-metadata.json.stub`). `ASTRA-0004` declares `adblock = { version = "=0.12.1", ... }`, `Cargo.lock` carries it, and `third_party/rust/adblock` is absent: `forge import` reported `mach vendor rust` **incomplete**. Next step is a real vendor pass (`./mach vendor rust --verbose` in `engine/`) before the build means anything.
