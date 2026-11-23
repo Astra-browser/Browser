@@ -13,6 +13,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/state-check.py
+  setup-dry-run:
+    # The public install path stays one command. A dry run checks the script's
+    # plan, options and platform bridge without installing or building.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: ./setup.sh --dry-run
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/setup-windows.ps1 -DryRun
   docs-check:
     # Docs stay reachable: every doc is indexed in docs/README.md or cited by
     # name in the repo (tools/docs-check.mjs). Sediment fails the build.

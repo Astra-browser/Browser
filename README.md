@@ -127,19 +127,22 @@ Astra's case is simple: if you want Gecko with a modern, coherent interface and
 privacy built into the walls instead of bolted onto them — and you run Linux —
 there is nothing else shaped like it.
 
-## Supported Linux distros
+## Supported platforms
 
-`./setup.sh` detects your distro and installs everything itself. x86_64 only.
+`./setup.sh` detects the machine and installs everything itself. Linux x86_64
+first; Windows 11 x64 is built through the same command from Git Bash.
 
-| Family | Distros | Package manager |
+| Platform | Status | Package manager / bridge |
 |---|---|---|
 | Debian | Ubuntu, Debian, Linux Mint, Pop!_OS | `apt-get` |
 | Fedora | Fedora, RHEL, CentOS, Rocky, AlmaLinux | `dnf` |
 | SUSE | openSUSE Leap / Tumbleweed | `zypper` |
 | Arch | Arch Linux (+ derivatives reporting `ID_LIKE=arch`) | `pacman` |
+| Windows 11 x64 | supported | `winget` + `tools/setup-windows.ps1` |
 
-Anything else stops with `unsupported distro` — open an issue with your
-`/etc/os-release` and it can usually be added in minutes.
+Anything else stops with `unsupported host` / `unsupported distro` — open an
+issue with your `/etc/os-release` (or Windows build) and it can usually be
+added in minutes.
 
 ## Build it yourself
 
@@ -147,12 +150,15 @@ Anything else stops with `unsupported distro` — open an issue with your
 
 | Need | Why |
 |---|---|
-| 16 GB RAM minimum, 31 GB recommended | the gkrust LTO link peaks near 10 GB |
+| Linux x86_64 or Windows 11 x64 | the two supported build hosts |
+| 16 GB RAM minimum, 31 GB recommended | the engine link peaks near 10 GB |
 | ~30 GB free disk | engine source ~6 GB, objdir ~16 GB, Rust targets/caches ~8 GB |
-| `sudo` access | one password prompt up front for distro packages |
+| `sudo` on Linux | one password prompt up front for distro packages |
 
-Everything else — Rust toolchain, Bun, system libraries — is installed by the
-setup script.
+Everything else — Git, Rust, Bun, Node, Python, system libraries, Visual Studio
+Build Tools and NSIS on Windows — is checked and installed by the setup script
+where the platform package manager can provide it. MozillaBuild must already be
+present at `C:\mozilla-build` on Windows.
 
 ### 1. Clone
 
@@ -167,25 +173,45 @@ cd astra
 ./setup.sh
 ```
 
-That's it. The script asks for your `sudo` password once, then:
+That's it — the same command on Linux and Windows (Windows: run it from Git
+Bash). On Linux it asks for your `sudo` password once. On Windows it calls
+`tools/setup-windows.ps1`, which checks/installs the prerequisites it can and
+then builds and packages the portable Windows release.
 
-1. installs OS packages for your distro (compilers, GTK3, codecs, …),
+The script:
+
+1. installs OS packages / Windows prerequisites it can provide,
 2. installs Rust (rustup) and Bun if missing,
 3. builds `astra-forge` (the repo's zero-dependency build tool),
-4. downloads and GPG-verifies Firefox ESR 153.6, extracts it to `engine/`,
-5. renders `out/mozconfig.linux` and runs `mach bootstrap`,
+4. downloads and GPG-verifies Firefox ESR 153.6, extracts it to `engine/`
+   (or links an existing tree, see below),
+5. renders the platform mozconfig and runs `mach bootstrap` on Linux,
 6. installs UI dependencies and builds the chrome bundle,
-7. applies the overlay + the `patches/` series to `engine/`,
-8. builds the engine and the `astra-core` sidecar, then packages.
+7. applies the overlay + the `patches/` series,
+8. builds the engine and the `astra-core` sidecar, then packages the app.
 
 The first full build takes roughly **70 minutes** on 16 threads. Useful variants:
 
 ```sh
 JOBS=8 ./setup.sh       # engine parallelism (default 2: full-parallel link OOM-kills 31 GB machines)
+./setup.sh --dry-run    # print the plan and prerequisite status, build nothing
 ./setup.sh --skip-ui    # reuse the existing chrome bundle
 ./setup.sh --skip-build # stop after overlay (fetch + config + UI)
+./setup.sh --skip-package
 ./setup.sh --check      # no sudo: verify this machine runs the packaged build
 ```
+
+**Reusing an existing engine checkout or objdir (saves ~22 GB):**
+
+```sh
+./setup.sh --reuse-engine /path/to/firefox-esr-source --objdir /path/to/objdir
+# Windows, from Git Bash:
+./setup.sh --reuse-engine D:/astra/engine --objdir D:/astra-build/obj-astra-windows
+```
+
+`--reuse-engine` creates the `engine/` link instead of downloading ESR; the
+source tree is still overlaid from this checkout, so it must be the matching
+ESR source. `--objdir` keeps the large build directory wherever you have space.
 
 > No-sudo environment with deps preinstalled? Use `tools/bootstrap.sh` instead —
 > same pipeline minus the package installs (see `docs/astra/DEV_SETUP.md`).
@@ -193,13 +219,19 @@ JOBS=8 ./setup.sh       # engine parallelism (default 2: full-parallel link OOM-
 ### 3. Run it
 
 ```sh
-./tools/run-dev.sh            # reuse out/dev-profile (settings persist)
-./tools/run-dev.sh --fresh    # start from an empty profile
+./tools/run-dev.sh            # Linux: reuse out/dev-profile (settings persist)
+./tools/run-dev.sh --fresh    # Linux: start from an empty profile
+.\tools\run-dev.ps1           # Windows PowerShell: same dev profile
 ```
 
-The result is also packaged as `out/release/Astra-<version>-linux-x86_64.tar.xz`
-(+ `.sha256`). Extract and run `./install.sh` (per-user) or
-`sudo ./install.sh --system`.
+The result is also packaged:
+- Linux: `out/release/Astra-<version>-linux-x86_64.tar.xz` (+ `.sha256`)
+- Windows: `out/release/Astra-<version>-windows-x86_64.zip` (+ `.sha256`) and
+  `Astra-<version>-windows-x86_64-setup.exe` (per-user installer)
+
+On Linux, extract and run `./install.sh` (per-user) or
+`sudo ./install.sh --system`. On Windows, run the installer or unzip and launch
+`astra.cmd` / `astra.exe`.
 
 ### 4. Verify your build (optional)
 

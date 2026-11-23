@@ -1,10 +1,32 @@
-# Dev setup — Linux (P0-T01, first facts 2026-11-01)
+# Dev setup — Linux and Windows (P0-T01, P7-T07)
 
-> Fresh clone? Run `./setup.sh` from the repo root — it asks for the sudo
-> password once, installs system packages for your distro (Ubuntu/Debian,
-> Fedora/RHEL, openSUSE, Arch), fetches upstream, builds the UI + engine
-> and packages. `./setup.sh --check` verifies a packaged build runs.
-> `tools/bootstrap.sh` remains for no-sudo environments (deps preinstalled).
+> Fresh clone? Run `./setup.sh` from the repo root — the same command on Linux
+> and Windows (Windows: Git Bash). It checks/installs prerequisites, fetches or
+> links the pinned engine, builds the UI + engine, packages the app and verifies
+> the package. `./setup.sh --dry-run` prints the plan without building;
+> `./setup.sh --check` verifies an existing package.
+> On Windows the script bridges to `tools/setup-windows.ps1` (winget + VS Build
+> Tools + NSIS, then `forge --os windows` and `package-windows.ps1`).
+> `tools/bootstrap.sh` remains for no-sudo Linux environments with deps already
+> installed.
+>
+> Space-saving reuse (no second ESR download/objdir):
+> `./setup.sh --reuse-engine /path/to/esr-source --objdir /path/to/objdir`.
+> The `engine/` link is re-overlaid from this checkout, so keep it on the same
+> ESR pin.
+
+## One-command reproducibility
+
+The supported install path is `./setup.sh` on both build hosts. It is
+idempotent, logs each run to `out/setup/setup-<timestamp>.log`, and stops with
+the failing step named. `--dry-run` is the fast gate used by CI; it checks the
+platform, options and prerequisite status without sudo or a build.
+
+Windows prerequisites are installed through `winget` where a package exists
+(Git, Python, Node, Rust, NSIS); Visual Studio Build Tools are installed with
+the VCTools workload if `vswhere.exe` is absent. MozillaBuild at
+`C:\mozilla-build` is checked but not bundled. The package step produces the
+portable zip and the per-user `setup.exe`.
 
 ## Machine
 
