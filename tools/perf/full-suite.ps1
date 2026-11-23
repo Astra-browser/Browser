@@ -99,6 +99,7 @@ $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $Root
 
 $Stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+if (-not $Out -and $env:ASTRA_SUITE_OUT) { $Out = $env:ASTRA_SUITE_OUT }
 if (-not $Out) { $Out = Join-Path $Root "out/full-suite-$Stamp" }
 if (-not [System.IO.Path]::IsPathRooted($Out)) { $Out = Join-Path $Root $Out }
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
@@ -173,7 +174,9 @@ if ($Build) {
     Push-Location (Join-Path $Root "forge/astra-forge")
     & cargo run -q -- overlay
     $rc = $LASTEXITCODE
-    if ($rc -eq 0) { & cargo run -q -- build --os windows --faster; $rc = $LASTEXITCODE }
+    # Never without --jobs 2: the libxul link peaks near 10 GB and this machine
+    # has 31 GB, so the default job count OOMs the desktop (BUILD_TIMES.md).
+    if ($rc -eq 0) { & cargo run -q -- build --os windows --faster --jobs 2; $rc = $LASTEXITCODE }
     Pop-Location
     if ($rc -ne 0) { Write-Host "FAIL engine build"; exit 1 }
 } elseif ($SkipBuild) {
