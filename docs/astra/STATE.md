@@ -31,6 +31,17 @@ Gate defects found while planning, fixed on this branch: `tools/perf/full-suite.
 -Build` runs `forge build` with no `--jobs 2`, against the standing OOM rule, and
 `TESTING.md` documents `ASTRA_SUITE_OUT` which the runner never reads.
 
+**E-03 finding (2026-11-23): `forge fetch` cannot extract over an existing tree
+on Windows.** It runs `tar --strip-components=1 -xJf <tarball> -C engine/`, and
+bsdtar refuses to overwrite a file that is already there:
+`security/nss/lib/freebl/aes-x86.c: Refusing to overwrite archive: Input/output
+error`, exit 1, half-extracted. The documented recipe in `UPSTREAM.md` assumes
+that extract-over works. Repair is extract-into-empty-dir then mirror
+(`robocopy /MIR /XJ /XD .git obj-astra-windows`) plus a written
+`.forge-fetch-ok` marker; that also removes the 153-era files the new tarball no
+longer ships, which extract-over never did. `config/moz.configure` being absent
+is the cheap completeness check (`version.txt` alone is written early and lies).
+
 ## Integration: the Phase 7 stack is on main (2026-11-22, owner-directed)
 
 The seven-lane refactor stack was verified lane by lane and merged in order. No
