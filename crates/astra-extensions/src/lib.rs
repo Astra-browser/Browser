@@ -1,4 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
+﻿/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
@@ -6,10 +6,10 @@
 //!
 //! Two layers live here:
 //!
-//! * [`gallery`] / [`manager`] — the curated AMO gallery and the pure
+//! * [`gallery`] / [`manager`] â€” the curated AMO gallery and the pure
 //!   install-state model (P4-T04). Unchanged.
 //! * [`crx`], [`package`], [`manifest`], [`compat`], [`security`] and
-//!   [`pipeline`] — the Chrome package intake. The engine (Gecko 153) owns
+//!   [`pipeline`] â€” the Chrome package intake. The engine (the pinned Gecko build) owns
 //!   installation, permission enforcement, process isolation, background
 //!   execution and content-script injection through `AddonManager`. This
 //!   crate owns what the engine does not do for a Chrome package:

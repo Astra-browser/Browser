@@ -1,8 +1,8 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
+﻿/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Manifest parsing and Chrome-to-Gecko adaptation for Gecko 153.
+//! Manifest parsing and Chrome-to-Gecko adaptation for the pinned Gecko build.
 //!
 //! The engine already implements most of the Chrome manifest shape. The gaps
 //! this module closes are the ones inspected in `engine/toolkit/components/
@@ -27,7 +27,7 @@ use serde_json::{Map, Value};
 
 use crate::types::{Identity, ManifestSummary, Source};
 
-pub const ENGINE_VERSION: &str = "153.6.0esr";
+pub const ENGINE_VERSION: &str = "160.0.1";
 
 /// Chrome permissions this Gecko build cannot grant. Removing them narrows
 /// the package and is always reported.

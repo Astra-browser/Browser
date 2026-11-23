@@ -56,7 +56,7 @@ cargo build --release --manifest-path "$ROOT/forge/astra-forge/Cargo.toml"
 FORGE="$ROOT/forge/astra-forge/target/release/astra-forge"
 "$FORGE" doctor || true
 
-step "fetching pinned upstream (Firefox ESR 153.6.0)"
+step "fetching pinned upstream (version is in upstream.toml)"
 if ! gpg --list-keys 14F26682D0916CDD81E37B6D61B7B526D98F0353 >/dev/null 2>&1; then
   echo "bootstrap: warning: Mozilla release key not imported; the tarball" >&2
   echo "bootstrap: signature check will fail. Import it with:" >&2

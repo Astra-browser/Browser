@@ -1,4 +1,4 @@
-# Build the per-user Windows package from a finished engine build.
+﻿# Build the per-user Windows package from a finished engine build.
 #
 #   .\tools\package-windows.ps1                 # portable zip only
 #   .\tools\package-windows.ps1 -Installer      # zip + setup.exe (NSIS)
@@ -71,12 +71,24 @@ Copy-Item (Join-Path $app 'firefox.exe') (Join-Path $app 'astra.exe') -Force
 
 $gitCommit = (git -C $root rev-parse --short HEAD 2>$null)
 $gitBranch = (git -C $root rev-parse --abbrev-ref HEAD 2>$null)
-$engineVersion = '153.6.0esr'
+# platform.ini's Milestone already carries the channel ("160.0.1", or
+# "160.0.1esr" on an ESR pin), so nothing is appended to it: appending would
+# stamp a version that has never existed. The fallback comes from the pin, so a
+# missing platform.ini cannot resurrect an old base (D-58).
+$engineVersion = ''
 $engineIni = Join-Path $Dist 'platform.ini'
 if (Test-Path $engineIni) {
     $m = [regex]::Match((Get-Content $engineIni -Raw), '(?m)^Milestone=(.+)$')
-    if ($m.Success) { $engineVersion = $m.Groups[1].Value.Trim() + 'esr' }
+    if ($m.Success) { $engineVersion = $m.Groups[1].Value.Trim() }
 }
+if (-not $engineVersion) {
+    $pinFile = Join-Path $root 'upstream.toml'
+    if (Test-Path $pinFile) {
+        $pinned = [regex]::Match((Get-Content $pinFile -Raw), '(?m)^version\s*=\s*"([^"]+)"')
+        if ($pinned.Success) { $engineVersion = $pinned.Groups[1].Value }
+    }
+}
+if (-not $engineVersion) { $engineVersion = 'unknown' }
 
 $build = @"
 product: Astra
@@ -84,7 +96,7 @@ version: $Version
 platform: windows-x86_64
 built: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))
 git: $gitBranch @ $gitCommit
-engine: Firefox ESR $engineVersion (pinned upstream)
+engine: Firefox $engineVersion (pinned upstream)
 work-flag: off (VITE_ASTRA_WORK unset)
 package: $name
 "@
@@ -195,7 +207,7 @@ $manifest = [ordered]@{
     product = 'Astra'
     version = $Version
     platform = 'windows-x86_64'
-    engine = "Firefox ESR $engineVersion"
+    engine = "Firefox $engineVersion"
     git = "$gitBranch@$gitCommit"
     built = (Get-Date).ToUniversalTime().ToString('o')
     dist = $Dist

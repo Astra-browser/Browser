@@ -1,8 +1,8 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
+﻿/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Compatibility inventory for Gecko 153.6.0esr.
+//! Compatibility inventory for the pinned Gecko build.
 //!
 //! The table is not aspirational. Every namespace marked `Supported` has a
 //! schema in `engine/toolkit/components/extensions/schemas` or
@@ -75,17 +75,17 @@ const PARTIAL: &[(&str, &str, &str)] = &[
     (
         "identity",
         "getAuthToken",
-        "not implemented by Gecko 153; use identity.launchWebAuthFlow",
+        "not implemented by this Gecko build; use identity.launchWebAuthFlow",
     ),
     (
         "identity",
         "getAccounts",
-        "not implemented by Gecko 153; there is no Chrome profile account",
+        "not implemented by this Gecko build; there is no Chrome profile account",
     ),
     (
         "identity",
         "getProfileUserInfo",
-        "not implemented by Gecko 153",
+        "not implemented by this Gecko build",
     ),
     (
         "management",
@@ -142,7 +142,7 @@ const PARTIAL: &[(&str, &str, &str)] = &[
 /// Namespaces the engine does not implement. A call throws unless the
 /// compatibility prelude supplies a mapping (sidePanel is adapted).
 const UNSUPPORTED: &[(&str, &str)] = &[
-    ("debugger", "no chrome.debugger implementation in Gecko 153"),
+    ("debugger", "no chrome.debugger implementation in this Gecko build"),
     (
         "desktopCapture",
         "no desktop capture picker API in this build",
@@ -190,7 +190,7 @@ pub fn support_for(namespace: &str, member: Option<&str>) -> (ApiSupport, String
             return (ApiSupport::Partial, (*reason).into());
         }
         if namespace == "identity" && member == "getAuthToken" {
-            return (ApiSupport::Partial, "not implemented by Gecko 153".into());
+            return (ApiSupport::Partial, "not implemented by this Gecko build".into());
         }
     }
     if let Some((_, reason)) = UNSUPPORTED.iter().find(|(ns, _)| *ns == namespace) {
@@ -216,7 +216,7 @@ pub fn support_for(namespace: &str, member: Option<&str>) -> (ApiSupport, String
     }
     (
         ApiSupport::Unknown,
-        format!("Gecko 153 has no `{namespace}` extension namespace"),
+        format!("this Gecko build has no `{namespace}` extension namespace"),
     )
 }
 

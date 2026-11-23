@@ -31,6 +31,7 @@ import http.server
 import io
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -56,6 +57,26 @@ except ImportError:  # pragma: no cover - environment skip
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 ENGINE = astra_env.ENGINE
 BIN = astra_env.BINARY
+
+
+def pinned_engine_version():
+    """The Firefox base this checkout is pinned to (D-58).
+
+    The Rust core reports the same value from ``ENGINE_VERSION``, so the probe
+    compares against the pin instead of a literal that goes stale on every base
+    move.
+    """
+    try:
+        with open(os.path.join(ROOT, "upstream.toml"), encoding="utf-8") as fh:
+            for line in fh:
+                m = re.match(r'\s*version\s*=\s*"([^"]+)"', line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
 MPORT = int(os.environ.get("ASTRA_CHROME_EXT_MARIONETTE", "2917"))
 OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, "out", "chrome-ext-probe")
 PAGE_TITLE = "Chrome Extension Probe Site"
@@ -286,7 +307,7 @@ const done = arguments[arguments.length - 1];
 
     // 1. the Rust core answers with the engine profile -------------------
     const caps = await host.Boot.coreCall({ request_id: "ext-caps", name: "extensions.capabilities", payload: {} });
-    step("the Rust core answers", !caps?.error && caps?.payload?.engine === "153.6.0esr", caps?.payload ?? caps?.error);
+    step("the Rust core answers", !caps?.error && caps?.payload?.engine === "__ENGINE__", caps?.payload ?? caps?.error);
     step("the core reports service workers disabled", caps?.payload?.service_workers === false);
     step("the core reports CRX3 intake", Array.isArray(caps?.payload?.crx) && caps.payload.crx.includes("crx3"));
 
@@ -594,6 +615,7 @@ def main():
             .replace("__TAMPERED__", fixtures["tampered"])
             .replace("__TRAVERSAL__", fixtures["traversal"])
             .replace("__PAGE__", page)
+            .replace("__ENGINE__", pinned_engine_version())
         )
         first = json.loads(m.execute_async(script))
         result["first"] = first
