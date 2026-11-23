@@ -53,9 +53,8 @@ index d97d92add2..0eff2425c4 100644
    let {
      audioInputDevices,
 @@ -555,6 +581,105 @@ function prompt(aActor, aBrowser, aRequest) {
-     }
-   }
- 
+   let promptBrowser = getPromptBrowser(aBrowser, aRequest);
+
 +  // Astra prompt (P6b-2): camera/microphone for an Astra tab. Screen sharing,
 +  // audio capture, speaker selection, add-on prompts and unsafe delegation keep
 +  // the native prompt because they need pickers/previews or show two origins.
@@ -155,6 +154,7 @@ index d97d92add2..0eff2425c4 100644
 +    }
 +  }
 +
-   // If aBrowser is sidebar browser, its ownerDocument is sidebar panel document.
-   // We need top chrome window's document to access notification elements.
-   let chromeDoc = aBrowser.browsingContext.topChromeWindow?.document;
+   // If promptBrowser is sidebar browser, its ownerDocument is sidebar panel
+   // document. We need top chrome window's document to access notification
+   // elements.
+   let chromeDoc = promptBrowser.browsingContext.topChromeWindow?.document;

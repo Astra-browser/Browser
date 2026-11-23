@@ -34,7 +34,7 @@ index 654ecffedd..320c664d8a 100644
 +    AstraBlocker::ApplyChannelAction(aChannel);
 +  }
 +
-   if (!task && !(contentClassifier && contentClassifier->IsInitialized())) {
+   if (!task && !contentClassifier) {
      return NS_ERROR_FAILURE;
    }
 diff --git a/netwerk/url-classifier/moz.build b/netwerk/url-classifier/moz.build
