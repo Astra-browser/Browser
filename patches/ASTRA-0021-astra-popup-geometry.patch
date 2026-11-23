@@ -5,8 +5,9 @@ Upstream-Files: xpfe/appshell/AppWindow.cpp, xpfe/appshell/AppWindow.h, toolkit/
 Intent: A page's window.open with features creates a chrome popup. The window must keep the requested size instead of inheriting the main window's persisted geometry (and being forced to the screen's available size when the fresh primary content has no layout yet). The native popup chrome is the only chrome in that window. The change is scoped to content-created windows so session-restored browser windows keep their normal sizing path.
 Risk: low (content-created chrome windows only; browser windows keep persistence and normal sizing)
 Test: tools/marionette-probe/popup-window-probe.py (20 checks), tests/contract/native_surfaces.mjs
-Verified-On: 153.6.0
+Verified-On: 160.0.1
 Removal-Plan: drop when upstream no longer restores persisted geometry into content popups or sizes features after first layout
+---
 ---
 ---
 diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
@@ -30,7 +31,7 @@ index a1044338..77f6322d 100644
  
    // Set up left/top
 diff --git a/xpfe/appshell/AppWindow.cpp b/xpfe/appshell/AppWindow.cpp
-index 33bd818a..04243df0 100644
+index 33bd818a..ae0cc8c5 100644
 --- a/xpfe/appshell/AppWindow.cpp
 +++ b/xpfe/appshell/AppWindow.cpp
 @@ -124,6 +124,7 @@ AppWindow::AppWindow(uint32_t aChromeFlags)
@@ -55,7 +56,7 @@ index 33bd818a..04243df0 100644
    SizeShellToWithLimit(aWidth, aHeight, shellWidth, shellHeight);
    return NS_OK;
  }
-@@ -2237,6 +2245,21 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
+@@ -2237,6 +2245,22 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
  
    AppWindow* appWin =
        static_cast<AppWindow*>(static_cast<nsIAppWindow*>(newWindow));
@@ -66,9 +67,10 @@ index 33bd818a..04243df0 100644
 +  // The browser window's persisted size, position and size mode must not be
 +  // restored into it first, or the popup inherits the main window's geometry
 +  // and the requested size is lost.
-+  bool contentPopup =
-+      !(aChromeFlags & nsIWebBrowserChrome::CHROME_TOOLBAR) ||
-+      !(aChromeFlags & nsIWebBrowserChrome::CHROME_LOCATIONBAR);
++  // Firefox 160 removed CHROME_LOCATIONBAR from nsIWebBrowserChrome, so this
++  // used to test TOOLBAR || LOCATIONBAR and now tests TOOLBAR alone. The
++  // distinction is unchanged: only the main browser window carries a toolbar.
++  bool contentPopup = !(aChromeFlags & nsIWebBrowserChrome::CHROME_TOOLBAR);
 +  if (contentPopup) {
 +    appWin->mIgnoreXULSize = true;
 +    appWin->mIgnoreXULPosition = true;
