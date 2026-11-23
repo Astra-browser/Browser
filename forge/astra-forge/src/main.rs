@@ -613,14 +613,53 @@ fn cmd_config(root: &Path, os: &str, branding: &str, objdir: Option<&str>) -> Re
     };
     let template = fs::read_to_string(&template_path).map_err(|e| e.to_string())?;
     let default_objdir = format!("@TOPSRCDIR@/{}", objdir_name(os));
-    let objdir = objdir.unwrap_or(&default_objdir);
+    // mozbuild misreads backslashes: `D:\astra-build\obj-160-windows` became
+    // `D:/astra-buildobject-160-windows`, a stray directory nobody looks in.
+    // Forward slashes are the only form that survives, so normalise here rather
+    // than trusting every caller to remember.
+    let objdir = objdir.unwrap_or(&default_objdir).replace('\\', "/");
     let rendered = template
         .replace("@ASTRA_BRANDING_DIR@", branding_dir)
         .replace("@ASTRA_DISPLAY_NAME@", &display)
         .replace("@ASTRA_BINARY_NAME@", &binary)
-        .replace("@ASTRA_OBJDIR@", objdir);
+        .replace("@ASTRA_OBJDIR@", &objdir);
     if rendered.contains("@ASTRA_") {
         return Err("config: unsubstituted @ASTRA_*@ placeholder left".into());
+    }
+    // The Windows build needs a WASI sysroot. tools/setup-windows.ps1 finds one
+    // and appends it, but this renderer does not run that script, so anyone
+    // following UPSTREAM.md instead of setup.sh stops at "Cannot find wasi
+    // headers". Same lookup order as that script, and an explicit opt-out only
+    // when nothing is found.
+    let mut rendered = rendered;
+    if os == "windows" {
+        let mut candidates: Vec<String> = Vec::new();
+        for key in ["MOZ_WASI_SYSROOT", "WASI_SYSROOT"] {
+            if let Ok(v) = std::env::var(key) {
+                if !v.is_empty() {
+                    candidates.push(v);
+                }
+            }
+        }
+        candidates.push("D:/astra-build/wasi-34/wasi-sysroot-34.0".into());
+        candidates.push("D:/astra-build/wasi/wasi-sysroot".into());
+        candidates.push("C:/tools/wasi-sysroot".into());
+        match candidates
+            .into_iter()
+            .find(|c| Path::new(c).is_dir())
+        {
+            Some(wasi) => {
+                rendered.push_str(&format!(
+                    "\nac_add_options --with-wasi-sysroot={}\n",
+                    wasi.replace('\\', "/")
+                ));
+                println!("config: wasi sysroot {wasi}");
+            }
+            None => {
+                rendered.push_str("\nac_add_options --without-wasm-sandboxed-libraries\n");
+                println!("config: WARNING no wasi sysroot; wasm sandboxed libraries disabled");
+            }
+        }
     }
     let out_dir = root.join("out");
     fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;

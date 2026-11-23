@@ -91,6 +91,27 @@ function Add-UserPaths {
     }
 }
 
+# Firefox will not vendor a crate nobody audited: `mach vendor rust` stops with
+# "Missing audit for <crate> (requires ['safe-to-deploy'])" and the build then
+# fails at "no matching package named <crate>". The blocker crate pins
+# adblock =0.12.1, so a clean clone needs that exemption recorded before
+# vendoring. Without this, ./setup.sh is not reproducible on this base (D-60).
+function Add-SupplyChainExemptions([string]$engine) {
+    $config = Join-Path $engine 'supply-chain\config.toml'
+    $blocker = Join-Path $engine 'toolkit\components\astra_blocker_engine\Cargo.toml'
+    if (-not (Test-Path $config) -or -not (Test-Path $blocker)) { return }
+    $m = [regex]::Match((Get-Content $blocker -Raw), 'adblock\s*=\s*\{[^}]*version\s*=\s*"=?([0-9][^"]*)"')
+    if (-not $m.Success) { return }
+    $version = $m.Groups[1].Value
+    $text = Get-Content $config -Raw
+    if ($text -match "(?m)^\[\[exemptions\.adblock\]\]") {
+        Write-Log "adblock $version exemption already recorded"
+        return
+    }
+    Add-Content -Path $config -Value "`n[[exemptions.adblock]]`nversion = ""$version""`ncriteria = ""safe-to-deploy""`n"
+    Write-Log "adblock $version exemption recorded (cargo-vet, D-60)"
+}
+
 function Install-Winget([string]$id, [string]$command) {
     if (Have $command) { return $true }
     if ($DryRun) { Write-Log "missing $command (would install $id)"; return $false }
@@ -268,6 +289,11 @@ if (-not $SkipBuild) {
     # different one from another checkout; a changed file also makes mach
     # regenerate backend.mk with the NASM above.
     $env:MOZCONFIG = Join-Path $root 'out\mozconfig.windows'
+    # The patch series needs its crates vendored before mach can resolve them,
+    # and vendoring refuses unaudited crates. `forge import` is the step that
+    # runs `mach vendor rust`, so the exemption goes in first (D-60).
+    Add-SupplyChainExemptions (Join-Path $root 'engine')
+    Run 'vendoring Rust crates' { & $forge import --os windows }
     $buildArgs = @('build', '--os', 'windows', '--jobs', $Jobs)
     if ($Faster) { $buildArgs += '--faster' }
     Run 'building the engine' { & $forge @buildArgs }
