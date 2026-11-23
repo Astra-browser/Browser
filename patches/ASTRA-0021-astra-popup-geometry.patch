@@ -8,11 +8,12 @@ Test: tools/marionette-probe/popup-window-probe.py (20 checks), tests/contract/n
 Verified-On: 153.6.0
 Removal-Plan: drop when upstream no longer restores persisted geometry into content popups or sizes features after first layout
 ---
+---
 diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-index dfa3fe9671..3c195effeb 100644
+index a1044338..77f6322d 100644
 --- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
 +++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-@@ -2349,6 +2349,15 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
+@@ -2311,6 +2311,15 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
      CSSIntSize contentSizeCSS = RoundedToInt(contentSize / cssToDevScale);
      chromeWidth = width - contentSizeCSS.width;
      chromeHeight = height - contentSizeCSS.height;
@@ -29,18 +30,18 @@ index dfa3fe9671..3c195effeb 100644
  
    // Set up left/top
 diff --git a/xpfe/appshell/AppWindow.cpp b/xpfe/appshell/AppWindow.cpp
-index 8ce7a79d6f..b60e3eeb2b 100644
+index 33bd818a..04243df0 100644
 --- a/xpfe/appshell/AppWindow.cpp
 +++ b/xpfe/appshell/AppWindow.cpp
-@@ -125,6 +125,7 @@ AppWindow::AppWindow(uint32_t aChromeFlags)
+@@ -124,6 +124,7 @@ AppWindow::AppWindow(uint32_t aChromeFlags)
+       mIgnoreXULSize(false),
        mIgnoreXULPosition(false),
-       mChromeFlagsFrozen(false),
        mIgnoreXULSizeMode(false),
 +      mContentCreated(false),
        mDestroying(false),
        mRegistered(false),
        mDominantClientSize(false),
-@@ -2133,6 +2134,13 @@ AppWindow::SetPrimaryContentSize(int32_t aWidth, int32_t aHeight) {
+@@ -2111,6 +2112,13 @@ AppWindow::SetPrimaryContentSize(int32_t aWidth, int32_t aHeight) {
  nsresult AppWindow::SetPrimaryRemoteTabSize(int32_t aWidth, int32_t aHeight) {
    int32_t shellWidth, shellHeight;
    GetPrimaryRemoteTabSize(&shellWidth, &shellHeight);
@@ -54,7 +55,7 @@ index 8ce7a79d6f..b60e3eeb2b 100644
    SizeShellToWithLimit(aWidth, aHeight, shellWidth, shellHeight);
    return NS_OK;
  }
-@@ -2259,6 +2267,21 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
+@@ -2237,6 +2245,21 @@ NS_IMETHODIMP AppWindow::CreateNewContentWindow(
  
    AppWindow* appWin =
        static_cast<AppWindow*>(static_cast<nsIAppWindow*>(newWindow));
@@ -77,12 +78,12 @@ index 8ce7a79d6f..b60e3eeb2b 100644
    // Specify which flags should be used by browser.xhtml to create the initial
    // content browser window.
 diff --git a/xpfe/appshell/AppWindow.h b/xpfe/appshell/AppWindow.h
-index a344dd08ad..679bb30df2 100644
+index b758859f..6cafa2bd 100644
 --- a/xpfe/appshell/AppWindow.h
 +++ b/xpfe/appshell/AppWindow.h
-@@ -335,6 +335,8 @@ class AppWindow final : public nsIBaseWindow,
+@@ -329,6 +329,8 @@ class AppWindow final : public nsIBaseWindow,
+   bool mIgnoreXULSize;
    bool mIgnoreXULPosition;
-   bool mChromeFlagsFrozen;
    bool mIgnoreXULSizeMode;
 +  // True for a window created by nsWindowWatcher for content (a popup).
 +  bool mContentCreated;
