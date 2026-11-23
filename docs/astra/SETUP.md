@@ -82,5 +82,20 @@ Windows also keeps `firefox.exe` beside `astra.exe` for engine compatibility;
 
 ## Verification record
 
-See the `P7-T07` row in `docs/astra/STATE.md` for the measured Windows build,
-the dry-run gate and the clone test.
+`docs/astra/STATE.md` P7-T07 records the measured Windows run. Summary:
+
+- `bash ./setup.sh --reuse-engine E:/Astra/engine --objdir D:/astra-build/obj-astra-windows`
+  ran in the preserved clone `E:\Astra-test-repo` and reached `== done`.
+- Produced `Astra-0.1.769-windows-x86_64.zip` and
+  `Astra-0.1.769-windows-x86_64-setup.exe`, both with `.sha256`.
+- Extracted `astra.exe --version` reports Firefox 153.6.0esr;
+  `setup-windows.ps1 -Check` confirms the package.
+- Deleted the clone's generated files with `git clean -fdx` and ran the same
+  command again from source-only; it reached `== done` a second time.
+- The clone's only tracked changes after the build are the two necessary staged
+  documents (`onboarding.html`, `jar.mn`); engine, objdir and `out/` stay
+  ignored.
+- Known Windows prerequisites found by the run: NASM must be 2.16.x (3.x crashes
+  the pinned libvpx assembly), the WASI sysroot must exist, and NSIS must be
+  installed for `setup.exe`.
+
