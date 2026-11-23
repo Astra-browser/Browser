@@ -1940,7 +1940,8 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
                 "-defterm",
                 "-c",
             ])
-            .arg(format!("bash {}", to_msys_path(&script_path)))
+            .arg("bash")
+            .arg(to_msys_path(&script_path))
             .status()
             .map_err(|e| format!("spawn MozillaBuild: {e}"))?
     } else {
