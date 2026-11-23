@@ -30,6 +30,10 @@ if (!existsSync(STUB)) {
   );
   process.exit(2);
 }
+if (process.platform === "win32") {
+  console.log("SKIP sidecar spike: the stdio spike binary is a Linux verifier");
+  process.exit(2);
+}
 
 const N_RTT = 2000;
 const BURST = 1000;
