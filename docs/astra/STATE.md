@@ -21,8 +21,8 @@ GitLab and GitHub and both tips verified equal (GitLab was 29 commits behind).
 |---|---|---|
 | E-01 pin, brand strings | doing | `upstream.toml`; `crates/astra-extensions/src/manifest.rs` `ENGINE_VERSION`; the `esr` suffix in `tools/package-windows.ps1` |
 | E-02 Astra version `0.2.770` | doing | `branding/astra.toml`; only `version-probe` asserts the live value, and it reads the file |
-| E-03 fresh 160 source | todo | `forge fetch` extracts over `engine/`; the 153 build is archived on D: first |
-| E-04 21-patch rebase | todo | `forge import` 3-way, per-patch health in `out/patch-health.json`; 15 of 21 touch high-churn files, `ASTRA-0020` is P1 |
+| E-03 fresh 160 source | done | extract-over failed on Windows; repaired by extract-to-empty-dir + `robocopy /MIR`; `version.txt` = 160.0.1, 485,672 files |
+| E-04 21-patch rebase | doing | `forge import --check`: 21 classified, **0 conflicts**; 14 clean, 3 offset-only via 3-way, **3 real hunk failures (0005, 0008, 0016)**, 0014 OS-skipped; `ASTRA-0020` (P1) clean |
 | E-05 engine build | todo | objdir `D:\astra-build\obj-160-windows`; `--jobs 2` only |
 | E-06 live matrix | todo | 67 registered probes, 76 contract suites, interval capture pass |
 | E-07 161.0 follow-up | todo | its own ticket, after the 160 gates are green |

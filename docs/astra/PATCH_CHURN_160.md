@@ -46,3 +46,27 @@ authority; this table only says where to look first.
   isolation.
 - `Cargo.lock` is touched by `0003` and `0014` and churned regardless, so the
   vendored-crate regeneration is unavoidable and is its own ticket (`#9`).
+
+## Measured result (2026-11-23, branch `feat/firefox-160-base`)
+
+`forge import --check` against the settled 160.0.1 tree: **21 classified,
+`conflicts: 0`**. This is the authority; the prediction above over-estimated,
+because `git apply` tolerates context drift that the blob comparison flags.
+
+| Verdict | Patches |
+|---|---|
+| `clean`, no work | 0001, 0002, 0004, 0006, 0007, 0009, 0010, 0011, 0012, 0015, 0017, 0018, 0019, **0020** |
+| `needs-three-way` but **no hunk failed** (offset/fuzz only) | 0003 (offset -14, fuzz 2 @3021), 0013 (offset +2/+2/+3), 0021 (offset -38/-1/-22) |
+| **real hunk failure** | 0005 (hunk 2 FAILED @975, `AsyncUrlChannelClassifier.cpp`), 0008 (hunk 3 FAILED @581, `WebRTCParent.sys.mjs`), 0016 (2 of 2 FAILED, `nsprpub/pr/src/io/prsocket.c`) |
+| `skipped` | 0014 (`OS: linux`) |
+
+So the rewrite job is **three patches**, not fifteen: `0005`, `0008`, `0016`.
+Everything else either applies as-is or needs only `git apply --3way`.
+
+`ASTRA-0020` — the P1 prompt suppression — is `clean`. That was the one result
+that could have changed product behaviour, and it did not.
+
+Still required for every patch regardless of verdict: the `Verified-On:` header
+moves from `153.6.0` to `160.0.1` only after that patch is confirmed applied, or
+`forge lint` fails the series on header mismatch (it fails all 21 today).
+
