@@ -1932,16 +1932,23 @@ fn cmd_build(root: &Path, os: &str, faster: bool, jobs: Option<&str>) -> Result<
         }
         fs::write(&script_path, script)
             .map_err(|e| format!("build: write {}: {e}", script_path.display()))?;
+        // Two constraints, both learned the hard way. cmd.exe mangles the
+        // quotes Rust adds around an argument containing a space, so the whole
+        // command cannot be one `.arg()`. And start-shell.bat's `-c` takes
+        // exactly one argument, so splitting it into "bash" plus a path makes
+        // start-shell run a bare `bash` and exit 0 without building anything.
+        // Putting the command in a .bat and handing cmd only that path satisfies
+        // both: every token cmd sees is quote-free.
+        let bat_path = root.join("out").join(format!(".forge-build-{os}.bat"));
+        let bat = format!(
+            "@call C:\\mozilla-build\\start-shell.bat -no-start -defterm -c \"bash {}\"\r\n",
+            to_msys_path(&script_path)
+        );
+        fs::write(&bat_path, bat)
+            .map_err(|e| format!("build: write {}: {e}", bat_path.display()))?;
         Command::new("cmd")
-            .args([
-                "/C",
-                "C:\\mozilla-build\\start-shell.bat",
-                "-no-start",
-                "-defterm",
-                "-c",
-            ])
-            .arg("bash")
-            .arg(to_msys_path(&script_path))
+            .arg("/C")
+            .arg(&bat_path)
             .status()
             .map_err(|e| format!("spawn MozillaBuild: {e}"))?
     } else {
